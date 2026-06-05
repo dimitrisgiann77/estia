@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language', 'el') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sergios Hotel — Pool</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#185FA5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="header-left">
+    <span class="header-icon">🏊</span>
+    <div>
+      <div class="header-title">SERGIOS HOTEL</div>
+      <div class="header-sub" id="today-date"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="lang-toggle">
+      <a href="/set-language/el" class="{{ 'active' if session.get('language','el')=='el' }}">ΕΛ</a>
+      <span>|</span>
+      <a href="/set-language/en" class="{{ 'active' if session.get('language','el')=='en' }}">EN</a>
+    </div>
+    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
+  </div>
+</header>
+
+<!-- User badge -->
+<div class="user-badge">
+  <i class="ti ti-user-circle"></i>
+  <span>{{ user.full_name }}</span>
+  {% if today_record %}
+  <span class="submitted-badge">
+    <i class="ti ti-check"></i>
+    <span data-el="Καταγραφή υποβλήθηκε" data-en="Record submitted"></span>
+  </span>
+  {% endif %}
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('measurements', this)">
+    <i class="ti ti-flask"></i>
+    <span data-el="Μετρήσεις" data-en="Measurements"></span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('checklist', this)">
+    <i class="ti ti-checklist"></i>
+    <span data-el="Checklist" data-en="Checklist"></span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('instructions', this)">
+    <i class="ti ti-book"></i>
+    <span data-el="Οδηγίες" data-en="Guidelines"></span>
+  </button>
+</div>
+
+<div class="app-content">
+
+<!-- ═══ TAB: ΜΕΤΡΗΣΕΙΣ ═══ -->
+<div id="tab-measurements" class="tab-content active">
+
+  <!-- Καιρός -->
+  <div class="weather-bar">
+    <i class="ti ti-sun" style="font-size:26px;color:#f59e0b;"></i>
+    <div>
+      <div style="font-size:20px;font-weight:600;" id="air-temp">—°C</div>
+      <div style="font-size:12px;color:#888;">Χερσόνησος Κρήτης</div>
+    </div>
+    <div style="margin-left:auto;font-size:11px;color:#aaa;text-align:right;" id="weather-note"></div>
+  </div>
+
+  <form id="pool-form" enctype="multipart/form-data">
+
+    <!-- Pool Line -->
+    <div class="section">
+      <div class="sec-title">
+        <i class="ti ti-device-analytics"></i>
+        <span data-el="Pool Line — μετρήσεις οργάνου" data-en="Pool Line — instrument readings"></span>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>pH</label>
+          <input type="number" name="ph" id="ph" min="6" max="9" step="0.1" placeholder="π.χ. 7.4" oninput="calcChemicals()">
+          <div class="hint" data-el="Στόχος: 7.2–7.8" data-en="Target: 7.2–7.8"></div>
+          <div id="ph-st"></div>
+        </div>
+        <div class="field">
+          <label data-el="Alkalinity (mg/L)" data-en="Alkalinity (mg/L)">Alkalinity (mg/L)</label>
+          <input type="number" name="alkalinity" id="alk" min="0" max="400" step="1" placeholder="π.χ. 100" oninput="calcChemicals()">
+          <div class="hint" data-el="Στόχος: 80–120" data-en="Target: 80–120"></div>
+          <div id="alk-st"></div>
+        </div>
+        <div class="field">
+          <label data-el="Free Chlorine (mg/L)" data-en="Free Chlorine (mg/L)">Free Chlorine (mg/L)</label>
+          <input type="number" name="free_chlorine" id="fc" min="0" max="10" step="0.1" placeholder="π.χ. 2.5" oninput="calcChemicals()">
+          <div class="hint" data-el="Στόχος: 2.0–3.0" data-en="Target: 2.0–3.0"></div>
+          <div id="fc-st"></div>
+        </div>
+        <div class="field">
+          <label data-el="Total Chlorine (mg/L)" data-en="Total Chlorine (mg/L)">Total Chlorine (mg/L)</label>
+          <input type="number" name="total_chlorine" id="tc" min="0" max="10" step="0.1" placeholder="π.χ. 2.6" oninput="calcChemicals()">
+          <div class="hint" data-el="≥ Free Chlorine" data-en="≥ Free Chlorine"></div>
+          <div id="tc-st"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label data-el="Cyanuric Acid — CYA (mg/L)" data-en="Cyanuric Acid — CYA (mg/L)">Cyanuric Acid — CYA (mg/L)</label>
+        <input type="number" name="cya" id="cya" min="0" max="200" step="1" placeholder="π.χ. 40" oninput="calcChemicals()">
+        <div class="hint" data-el="Στόχος: 30–50 mg/L" data-en="Target: 30–50 mg/L"></div>
+        <div id="cya-st"></div>
+      </div>
+      <div id="combined-box" style="display:none;" class="derived-box">
+        <span style="font-size:12px;color:#888;"><i class="ti ti-math-function"></i> <span data-el="Δεσμευμένο χλώριο (Total − Free)" data-en="Combined chlorine (Total − Free)"></span></span>
+        <span style="font-size:15px;font-weight:600;" id="combined-val">—</span>
+      </div>
+    </div>
+
+    <!-- Συνθήκες -->
+    <div class="section">
+      <div class="sec-title">
+        <i class="ti ti-thermometer"></i>
+        <span data-el="Συνθήκες ημέρας" data-en="Daily conditions"></span>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label data-el="Θερμοκρ. νερού (°C)" data-en="Water temp (°C)">Θερμοκρ. νερού (°C)</label>
+          <input type="number" name="water_temp" id="wtemp" min="10" max="45" step="0.5" placeholder="π.χ. 28" oninput="calcChemicals()">
+        </div>
+        <div class="field">
+          <label data-el="Κολυμβητές σήμερα" data-en="Swimmers today">Κολυμβητές σήμερα</label>
+          <input type="number" name="swimmers" id="sw" min="0" max="300" step="1" placeholder="π.χ. 35" oninput="calcChemicals()">
+        </div>
+      </div>
+      <div class="field">
+        <label data-el="Διαύγεια νερού" data-en="Water clarity">Διαύγεια νερού</label>
+        <select name="clarity" id="clarity" onchange="calcChemicals()">
+          <option value="" data-el="-- Επίλεξε --" data-en="-- Select --">-- Επίλεξε --</option>
+          <option value="crystal" data-el="Κρυστάλλινο" data-en="Crystal clear">Κρυστάλλινο</option>
+          <option value="slight" data-el="Ελαφρά θολό" data-en="Slightly cloudy">Ελαφρά θολό</option>
+          <option value="cloudy" data-el="Θολό" data-en="Cloudy">Θολό</option>
+          <option value="green" data-el="Πρασινωπό / άλγη" data-en="Green / algae">Πρασινωπό / άλγη</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-el="Αλγοκτόνο αυτή την εβδομάδα;" data-en="Algicide this week?">Αλγοκτόνο αυτή την εβδομάδα;</label>
+        <select name="algicide_done" id="algd" onchange="calcChemicals()">
+          <option value="" data-el="-- Επίλεξε --" data-en="-- Select --">-- Επίλεξε --</option>
+          <option value="true" data-el="Ναι, έχει γίνει" data-en="Yes, done">Ναι, έχει γίνει</option>
+          <option value="false" data-el="Όχι ακόμα" data-en="Not yet">Όχι ακόμα</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Αποτελέσματα -->
+    <div class="divider"></div>
+    <div id="results-section" style="display:none;">
+      <div class="results-header">
+        <i class="ti ti-beaker"></i>
+        <span data-el="Χημικά σήμερα" data-en="Chemicals today"></span>
+      </div>
+      <div id="results-content"></div>
+    </div>
+    <div id="empty-msg" class="empty-msg">
+      <i class="ti ti-arrow-up"></i>
+      <span data-el="Συμπλήρωσε τις μετρήσεις" data-en="Fill in the measurements"></span>
+    </div>
+
+  </form>
+</div>
+
+<!-- ═══ TAB: CHECKLIST ═══ -->
+<div id="tab-checklist" class="tab-content">
+  <div class="section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="sec-title" style="margin-bottom:0;">
+        <i class="ti ti-checklist"></i>
+        <span data-el="Ημερήσιες εργασίες" data-en="Daily tasks"></span>
+      </div>
+      <span style="font-size:12px;color:#888;" id="chk-txt">0/6</span>
+    </div>
+    <div class="prog-bg"><div class="prog-fill" id="chk-bar" style="width:0%"></div></div>
+    <div style="margin-top:10px;">
+      <label class="chk-item">
+        <input type="checkbox" name="check_walls" id="c1" onchange="updateChk()">
+        <i class="ti ti-brush chk-icon"></i>
+        <span class="chk-label" id="l-c1" data-el="Καθαρισμός τοιχίων και πυθμένα" data-en="Wall and floor cleaning">Καθαρισμός τοιχίων και πυθμένα</span>
+      </label>
+      <label class="chk-item">
+        <input type="checkbox" name="check_backwash" id="c2" onchange="updateChk()">
+        <i class="ti ti-refresh chk-icon"></i>
+        <span class="chk-label" id="l-c2" data-el="Backwash φίλτρου" data-en="Filter backwash">Backwash φίλτρου</span>
+      </label>
+      <label class="chk-item">
+        <input type="checkbox" name="check_pump" id="c3" onchange="updateChk()">
+        <i class="ti ti-engine chk-icon"></i>
+        <span class="chk-label" id="l-c3" data-el="Έλεγχος αντλίας και κυκλοφορίας" data-en="Pump and circulation check">Έλεγχος αντλίας και κυκλοφορίας</span>
+      </label>
+      <label class="chk-item">
+        <input type="checkbox" name="check_skimmer" id="c4" onchange="updateChk()">
+        <i class="ti ti-filter chk-icon"></i>
+        <span class="chk-label" id="l-c4" data-el="Έλεγχος skimmer (και οι 2)" data-en="Skimmer check (both)">Έλεγχος skimmer (και οι 2)</span>
+      </label>
+      <label class="chk-item">
+        <input type="checkbox" name="check_waterline" id="c5" onchange="updateChk()">
+        <i class="ti ti-droplet chk-icon"></i>
+        <span class="chk-label" id="l-c5" data-el="Καθαρισμός ίσαλης γραμμής" data-en="Waterline cleaning">Καθαρισμός ίσαλης γραμμής</span>
+      </label>
+      <label class="chk-item">
+        <input type="checkbox" name="check_prefilter" id="c6" onchange="updateChk()">
+        <i class="ti ti-adjustments chk-icon"></i>
+        <span class="chk-label" id="l-c6" data-el="Καθαρισμός προφίλτρων" data-en="Pre-filter cleaning">Καθαρισμός προφίλτρων</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Φωτογραφία πισίνας -->
+  <div class="section">
+    <div class="sec-title">
+      <i class="ti ti-camera"></i>
+      <span data-el="Φωτογραφία πισίνας" data-en="Pool photo"></span>
+    </div>
+    <div class="photo-area" id="photo-area" onclick="document.getElementById('photo-input').click()">
+      <img id="photo-preview" src="" alt="" style="display:none;width:100%;border-radius:10px;max-height:220px;object-fit:cover;">
+      <div id="photo-placeholder">
+        <i class="ti ti-camera" style="font-size:36px;color:#ccc;"></i>
+        <p data-el="Πάτα για φωτογραφία" data-en="Tap to take photo">Πάτα για φωτογραφία</p>
+      </div>
+    </div>
+    <input type="file" id="photo-input" name="photo" accept="image/*" capture="environment" style="display:none;" onchange="previewPhoto(this)">
+  </div>
+
+  <!-- Παρατηρήσεις -->
+  <div class="section">
+    <div class="sec-title">
+      <i class="ti ti-notes"></i>
+      <span data-el="Παρατηρήσεις υπευθύνου" data-en="Staff notes"></span>
+    </div>
+    <textarea name="notes" id="notes" placeholder="Γράψε οποιαδήποτε παρατήρηση..." style="width:100%;min-height:80px;padding:10px;border:1px solid #e5e5e0;border-radius:10px;font-size:14px;resize:vertical;"></textarea>
+  </div>
+
+  <!-- Submit button -->
+  <button type="button" class="submit-btn" onclick="submitForm()" id="submit-btn">
+    <i class="ti ti-send"></i>
+    <span data-el="Υποβολή αναφοράς" data-en="Submit report"></span>
+  </button>
+
+  <div id="submit-msg" style="display:none;" class="submit-msg"></div>
+</div>
+
+<!-- ═══ TAB: ΟΔΗΓΙΕΣ ═══ -->
+<div id="tab-instructions" class="tab-content">
+  <p style="font-size:12px;color:#888;margin-bottom:12px;" data-el="Πάτα σε κάθε διαδικασία για να δεις τις οδηγίες." data-en="Tap each procedure to see the instructions.">
+    Πάτα σε κάθε διαδικασία για να δεις τις οδηγίες.
+  </p>
+  <div id="procs-container"></div>
+</div>
+
+</div><!-- end app-content -->
+
+<script src="/static/app.js"></script>
+<script>
+const LANG = '{{ session.get("language", "el") }}';
+const AIR_TEMP = 26.4;
+</script>
+</body>
+</html>

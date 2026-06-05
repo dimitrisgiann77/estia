@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sergios Hotel — Pool App</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#185FA5">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #185FA5 0%, #0d3d6e 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .logo {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .logo-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .hotel-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #185FA5;
+    letter-spacing: 0.5px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-top: 4px;
+  }
+  .form-group {
+    margin-bottom: 18px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 6px;
+  }
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #e5e5e0;
+    border-radius: 10px;
+    font-size: 15px;
+    color: #1a1a1a;
+    transition: border-color 0.2s;
+    background: #fafafa;
+  }
+  input:focus {
+    outline: none;
+    border-color: #185FA5;
+    background: white;
+  }
+  button[type=submit] {
+    width: 100%;
+    padding: 14px;
+    background: #185FA5;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.2s;
+  }
+  button[type=submit]:hover { background: #0d3d6e; }
+  .error {
+    background: #FEE;
+    color: #c0392b;
+    border: 1px solid #FCC;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .lang-switch {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 13px;
+    color: #aaa;
+  }
+  .lang-switch a {
+    color: #185FA5;
+    text-decoration: none;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <span class="logo-icon">🏊</span>
+    <div class="hotel-name">SERGIOS HOTEL</div>
+    <div class="subtitle">Διαχείριση Πισίνας</div>
+  </div>
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST">
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" name="username" placeholder="π.χ. giorgos" autocomplete="username" required autofocus>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+    </div>
+    <button type="submit">Είσοδος →</button>
+  </form>
+
+  <div class="lang-switch">
+    🇬🇷 <a href="#">Ελληνικά</a> &nbsp;|&nbsp; 🇬🇧 <a href="#">English</a>
+  </div>
+</div>
+</body>
+</html>
