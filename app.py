@@ -1,312 +1,494 @@
-<!DOCTYPE html>
-<html lang="el">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sergios Hotel — Dashboard</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f5f5f0; color:#1a1a1a; }
-  .topbar { background:#185FA5; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
-  .topbar-title { font-size:16px; font-weight:600; }
-  .topbar-sub { font-size:12px; opacity:0.7; margin-top:2px; }
-  .topbar-right { display:flex; gap:12px; align-items:center; }
-  .topbar a { color:white; text-decoration:none; font-size:13px; padding:6px 12px; background:rgba(255,255,255,0.15); border-radius:6px; }
-  .topbar a:hover { background:rgba(255,255,255,0.25); }
-  .container { max-width:1100px; margin:0 auto; padding:24px; }
-  .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:24px; }
-  .stat-card { background:white; border-radius:12px; padding:18px; border:1px solid #e5e5e0; }
-  .stat-label { font-size:12px; color:#888; margin-bottom:6px; }
-  .stat-value { font-size:28px; font-weight:600; color:#1a1a1a; }
-  .stat-sub { font-size:11px; color:#aaa; margin-top:4px; }
-  .stat-ok { color:#16a34a; }
-  .stat-warn { color:#d97706; }
-  .stat-bad { color:#dc2626; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
-  @media(max-width:700px){ .grid2 { grid-template-columns:1fr; } }
-  .card { background:white; border-radius:12px; padding:20px; border:1px solid #e5e5e0; }
-  .card-title { font-size:14px; font-weight:600; color:#333; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-  table { width:100%; border-collapse:collapse; font-size:13px; }
-  th { text-align:left; padding:8px; color:#888; font-weight:500; border-bottom:1px solid #eee; }
-  td { padding:10px 8px; border-bottom:1px solid #f5f5f0; }
-  tr:last-child td { border-bottom:none; }
-  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; }
-  .badge-ok { background:#dcfce7; color:#16a34a; }
-  .badge-warn { background:#fef3c7; color:#d97706; }
-  .badge-bad { background:#fee2e2; color:#dc2626; }
-  .badge-admin { background:#dbeafe; color:#185FA5; }
-  .badge-staff { background:#f0f0f0; color:#666; }
-  .add-user-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  @media(max-width:500px){ .add-user-form { grid-template-columns:1fr; } }
-  .add-user-form input, .add-user-form select {
-    padding:10px 12px; border:1px solid #e5e5e0; border-radius:8px; font-size:14px; width:100%;
-  }
-  .btn { padding:10px 18px; border:none; border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; }
-  .btn-primary { background:#185FA5; color:white; }
-  .btn-primary:hover { background:#0d3d6e; }
-  .btn-danger { background:#fee2e2; color:#dc2626; border:none; padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; }
-  .photo-thumb { width:40px; height:40px; border-radius:6px; object-fit:cover; }
-  .section-title { font-size:16px; font-weight:600; margin-bottom:16px; color:#333; }
-  .success-msg { background:#dcfce7; color:#16a34a; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px; }
-  .error-msg { background:#fee2e2; color:#dc2626; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px; }
-</style>
-</head>
-<body>
+"""
+SERGIOS HOTEL — Pool Management App
+Backend: Flask + SQLite + SendGrid
+"""
 
-<div class="topbar">
-  <div>
-    <div class="topbar-title">🏊 SERGIOS HOTEL — Dashboard Πισίνας</div>
-    <div class="topbar-sub">Διαχείριση & Ιστορικό Μετρήσεων</div>
-  </div>
-  <div class="topbar-right">
-    <a href="/app"><i class="ti ti-device-mobile"></i> Εφαρμογή</a>
-    <a href="/logout"><i class="ti ti-logout"></i> Έξοδος</a>
-  </div>
-</div>
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from datetime import datetime, date
+import os, json, base64
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 
-<div class="container">
+app = Flask(__name__)
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for cat, msg in messages %}
-        <div class="{{ 'success-msg' if cat=='success' else 'error-msg' }}">{{ msg }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+# ─── Ρυθμίσεις ───────────────────────────────────────────────
+app.secret_key = os.environ.get('SECRET_KEY', 'sergios-pool-secret-2024')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///pool.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max φωτογραφία
 
-  {% if request.args.get('success') == 'user_added' %}
-  <div class="success-msg">✅ Χρήστης προστέθηκε επιτυχώς!</div>
-  {% endif %}
+# Email ρυθμίσεις (βάλε στο Railway environment variables)
+SENDGRID_API_KEY  = os.environ.get('SENDGRID_API_KEY', '')
+EMAIL_FROM        = os.environ.get('EMAIL_FROM', 'pool@sergioshotel.gr')
+EMAIL_TO          = os.environ.get('EMAIL_TO', 'info@sergioshotel.gr')
+HOTEL_NAME        = 'Sergios Hotel'
 
-  <!-- Σημερινές μετρήσεις -->
-  <div class="section-title">📊 Σημερινές μετρήσεις</div>
-  {% if today %}
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">pH</div>
-      <div class="stat-value {{ 'stat-ok' if today.ph and 7.2 <= today.ph <= 7.8 else 'stat-bad' if today.ph else '' }}">
-        {{ today.ph or '—' }}
-      </div>
-      <div class="stat-sub">Στόχος: 7.2–7.8</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Free Chlorine</div>
-      <div class="stat-value {{ 'stat-ok' if today.free_chlorine and 2.0 <= today.free_chlorine <= 3.0 else 'stat-bad' if today.free_chlorine else '' }}">
-        {{ today.free_chlorine or '—' }}
-      </div>
-      <div class="stat-sub">mg/L · Στόχος: 2.0–3.0</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Alkalinity</div>
-      <div class="stat-value {{ 'stat-ok' if today.alkalinity and 80 <= today.alkalinity <= 120 else 'stat-warn' if today.alkalinity else '' }}">
-        {{ today.alkalinity or '—' }}
-      </div>
-      <div class="stat-sub">mg/L · Στόχος: 80–120</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">CYA</div>
-      <div class="stat-value {{ 'stat-ok' if today.cya and 30 <= today.cya <= 50 else 'stat-warn' if today.cya else '' }}">
-        {{ today.cya or '—' }}
-      </div>
-      <div class="stat-sub">mg/L · Στόχος: 30–50</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Κολυμβητές</div>
-      <div class="stat-value">{{ today.swimmers or '—' }}</div>
-      <div class="stat-sub">άτομα σήμερα</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Υποβλήθηκε από</div>
-      <div class="stat-value" style="font-size:18px;">{{ today.user.full_name }}</div>
-      <div class="stat-sub">{{ today.recorded_at.strftime('%H:%M') }}</div>
-    </div>
-  </div>
-  {% if today.photo_filename %}
-  <div class="card" style="margin-bottom:24px;">
-    <div class="card-title"><i class="ti ti-camera"></i> Φωτογραφία πισίνας σήμερα</div>
-    <img src="/uploads/{{ today.photo_filename }}" style="max-width:100%;border-radius:10px;max-height:300px;object-fit:cover;">
-  </div>
-  {% endif %}
-  {% else %}
-  <div class="card" style="margin-bottom:24px;text-align:center;padding:40px;color:#888;">
-    <i class="ti ti-clock" style="font-size:32px;"></i>
-    <p style="margin-top:10px;">Δεν υπάρχει καταγραφή για σήμερα ακόμα.</p>
-  </div>
-  {% endif %}
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-  <!-- Γραφήματα -->
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-chart-line"></i> pH (τελευταίες 14 ημέρες)</div>
-      <canvas id="ph-chart" height="120"></canvas>
-    </div>
-    <div class="card">
-      <div class="card-title"><i class="ti ti-chart-line"></i> Free Chlorine (τελευταίες 14 ημέρες)</div>
-      <canvas id="cl-chart" height="120"></canvas>
-    </div>
-  </div>
+db = SQLAlchemy(app)
 
-  <!-- Ιστορικό -->
-  <div class="card" style="margin-bottom:24px;">
-    <div class="card-title"><i class="ti ti-history"></i> Ιστορικό μετρήσεων (τελευταίες 30 ημέρες)</div>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Ημερομηνία</th>
-            <th>Υπεύθυνος</th>
-            <th>pH</th>
-            <th>Free Cl</th>
-            <th>Alkalinity</th>
-            <th>CYA</th>
-            <th>Κολυμβητές</th>
-            <th>Φωτό</th>
-            <th>Παρατηρήσεις</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in records %}
-          <tr>
-            <td>{{ r.record_date.strftime('%d/%m/%Y') }}</td>
-            <td>{{ r.user.full_name }}</td>
-            <td>
-              {% if r.ph %}
-              <span class="badge {{ 'badge-ok' if 7.2 <= r.ph <= 7.8 else 'badge-bad' }}">{{ r.ph }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td>
-              {% if r.free_chlorine %}
-              <span class="badge {{ 'badge-ok' if 2.0 <= r.free_chlorine <= 3.0 else 'badge-bad' }}">{{ r.free_chlorine }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td>
-              {% if r.alkalinity %}
-              <span class="badge {{ 'badge-ok' if 80 <= r.alkalinity <= 120 else 'badge-warn' }}">{{ r.alkalinity }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td>
-              {% if r.cya %}
-              <span class="badge {{ 'badge-ok' if 30 <= r.cya <= 50 else 'badge-warn' }}">{{ r.cya }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td>{{ r.swimmers or '—' }}</td>
-            <td>
-              {% if r.photo_filename %}
-              <img src="/uploads/{{ r.photo_filename }}" class="photo-thumb">
-              {% else %}—{% endif %}
-            </td>
-            <td style="max-width:200px;font-size:12px;color:#666;">{{ r.notes or '—' }}</td>
-          </tr>
-          {% endfor %}
-          {% if not records %}
-          <tr><td colspan="9" style="text-align:center;color:#aaa;padding:20px;">Δεν υπάρχουν καταγραφές ακόμα</td></tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+# ─── Μοντέλα Βάσης Δεδομένων ─────────────────────────────────
 
-  <!-- Διαχείριση χρηστών -->
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title"><i class="ti ti-users"></i> Χρήστες</div>
-      <table>
-        <thead><tr><th>Όνομα</th><th>Username</th><th>Ρόλος</th><th></th></tr></thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.full_name }}</td>
-            <td><code style="font-size:12px;">{{ u.username }}</code></td>
-            <td><span class="badge {{ 'badge-admin' if u.role=='admin' else 'badge-staff' }}">{{ u.role }}</span></td>
-            <td>
-              {% if u.role != 'admin' %}
-              <a href="/dashboard/delete-user/{{ u.id }}" onclick="return confirm('Διαγραφή χρήστη;')" class="btn-danger">Διαγραφή</a>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+class User(db.Model):
+    """Χρήστες της εφαρμογής"""
+    id           = db.Column(db.Integer, primary_key=True)
+    username     = db.Column(db.String(50), unique=True, nullable=False)
+    password     = db.Column(db.String(200), nullable=False)
+    full_name    = db.Column(db.String(100), nullable=False)
+    role         = db.Column(db.String(20), default='staff')  # 'admin' ή 'staff'
+    language     = db.Column(db.String(5), default='el')      # 'el' ή 'en'
+    is_active    = db.Column(db.Boolean, default=True)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
 
-    <div class="card">
-      <div class="card-title"><i class="ti ti-user-plus"></i> Νέος χρήστης</div>
-      <form method="POST" action="/dashboard/add-user">
-        <div class="add-user-form">
-          <input type="text" name="full_name" placeholder="Ονοματεπώνυμο" required>
-          <input type="text" name="username" placeholder="Username" required>
-          <input type="password" name="password" placeholder="Password" required>
-          <select name="role">
-            <option value="staff">Staff (υπεύθυνος)</option>
-            <option value="admin">Admin (διαχειριστής)</option>
-          </select>
-          <select name="language">
-            <option value="el">Ελληνικά</option>
-            <option value="en">English</option>
-          </select>
-          <button type="submit" class="btn btn-primary">Προσθήκη χρήστη</button>
-        </div>
-      </form>
-    </div>
-  </div>
+class DailyRecord(db.Model):
+    """Ημερήσιες καταγραφές μετρήσεων"""
+    id             = db.Column(db.Integer, primary_key=True)
+    user_id        = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    record_date    = db.Column(db.Date, default=date.today, nullable=False)
+    recorded_at    = db.Column(db.DateTime, default=datetime.utcnow)
 
-</div>
+    # Μετρήσεις Pool Line
+    ph             = db.Column(db.Float)
+    alkalinity     = db.Column(db.Float)
+    free_chlorine  = db.Column(db.Float)
+    total_chlorine = db.Column(db.Float)
+    cya            = db.Column(db.Float)
+    water_temp     = db.Column(db.Float)
+    swimmers       = db.Column(db.Integer)
+    clarity        = db.Column(db.String(20))
+    algicide_done  = db.Column(db.Boolean, default=False)
 
-<script>
-// Φόρτωση δεδομένων γραφημάτων
-fetch('/api/history').then(r => r.json()).then(data => {
-  const labels = data.map(d => d.date).reverse();
-  const phData = data.map(d => d.ph).reverse();
-  const clData = data.map(d => d.fc).reverse();
+    # Συστάσεις χημικών (JSON)
+    recommendations = db.Column(db.Text)
 
-  new Chart(document.getElementById('ph-chart'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'pH',
-        data: phData,
-        borderColor: '#185FA5',
-        backgroundColor: 'rgba(24,95,165,0.1)',
-        tension: 0.3,
-        fill: true,
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { min: 6.5, max: 9.0,
-          grid: { color: '#f0f0f0' }
-        }
-      }
+    # Checklist
+    check_walls        = db.Column(db.Boolean, default=False)
+    check_backwash     = db.Column(db.Boolean, default=False)
+    check_pump         = db.Column(db.Boolean, default=False)
+    check_skimmer      = db.Column(db.Boolean, default=False)
+    check_waterline    = db.Column(db.Boolean, default=False)
+    check_prefilter    = db.Column(db.Boolean, default=False)
+
+    # Φωτογραφία + Παρατηρήσεις
+    photo_filename  = db.Column(db.String(200))
+    notes           = db.Column(db.Text)
+
+    # Σχέση με χρήστη
+    user = db.relationship('User', backref='records')
+
+# ─── Βοηθητικές συναρτήσεις ──────────────────────────────────
+
+def calculate_chemicals(ph, alk, fc, tc, cya, water_temp, swimmers, clarity, algicide_done):
+    """Υπολογισμός χημικών βάσει μετρήσεων — 90m³ πισίνα"""
+    VOL = 90
+    AIR_TEMP = 26.0  # Μέση θερμοκρασία Χερσόνησου καλοκαίρι
+    results = []
+
+    high_temp = (AIR_TEMP > 25) or (water_temp and water_temp > 28)
+    high_load = (swimmers and swimmers > 40) or high_temp
+    combined  = max(0, (tc or 0) - (fc or 0)) if tc and fc else 0
+    min_fc    = max(2.0, (cya or 0) * 0.075) if cya else 2.0
+    needs_shock = combined > 0.5 or clarity in ['cloudy', 'green']
+
+    # pH
+    if ph:
+        if ph > 7.8:
+            dose = round((ph - 7.4) * VOL * 0.18)
+            results.append({'product': 'pH−', 'dose': f'{dose} g',
+                'note': f'Μείωσε pH {ph} → 7.4. Βράδυ ή πρωί (2h πριν ανοίξει).', 'type': 'success'})
+        elif ph < 7.2:
+            dose = round((7.4 - ph) * VOL * 0.14)
+            results.append({'product': 'pH+', 'dose': f'{dose} g',
+                'note': f'Ανύψωσε pH {ph} → 7.4.', 'type': 'info'})
+
+    # CYA
+    if cya:
+        if cya > 70:
+            results.append({'product': 'CYA — Αραίωση νερού', 'dose': '—',
+                'note': f'CYA {cya} mg/L — αδειάσε μέρος νερού και αναπλήρωσε με φρέσκο.', 'type': 'danger'})
+        elif cya < 30:
+            results.append({'product': 'CYA χαμηλό', 'dose': '—',
+                'note': f'CYA {cya} mg/L — οι ταμπλέτες θα το ανεβάσουν σταδιακά.', 'type': 'warning'})
+
+    # Χλώριο
+    if fc is not None:
+        if needs_shock:
+            dose = VOL * 10
+            reasons = []
+            if combined > 0.5: reasons.append(f'δεσμευμένο χλώριο {combined:.2f} mg/L')
+            if clarity == 'cloudy': reasons.append('θολό νερό')
+            if clarity == 'green': reasons.append('άλγη')
+            results.append({'product': 'Astral Trichloro Powder — SHOCK', 'dose': f'{dose} g',
+                'note': f'Λόγω: {", ".join(reasons)}. Διάλυσε σε νερό, ρίξε στην πισίνα. Βράδυ, χωρίς κολυμβητές. Είσοδος μετά 12–14 ώρες.', 'type': 'danger'})
+        else:
+            tabs = 2 if (fc < min_fc or high_load) else 1
+            reason = f'Free Chlorine {fc} mg/L' if fc < min_fc else ('υψηλό φορτίο/θερμοκρ.' if high_load else 'maintenance')
+            results.append({'product': 'Aqua Clor Ταμπλέτες 200g', 'dose': f'{tabs} τεμ.',
+                'note': f'{reason}. {"1 ταμπλέτα σε κάθε skimmer." if tabs==2 else "1 ταμπλέτα σε έναν skimmer."}', 'type': 'info'})
+
+    # Alkalinity
+    if alk:
+        if alk < 80:
+            dose = round((80 - alk) * VOL * 0.015)
+            results.append({'product': 'Sodium Bicarbonate', 'dose': f'{dose} g',
+                'note': f'Alkalinity {alk} → στόχος 80–120 mg/L.', 'type': 'warning'})
+        elif alk > 150:
+            results.append({'product': 'Alkalinity υψηλή', 'dose': '—',
+                'note': f'Alkalinity {alk} mg/L — μείωσε με pH−.', 'type': 'danger'})
+
+    # Αλγοκτόνο
+    if not algicide_done:
+        dose = round(375 * VOL / 50)
+        results.append({'product': 'Aqua Clor Algicide Super', 'dose': f'{dose} ml',
+            'note': 'Εβδομαδιαία δόση. Τέλος ημερήσιας χρήσης, κοντά στις εισόδους νερού.', 'type': 'success'})
+
+    if not results:
+        results.append({'product': 'Όλα εντός ορίων!', 'dose': '—',
+            'note': 'Δεν απαιτείται καμία ενέργεια σήμερα.', 'type': 'ok'})
+
+    return results
+
+def send_report_email(record, user, recommendations, photo_path=None):
+    """Αποστολή email report στον admin"""
+    if not SENDGRID_API_KEY:
+        print("⚠ SendGrid API key δεν έχει οριστεί")
+        return False
+
+    checklist_items = {
+        'Καθαρισμός τοιχίων/πυθμένα': record.check_walls,
+        'Backwash φίλτρου': record.check_backwash,
+        'Έλεγχος αντλίας': record.check_pump,
+        'Έλεγχος skimmer': record.check_skimmer,
+        'Καθαρισμός ίσαλης γραμμής': record.check_waterline,
+        'Καθαρισμός προφίλτρων': record.check_prefilter,
     }
-  });
 
-  new Chart(document.getElementById('cl-chart'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Free Chlorine',
-        data: clData,
-        borderColor: '#16a34a',
-        backgroundColor: 'rgba(22,163,74,0.1)',
-        tension: 0.3,
-        fill: true,
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { min: 0, max: 5,
-          grid: { color: '#f0f0f0' }
-        }
-      }
-    }
-  });
-});
-</script>
-</body>
-</html>
+    recs_html = ''.join([
+        f'<tr style="border-bottom:1px solid #eee;">'
+        f'<td style="padding:8px;font-weight:500;">{r["product"]}</td>'
+        f'<td style="padding:8px;">{r["dose"]}</td>'
+        f'<td style="padding:8px;color:#666;">{r["note"]}</td>'
+        f'</tr>' for r in recommendations
+    ])
+
+    chk_html = ''.join([
+        f'<tr><td style="padding:6px;">{"✅" if v else "❌"} {k}</td></tr>'
+        for k, v in checklist_items.items()
+    ])
+
+    combined = max(0, (record.total_chlorine or 0) - (record.free_chlorine or 0))
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#185FA5;color:white;padding:20px;border-radius:8px 8px 0 0;">
+        <h1 style="margin:0;font-size:20px;">🏊 {HOTEL_NAME} — Ημερήσιο Report Πισίνας</h1>
+        <p style="margin:5px 0 0;opacity:0.8;">{record.record_date.strftime('%A, %d %B %Y')} &nbsp;|&nbsp; Υπεύθυνος: {user.full_name}</p>
+      </div>
+
+      <div style="background:#f9f9f9;padding:20px;border:1px solid #eee;">
+
+        <h2 style="font-size:15px;color:#333;border-bottom:2px solid #185FA5;padding-bottom:6px;">📊 Μετρήσεις Pool Line</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#fff;">
+            <td style="padding:8px;border:1px solid #eee;"><b>pH</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.ph or '—'}</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">Στόχος: 7.2–7.8</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Free Chlorine</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.free_chlorine or '—'} mg/L</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">Στόχος: 2.0–3.0</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Total Chlorine</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.total_chlorine or '—'} mg/L</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">≥ Free Chlorine</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Δεσμευμένο χλώριο</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{combined:.2f} mg/L</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">Πρέπει: &lt; 0.5</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Alkalinity</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.alkalinity or '—'} mg/L</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">Στόχος: 80–120</td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:8px;border:1px solid #eee;"><b>CYA</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.cya or '—'} mg/L</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;">Στόχος: 30–50</td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Θερμοκρ. νερού</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.water_temp or '—'} °C</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;"></td>
+          </tr>
+          <tr style="background:#f5f5f5;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Κολυμβητές</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.swimmers or '—'}</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;"></td>
+          </tr>
+          <tr style="background:#fff;">
+            <td style="padding:8px;border:1px solid #eee;"><b>Διαύγεια</b></td>
+            <td style="padding:8px;border:1px solid #eee;">{record.clarity or '—'}</td>
+            <td style="padding:8px;border:1px solid #eee;color:#888;"></td>
+          </tr>
+        </table>
+
+        <h2 style="font-size:15px;color:#333;border-bottom:2px solid #185FA5;padding-bottom:6px;margin-top:20px;">🧪 Συστάσεις χημικών</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="background:#185FA5;color:white;">
+            <th style="padding:8px;text-align:left;">Χημικό</th>
+            <th style="padding:8px;text-align:left;">Δόση</th>
+            <th style="padding:8px;text-align:left;">Σημείωση</th>
+          </tr>
+          {recs_html}
+        </table>
+
+        <h2 style="font-size:15px;color:#333;border-bottom:2px solid #185FA5;padding-bottom:6px;margin-top:20px;">✅ Checklist εργασιών</h2>
+        <table style="width:100%;border-collapse:collapse;">
+          {chk_html}
+        </table>
+
+        {'<h2 style="font-size:15px;color:#333;border-bottom:2px solid #185FA5;padding-bottom:6px;margin-top:20px;">📝 Παρατηρήσεις</h2><p style="background:#fff;padding:12px;border:1px solid #eee;border-radius:4px;">' + (record.notes or '—') + '</p>' if record.notes else ''}
+
+      </div>
+      <div style="background:#f0f0f0;padding:12px;text-align:center;font-size:12px;color:#888;border-radius:0 0 8px 8px;">
+        {HOTEL_NAME} · Διαχείριση Πισίνας · {record.record_date.strftime('%d/%m/%Y %H:%M')}
+      </div>
+    </div>
+    """
+
+    message = Mail(
+        from_email=EMAIL_FROM,
+        to_emails=EMAIL_TO,
+        subject=f'🏊 {HOTEL_NAME} — Report Πισίνας {record.record_date.strftime("%d/%m/%Y")}',
+        html_content=html
+    )
+
+    # Επισύναψη φωτογραφίας αν υπάρχει
+    if photo_path and os.path.exists(photo_path):
+        with open(photo_path, 'rb') as f:
+            encoded = base64.b64encode(f.read()).decode()
+        ext = photo_path.split('.')[-1].lower()
+        mime = 'image/jpeg' if ext in ['jpg', 'jpeg'] else 'image/png'
+        attachment = Attachment(
+            FileContent(encoded),
+            FileName(f'pool_{record.record_date}.{ext}'),
+            FileType(mime),
+            Disposition('attachment')
+        )
+        message.attachment = attachment
+
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        sg.send(message)
+        return True
+    except Exception as e:
+        print(f'Email error: {e}')
+        return False
+
+# ─── Routes ──────────────────────────────────────────────────
+
+@app.route('/')
+def index():
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user and user.role == 'admin':
+            return redirect(url_for('dashboard'))
+        return redirect(url_for('pool_app'))
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(username=username, is_active=True).first()
+        if user and check_password_hash(user.password, password):
+            session['user_id']   = user.id
+            session['user_name'] = user.full_name
+            session['user_role'] = user.role
+            session['language']  = user.language
+            return redirect(url_for('dashboard') if user.role == 'admin' else url_for('pool_app'))
+        error = 'Λάθος username ή password'
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/app')
+def pool_app():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    # Έλεγξε αν υπάρχει ήδη καταγραφή σήμερα
+    today_record = DailyRecord.query.filter_by(
+        user_id=user.id, record_date=date.today()
+    ).first()
+    return render_template('app.html', user=user, today_record=today_record)
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημένο'}), 401
+
+    user = User.query.get(session['user_id'])
+    data = request.form
+
+    # Αποθήκευση φωτογραφίας
+    photo_filename = None
+    photo_path = None
+    if 'photo' in request.files:
+        photo = request.files['photo']
+        if photo and photo.filename:
+            ext = photo.filename.rsplit('.', 1)[-1].lower()
+            if ext in ['jpg', 'jpeg', 'png', 'heic']:
+                photo_filename = f"pool_{user.id}_{date.today()}_{int(datetime.utcnow().timestamp())}.{ext}"
+                photo_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(photo_filename))
+                photo.save(photo_path)
+
+    def flt(key): return float(data[key]) if data.get(key) else None
+    def nt(key):  return int(data[key]) if data.get(key) else None
+    def bl(key):  return data.get(key) == 'true'
+
+    ph    = flt('ph')
+    alk   = flt('alkalinity')
+    fc    = flt('free_chlorine')
+    tc    = flt('total_chlorine')
+    cya   = flt('cya')
+    wt    = flt('water_temp')
+    sw    = nt('swimmers')
+    cl    = data.get('clarity', '')
+    algd  = bl('algicide_done')
+
+    recommendations = calculate_chemicals(ph, alk, fc, tc, cya, wt, sw, cl, algd)
+
+    record = DailyRecord(
+        user_id=user.id,
+        record_date=date.today(),
+        ph=ph, alkalinity=alk, free_chlorine=fc, total_chlorine=tc,
+        cya=cya, water_temp=wt, swimmers=sw, clarity=cl, algicide_done=algd,
+        recommendations=json.dumps(recommendations, ensure_ascii=False),
+        check_walls=bl('check_walls'), check_backwash=bl('check_backwash'),
+        check_pump=bl('check_pump'), check_skimmer=bl('check_skimmer'),
+        check_waterline=bl('check_waterline'), check_prefilter=bl('check_prefilter'),
+        photo_filename=photo_filename,
+        notes=data.get('notes', '')
+    )
+    db.session.add(record)
+    db.session.commit()
+
+    # Αποστολή email
+    email_sent = send_report_email(record, user, recommendations, photo_path)
+
+    return jsonify({
+        'success': True,
+        'message': 'Καταγραφή αποθηκεύτηκε!' + (' Email απεστάλη.' if email_sent else ''),
+        'recommendations': recommendations
+    })
+
+@app.route('/set-language/<lang>')
+def set_language(lang):
+    if lang in ['el', 'en'] and 'user_id' in session:
+        session['language'] = lang
+        user = User.query.get(session['user_id'])
+        if user:
+            user.language = lang
+            db.session.commit()
+    return redirect(request.referrer or url_for('pool_app'))
+
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+# ─── Admin Dashboard ──────────────────────────────────────────
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session or session.get('user_role') != 'admin':
+        return redirect(url_for('login'))
+    records = DailyRecord.query.order_by(DailyRecord.record_date.desc()).limit(30).all()
+    users   = User.query.filter_by(is_active=True).all()
+    today   = DailyRecord.query.filter_by(record_date=date.today()).first()
+    return render_template('dashboard.html', records=records, users=users, today=today)
+
+@app.route('/dashboard/add-user', methods=['POST'])
+def add_user():
+    if session.get('user_role') != 'admin':
+        return redirect(url_for('login'))
+    data = request.form
+    existing = User.query.filter_by(username=data['username']).first()
+    if existing:
+        return redirect(url_for('dashboard') + '?error=exists')
+    user = User(
+        username=data['username'],
+        password=generate_password_hash(data['password']),
+        full_name=data['full_name'],
+        role=data.get('role', 'staff'),
+        language=data.get('language', 'el')
+    )
+    db.session.add(user)
+    db.session.commit()
+    return redirect(url_for('dashboard') + '?success=user_added')
+
+@app.route('/dashboard/delete-user/<int:user_id>')
+def delete_user(user_id):
+    if session.get('user_role') != 'admin':
+        return redirect(url_for('login'))
+    user = User.query.get(user_id)
+    if user and user.role != 'admin':
+        user.is_active = False
+        db.session.commit()
+    return redirect(url_for('dashboard'))
+
+@app.route('/api/history')
+def api_history():
+    if 'user_id' not in session:
+        return jsonify([])
+    records = DailyRecord.query.order_by(DailyRecord.record_date.desc()).limit(14).all()
+    return jsonify([{
+        'date': r.record_date.strftime('%d/%m'),
+        'ph': r.ph, 'fc': r.free_chlorine,
+        'alk': r.alkalinity, 'cya': r.cya
+    } for r in records if r.ph or r.free_chlorine])
+
+# ─── Αρχικοποίηση ─────────────────────────────────────────────
+
+def init_db():
+    """Δημιουργία βάσης και admin χρήστη"""
+    with app.app_context():
+        db.create_all()
+        # Δημιουργία admin αν δεν υπάρχει
+        if not User.query.filter_by(username='admin').first():
+            admin = User(
+                username='admin',
+                password=generate_password_hash('sergios2024'),
+                full_name='Δημήτρης Γιαννουλάκης',
+                role='admin',
+                language='el'
+            )
+            db.session.add(admin)
+            # Manager
+            manager = User(
+                username='giannhs',
+                password=generate_password_hash('pool2024'),
+                full_name='Γιάννης Γιακουμάκης',
+                role='admin',
+                language='el'
+            )
+            db.session.add(manager)
+            db.session.commit()
+            print('✅ Βάση δεδομένων και χρήστες δημιουργήθηκαν')
+
+if __name__ == '__main__':
+    init_db()
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
