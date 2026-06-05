@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, date
-import os, json, base64, smtplib
+import os, json, base64, smtplib, threading
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -295,7 +295,11 @@ def submit():
     db.session.add(record)
     db.session.commit()
 
-    email_sent = send_report_email(record, user, recommendations, photo_path)
+    # Αποστολη email σε background thread
+    email_thread = threading.Thread(target=send_report_email, args=(record, user, recommendations, photo_path))
+    email_thread.daemon = True
+    email_thread.start()
+    email_sent = True
 
     return jsonify({
         'success': True,
