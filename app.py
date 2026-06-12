@@ -148,6 +148,55 @@ def compute_pool_actions(rec):
     return out
 
 
+# ── ΖΝΧ / Δίκτυο νερού: κανόνες προτεινόμενων ενεργειών (legionella) ─────────
+def _clo2_act(name):
+    return (f'ClO2 {name} <1 ppm: αύξησε τη δοσομέτρηση ClO2· έλεγξε δοσομετρική αντλία/απόθεμα.',
+            f'ClO2 {name} >2 ppm: μείωσε τη δοσομέτρηση ClO2.')
+
+# key WaterRecord -> (min, max, ενέργεια_low, ενέργεια_high). Όρια ίδια με το report νερού.
+WATER_ACTION_RULES = {
+    'temp_dhw_out':     (60.0, None, 'Κολεκτέρ ΖΝΧ <60°C: ανέβασε τη θερμοκρασία αποθήκευσης ≥60°C (κίνδυνος legionella)· έλεγξε λέβητα/εναλλάκτη/θερμοστάτη.', None),
+    'temp_dhw_return':  (50.0, None, 'Επιστροφή ανακυκλοφορίας <50°C: ανεπαρκής ανακυκλοφορία· έλεγξε αντλία & βάνες ανακυκλοφορίας· εξέτασε θερμική απολύμανση/flushing.', None),
+    'temp_kitchen_hot': (50.0, None, 'Ζεστό Κουζίνας <50°C: flushing του σημείου· έλεγξε ανακυκλοφορία/μόνωση γραμμής.', None),
+    'temp_remote_hot':  (50.0, None, 'Ζεστό Απομακρυσμένου <50°C: flushing· έλεγξε ανακυκλοφορία (κρίσιμο τελευταίο σημείο δικτύου).', None),
+    'temp_tank':        (None, 20.0, None, 'Δεξαμενή (κρύο) >20°C: εξέτασε ψύξη/μόνωση/ανανέωση νερού· κίνδυνος ανάπτυξης μικροβίων.'),
+    'clo2_dhw_out':     (1.0, 2.0, *_clo2_act('Αναχώρηση ΖΝΧ')),
+    'clo2_dhw_return':  (1.0, 2.0, *_clo2_act('Επιστροφή ΖΝΧ')),
+    'clo2_tank':        (1.0, 2.0, *_clo2_act('Δεξαμενή')),
+    'clo2_kitchen':     (1.0, 2.0, *_clo2_act('Κουζίνα')),
+    'clo2_remote':      (1.0, 2.0, *_clo2_act('Απομακρυσμένο')),
+    'clo2_ro':          (1.0, 2.0, *_clo2_act('Αντ. Όσμωση')),
+}
+WATER_ACTION_LABELS = {
+    'temp_dhw_out': 'Κολεκτέρ ΖΝΧ (Αναχ.)', 'temp_dhw_return': 'Κολεκτέρ Ανακυκλ. (Επιστρ.)',
+    'temp_kitchen_hot': 'Κουζίνα Ζεστό', 'temp_remote_hot': 'Απομακρυσμένο Ζεστό', 'temp_tank': 'Δεξαμενή',
+    'clo2_dhw_out': 'ClO2 Αναχώρηση ΖΝΧ', 'clo2_dhw_return': 'ClO2 Επιστροφή ΖΝΧ',
+    'clo2_tank': 'ClO2 Δεξαμενή', 'clo2_kitchen': 'ClO2 Κουζίνα', 'clo2_remote': 'ClO2 Απομακρυσμένο', 'clo2_ro': 'ClO2 Αντ. Όσμωση',
+}
+
+def _water_urgent(key, val):
+    if key == 'temp_dhw_out' and val < 50: return True
+    if key in ('temp_dhw_return', 'temp_kitchen_hot', 'temp_remote_hot') and val < 45: return True
+    if key in ('clo2_dhw_out', 'clo2_dhw_return') and val < 0.3: return True
+    return False
+
+def compute_water_actions(rec):
+    """Προτεινόμενες ενέργειες ΖΝΧ/δικτύου νερού όταν μέτρηση εκτός ορίων. Δεν αγγίζει πισίνες."""
+    out = []
+    for key, (mn, mx, low, high) in WATER_ACTION_RULES.items():
+        val = getattr(rec, key, None)
+        if val is None:
+            continue
+        action = None
+        if mn is not None and val < mn:
+            action = low
+        elif mx is not None and val > mx:
+            action = high
+        if action:
+            out.append({'label': WATER_ACTION_LABELS.get(key, key), 'action': action, 'urgent': _water_urgent(key, val)})
+    return out
+
+
 def notify(user_id, text, link=None):
     if not user_id:
         return
@@ -592,6 +641,12 @@ def send_report_email(record, user):
     temp_rows += row(f'Κουζινα Ζεστο{loc_kit}', record.temp_kitchen_hot, 'C', 50.0, None)
     temp_rows += row(f'Απομακρυσμενο Κρυο{loc_rem}', record.temp_remote_cold, 'C')
     temp_rows += row(f'Απομακρυσμενο Ζεστο{loc_rem}', record.temp_remote_hot, 'C', 50.0, None)
+    _wa = compute_water_actions(record)
+    if _wa:
+        _li = ''.join('<li style="margin-bottom:4px;' + ('color:#b91c1c;font-weight:600;' if a['urgent'] else '') + '">' + ('ΕΠΕΙΓΟΝ — ' if a['urgent'] else '') + a['label'] + ': ' + a['action'] + '</li>' for a in _wa)
+        actions_html = '<h2 style="font-size:15px;color:#b45309;margin-top:18px;">Προτεινομενες ενεργειες (ΖΝΧ / νερο)</h2><ul style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 12px 12px 28px;color:#333;">' + _li + '</ul>'
+    else:
+        actions_html = ''
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0369a1;color:white;padding:20px;border-radius:8px 8px 0 0;">
@@ -609,6 +664,7 @@ def send_report_email(record, user):
           <tr style="background:#0369a1;color:white;"><th style="padding:8px;text-align:left;">Σημειο</th><th style="padding:8px;text-align:left;">Μετρηση</th><th style="padding:8px;text-align:left;">Ορια</th></tr>
           {temp_rows}
         </table>
+        {actions_html}
         {f'<h2 style="font-size:15px;color:#333;margin-top:20px;">pH</h2><p style="background:#fff;padding:10px;border:1px solid #eee;">Δεξαμενη: {record.ph_tank}</p>' if record.period == 'morning' and record.ph_tank else ''}
         {f'<h2 style="font-size:15px;color:#333;margin-top:20px;">Παρατηρησεις</h2><p style="background:#fff;padding:10px;border:1px solid #eee;">{record.notes}</p>' if record.notes else ''}
       </div>
@@ -1000,6 +1056,9 @@ def submit():
         apply_record(record, data, period)
         db.session.add(record)
     db.session.commit()
+    _wa = compute_water_actions(record)
+    if _wa:
+        notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _wa) else '') + 'Μέτρηση νερού/ΖΝΧ εκτός ορίων — δες την αναφορά.'), '/dashboard')
     threading.Thread(target=_bg_send_water, args=(record.id, user.id), daemon=True).start()
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
     return jsonify({'success': True, 'message': f'Καταγραφη {period_gr} αποθηκευτηκε!'})
@@ -1967,100 +2026,4 @@ def init_db():
 
 
 def _athens_now():
-    try:
-        from zoneinfo import ZoneInfo
-        return datetime.now(ZoneInfo('Europe/Athens'))
-    except Exception:
-        return datetime.utcnow() + timedelta(hours=3)
-
-def missing_today():
-    today = date.today()
-    miss = []
-    for p in Pool.query.filter_by(is_active=True).all():
-        recs = {r.period for r in PoolRecord.query.filter_by(pool_id=p.id, record_date=today).all()}
-        gaps = [per for per in ('morning', 'afternoon') if per not in recs]
-        if gaps:
-            hotel = p.hotel.name if p.hotel else ''
-            miss.append(f"{hotel} — {p.name}: " + ', '.join('Πρωί' if g == 'morning' else 'Απόγευμα' for g in gaps))
-    for per, label in (('morning', 'Πρωί'), ('afternoon', 'Απόγευμα')):
-        if not WaterRecord.query.filter_by(record_date=today, period=per).first():
-            miss.append('Νερά Χρήσης (Sergios): ' + label)
-    return miss
-
-def send_reminder_email(miss):
-    if (not EMAIL_PASSWORD and not GRAPH_CLIENT_ID) or not miss:
-        return False
-    recips = list(EMAIL_TO_LIST)
-    for u in User.query.filter_by(is_active=True, approved=True).all():
-        if u.email and u.email not in recips:
-            recips.append(u.email)
-    items = ''.join(f'<li>{m}</li>' for m in miss)
-    html = f'<div style="font-family:Arial,sans-serif"><h3 style="color:#193847">Εκκρεμείς καταγραφές σήμερα</h3><ul>{items}</ul><p style="color:#888;font-size:12px">CONDIAN Hotels — αυτόματη υπενθύμιση</p></div>'
-    return send_email('Υπενθυμιση καταγραφων - ' + date.today().strftime('%d/%m/%Y'), html, recips)
-
-def reminder_tick():
-    with app.app_context():
-        now = _athens_now()
-        if now.hour != REMINDER_HOUR:
-            return
-        today = now.strftime('%Y-%m-%d')
-        if ReminderSent.query.get(today):
-            return
-        try:
-            db.session.add(ReminderSent(day=today)); db.session.commit()
-        except Exception:
-            db.session.rollback(); return   # άλλος worker το ανέλαβε
-        miss = missing_today()
-        if miss:
-            send_reminder_email(miss)
-            print(f'[reminder] {today}: {len(miss)} εκκρεμή')
-
-def reminder_loop():
-    while True:
-        try:
-            reminder_tick()
-        except Exception as e:
-            print('[reminder] loop error:', e)
-        time.sleep(1800)   # κάθε 30 λεπτά
-
-def start_scheduler():
-    if ENABLE_SCHEDULER:
-        threading.Thread(target=reminder_loop, daemon=True).start()
-        print('[scheduler] reminder loop started')
-
-
-def seed_team():
-    """Μία φορά: δημιουργεί την πραγματική ομάδα CONDIAN."""
-    with app.app_context():
-        try:
-            if Setting.query.get('seeded_team_v1'):
-                return
-            team = [
-                ('giakoumakis',  'Giakoumakis Giannis',    'masteradmin', 'g.giakoumakis@condianhotels.gr', '+306973728931'),
-                ('giannoulakis', 'Γιαννουλάκης Δημήτρης',  'admin',       'dimitris@condianhotels.gr',      '+306936647778'),
-                ('xypakis',      'Ξυπάκης Μάνος',          'manager',     'm.xypakis@condianhotels.gr',     '+306972238222'),
-                ('smyrnakis',    'Σμυρνάκης Χριστόφορος',  'manager',     'c.smyrnakis@condianhotels.gr',   '+306992015939'),
-                ('flouris',      'Φλουρής Στέφανος',       'manager',     's.flouris@condianhotels.gr',     '+306931549656'),
-            ]
-            for un, fn, role, em, ph in team:
-                u = User.query.filter_by(username=un).first()
-                if u:
-                    u.full_name = fn; u.role = role; u.email = em; u.phone = ph
-                    u.approved = True; u.is_active = True
-                else:
-                    db.session.add(User(username=un, password=generate_password_hash('condian2026'),
-                                        full_name=fn, role=role, email=em, phone=ph,
-                                        approved=True, is_active=True, language='el'))
-            db.session.add(Setting(key='seeded_team_v1', value='1'))
-            db.session.commit()
-            print('Team CONDIAN seeded')
-        except Exception as e:
-            db.session.rollback(); print('seed_team skipped:', e)
-
-
-init_db()
-seed_team()
-start_scheduler()
-
-if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    tr
