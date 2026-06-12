@@ -374,6 +374,89 @@ class Setting(db.Model):
     key   = db.Column(db.String(40), primary_key=True)
     value = db.Column(db.Text)
 
+# ── Generic monitoring engine (Πλατφόρμα Συντήρησης) ──
+class MonitorTemplate(db.Model):
+    key       = db.Column(db.String(30), primary_key=True)   # 'tank','energy',...
+    name      = db.Column(db.String(80))
+    icon      = db.Column(db.String(30), default='ti-checklist')
+    frequency = db.Column(db.String(10), default='daily')    # twice|daily|weekly|monthly
+    sort      = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    params    = db.relationship('MonitorParam', backref='template', order_by='MonitorParam.sort',
+                                cascade='all, delete-orphan')
+
+class MonitorParam(db.Model):
+    id           = db.Column(db.Integer, primary_key=True)
+    template_key = db.Column(db.String(30), db.ForeignKey('monitor_template.key'))
+    pkey         = db.Column(db.String(40))      # κλειδί τιμής
+    label        = db.Column(db.String(80))
+    unit         = db.Column(db.String(20), default='')
+    min_v        = db.Column(db.Float)
+    max_v        = db.Column(db.Float)
+    action_low   = db.Column(db.String(200))
+    action_high  = db.Column(db.String(200))
+    periodic     = db.Column(db.Boolean, default=False)   # μόνο πρωί/πρώτη βάρδια
+    sort         = db.Column(db.Integer, default=0)
+
+class Area(db.Model):
+    id           = db.Column(db.Integer, primary_key=True)
+    hotel_id     = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False)
+    template_key = db.Column(db.String(30), db.ForeignKey('monitor_template.key'), nullable=False)
+    name         = db.Column(db.String(120))
+    location     = db.Column(db.String(120))
+    is_active    = db.Column(db.Boolean, default=True)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    hotel        = db.relationship('Hotel')
+    template     = db.relationship('MonitorTemplate')
+
+class Reading(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    area_id     = db.Column(db.Integer, db.ForeignKey('area.id'), nullable=False)
+    template_key= db.Column(db.String(30))
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id'))
+    record_date = db.Column(db.Date, default=date.today)
+    period      = db.Column(db.String(10), default='day')
+    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at  = db.Column(db.DateTime)
+    updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
+    values      = db.Column(db.Text)     # JSON {pkey: value}
+    notes       = db.Column(db.Text)
+    area        = db.relationship('Area')
+    user        = db.relationship('User', foreign_keys=[user_id])
+
+FREQ_PERIODS = {'twice': ['morning', 'afternoon'], 'daily': ['day'], 'weekly': ['day'], 'monthly': ['day']}
+FREQ_LABEL   = {'twice': '2×/ημέρα (πρωί/απόγευμα)', 'daily': 'Καθημερινά', 'weekly': 'Εβδομαδιαία', 'monthly': 'Μηνιαία'}
+
+def periods_for(freq):
+    return FREQ_PERIODS.get(freq, ['day'])
+
+def area_actions(reading):
+    """Generic έλεγχος ορίων -> ενέργειες, με βάση τις παραμέτρους του template."""
+    out = []
+    try:
+        vals = json.loads(reading.values or '{}')
+    except Exception:
+        vals = {}
+    tpl = MonitorTemplate.query.get(reading.template_key)
+    if not tpl:
+        return out
+    for p in tpl.params:
+        v = vals.get(p.pkey)
+        if v is None:
+            continue
+        try:
+            v = float(v)
+        except (ValueError, TypeError):
+            continue
+        act = None
+        if p.min_v is not None and v < p.min_v:
+            act = p.action_low or ('Χαμηλό: ' + p.label)
+        elif p.max_v is not None and v > p.max_v:
+            act = p.action_high or ('Υψηλό: ' + p.label)
+        if act:
+            out.append({'label': p.label, 'value': v, 'unit': p.unit, 'action': act})
+    return out
+
 
 def flt(data, key):
     try:
@@ -1450,6 +1533,200 @@ def ai_admin():
               'openai': ('*' * 8 + c['openai'][-4:]) if c['openai'] else ''}
     return render_template('ai_admin.html', cfg=c, masked=masked, configured=(resolve_provider() is not None))
 
+# ── GENERIC AREAS (Πλατφόρμα Συντήρησης) ──
+def can_access_area(u, area):
+    if u is None or area is None:
+        return False
+    if role_rank(u.role) >= ROLE_RANK['admin']:
+        return True
+    assigned = {h.id for h in u.hotels if h.is_active}
+    if not assigned:
+        return True
+    return area.hotel_id in assigned
+
+def _templates_json():
+    out = {}
+    for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort).all():
+        out[t.key] = {'name': t.name, 'icon': t.icon, 'frequency': t.frequency,
+                      'params': [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit,
+                                  'min': p.min_v, 'max': p.max_v, 'periodic': p.periodic} for p in t.params]}
+    return out
+
+def reading_cells(r):
+    try:
+        vals = json.loads(r.values or '{}')
+    except Exception:
+        vals = {}
+    tpl = MonitorTemplate.query.get(r.template_key); cells = []
+    if tpl:
+        for p in tpl.params:
+            v = vals.get(p.pkey); ok = True
+            if v is not None:
+                try:
+                    fv = float(v); ok = (p.min_v is None or fv >= p.min_v) and (p.max_v is None or fv <= p.max_v)
+                except Exception:
+                    pass
+            cells.append({'label': p.label, 'value': v, 'unit': p.unit, 'ok': ok})
+    return cells
+
+@app.route('/areas')
+def areas_app():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if not can_log():
+        return redirect(url_for('areas_dashboard'))
+    user = current_user()
+    hids = {h.id for h in allowed_hotels(user)}
+    areas = [a for a in Area.query.filter_by(is_active=True).order_by(Area.template_key, Area.name).all() if a.hotel_id in hids]
+    areas_json = [{'id': a.id, 'name': a.name, 'location': a.location or '',
+                   'hotel': a.hotel.name if a.hotel else '', 'template': a.template_key} for a in areas]
+    todays = Reading.query.filter_by(record_date=date.today()).all()
+    done = {}
+    for r in todays:
+        done.setdefault(str(r.area_id), []).append(r.period)
+    return render_template('areas.html', user=user, areas_json=areas_json,
+                           templates=_templates_json(), done=done, freq_periods=FREQ_PERIODS)
+
+@app.route('/areas/submit', methods=['POST'])
+def areas_submit():
+    if 'user_id' not in session or not can_log():
+        return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
+    user = current_user(); data = request.form
+    area = Area.query.filter_by(id=data.get('area_id'), is_active=True).first() if data.get('area_id') else None
+    if not area:
+        return jsonify({'success': False, 'message': 'Επιλεξτε τομεα'}), 400
+    if not can_access_area(user, area):
+        return jsonify({'success': False, 'message': 'Δεν εχεις προσβαση'}), 403
+    period = data.get('period', 'day')
+    tpl = MonitorTemplate.query.get(area.template_key)
+    vals = {}
+    for p in (tpl.params if tpl else []):
+        v = data.get(p.pkey, '')
+        if v not in (None, ''):
+            try:
+                vals[p.pkey] = float(v)
+            except (ValueError, TypeError):
+                pass
+    rec = Reading.query.filter_by(area_id=area.id, record_date=date.today(), period=period).first()
+    if rec:
+        rec.values = json.dumps(vals); rec.notes = data.get('notes', '')
+        rec.updated_at = datetime.utcnow(); rec.updated_by = user.id
+    else:
+        rec = Reading(area_id=area.id, template_key=area.template_key, user_id=user.id,
+                      record_date=date.today(), period=period, values=json.dumps(vals), notes=data.get('notes', ''))
+        db.session.add(rec)
+    db.session.commit()
+    log_activity('area_submit', area.name)
+    acts = area_actions(rec)
+    if acts:
+        notify_admins('Εκτός ορίων: ' + area.name + ' (' + str(len(acts)) + ')', '/areas/dashboard')
+    return jsonify({'success': True, 'message': 'Καταγραφη ' + area.name + ' αποθηκευτηκε!'})
+
+@app.route('/areas/dashboard')
+def areas_dashboard():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    hids = {h.id for h in allowed_hotels(user)}
+    areas = [a for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids]
+    aids = {a.id for a in areas}
+    q = Reading.query
+    if role_rank(user.role) < ROLE_RANK['admin']:
+        q = q.filter(Reading.area_id.in_(aids if aids else [-1]))
+    recs = q.order_by(Reading.record_date.desc(), Reading.recorded_at.desc()).limit(120).all()
+    rows = [(r, reading_cells(r)) for r in recs]
+    return render_template('areas_dashboard.html', areas=areas, rows=rows,
+                           is_admin=is_admin(), templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all())
+
+# admin: areas management
+@app.route('/dashboard/areas', methods=['GET', 'POST'])
+def areas_admin():
+    if not is_admin():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        hid = request.form.get('hotel_id'); tk = request.form.get('template_key'); nm = request.form.get('name', '').strip()
+        if hid and tk and nm:
+            db.session.add(Area(hotel_id=int(hid), template_key=tk, name=nm, location=request.form.get('location', '').strip()))
+            db.session.commit(); log_activity('area_add', nm)
+        return redirect(url_for('areas_admin') + '?saved=1')
+    return render_template('areas_admin.html',
+                           hotels=Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all(),
+                           templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort).all(),
+                           areas=Area.query.filter_by(is_active=True).all())
+
+@app.route('/dashboard/area/<int:area_id>/delete', methods=['POST'])
+def area_delete(area_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    a = Area.query.get(area_id)
+    if a:
+        a.is_active = False; db.session.commit()
+    return redirect(url_for('areas_admin'))
+
+# admin: template editor (hybrid)
+@app.route('/dashboard/templates')
+def templates_admin():
+    if not is_admin():
+        return redirect(url_for('login'))
+    return render_template('templates_admin.html',
+                           templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
+                           freq_label=FREQ_LABEL)
+
+@app.route('/dashboard/template/new', methods=['POST'])
+def template_new():
+    if not is_admin():
+        return redirect(url_for('login'))
+    key = (request.form.get('key', '').strip().lower() or '')
+    key = ''.join(ch for ch in key if ch.isalnum() or ch == '_')[:30]
+    if key and not MonitorTemplate.query.get(key):
+        db.session.add(MonitorTemplate(key=key, name=request.form.get('name', key).strip(),
+                       icon=request.form.get('icon', 'ti-checklist').strip() or 'ti-checklist',
+                       frequency=request.form.get('frequency', 'daily'), sort=99))
+        db.session.commit(); log_activity('template_new', key)
+    return redirect(url_for('template_edit', key=key) if key else url_for('templates_admin'))
+
+@app.route('/dashboard/template/<key>', methods=['GET', 'POST'])
+def template_edit(key):
+    if not is_admin():
+        return redirect(url_for('login'))
+    tpl = MonitorTemplate.query.get(key)
+    if not tpl:
+        return redirect(url_for('templates_admin'))
+    if request.method == 'POST':
+        tpl.name = request.form.get('name', tpl.name).strip()
+        tpl.icon = request.form.get('icon', tpl.icon).strip() or tpl.icon
+        tpl.frequency = request.form.get('frequency', tpl.frequency)
+        def fnum(v):
+            try:
+                return float(v) if v not in (None, '') else None
+            except (ValueError, TypeError):
+                return None
+        # update existing params
+        for p in list(tpl.params):
+            if request.form.get('del_%d' % p.id):
+                db.session.delete(p); continue
+            p.label = request.form.get('label_%d' % p.id, p.label).strip()
+            p.unit = request.form.get('unit_%d' % p.id, p.unit).strip()
+            p.min_v = fnum(request.form.get('min_%d' % p.id))
+            p.max_v = fnum(request.form.get('max_%d' % p.id))
+            p.action_low = request.form.get('alow_%d' % p.id, '').strip()
+            p.action_high = request.form.get('ahigh_%d' % p.id, '').strip()
+            p.periodic = bool(request.form.get('per_%d' % p.id))
+        # new param
+        npk = request.form.get('new_pkey', '').strip().lower()
+        npk = ''.join(ch for ch in npk if ch.isalnum() or ch == '_')[:40]
+        if npk and request.form.get('new_label', '').strip():
+            db.session.add(MonitorParam(template_key=tpl.key, pkey=npk,
+                           label=request.form.get('new_label').strip(),
+                           unit=request.form.get('new_unit', '').strip(),
+                           min_v=fnum(request.form.get('new_min')), max_v=fnum(request.form.get('new_max')),
+                           action_low=request.form.get('new_alow', '').strip(),
+                           action_high=request.form.get('new_ahigh', '').strip(),
+                           periodic=bool(request.form.get('new_per')), sort=len(tpl.params) + 1))
+        db.session.commit(); log_activity('template_edit', key)
+        return redirect(url_for('template_edit', key=key) + '?saved=1')
+    return render_template('template_edit.html', tpl=tpl, freq_label=FREQ_LABEL)
+
 # ── Demo data seeder (admin) — τυχαίες καταγραφές 1-31/5 ──
 @app.route('/admin/seed-demo')
 def seed_demo():
@@ -1614,6 +1891,32 @@ def init_db():
                 db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids', volume_m3=20))
                 db.session.commit()
                 print('Δημιουργηθηκε δειγμα ξενοδοχειου & πισινων')
+
+            if not MonitorTemplate.query.first():
+                tank = MonitorTemplate(key='tank', name='Στάθμες & Δεξαμενές', icon='ti-stack-2', frequency='daily', sort=10)
+                db.session.add(tank); db.session.flush()
+                db.session.add_all([
+                    MonitorParam(template_key='tank', pkey='level_pct', label='Στάθμη', unit='%', min_v=20, max_v=100, action_low='Χαμηλή στάθμη — έλεγξε πλήρωση/διαρροή.', sort=1),
+                    MonitorParam(template_key='tank', pkey='pressure', label='Πίεση', unit='bar', sort=2),
+                    MonitorParam(template_key='tank', pkey='temp', label='Θερμοκρασία', unit='C', sort=3),
+                ])
+                energy = MonitorTemplate(key='energy', name='Ενέργεια & Μετρητές', icon='ti-bolt', frequency='daily', sort=20)
+                db.session.add(energy); db.session.flush()
+                db.session.add_all([
+                    MonitorParam(template_key='energy', pkey='electricity_kwh', label='Ρεύμα (ένδειξη)', unit='kWh', sort=1),
+                    MonitorParam(template_key='energy', pkey='water_m3', label='Νερό (ένδειξη)', unit='m3', sort=2),
+                    MonitorParam(template_key='energy', pkey='gas_m3', label='Φυσικό αέριο (ένδειξη)', unit='m3', sort=3),
+                ])
+                db.session.commit()
+                print('Δημιουργηθηκαν generic templates')
+
+            if not Area.query.first():
+                _h = Hotel.query.first()
+                if _h:
+                    db.session.add(Area(hotel_id=_h.id, template_key='tank', name='Κεντρική Δεξαμενή', location='Μηχανοστάσιο'))
+                    db.session.add(Area(hotel_id=_h.id, template_key='energy', name='Γενικός Μετρητής', location='Πίνακας ΔΕΗ'))
+                    db.session.commit()
+                    print('Δημιουργηθηκαν δειγματικα areas')
         except Exception as e:
             db.session.rollback()
             print(f'init_db seed skipped: {e}')
