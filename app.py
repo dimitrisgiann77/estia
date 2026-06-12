@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.8)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.9)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -15,6 +15,8 @@ Modules:
             μεταφέρθηκε από τον Πίνακα Πισινών στο μενού Διαχείρισης
   - v12.8 — Header: 4ο κουμπί Operations · ειδοποιήσεις στο καμπανάκι · dropdown προφίλ
             (προφίλ/μηνύματα/γλώσσα/ρυθμίσεις/λογαριασμός/θέμα/έξοδος) · Day/Dark/System (cookie) · γλώσσα el/en/uk
+  - v12.9 — Login: φουτουριστικό AI background (neural-net canvas)· Μηνύματα μεταξύ χρηστών (Message)·
+            σελίδες Ρυθμίσεις & Λογαριασμός μου· badge αδιάβαστων μηνυμάτων στο header
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -250,14 +252,15 @@ def current_user():
 def inject_nav():
     uid = session.get('user_id')
     unread = Notification.query.filter_by(user_id=uid, is_read=False).count() if uid else 0
-    return {'nav_unread': unread}
+    msgs   = Message.query.filter_by(recipient_id=uid, is_read=False).count() if uid else 0
+    return {'nav_unread': unread, 'msg_unread': msgs}
 
 @app.context_processor
 def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.8'
+APP_VERSION = '12.9'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -453,6 +456,17 @@ class Notification(db.Model):
     link       = db.Column(db.String(120))
     is_read    = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# v12.9 — Μηνύματα μεταξύ χρηστών (νέος πίνακας· create_all το δημιουργεί αυτόματα)
+class Message(db.Model):
+    id           = db.Column(db.Integer, primary_key=True)
+    sender_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    body         = db.Column(db.Text, nullable=False)
+    is_read      = db.Column(db.Boolean, default=False)
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    sender    = db.relationship('User', foreign_keys=[sender_id])
+    recipient = db.relationship('User', foreign_keys=[recipient_id])
 
 class EmailLog(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -1113,6 +1127,54 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# ── v12.9 — Μηνύματα / Ρυθμίσεις / Λογαριασμός ──
+@app.route('/messages')
+def messages():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    uid = session['user_id']
+    box = request.args.get('box', 'in')
+    if box == 'out':
+        items = (Message.query.filter_by(sender_id=uid)
+                 .order_by(Message.created_at.desc()).limit(100).all())
+    else:
+        items = (Message.query.filter_by(recipient_id=uid)
+                 .order_by(Message.created_at.desc()).limit(100).all())
+        for m in items:
+            if not m.is_read:
+                m.is_read = True
+        db.session.commit()
+    people = (User.query.filter(User.id != uid, User.is_active == True, User.approved == True)
+              .order_by(User.full_name).all())
+    return render_template('messages.html', items=items, box=box, people=people, me=current_user())
+
+@app.route('/messages/send', methods=['POST'])
+def messages_send():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    uid = session['user_id']
+    rid = request.form.get('recipient_id', type=int)
+    body = (request.form.get('body') or '').strip()
+    if rid and body and User.query.get(rid):
+        db.session.add(Message(sender_id=uid, recipient_id=rid, body=body[:4000]))
+        me = current_user()
+        db.session.add(Notification(user_id=rid,
+            text='Νέο μήνυμα από ' + (me.full_name if me else ''), link='/messages?embed=1'))
+        db.session.commit()
+    return redirect('/messages?box=out&embed=1')
+
+@app.route('/settings')
+def settings_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('settings.html', me=current_user())
+
+@app.route('/account')
+def account_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    return render_template('account.html', me=current_user())
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():

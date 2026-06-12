@@ -93,6 +93,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .pm-item:hover{background:#f3f7f9;}
 .pm-item i{font-size:18px;width:20px;text-align:center;}
 .pm-item.danger{color:#dc2626;}
+.pm-badge{margin-left:auto;background:#dc2626;color:#fff;font-size:10px;min-width:16px;height:16px;line-height:16px;text-align:center;border-radius:8px;padding:0 4px;font-weight:600;}
 .pm-sep{height:1px;background:#eef2f5;margin:6px 4px;}
 .pm-label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#9aa7ad;padding:6px 10px 4px;}
 .pm-row{display:flex;gap:6px;padding:0 8px 4px;flex-wrap:wrap;}
@@ -136,6 +137,7 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
       <button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>
       <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
     </div>
+    <div class="ic" onclick="go('/messages?embed=1',null)" title="Μηνύματα"><i class="ti ti-mail"></i>{% if msg_unread %}<span class="badge">{{ msg_unread }}</span>{% endif %}</div>
     <div class="ic" onclick="go('/notifications?embed=1',null)" title="Ειδοποιήσεις"><i class="ti ti-bell"></i>{% if nav_unread %}<span class="badge">{{ nav_unread }}</span>{% endif %}</div>
     <div class="prof" id="prof">
       <button class="who" onclick="toggleProf(event)" title="{{ user.full_name }} · {{ user.role }}">
@@ -149,7 +151,7 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
           <div><div class="pm-name">{{ user.full_name }}</div><div class="pm-role">{{ user.role }}</div></div>
         </div>
         <a class="pm-item" href="#" onclick="navTo('/profile?embed=1');return false;"><i class="ti ti-user"></i> Το προφίλ μου</a>
-        <a class="pm-item" href="#" onclick="estiaSoon('Μηνύματα');return false;"><i class="ti ti-mail"></i> Μηνύματα</a>
+        <a class="pm-item" href="#" onclick="navTo('/messages?embed=1');return false;"><i class="ti ti-mail"></i> Μηνύματα{% if msg_unread %}<span class="pm-badge">{{ msg_unread }}</span>{% endif %}</a>
         <div class="pm-sep"></div>
         <div class="pm-label">Γλώσσα</div>
         <div class="pm-row" id="pm-langs">
@@ -164,8 +166,8 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
           <button class="pm-pill" data-mode="system" onclick="setTheme('system')"><i class="ti ti-device-desktop"></i> Σύστημα</button>
         </div>
         <div class="pm-sep"></div>
-        <a class="pm-item" href="#" onclick="estiaSoon('Ρυθμίσεις');return false;"><i class="ti ti-settings"></i> Ρυθμίσεις</a>
-        <a class="pm-item" href="#" onclick="estiaSoon('Λογαριασμός μου');return false;"><i class="ti ti-id-badge"></i> Λογαριασμός μου</a>
+        <a class="pm-item" href="#" onclick="navTo('/settings?embed=1');return false;"><i class="ti ti-settings"></i> Ρυθμίσεις</a>
+        <a class="pm-item" href="#" onclick="navTo('/account?embed=1');return false;"><i class="ti ti-id-badge"></i> Λογαριασμός μου</a>
         <div class="pm-sep"></div>
         <a class="pm-item danger" href="/logout"><i class="ti ti-logout"></i> Έξοδος</a>
       </div>
