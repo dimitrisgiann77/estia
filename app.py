@@ -17,8 +17,14 @@ from email.mime.text import MIMEText
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'sergios-water-secret-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///water.db')
+
+# Railway/Heroku δίνουν 'postgres://' — η SQLAlchemy 2.x θέλει 'postgresql://'
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///water.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
 
 SMTP_SERVER    = 'condian.gr'
 SMTP_PORT      = 465
@@ -698,24 +704,32 @@ def api_pool_history(pool_id):
 def init_db():
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            db.session.add(User(username='admin', password=generate_password_hash('sergios2024'), full_name='Δημητρης Γιαννουλακης', role='admin', language='el'))
-            db.session.add(User(username='giannhs', password=generate_password_hash('pool2024'), full_name='Γιαννης Γιακουμακης', role='admin', language='el'))
-            db.session.add(User(username='xypakis', password=generate_password_hash('water2024'), full_name='Μανος Χυπακης', role='staff', language='el'))
-            db.session.commit()
-            print('Βαση δεδομενων και χρηστες δημιουργηθηκαν')
+        try:
+            if not User.query.filter_by(username='admin').first():
+                db.session.add(User(username='admin', password=generate_password_hash('sergios2024'), full_name='Δημητρης Γιαννουλακης', role='admin', language='el'))
+                db.session.add(User(username='giannhs', password=generate_password_hash('pool2024'), full_name='Γιαννης Γιακουμακης', role='admin', language='el'))
+                db.session.add(User(username='xypakis', password=generate_password_hash('water2024'), full_name='Μανος Χυπακης', role='staff', language='el'))
+                db.session.commit()
+                print('Βαση δεδομενων και χρηστες δημιουργηθηκαν')
 
-        # Seed example hotel + pools (μόνο αν δεν υπάρχουν ξενοδοχεια)
-        if not Hotel.query.first():
-            sergios = Hotel(name='Sergios Hotel')
-            db.session.add(sergios)
-            db.session.flush()
-            db.session.add(Pool(hotel_id=sergios.id, name='Κύρια Πισίνα', location='Pool bar', pool_type='pool'))
-            db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids'))
-            db.session.commit()
-            print('Δημιουργηθηκε δειγμα ξενοδοχειου & πισινων')
+            # Seed example hotel + pools (μόνο αν δεν υπάρχουν ξενοδοχεια)
+            if not Hotel.query.first():
+                sergios = Hotel(name='Sergios Hotel')
+                db.session.add(sergios)
+                db.session.flush()
+                db.session.add(Pool(hotel_id=sergios.id, name='Κύρια Πισίνα', location='Pool bar', pool_type='pool'))
+                db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids'))
+                db.session.commit()
+                print('Δημιουργηθηκε δειγμα ξενοδοχειου & πισινων')
+        except Exception as e:
+            # Σε race μεταξύ gunicorn workers το seeding μπορεί να συγκρουστεί — αγνόησέ το
+            db.session.rollback()
+            print(f'init_db seed skipped: {e}')
 
+
+# ΣΗΜΑΝΤΙΚΟ: τρέχει και κάτω από gunicorn (Railway), όχι μόνο με `python app.py`,
+# ώστε να δημιουργούνται οι πίνακες & οι χρήστες στην παραγωγή.
+init_db()
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
