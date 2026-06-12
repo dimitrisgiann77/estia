@@ -1,5 +1,5 @@
 """
-CONDIAN HOTELS - Water & Pool Log App v4
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.2)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -340,8 +340,10 @@ class WaterRecord(db.Model):
     temp_remote_hot   = db.Column(db.Float)
     ph_tank = db.Column(db.Float)
     notes   = db.Column(db.Text)
+    water_system_id = db.Column(db.Integer, db.ForeignKey('water_system.id'), nullable=True)  # v12.3
     user         = db.relationship('User', foreign_keys=[user_id], backref='water_records')
     updated_user = db.relationship('User', foreign_keys=[updated_by])
+    water_system = db.relationship('WaterSystem')
 
 class Hotel(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -382,6 +384,17 @@ class PoolRecord(db.Model):
     pool         = db.relationship('Pool')
     user         = db.relationship('User', foreign_keys=[user_id])
     updated_user = db.relationship('User', foreign_keys=[updated_by])
+
+
+# v12.3 — Δίκτυο Νερού ανά ξενοδοχείο (mirror Pool). Ένα ξενοδοχείο μπορεί να έχει >1.
+class WaterSystem(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False)
+    name       = db.Column(db.String(120), nullable=False)
+    location   = db.Column(db.String(120))
+    is_active  = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    hotel      = db.relationship('Hotel')
 
 
 class ReminderSent(db.Model):
@@ -563,7 +576,7 @@ def send_email(subject, html, recips=None):
     return ok
 
 
-THEME_DEFAULTS = {'primary': '#193847', 'accent': '#BB9549', 'app_title': 'CONDIAN HOTELS', 'logo': ''}
+THEME_DEFAULTS = {'primary': '#193847', 'accent': '#BB9549', 'app_title': 'Εστία', 'logo': ''}
 
 def get_theme():
     t = dict(THEME_DEFAULTS)
@@ -650,7 +663,7 @@ def send_report_email(record, user):
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0369a1;color:white;padding:20px;border-radius:8px 8px 0 0;">
-        <h1 style="margin:0;font-size:20px;">Sergios Hotel - Water Log {period_gr}</h1>
+        <h1 style="margin:0;font-size:20px;">Εστία — Νερά Χρήσης (Sergios) {period_gr}</h1>
         <p style="margin:5px 0 0;opacity:0.8;">{record.record_date.strftime('%d/%m/%Y')} | Υπευθυνος: {user.full_name}</p>
       </div>
       <div style="background:#f9f9f9;padding:20px;border:1px solid #eee;">
@@ -669,10 +682,10 @@ def send_report_email(record, user):
         {f'<h2 style="font-size:15px;color:#333;margin-top:20px;">Παρατηρησεις</h2><p style="background:#fff;padding:10px;border:1px solid #eee;">{record.notes}</p>' if record.notes else ''}
       </div>
       <div style="background:#f0f0f0;padding:12px;text-align:center;font-size:12px;color:#888;border-radius:0 0 8px 8px;">
-        Sergios Hotel - Water Log - {record.record_date.strftime('%d/%m/%Y')} - {period_gr}
+        Εστία — CONDIAN HOTELS · {record.record_date.strftime('%d/%m/%Y')} · {period_gr}
       </div>
     </div>"""
-    return send_email(f'Sergios Hotel - Water Log {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
+    return send_email(f'Εστία — Νερά Χρήσης (Sergios) {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -863,7 +876,7 @@ def build_pool_report_pdf(rep_date, records):
     except Exception:
         pass
     pdf.set_xy(32, 11); pdf.set_font('dv', 'B', 16); pdf.set_text_color(*NAVY)
-    pdf.cell(0, 8, 'CONDIAN Hotels — Αναφορά Πισινών', ln=1)
+    pdf.cell(0, 8, 'Εστία — CONDIAN HOTELS · Αναφορά Πισινών', ln=1)
     pdf.set_x(32); pdf.set_font('dv', '', 11); pdf.set_text_color(*GREY)
     pdf.cell(0, 6, 'Ημερομηνία: ' + rep_date.strftime('%d/%m/%Y'), ln=1)
     pdf.ln(8)
@@ -1516,7 +1529,7 @@ def email_test():
         return redirect(url_for('login'))
     to = request.form.get('to', '').strip()
     recips = [to] if to else EMAIL_TO_LIST
-    send_email('CONDIAN - Δοκιμαστικο email', '<p>Δοκιμαστικο email απο την εφαρμογη CONDIAN. Αν το βλεπεις, η αποστολη λειτουργει.</p>', recips)
+    send_email('Εστία — Δοκιμαστικό email', '<p>Δοκιμαστικό email από την Εστία (CONDIAN HOTELS). Αν το βλέπεις, η αποστολή λειτουργεί.</p>', recips)
     log_activity('email_test', ', '.join(recips))
     return redirect(url_for('email_admin'))
 
@@ -1547,7 +1560,7 @@ def theme_admin():
             v = request.form.get(k, '')
             if _re.match(r'^#[0-9a-fA-F]{6}$', v):
                 setk(k, v)
-        setk('app_title', (request.form.get('app_title', 'CONDIAN HOTELS') or 'CONDIAN HOTELS')[:60])
+        setk('app_title', (request.form.get('app_title', 'Εστία') or 'Εστία')[:60])
         if request.form.get('reset_logo'):
             setk('logo', '')
         else:
@@ -1971,6 +1984,7 @@ def ensure_columns():
         _add_col('user', 'phone', 'phone VARCHAR(40)')
         _add_col('user', 'approved', f'approved BOOLEAN DEFAULT {truth}')
         _add_col('user', 'avatar', 'avatar TEXT')
+        _add_col('water_record', 'water_system_id', 'water_system_id INTEGER')  # v12.3
     except Exception as e:
         db.session.rollback()
         print(f'ensure_columns skipped: {e}')
@@ -1994,6 +2008,20 @@ def init_db():
                 db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids', volume_m3=20))
                 db.session.commit()
                 print('Δημιουργηθηκε δειγμα ξενοδοχειου & πισινων')
+
+            # v12.3 — default Δίκτυο Νερού + backfill παλιών records (idempotent, ασφαλές για υπάρχουσα βάση)
+            try:
+                _h0 = Hotel.query.first()
+                if _h0 and not WaterSystem.query.first():
+                    db.session.add(WaterSystem(hotel_id=_h0.id, name='Κεντρικό Δίκτυο', location='Μηχανοστάσιο'))
+                    db.session.commit()
+                _ws0 = WaterSystem.query.first()
+                if _ws0:
+                    WaterRecord.query.filter_by(water_system_id=None).update({'water_system_id': _ws0.id})
+                    db.session.commit()
+            except Exception as _e:
+                db.session.rollback()
+                print(f'water_system seed skipped: {_e}')
 
             if not MonitorTemplate.query.first():
                 tank = MonitorTemplate(key='tank', name='Στάθμες & Δεξαμενές', icon='ti-stack-2', frequency='daily', sort=10)
@@ -2026,4 +2054,100 @@ def init_db():
 
 
 def _athens_now():
-    tr
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo('Europe/Athens'))
+    except Exception:
+        return datetime.utcnow() + timedelta(hours=3)
+
+def missing_today():
+    today = date.today()
+    miss = []
+    for p in Pool.query.filter_by(is_active=True).all():
+        recs = {r.period for r in PoolRecord.query.filter_by(pool_id=p.id, record_date=today).all()}
+        gaps = [per for per in ('morning', 'afternoon') if per not in recs]
+        if gaps:
+            hotel = p.hotel.name if p.hotel else ''
+            miss.append(f"{hotel} — {p.name}: " + ', '.join('Πρωί' if g == 'morning' else 'Απόγευμα' for g in gaps))
+    for per, label in (('morning', 'Πρωί'), ('afternoon', 'Απόγευμα')):
+        if not WaterRecord.query.filter_by(record_date=today, period=per).first():
+            miss.append('Νερά Χρήσης (Sergios): ' + label)
+    return miss
+
+def send_reminder_email(miss):
+    if (not EMAIL_PASSWORD and not GRAPH_CLIENT_ID) or not miss:
+        return False
+    recips = list(EMAIL_TO_LIST)
+    for u in User.query.filter_by(is_active=True, approved=True).all():
+        if u.email and u.email not in recips:
+            recips.append(u.email)
+    items = ''.join(f'<li>{m}</li>' for m in miss)
+    html = f'<div style="font-family:Arial,sans-serif"><h3 style="color:#193847">Εκκρεμείς καταγραφές σήμερα</h3><ul>{items}</ul><p style="color:#888;font-size:12px">Εστία — CONDIAN HOTELS · αυτόματη υπενθύμιση</p></div>'
+    return send_email('Εστία — Υπενθύμιση καταγραφών - ' + date.today().strftime('%d/%m/%Y'), html, recips)
+
+def reminder_tick():
+    with app.app_context():
+        now = _athens_now()
+        if now.hour != REMINDER_HOUR:
+            return
+        today = now.strftime('%Y-%m-%d')
+        if ReminderSent.query.get(today):
+            return
+        try:
+            db.session.add(ReminderSent(day=today)); db.session.commit()
+        except Exception:
+            db.session.rollback(); return   # άλλος worker το ανέλαβε
+        miss = missing_today()
+        if miss:
+            send_reminder_email(miss)
+            print(f'[reminder] {today}: {len(miss)} εκκρεμή')
+
+def reminder_loop():
+    while True:
+        try:
+            reminder_tick()
+        except Exception as e:
+            print('[reminder] loop error:', e)
+        time.sleep(1800)   # κάθε 30 λεπτά
+
+def start_scheduler():
+    if ENABLE_SCHEDULER:
+        threading.Thread(target=reminder_loop, daemon=True).start()
+        print('[scheduler] reminder loop started')
+
+
+def seed_team():
+    """Μία φορά: δημιουργεί την πραγματική ομάδα CONDIAN."""
+    with app.app_context():
+        try:
+            if Setting.query.get('seeded_team_v1'):
+                return
+            team = [
+                ('giakoumakis',  'Giakoumakis Giannis',    'masteradmin', 'g.giakoumakis@condianhotels.gr', '+306973728931'),
+                ('giannoulakis', 'Γιαννουλάκης Δημήτρης',  'admin',       'dimitris@condianhotels.gr',      '+306936647778'),
+                ('xypakis',      'Ξυπάκης Μάνος',          'manager',     'm.xypakis@condianhotels.gr',     '+306972238222'),
+                ('smyrnakis',    'Σμυρνάκης Χριστόφορος',  'manager',     'c.smyrnakis@condianhotels.gr',   '+306992015939'),
+                ('flouris',      'Φλουρής Στέφανος',       'manager',     's.flouris@condianhotels.gr',     '+306931549656'),
+            ]
+            for un, fn, role, em, ph in team:
+                u = User.query.filter_by(username=un).first()
+                if u:
+                    u.full_name = fn; u.role = role; u.email = em; u.phone = ph
+                    u.approved = True; u.is_active = True
+                else:
+                    db.session.add(User(username=un, password=generate_password_hash('condian2026'),
+                                        full_name=fn, role=role, email=em, phone=ph,
+                                        approved=True, is_active=True, language='el'))
+            db.session.add(Setting(key='seeded_team_v1', value='1'))
+            db.session.commit()
+            print('Team CONDIAN seeded')
+        except Exception as e:
+            db.session.rollback(); print('seed_team skipped:', e)
+
+
+init_db()
+seed_team()
+start_scheduler()
+
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

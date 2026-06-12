@@ -1,4 +1,4 @@
-// SERGIOS HOTEL — Water Log App JS
+// ΕΣΤΙΑ (CONDIAN) — Νερά Χρήσης module JS
 
 let currentPeriod = 'morning';
 
