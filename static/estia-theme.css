@@ -1,0 +1,26 @@
+/* Εστία v12.8 — Dark mode overrides (κοινό για τις εσωτερικές σελίδες).
+   Ενεργοποιείται όταν <html data-theme="dark">. Το topbar κρατά το χρώμα brand. */
+html[data-theme="dark"] body{background:#0f1722 !important;color:#e6edf3 !important;}
+html[data-theme="dark"] .container{color:#e6edf3;}
+html[data-theme="dark"] .card{background:#141d2a !important;border-color:#243140 !important;color:#e6edf3;}
+html[data-theme="dark"] .card-title{color:#e6edf3 !important;}
+html[data-theme="dark"] .section-title{color:#e6edf3 !important;}
+html[data-theme="dark"] .stat-card{background:#1b2735 !important;border-color:#2c3a4a !important;}
+html[data-theme="dark"] .stat-label,
+html[data-theme="dark"] .stat-sub{color:#8b99a7 !important;}
+html[data-theme="dark"] .stat-value{color:#e6edf3;}
+html[data-theme="dark"] table th{color:#8b99a7 !important;border-bottom-color:#243140 !important;}
+html[data-theme="dark"] table td{border-bottom-color:#1c2735 !important;color:#d6dee6;}
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea{background:#1b2735 !important;border-color:#2c3a4a !important;color:#e6edf3 !important;}
+html[data-theme="dark"] input::placeholder{color:#6b7b8c;}
+html[data-theme="dark"] .muted,
+html[data-theme="dark"] .topbar-sub{color:#7b8a98 !important;}
+html[data-theme="dark"] .hotel-name{color:#cfe0ee !important;}
+html[data-theme="dark"] .pool-item{border-bottom-color:#1c2735 !important;}
+html[data-theme="dark"] .hotel-group{border-color:#243140;}
+html[data-theme="dark"] .tab{background:#141d2a !important;border-color:#243140 !important;color:#c4d0dc !important;}
+html[data-theme="dark"] .success-msg{background:#14301f !important;color:#7fdca0 !important;}
+html[data-theme="dark"] a{color:#7fb2e6;}
+/* Διατηρούμε ως έχουν: .topbar (brand), .badge-* (έγχρωμα status), κουμπιά brand */

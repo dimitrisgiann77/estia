@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>{{ theme.app_title }} — CONDIAN</title>
 <meta name="theme-color" content="{{ theme.primary }}">
+<script>/* v12.8 — εφαρμογή θέματος πριν το paint (no flash) */(function(){try{var m=(document.cookie.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||'system';var dark=m==='dark'||(m==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light');}catch(e){}})();</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -77,6 +78,46 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 @media(max-width:1120px){ .top .hdr-meta{display:none;} }
 @media(max-width:900px){ .top .apps .hbtn span{display:none;} .top .apps .hbtn{padding:7px 9px;} }
 @media(max-width:560px){ .top .apps{display:none;} .foot{font-size:10px;gap:6px;} }
+/* v12.8 — προφίλ dropdown */
+.top .prof{position:relative;}
+.top .who{background:rgba(255,255,255,.0);border:none;cursor:pointer;padding:5px 8px;border-radius:9px;}
+.top .who:hover{background:rgba(255,255,255,.15);}
+.prof-menu{position:absolute;top:46px;right:0;width:260px;background:#fff;color:#1a2530;border:1px solid #e6eef2;
+  border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.22);padding:8px;display:none;z-index:130;}
+.prof.open .prof-menu{display:block;}
+.pm-head{display:flex;align-items:center;gap:10px;padding:8px 8px 10px;border-bottom:1px solid #eef2f5;margin-bottom:6px;}
+.pm-head img{width:38px;height:38px;border-radius:50%;object-fit:cover;}
+.pm-name{font-weight:600;font-size:14px;}
+.pm-role{font-size:11px;color:#8a97a3;text-transform:capitalize;}
+.pm-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;font-size:13.5px;color:#33454d;text-decoration:none;cursor:pointer;}
+.pm-item:hover{background:#f3f7f9;}
+.pm-item i{font-size:18px;width:20px;text-align:center;}
+.pm-item.danger{color:#dc2626;}
+.pm-sep{height:1px;background:#eef2f5;margin:6px 4px;}
+.pm-label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#9aa7ad;padding:6px 10px 4px;}
+.pm-row{display:flex;gap:6px;padding:0 8px 4px;flex-wrap:wrap;}
+.pm-pill{flex:1;min-width:62px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;
+  padding:7px 6px;border-radius:8px;border:1px solid #dde6ec;background:#fff;color:#44535f;cursor:pointer;}
+.pm-pill:hover{background:#f3f7f9;}
+.pm-pill.on{background:{{ theme.primary }};color:#fff;border-color:{{ theme.primary }};font-weight:600;}
+.pm-pill i{font-size:15px;}
+/* v12.8 — Dark mode (shell) */
+html[data-theme="dark"] body{background:#0f1722;color:#e6edf3;}
+html[data-theme="dark"] .side{background:#141d2a;border-right-color:#243140;}
+html[data-theme="dark"] .item{color:#c4d0dc;}
+html[data-theme="dark"] .item:hover{background:#1b2735;}
+html[data-theme="dark"] .item.active{background:#1d2a3a;color:#fff;}
+html[data-theme="dark"] .grp{color:#6b7b8c;}
+html[data-theme="dark"] .content{background:#0f1722;}
+html[data-theme="dark"] .prof-menu{background:#141d2a;color:#e6edf3;border-color:#243140;}
+html[data-theme="dark"] .pm-head{border-bottom-color:#243140;}
+html[data-theme="dark"] .pm-role{color:#7b8a98;}
+html[data-theme="dark"] .pm-item{color:#c4d0dc;}
+html[data-theme="dark"] .pm-item:hover{background:#1b2735;}
+html[data-theme="dark"] .pm-sep{background:#243140;}
+html[data-theme="dark"] .pm-pill{background:#1b2735;border-color:#2c3a4a;color:#c4d0dc;}
+html[data-theme="dark"] .pm-pill:hover{background:#243140;}
+html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
 </style>
 </head>
 <body>
@@ -90,16 +131,45 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
     </div>
     <div class="sp"></div>
     <div class="apps">
-      <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
-      <button class="hbtn active" onclick="estiaSoon('Staff HUB')" title="Staff HUB"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
+      <button class="hbtn active" onclick="estiaSoon('Operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>
+      <button class="hbtn" onclick="estiaSoon('Staff HUB')" title="Staff HUB — σύντομα"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
       <button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>
+      <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
     </div>
     <div class="ic" onclick="go('/notifications?embed=1',null)" title="Ειδοποιήσεις"><i class="ti ti-bell"></i>{% if nav_unread %}<span class="badge">{{ nav_unread }}</span>{% endif %}</div>
-    <div class="who" title="{{ user.full_name }} · {{ user.role }}">
-      {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}<i class="ti ti-user-circle" style="font-size:24px;"></i>{% endif %}
-      <span style="opacity:.9;">{{ user.full_name.split(' ')[0] }}</span>
+    <div class="prof" id="prof">
+      <button class="who" onclick="toggleProf(event)" title="{{ user.full_name }} · {{ user.role }}">
+        {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}<i class="ti ti-user-circle" style="font-size:24px;"></i>{% endif %}
+        <span style="opacity:.9;">{{ user.full_name.split(' ')[0] }}</span>
+        <i class="ti ti-chevron-down" style="font-size:14px;opacity:.7;"></i>
+      </button>
+      <div class="prof-menu" id="prof-menu">
+        <div class="pm-head">
+          {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}<i class="ti ti-user-circle" style="font-size:32px;color:#94a3b8;"></i>{% endif %}
+          <div><div class="pm-name">{{ user.full_name }}</div><div class="pm-role">{{ user.role }}</div></div>
+        </div>
+        <a class="pm-item" href="#" onclick="navTo('/profile?embed=1');return false;"><i class="ti ti-user"></i> Το προφίλ μου</a>
+        <a class="pm-item" href="#" onclick="estiaSoon('Μηνύματα');return false;"><i class="ti ti-mail"></i> Μηνύματα</a>
+        <div class="pm-sep"></div>
+        <div class="pm-label">Γλώσσα</div>
+        <div class="pm-row" id="pm-langs">
+          <button class="pm-pill {{ 'on' if session.get('language','el')=='el' }}" onclick="setLang('el')">🇬🇷 ΕΛ</button>
+          <button class="pm-pill {{ 'on' if session.get('language')=='en' }}" onclick="setLang('en')">🇬🇧 EN</button>
+          <button class="pm-pill {{ 'on' if session.get('language')=='uk' }}" onclick="setLang('uk')">🇺🇦 UK</button>
+        </div>
+        <div class="pm-label">Θέμα</div>
+        <div class="pm-row" id="pm-themes">
+          <button class="pm-pill" data-mode="day" onclick="setTheme('day')"><i class="ti ti-sun"></i> Φωτεινό</button>
+          <button class="pm-pill" data-mode="dark" onclick="setTheme('dark')"><i class="ti ti-moon"></i> Σκούρο</button>
+          <button class="pm-pill" data-mode="system" onclick="setTheme('system')"><i class="ti ti-device-desktop"></i> Σύστημα</button>
+        </div>
+        <div class="pm-sep"></div>
+        <a class="pm-item" href="#" onclick="estiaSoon('Ρυθμίσεις');return false;"><i class="ti ti-settings"></i> Ρυθμίσεις</a>
+        <a class="pm-item" href="#" onclick="estiaSoon('Λογαριασμός μου');return false;"><i class="ti ti-id-badge"></i> Λογαριασμός μου</a>
+        <div class="pm-sep"></div>
+        <a class="pm-item danger" href="/logout"><i class="ti ti-logout"></i> Έξοδος</a>
+      </div>
     </div>
-    <a href="/logout" class="ic" title="Έξοδος"><i class="ti ti-logout"></i></a>
   </div>
   <div class="body">
     <div class="scrim" onclick="document.getElementById('app').classList.remove('open')"></div>
@@ -120,7 +190,6 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
       <div class="item" data-url="/areas/dashboard?embed=1"><i class="ti ti-clipboard-list"></i> Πίνακας τομέων</div>
       <div class="grp">Γενικά</div>
       <div class="item" data-url="/fault?embed=1"><i class="ti ti-tool"></i> Αναφορά βλάβης</div>
-      <div class="item" data-url="/notifications?embed=1"><i class="ti ti-bell"></i> Ειδοποιήσεις</div>
       <div class="item" data-url="/profile?embed=1"><i class="ti ti-user"></i> Το προφίλ μου</div>
       {% if is_admin %}
       <div class="grp">Διαχείριση</div>
@@ -168,6 +237,27 @@ function estiaSoon(name){
   t.classList.add('show'); clearTimeout(window.__st);
   window.__st=setTimeout(function(){ t.classList.remove('show'); }, 2200);
 }
+// v12.8 — προφίλ dropdown + γλώσσα + θέμα
+function toggleProf(e){ e.stopPropagation(); document.getElementById('prof').classList.toggle('open'); }
+function closeProf(){ var p=document.getElementById('prof'); if(p) p.classList.remove('open'); }
+document.addEventListener('click', function(e){ var p=document.getElementById('prof'); if(p && !p.contains(e.target)) p.classList.remove('open'); });
+function navTo(url){ closeProf(); if(window.go) go(url,null); }
+function _ck(n){ return (document.cookie.match(new RegExp('(?:^|; )'+n+'=([^;]+)'))||[])[1]; }
+function setLang(code){ document.cookie='estia_lang='+code+';path=/;max-age=31536000'; location.href='/set-language/'+code; }
+function applyTheme(){
+  var m=_ck('estia_theme')||'system';
+  var dark = m==='dark' || (m==='system' && window.matchMedia && matchMedia('(prefers-color-scheme:dark)').matches);
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  document.querySelectorAll('#pm-themes .pm-pill').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });
+}
+function setTheme(mode){
+  document.cookie='estia_theme='+mode+';path=/;max-age=31536000';
+  try{ localStorage.setItem('estia_theme',mode); }catch(e){}
+  applyTheme();
+  var f=document.getElementById('frame'); if(f && f.src) f.src=f.src;   // re-apply στο περιεχόμενο
+}
+applyTheme();
+if(window.matchMedia){ try{ matchMedia('(prefers-color-scheme:dark)').addEventListener('change', applyTheme); }catch(e){} }
 // v12.6 — ζωντανό ρολόι (ημ/νία + ώρα με δευτερόλεπτα)
 (function(){
   var DAYS=['Κυριακή','Δευτέρα','Τρίτη','Τετάρτη','Πέμπτη','Παρασκευή','Σάββατο'];

@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.7)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.8)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -13,6 +13,8 @@ Modules:
             Footer (Εστία · All Rights Reserved 2026 · version/build · CONDIAN Hotels)
   - v12.7 — Βοηθός μετονομάστηκε «SpithaAI»· Διαχείριση Ξενοδοχείων & Πισινών (/dashboard/hotels) —
             μεταφέρθηκε από τον Πίνακα Πισινών στο μενού Διαχείρισης
+  - v12.8 — Header: 4ο κουμπί Operations · ειδοποιήσεις στο καμπανάκι · dropdown προφίλ
+            (προφίλ/μηνύματα/γλώσσα/ρυθμίσεις/λογαριασμός/θέμα/έξοδος) · Day/Dark/System (cookie) · γλώσσα el/en/uk
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -255,7 +257,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.7'
+APP_VERSION = '12.8'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -1280,7 +1282,7 @@ def api_record(record_id):
 
 @app.route('/set-language/<lang>')
 def set_language(lang):
-    if lang in ['el', 'en'] and 'user_id' in session:
+    if lang in ['el', 'en', 'uk'] and 'user_id' in session:
         session['language'] = lang
         user = User.query.get(session['user_id'])
         if user:
