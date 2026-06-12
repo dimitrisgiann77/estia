@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.5)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.6)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -9,6 +9,8 @@ Modules:
   - Records feed (v12.4) — ενιαία λίστα υποβολών πισινών & νερών
   - v12.5 — Πίνακας Πισινών: κεντρικό πάνελ (σημερινές μετρήσεις + charts + φίλτρα)·
             Records: εξαγωγή PDF & XLSX (έτοιμα προς εκτύπωση)
+  - v12.6 — Shell header: ζωντανό ρολόι + καιρός/location, κουμπιά Guest/Staff/Admin (placeholder)·
+            Footer (Εστία · All Rights Reserved 2026 · version/build · CONDIAN Hotels)
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
