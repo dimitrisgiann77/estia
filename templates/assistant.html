@@ -42,6 +42,7 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
     </div>
   </div>
   <div class="header-right">
+    <a href="/notifications" class="logout-btn" title="Ειδοποιήσεις" style="position:relative;"><i class="ti ti-bell"></i>{% if nav_unread %}<span style="position:absolute;top:-2px;right:-3px;background:#dc2626;color:#fff;font-size:9px;min-width:14px;height:14px;line-height:14px;border-radius:7px;text-align:center;padding:0 3px;">{{ nav_unread }}</span>{% endif %}</a>
     <a href="/profile" class="logout-btn" title="Προφίλ"><i class="ti ti-user-circle"></i></a>
     <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
   </div>

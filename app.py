@@ -27,6 +27,7 @@ if _db_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True}
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024   # 2MB (avatar upload)
 
 SMTP_SERVER    = 'condian.gr'
 SMTP_PORT      = 465
@@ -116,6 +117,9 @@ ACTION_RULES = {
 }
 SAFETY_NOTE = 'Ποτέ μην αναμειγνύεις χημικά μεταξύ τους (ειδικά χλώριο με οξύ). Πρόσθεσε ένα-ένα, με την κυκλοφορία ανοιχτή.'
 
+AREA_LABELS = {'pump': 'Αντλία', 'filter': 'Φίλτρο', 'chemicals': 'Χημικά / Δοσομέτρηση',
+               'water': 'Νερό / Στάθμη', 'electrical': 'Ηλεκτρικό', 'app': 'Εφαρμογή', 'other': 'Άλλο'}
+
 def _urgent(param, val):
     return ((param == 'free_chlorine' and val < 0.2) or
             (param == 'combined_chlorine' and val > 1.0) or
@@ -137,9 +141,114 @@ def compute_pool_actions(rec):
             out.append({'label': PARAM_LABELS.get(key, key), 'action': action, 'urgent': _urgent(key, val)})
     return out
 
+
+def notify(user_id, text, link=None):
+    if not user_id:
+        return
+    try:
+        db.session.add(Notification(user_id=user_id, text=(text or '')[:300], link=link))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+def notify_admins(text, link=None):
+    for u in User.query.filter(User.is_active == True, User.role.in_(['admin', 'masteradmin'])).all():
+        notify(u.id, text, link)
+
+def send_fault_email(fr):
+    if not EMAIL_PASSWORD:
+        return False
+    label = AREA_LABELS.get(fr.area, fr.area)
+    who = fr.user.full_name if fr.user else '-'
+    where = (fr.pool.hotel.name + ' / ' + fr.pool.name) if (fr.pool and fr.pool.hotel) else (fr.pool.name if fr.pool else '-')
+    html = ('<div style="font-family:Arial,sans-serif;max-width:600px;">'
+            '<div style="background:#b91c1c;color:white;padding:16px;border-radius:8px 8px 0 0;"><h2 style="margin:0;">Αναφορα βλαβης</h2></div>'
+            '<div style="background:#f9f9f9;padding:16px;border:1px solid #eee;">'
+            + '<p><b>Τομεας:</b> ' + label + '</p><p><b>Σημειο:</b> ' + where + '</p><p><b>Απο:</b> ' + who + '</p>'
+            + '<p><b>Περιγραφη:</b><br>' + (fr.message or '') + '</p></div></div>')
+    try:
+        msg = MIMEMultipart(); msg['From'] = EMAIL_FROM; msg['To'] = ', '.join(EMAIL_TO_LIST)
+        msg['Subject'] = 'Αναφορα βλαβης - ' + label
+        msg.attach(MIMEText(html, 'html', 'utf-8'))
+        sv = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT); sv.login(EMAIL_FROM, EMAIL_PASSWORD)
+        sv.sendmail(EMAIL_FROM, EMAIL_TO_LIST, msg.as_string()); sv.quit()
+        return True
+    except Exception as e:
+        print('fault email error:', e); return False
+
+
+# ── ROLES & PERMISSIONS ──
+ROLE_RANK = {'viewer': 0, 'staff': 1, 'manager': 2, 'admin': 3, 'masteradmin': 4}
+ROLE_LABELS = {'viewer': 'Viewer (μόνο ανάγνωση)', 'staff': 'Staff (καταγραφή)',
+               'manager': 'Manager (επόπτης)', 'admin': 'Admin', 'masteradmin': 'Master Admin'}
+
+def role_rank(role):
+    return ROLE_RANK.get(role, 0)
+
+def current_user():
+    uid = session.get('user_id')
+    return User.query.get(uid) if uid else None
+
+@app.context_processor
+def inject_nav():
+    uid = session.get('user_id')
+    unread = Notification.query.filter_by(user_id=uid, is_read=False).count() if uid else 0
+    return {'nav_unread': unread}
+
+def has_rank(min_rank):
+    u = current_user()
+    return u is not None and role_rank(u.role) >= min_rank
+
+def is_admin():
+    return has_rank(ROLE_RANK['admin'])      # admin ή masteradmin
+
+def can_log():
+    return has_rank(ROLE_RANK['staff'])      # ό,τι πάνω από viewer
+
+def allowed_hotels(u):
+    if u is None:
+        return []
+    if role_rank(u.role) >= ROLE_RANK['admin']:
+        return Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    assigned = [h for h in u.hotels if h.is_active]
+    if assigned:
+        return sorted(assigned, key=lambda h: h.name)
+    return Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()   # χωρίς ανάθεση = όλα
+
+def can_access_pool(u, pool):
+    if u is None or pool is None:
+        return False
+    if role_rank(u.role) >= ROLE_RANK['admin']:
+        return True
+    assigned = {h.id for h in u.hotels if h.is_active}
+    if not assigned:
+        return True   # χωρίς ανάθεση = όλα
+    return pool.hotel_id in assigned
+
+def log_activity(action, detail=''):
+    try:
+        db.session.add(ActivityLog(user_id=session.get('user_id'),
+                                   action=(action or '')[:60], detail=(detail or '')[:300]))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 # ──────────────────────────────────────────────────────────────────────────
 #  MODELS
 # ──────────────────────────────────────────────────────────────────────────
+user_hotels = db.Table('user_hotels',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('hotel_id', db.Integer, db.ForeignKey('hotel.id'), primary_key=True),
+)
+
+class ActivityLog(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    action     = db.Column(db.String(60))
+    detail     = db.Column(db.String(300))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    user       = db.relationship('User')
+
 class User(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     username   = db.Column(db.String(50), unique=True, nullable=False)
@@ -150,8 +259,10 @@ class User(db.Model):
     email      = db.Column(db.String(120))
     phone      = db.Column(db.String(40))
     approved   = db.Column(db.Boolean, default=True)
+    avatar     = db.Column(db.Text)                       # data URL (base64) εικόνας προφίλ
     is_active  = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    hotels     = db.relationship('Hotel', secondary=user_hotels, backref='members')
 
 class WaterRecord(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -226,6 +337,29 @@ class PoolRecord(db.Model):
 class ReminderSent(db.Model):
     day = db.Column(db.String(10), primary_key=True)        # 'YYYY-MM-DD' lock ανά ημέρα
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class FaultReport(db.Model):
+    id          = db.Column(db.Integer, primary_key=True)
+    user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    hotel_id    = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=True)
+    pool_id     = db.Column(db.Integer, db.ForeignKey('pool.id'), nullable=True)
+    area        = db.Column(db.String(20))
+    message     = db.Column(db.Text)
+    status      = db.Column(db.String(12), default='open')   # open / resolved
+    answer      = db.Column(db.Text)
+    answered_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    user = db.relationship('User', foreign_keys=[user_id])
+    pool = db.relationship('Pool')
+
+class Notification(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    text       = db.Column(db.String(300))
+    link       = db.Column(db.String(120))
+    is_read    = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 def flt(data, key):
@@ -576,13 +710,18 @@ def build_pool_report_pdf(rep_date, records):
 # ──────────────────────────────────────────────────────────────────────────
 #  AUTH
 # ──────────────────────────────────────────────────────────────────────────
+def landing_for(user):
+    r = role_rank(user.role)
+    if r >= ROLE_RANK['admin']:
+        return url_for('dashboard')
+    if r >= ROLE_RANK['viewer'] and r != ROLE_RANK['staff']:
+        return url_for('pools_dashboard')   # manager / viewer
+    return url_for('pools_app')             # staff
 @app.route('/')
 def index():
     if 'user_id' in session:
         user = User.query.get(session['user_id'])
-        if user and user.role == 'admin':
-            return redirect(url_for('dashboard'))
-        return redirect(url_for('water_app'))
+        return redirect(landing_for(user)) if user else redirect(url_for('login'))
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -597,7 +736,8 @@ def login():
             session['user_name'] = user.full_name
             session['user_role'] = user.role
             session['language']  = user.language
-            return redirect(url_for('dashboard') if user.role == 'admin' else url_for('water_app'))
+            log_activity('login')
+            return redirect(landing_for(user))
         error = 'Λαθος username η password'
     return render_template('login.html', error=error)
 
@@ -646,7 +786,14 @@ def profile():
             user.language = fm['language']; session['language'] = fm['language']
         if fm.get('password'):
             user.password = generate_password_hash(fm['password'])
+        photo = request.files.get('photo')
+        if photo and photo.filename and photo.mimetype and photo.mimetype.startswith('image/'):
+            raw = photo.read()
+            if 0 < len(raw) <= 800 * 1024:
+                import base64
+                user.avatar = 'data:' + photo.mimetype + ';base64,' + base64.b64encode(raw).decode()
         db.session.commit()
+        log_activity('profile_update')
         saved = True
     return render_template('profile.html', user=user, saved=saved)
 
@@ -658,6 +805,8 @@ def profile():
 def water_app():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if not can_log():
+        return redirect(url_for('pools_dashboard'))
     user = User.query.get(session['user_id'])
     today_morning   = WaterRecord.query.filter_by(record_date=date.today(), period='morning').first()
     today_afternoon = WaterRecord.query.filter_by(record_date=date.today(), period='afternoon').first()
@@ -739,8 +888,11 @@ def set_language(lang):
 # ──────────────────────────────────────────────────────────────────────────
 #  POOL LOG ROUTES
 # ──────────────────────────────────────────────────────────────────────────
-def hotels_payload():
-    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+def hotels_payload(user=None):
+    if user is not None and role_rank(user.role) < ROLE_RANK['admin']:
+        hotels = allowed_hotels(user)
+    else:
+        hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     payload = [{
         'id': h.id, 'name': h.name,
         'pools': [{'id': p.id, 'name': p.name, 'location': p.location or '',
@@ -753,8 +905,10 @@ def hotels_payload():
 def pools_app():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if not can_log():
+        return redirect(url_for('pools_dashboard'))
     user = User.query.get(session['user_id'])
-    hotels, hotels_json = hotels_payload()
+    hotels, hotels_json = hotels_payload(user)
     todays = PoolRecord.query.filter_by(record_date=date.today()).all()
     done = {}
     for r in todays:
@@ -765,7 +919,7 @@ def pools_app():
 
 @app.route('/submit-pool', methods=['POST'])
 def submit_pool():
-    if 'user_id' not in session:
+    if 'user_id' not in session or not can_log():
         return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
     user   = User.query.get(session['user_id'])
     data   = request.form
@@ -774,6 +928,8 @@ def submit_pool():
     pool = Pool.query.filter_by(id=pool_id, is_active=True).first() if pool_id else None
     if not pool:
         return jsonify({'success': False, 'message': 'Επιλεξτε πισινα'}), 400
+    if not can_access_pool(user, pool):
+        return jsonify({'success': False, 'message': 'Δεν εχεις προσβαση σε αυτη την πισινα'}), 403
     record = PoolRecord.query.filter_by(pool_id=pool.id, record_date=date.today(), period=period).first()
     if record:
         apply_pool_record(record, data, period)
@@ -784,6 +940,10 @@ def submit_pool():
         apply_pool_record(record, data, period)
         db.session.add(record)
     db.session.commit()
+    log_activity('pool_submit', f'{pool.name} ({period})')
+    _a = compute_pool_actions(record)
+    if _a:
+        notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _a) else '') + 'Μέτρηση εκτός ορίων: ' + pool.name), '/pools/dashboard')
     t = threading.Thread(target=send_pool_report_email, args=(record, user))
     t.daemon = True
     t.start()
@@ -792,17 +952,20 @@ def submit_pool():
 
 @app.route('/pools/edit/<int:record_id>', methods=['GET', 'POST'])
 def edit_pool_record(record_id):
-    if 'user_id' not in session:
+    if 'user_id' not in session or not can_log():
         return redirect(url_for('login'))
-    user   = User.query.get(session['user_id'])
+    user   = current_user()
     record = PoolRecord.query.get_or_404(record_id)
-    if user.role != 'admin' and record.record_date != date.today():
+    if not can_access_pool(user, record.pool):
+        return redirect(url_for('pools_app'))
+    if not is_admin() and record.record_date != date.today():
         return redirect(url_for('pools_app'))
     if request.method == 'POST':
         apply_pool_record(record, request.form, record.period)
         record.updated_at = datetime.utcnow()
         record.updated_by = user.id
         db.session.commit()
+        log_activity('pool_edit', record.pool.name if record.pool else '')
         if user.role == 'admin':
             return redirect(url_for('pools_dashboard') + '?success=updated')
         return redirect(url_for('pools_app'))
@@ -847,7 +1010,7 @@ def assistant_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = User.query.get(session['user_id'])
-    hotels, hotels_json = hotels_payload()
+    hotels, hotels_json = hotels_payload(current_user())
     return render_template('assistant.html', user=user,
                            hotels_json=hotels_json,
                            configured=(resolve_provider() is not None))
@@ -883,7 +1046,7 @@ def api_assistant():
 # ──────────────────────────────────────────────────────────────────────────
 @app.route('/dashboard')
 def dashboard():
-    if 'user_id' not in session or session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     records = WaterRecord.query.order_by(WaterRecord.record_date.desc(), WaterRecord.period).limit(60).all()
     users   = User.query.filter_by(is_active=True, approved=True).all()
@@ -891,23 +1054,30 @@ def dashboard():
     today_m = WaterRecord.query.filter_by(record_date=date.today(), period='morning').first()
     today_a = WaterRecord.query.filter_by(record_date=date.today(), period='afternoon').first()
     return render_template('dashboard.html', records=records, users=users, pending=pending,
-                           today_morning=today_m, today_afternoon=today_a)
+                           today_morning=today_m, today_afternoon=today_a,
+                           all_hotels=Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all(),
+                           role_labels=ROLE_LABELS, me=current_user())
 
 @app.route('/pools/dashboard')
 def pools_dashboard():
-    if 'user_id' not in session or session.get('user_role') != 'admin':
+    if 'user_id' not in session:
         return redirect(url_for('login'))
-    hotels  = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
-    pools   = Pool.query.filter_by(is_active=True).all()
-    records = (PoolRecord.query
-               .order_by(PoolRecord.record_date.desc(), PoolRecord.recorded_at.desc())
-               .limit(80).all())
+    user = current_user()
+    hotels = allowed_hotels(user)
+    hids = {h.id for h in hotels}
+    pools = [p for p in Pool.query.filter_by(is_active=True).all() if p.hotel_id in hids]
+    pids = {p.id for p in pools}
+    q = PoolRecord.query
+    if role_rank(user.role) < ROLE_RANK['admin']:
+        q = q.filter(PoolRecord.pool_id.in_(pids if pids else [-1]))
+    records = q.order_by(PoolRecord.record_date.desc(), PoolRecord.recorded_at.desc()).limit(80).all()
     return render_template('pools_dashboard.html', hotels=hotels, pools=pools,
-                           records=records, limits=POOL_LIMITS)
+                           records=records, limits=POOL_LIMITS,
+                           is_admin=is_admin(), user=user)
 
 @app.route('/dashboard/add-user', methods=['POST'])
 def add_user():
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     data = request.form
     if not User.query.filter_by(username=data['username']).first():
@@ -915,35 +1085,201 @@ def add_user():
             username=data['username'],
             password=generate_password_hash(data['password']),
             full_name=data['full_name'],
+            email=data.get('email', '').strip(),
+            phone=data.get('phone', '').strip(),
             role=data.get('role', 'staff'),
             language=data.get('language', 'el')
         ))
         db.session.commit()
+        log_activity('user_add', data.get('username', ''))
     return redirect(url_for('dashboard') + '?success=user_added')
 
 @app.route('/dashboard/delete-user/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     user = User.query.get(user_id)
-    if user and user.role != 'admin':
+    if user and role_rank(user.role) < ROLE_RANK['admin']:
         user.is_active = False
         db.session.commit()
+        log_activity('user_delete', user.username)
     return redirect(url_for('dashboard'))
 
 @app.route('/dashboard/approve-user/<int:user_id>', methods=['POST'])
 def approve_user(user_id):
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     u = User.query.get(user_id)
     if u:
         u.approved = True; u.is_active = True
         db.session.commit()
+        log_activity('user_approve', u.username)
+        notify(u.id, 'Ο λογαριασμός σου εγκρίθηκε. Καλώς ήρθες!', '/pools')
     return redirect(url_for('dashboard') + '?success=user_approved')
+
+def _protected(actor, target):
+    # δεν επιτρέπεται σε χαμηλότερο ρόλο να πειράξει masteradmin
+    return role_rank(target.role) >= ROLE_RANK['masteradmin'] and role_rank(actor.role) < ROLE_RANK['masteradmin']
+
+@app.route('/dashboard/edit-user/<int:user_id>', methods=['POST'])
+def edit_user(user_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    actor = current_user(); u = User.query.get(user_id)
+    if not u or _protected(actor, u):
+        return redirect(url_for('dashboard'))
+    fm = request.form
+    u.full_name = (fm.get('full_name') or u.full_name).strip() or u.full_name
+    u.email = fm.get('email', '').strip()
+    u.phone = fm.get('phone', '').strip()
+    new_role = fm.get('role', u.role)
+    if new_role in ROLE_RANK and role_rank(new_role) <= role_rank(actor.role):
+        u.role = new_role
+    hids = [int(x) for x in fm.getlist('hotel_ids') if x.isdigit()]
+    u.hotels = Hotel.query.filter(Hotel.id.in_(hids)).all() if hids else []
+    db.session.commit()
+    log_activity('user_edit', u.username)
+    return redirect(url_for('dashboard') + '?success=user_edited')
+
+@app.route('/dashboard/reset-password/<int:user_id>', methods=['POST'])
+def reset_password(user_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    actor = current_user(); u = User.query.get(user_id)
+    if u and not _protected(actor, u):
+        newpw = request.form.get('password', '').strip()
+        if newpw:
+            u.password = generate_password_hash(newpw); db.session.commit()
+            log_activity('user_reset_password', u.username)
+    return redirect(url_for('dashboard') + '?success=password_reset')
+
+@app.route('/dashboard/toggle-user/<int:user_id>', methods=['POST'])
+def toggle_user(user_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    actor = current_user(); u = User.query.get(user_id)
+    if u and u.id != actor.id and not _protected(actor, u):
+        u.is_active = not u.is_active; db.session.commit()
+        log_activity('user_toggle', u.username + (' -> active' if u.is_active else ' -> inactive'))
+    return redirect(url_for('dashboard'))
+
+@app.route('/dashboard/activity')
+def activity_log_view():
+    if not is_admin():
+        return redirect(url_for('login'))
+    logs = ActivityLog.query.order_by(ActivityLog.id.desc()).limit(200).all()
+    return render_template('activity.html', logs=logs)
+
+# ── Εβδομαδιαία κάλυψη ──
+@app.route('/pools/coverage')
+def pools_coverage():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    hids = {h.id for h in allowed_hotels(user)}
+    pools = [p for p in Pool.query.filter_by(is_active=True).order_by(Pool.hotel_id, Pool.name).all() if p.hotel_id in hids]
+    days = [date.today() - timedelta(days=i) for i in range(6, -1, -1)]
+    recs = PoolRecord.query.filter(
+        PoolRecord.pool_id.in_([p.id for p in pools] or [-1]),
+        PoolRecord.record_date.in_(days)).all()
+    cov = {}
+    for r in recs:
+        cov.setdefault((r.pool_id, r.record_date), set()).add(r.period)
+    grid = []
+    for p in pools:
+        cells = []
+        for d in days:
+            sset = cov.get((p.id, d), set())
+            cells.append({'m': 'morning' in sset, 'a': 'afternoon' in sset})
+        grid.append({'pool': p, 'cells': cells})
+    return render_template('coverage.html', grid=grid, days=days)
+
+# ── Αναφορά βλάβης ──
+@app.route('/fault', methods=['GET', 'POST'])
+def fault_report():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    hids = {h.id for h in allowed_hotels(user)}
+    pools = [p for p in Pool.query.filter_by(is_active=True).all() if p.hotel_id in hids]
+    if request.method == 'POST':
+        area = request.form.get('area', 'other')
+        msg = request.form.get('message', '').strip()
+        pid = request.form.get('pool_id', '')
+        pool = Pool.query.get(int(pid)) if pid.isdigit() else None
+        if msg:
+            fr = FaultReport(user_id=user.id, area=area, message=msg,
+                             pool_id=pool.id if pool else None,
+                             hotel_id=pool.hotel_id if pool else None, status='open')
+            db.session.add(fr); db.session.commit()
+            log_activity('fault_report', area)
+            where = (' / ' + pool.name) if pool else ''
+            notify_admins('Νέα αναφορά βλάβης: ' + AREA_LABELS.get(area, area) + where, '/dashboard/faults')
+            threading.Thread(target=send_fault_email, args=(fr,), daemon=True).start()
+            return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=True)
+    return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=False)
+
+# ── In-app ειδοποιήσεις ──
+@app.route('/notifications')
+def notifications():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    items = Notification.query.filter_by(user_id=session['user_id']).order_by(Notification.id.desc()).limit(100).all()
+    return render_template('notifications.html', items=items)
+
+@app.route('/notifications/read', methods=['POST'])
+def notifications_read():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    Notification.query.filter_by(user_id=session['user_id'], is_read=False).update({'is_read': True})
+    db.session.commit()
+    return redirect(url_for('notifications'))
+
+# ── Admin inbox βλαβών ──
+@app.route('/dashboard/faults')
+def faults_inbox():
+    if not is_admin():
+        return redirect(url_for('login'))
+    open_faults = FaultReport.query.filter_by(status='open').order_by(FaultReport.id.desc()).all()
+    done_faults = FaultReport.query.filter_by(status='resolved').order_by(FaultReport.id.desc()).limit(50).all()
+    return render_template('faults_inbox.html', open_faults=open_faults, done_faults=done_faults, areas=AREA_LABELS)
+
+@app.route('/dashboard/fault/<int:fid>/answer', methods=['POST'])
+def fault_answer(fid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    fr = FaultReport.query.get(fid)
+    if fr:
+        fr.answer = request.form.get('answer', '').strip()
+        fr.answered_by = session.get('user_id')
+        db.session.commit()
+        notify(fr.user_id, 'Απάντηση στην αναφορά σου: ' + (fr.answer or '')[:80], '/notifications')
+        log_activity('fault_answer', str(fid))
+    return redirect(url_for('faults_inbox'))
+
+@app.route('/dashboard/fault/<int:fid>/resolve', methods=['POST'])
+def fault_resolve(fid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    fr = FaultReport.query.get(fid)
+    if fr:
+        fr.status = 'resolved'; fr.resolved_at = datetime.utcnow(); db.session.commit()
+        notify(fr.user_id, 'Η αναφορά βλάβης σου επιλύθηκε.', '/notifications')
+        log_activity('fault_resolve', str(fid))
+    return redirect(url_for('faults_inbox'))
+
+@app.route('/dashboard/fault/<int:fid>/reopen', methods=['POST'])
+def fault_reopen(fid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    fr = FaultReport.query.get(fid)
+    if fr:
+        fr.status = 'open'; fr.resolved_at = None; db.session.commit()
+    return redirect(url_for('faults_inbox'))
 
 @app.route('/dashboard/add-hotel', methods=['POST'])
 def add_hotel():
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     name = request.form.get('name', '').strip()
     if name and not Hotel.query.filter_by(name=name).first():
@@ -953,7 +1289,7 @@ def add_hotel():
 
 @app.route('/dashboard/delete-hotel/<int:hotel_id>', methods=['POST'])
 def delete_hotel(hotel_id):
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     hotel = Hotel.query.get(hotel_id)
     if hotel:
@@ -965,7 +1301,7 @@ def delete_hotel(hotel_id):
 
 @app.route('/dashboard/add-pool', methods=['POST'])
 def add_pool():
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     data = request.form
     hotel_id = data.get('hotel_id')
@@ -983,7 +1319,7 @@ def add_pool():
 
 @app.route('/dashboard/delete-pool/<int:pool_id>', methods=['POST'])
 def delete_pool(pool_id):
-    if session.get('user_role') != 'admin':
+    if not is_admin():
         return redirect(url_for('login'))
     pool = Pool.query.get(pool_id)
     if pool:
@@ -1042,6 +1378,7 @@ def ensure_columns():
         _add_col('user', 'email', 'email VARCHAR(120)')
         _add_col('user', 'phone', 'phone VARCHAR(40)')
         _add_col('user', 'approved', f'approved BOOLEAN DEFAULT {truth}')
+        _add_col('user', 'avatar', 'avatar TEXT')
     except Exception as e:
         db.session.rollback()
         print(f'ensure_columns skipped: {e}')
@@ -1052,7 +1389,7 @@ def init_db():
         ensure_columns()
         try:
             if not User.query.filter_by(username='admin').first():
-                db.session.add(User(username='admin', password=generate_password_hash('sergios2024'), full_name='Δημητρης Γιαννουλακης', role='admin', language='el'))
+                db.session.add(User(username='admin', password=generate_password_hash('sergios2024'), full_name='Δημητρης Γιαννουλακης', role='masteradmin', language='el'))
                 db.session.add(User(username='giannhs', password=generate_password_hash('pool2024'), full_name='Γιαννης Γιακουμακης', role='admin', language='el'))
                 db.session.add(User(username='xypakis', password=generate_password_hash('water2024'), full_name='Μανος Χυπακης', role='staff', language='el'))
                 db.session.commit()

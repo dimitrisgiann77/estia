@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Αναφορές βλαβών — CONDIAN</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;color:#1a1a1a;}
+.topbar{background:#193847;color:white;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.topbar a{color:white;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,0.15);border-radius:6px;}
+.container{max-width:900px;margin:0 auto;padding:24px;}
+.card{background:white;border-radius:12px;padding:16px 18px;border:1px solid #d6eef3;margin-bottom:14px;}
+.fault{border:1px solid #fde68a;background:#fffdf5;border-radius:10px;padding:14px;margin-bottom:12px;}
+.fault.res{border-color:#e0f0ff;background:#fff;}
+.tag{display:inline-block;background:#193847;color:white;font-size:11px;padding:2px 8px;border-radius:5px;}
+.meta{font-size:12px;color:#888;margin:4px 0 8px;}
+textarea{width:100%;min-height:60px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;}
+.btn{padding:7px 14px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-p{background:#193847;color:white;} .btn-g{background:#16a34a;color:white;} .btn-o{background:#fde68a;color:#92400e;}
+</style></head><body>
+<div class="topbar">
+  <div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Αναφορές βλαβών</strong></div>
+  <div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div>
+</div>
+<div class="container">
+  <div class="card"><h2 style="font-size:15px;margin-bottom:12px;">Ανοιχτές ({{ open_faults|length }})</h2>
+  {% for fr in open_faults %}
+    <div class="fault">
+      <span class="tag">{{ areas.get(fr.area, fr.area) }}</span>
+      <div class="meta">{{ fr.created_at.strftime('%d/%m %H:%M') }} · {{ fr.user.full_name if fr.user else '—' }}{% if fr.pool %} · {{ fr.pool.hotel.name if fr.pool.hotel else '' }} / {{ fr.pool.name }}{% endif %}</div>
+      <div style="margin-bottom:10px;">{{ fr.message }}</div>
+      {% if fr.answer %}<div style="background:#eef2ff;padding:8px 10px;border-radius:6px;font-size:13px;margin-bottom:8px;"><b>Απάντηση:</b> {{ fr.answer }}</div>{% endif %}
+      <form method="POST" action="/dashboard/fault/{{ fr.id }}/answer" style="margin-bottom:8px;">
+        <textarea name="answer" placeholder="Απάντηση / οδηγία...">{{ fr.answer or '' }}</textarea>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button type="submit" class="btn btn-p">Απάντηση</button>
+        </div>
+      </form>
+      <form method="POST" action="/dashboard/fault/{{ fr.id }}/resolve" style="display:inline;"><button class="btn btn-g">Επιλύθηκε</button></form>
+    </div>
+  {% else %}<p style="color:#aaa;">Καμία ανοιχτή αναφορά.</p>{% endfor %}
+  </div>
+
+  <div class="card"><h2 style="font-size:15px;margin-bottom:12px;">Επιλυμένες</h2>
+  {% for fr in done_faults %}
+    <div class="fault res">
+      <span class="tag" style="background:#94a3b8;">{{ areas.get(fr.area, fr.area) }}</span>
+      <div class="meta">{{ fr.created_at.strftime('%d/%m') }} · {{ fr.user.full_name if fr.user else '—' }}</div>
+      <div style="font-size:13px;">{{ fr.message }}</div>
+      {% if fr.answer %}<div style="font-size:12px;color:#555;margin-top:4px;"><b>Απάντηση:</b> {{ fr.answer }}</div>{% endif %}
+      <form method="POST" action="/dashboard/fault/{{ fr.id }}/reopen" style="margin-top:6px;"><button class="btn btn-o">Επαναφορά</button></form>
+    </div>
+  {% else %}<p style="color:#aaa;">—</p>{% endfor %}
+  </div>
+</div></body></html>

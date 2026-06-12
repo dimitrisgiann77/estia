@@ -12,7 +12,7 @@
 <body>
 <header class="app-header">
   <div class="header-left">
-    <a href="{{ '/pools' if user.role!='admin' else '/dashboard' }}" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
+    <a href="{{ '/pools' if user.role not in ['admin','masteradmin'] else '/dashboard' }}" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
     <img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;">
     <div><div class="header-title">Το προφίλ μου</div><div class="header-sub">{{ user.full_name }}</div></div>
   </div>
@@ -20,7 +20,12 @@
 </header>
 <div class="app-content">
   {% if saved %}<div class="submit-msg success" style="display:block;">Αποθηκεύτηκε.</div>{% endif %}
-  <form method="POST">
+  <form method="POST" enctype="multipart/form-data">
+    <div class="section" style="text-align:center;">
+      <div class="sec-title" style="justify-content:center;"><i class="ti ti-camera"></i> Φωτογραφία προφίλ</div>
+      {% if user.avatar %}<img src="{{ user.avatar }}" style="width:84px;height:84px;border-radius:50%;object-fit:cover;border:2px solid #193847;">{% else %}<img src="/static/img/avatar.svg" style="width:84px;height:84px;border-radius:50%;background:#e0f0ff;padding:8px;">{% endif %}
+      <div class="field" style="margin-top:10px;"><input type="file" name="photo" accept="image/*" style="font-size:13px;"></div>
+    </div>
     <div class="section">
       <div class="sec-title"><i class="ti ti-user"></i> Στοιχεία επικοινωνίας</div>
       <div class="field"><label>Email</label><input type="email" name="email" value="{{ user.email or '' }}"></div>

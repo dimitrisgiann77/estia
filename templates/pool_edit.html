@@ -19,7 +19,7 @@
 
 <header class="app-header pool">
   <div class="header-left">
-    <a href="{{ '/pools/dashboard' if user.role == 'admin' else '/pools' }}" style="color:white; text-decoration:none; margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
+    <a href="{{ '/pools/dashboard' if user.role in ['admin','masteradmin'] else '/pools' }}" style="color:white; text-decoration:none; margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
     <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
     <div>
       <div class="header-title">Επεξεργασία πισίνας</div>
@@ -100,7 +100,7 @@
     <i class="ti ti-device-floppy"></i> Αποθήκευση αλλαγών
   </button>
 
-  <a href="{{ '/pools/dashboard' if user.role == 'admin' else '/pools' }}" style="display:block; text-align:center; margin-top:12px; font-size:13px; color:#888; text-decoration:none;">Ακύρωση</a>
+  <a href="{{ '/pools/dashboard' if user.role in ['admin','masteradmin'] else '/pools' }}" style="display:block; text-align:center; margin-top:12px; font-size:13px; color:#888; text-decoration:none;">Ακύρωση</a>
 
 </form>
 </div>

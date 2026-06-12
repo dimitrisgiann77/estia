@@ -40,7 +40,7 @@
     <a href="/app" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
       <i class="ti ti-droplet" style="font-size:14px;"></i> Νερά
     </a>
-    {% if user.role == 'admin' %}
+    {% if user.role in ['admin','masteradmin'] %}
     <a href="/pools/dashboard" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
       <i class="ti ti-layout-dashboard" style="font-size:14px;"></i> Dashboard
     </a>
@@ -50,6 +50,8 @@
       <span>|</span>
       <a href="/set-language/en" class="{{ 'active' if session.get('language','el')=='en' }}">EN</a>
     </div>
+    <a href="/fault" class="logout-btn" title="Αναφορά βλάβης"><i class="ti ti-tool"></i></a>
+    <a href="/notifications" class="logout-btn" title="Ειδοποιήσεις" style="position:relative;"><i class="ti ti-bell"></i>{% if nav_unread %}<span style="position:absolute;top:-2px;right:-3px;background:#dc2626;color:#fff;font-size:9px;min-width:14px;height:14px;line-height:14px;border-radius:7px;text-align:center;padding:0 3px;">{{ nav_unread }}</span>{% endif %}</a>
     <a href="/profile" class="logout-btn" title="Προφίλ"><i class="ti ti-user-circle"></i></a>
     <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
   </div>
@@ -65,7 +67,7 @@
   <div class="section" style="text-align:center;color:#888;">
     <i class="ti ti-pool" style="font-size:32px;"></i>
     <p style="margin-top:10px;" data-el="Δεν υπάρχουν πισίνες ακόμα." data-en="No pools yet.">Δεν υπάρχουν πισίνες ακόμα.</p>
-    {% if user.role == 'admin' %}<p style="margin-top:6px;"><a href="/pools/dashboard" style="color:#193847;">Πρόσθεσε ξενοδοχείο & πισίνα →</a></p>{% endif %}
+    {% if user.role in ['admin','masteradmin'] %}<p style="margin-top:6px;"><a href="/pools/dashboard" style="color:#193847;">Πρόσθεσε ξενοδοχείο & πισίνα →</a></p>{% endif %}
   </div>
 </div>
 {% else %}

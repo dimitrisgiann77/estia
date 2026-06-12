@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language','el') }}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Αναφορά βλάβης — CONDIAN</title><meta name="theme-color" content="#193847">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>.app-header{background:#193847;} .sbtn{width:100%;padding:14px;background:#b91c1c;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;} .self{width:100%;padding:10px 12px;border:1.5px solid #e0f0ff;border-radius:8px;font-size:15px;background:#f8fcff;}</style></head><body>
+<header class="app-header"><div class="header-left">
+  <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
+  <img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;">
+  <div><div class="header-title">Αναφορά βλάβης</div><div class="header-sub">Ειδοποιείται η διοίκηση</div></div>
+</div></header>
+<div class="app-content">
+{% if done %}
+  <div class="submit-msg success" style="display:block;">Η αναφορά στάλθηκε στη διοίκηση. Ευχαριστούμε!</div>
+  <a href="/pools" style="display:block;text-align:center;margin-top:14px;color:#193847;">← Επιστροφή</a>
+{% else %}
+  <form method="POST">
+    <div class="section">
+      <div class="sec-title"><i class="ti ti-alert-triangle"></i> Τι πρόβλημα υπάρχει;</div>
+      <div class="field"><label>Τομέας</label>
+        <select name="area" class="self">{% for k,v in areas.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+      </div>
+      <div class="field"><label>Πισίνα (προαιρετικό)</label>
+        <select name="pool_id" class="self"><option value="">—</option>{% for p in pools %}<option value="{{ p.id }}">{{ p.hotel.name if p.hotel else '' }} — {{ p.name }}</option>{% endfor %}</select>
+      </div>
+      <div class="field"><label>Περιγραφή</label>
+        <textarea name="message" required placeholder="Περίγραψε το πρόβλημα..." style="width:100%;min-height:110px;padding:10px;border:1.5px solid #e0f0ff;border-radius:8px;font-size:14px;"></textarea>
+      </div>
+    </div>
+    <button type="submit" class="sbtn"><i class="ti ti-send"></i> Αποστολή αναφοράς</button>
+  </form>
+{% endif %}
+</div></body></html>

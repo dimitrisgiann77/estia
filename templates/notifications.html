@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language','el') }}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ειδοποιήσεις — CONDIAN</title><meta name="theme-color" content="#193847">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>.app-header{background:#193847;} .nitem{background:white;border:1px solid #e0f0ff;border-radius:10px;padding:12px 14px;margin-bottom:8px;} .nitem.unread{border-left:4px solid #BB9549;background:#fffdf5;} .ntime{font-size:11px;color:#999;margin-top:4px;}</style></head><body>
+<header class="app-header"><div class="header-left">
+  <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
+  <img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;">
+  <div><div class="header-title">Ειδοποιήσεις</div></div>
+</div>
+<div class="header-right"><form method="POST" action="/notifications/read" style="margin:0;"><button type="submit" style="background:rgba(255,255,255,0.15);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;">Όλα διαβασμένα</button></form></div>
+</header>
+<div class="app-content">
+{% for n in items %}
+  <a href="{{ n.link or '#' }}" style="text-decoration:none;color:inherit;">
+    <div class="nitem {{ 'unread' if not n.is_read }}">
+      {{ n.text }}
+      <div class="ntime">{{ n.created_at.strftime('%d/%m %H:%M') }} (UTC)</div>
+    </div>
+  </a>
+{% else %}
+  <div style="text-align:center;color:#888;margin-top:40px;"><i class="ti ti-bell-off" style="font-size:34px;"></i><p style="margin-top:10px;">Καμία ειδοποίηση.</p></div>
+{% endfor %}
+</div></body></html>

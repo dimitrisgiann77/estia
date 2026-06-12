@@ -58,6 +58,8 @@ tr:last-child td { border-bottom:none; }
   <div>
     <a href="/app"><i class="ti ti-device-mobile"></i> Νερά Χρήσης</a>
     <a href="/pools/dashboard"><i class="ti ti-pool"></i> Πισίνες</a>
+    <a href="/dashboard/faults"><i class="ti ti-tool"></i> Βλάβες</a>
+    <a href="/notifications"><i class="ti ti-bell"></i>{% if nav_unread %} {{ nav_unread }}{% endif %}</a>
     <a href="/profile"><i class="ti ti-user-circle"></i> Προφίλ</a>
     <a href="/logout"><i class="ti ti-logout"></i> Έξοδος</a>
   </div>
@@ -219,36 +221,72 @@ tr:last-child td { border-bottom:none; }
   {% endif %}
 
   <!-- Χρήστες -->
-  <div class="grid2">
-    <div class="card">
-      <div class="card-title">Χρήστες</div>
-      <table>
-        <thead><tr><th>Όνομα</th><th>Username</th><th>Ρόλος</th><th></th></tr></thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.full_name }}</td>
-            <td><code style="font-size:12px;">{{ u.username }}</code></td>
-            <td><span class="badge {{ 'badge-admin' if u.role=='admin' else 'badge-staff' }}">{{ u.role }}</span></td>
-            <td>{% if u.role != 'admin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή;')" style="display:inline;"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+      <span><i class="ti ti-users"></i> Χρήστες</span>
+      <a href="/dashboard/activity" class="btn" style="background:#eef2ff;color:#193847;text-decoration:none;font-size:12px;padding:6px 12px;"><i class="ti ti-history"></i> Ιστορικό ενεργειών</a>
     </div>
-    <div class="card">
-      <div class="card-title">Νέος χρήστης</div>
-      <form method="POST" action="/dashboard/add-user">
-        <div class="add-form">
-          <input type="text" name="full_name" placeholder="Ονοματεπώνυμο" required>
-          <input type="text" name="username" placeholder="Username" required>
-          <input type="password" name="password" placeholder="Password" required>
-          <select name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select>
-          <select name="language"><option value="el">Ελληνικά</option><option value="en">English</option></select>
-          <button type="submit" class="btn btn-primary">Προσθήκη</button>
-        </div>
-      </form>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>Όνομα</th><th>Username</th><th>Ρόλος</th><th>Ξενοδοχεία</th><th>Κατάσταση</th><th></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{% if u.avatar %}<img src="{{ u.avatar }}" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;object-fit:cover;margin-right:6px;">{% endif %}{{ u.full_name }}</td>
+          <td><code style="font-size:12px;">{{ u.username }}</code>{% if u.email %}<div style="font-size:11px;color:#999;">{{ u.email }}</div>{% endif %}</td>
+          <td><span class="badge badge-{{ u.role }}">{{ role_labels.get(u.role, u.role) }}</span></td>
+          <td style="font-size:12px;color:#666;max-width:160px;">{% if u.role in ['admin','masteradmin'] %}<em>όλα</em>{% else %}{{ u.hotels|map(attribute='name')|join(', ') or '—' }}{% endif %}</td>
+          <td>{% if u.is_active %}<span class="badge badge-ok">ενεργός</span>{% else %}<span class="badge badge-bad">ανενεργός</span>{% endif %}</td>
+          <td>
+            {% if not (u.role=='masteradmin' and me.role!='masteradmin') %}
+            <details><summary style="cursor:pointer;color:#193847;font-size:12px;font-weight:500;">⚙ Διαχείριση</summary>
+              <div style="background:#f8fafb;border:1px solid #e0f0ff;border-radius:8px;padding:12px;margin-top:8px;min-width:260px;">
+                <form method="POST" action="/dashboard/edit-user/{{ u.id }}" style="margin-bottom:10px;">
+                  <input type="text" name="full_name" value="{{ u.full_name }}" placeholder="Ονοματεπώνυμο" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                  <input type="email" name="email" value="{{ u.email or '' }}" placeholder="Email" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                  <input type="text" name="phone" value="{{ u.phone or '' }}" placeholder="Κινητό" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                  <select name="role" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                    {% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if u.role==rk }}>{{ rl }}</option>{% endfor %}
+                  </select>
+                  <div style="font-size:11px;color:#888;margin:4px 0;">Ανατεθειμένα ξενοδοχεία (manager/staff/viewer):</div>
+                  <div style="max-height:96px;overflow:auto;font-size:12px;margin-bottom:8px;border:1px solid #eee;border-radius:6px;padding:6px;">
+                    {% for h in all_hotels %}<label style="display:block;margin-bottom:2px;"><input type="checkbox" name="hotel_ids" value="{{ h.id }}" {{ 'checked' if h in u.hotels }}> {{ h.name }}</label>{% else %}<span class="muted">—</span>{% endfor %}
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="font-size:12px;padding:6px 14px;">Αποθήκευση</button>
+                </form>
+                <form method="POST" action="/dashboard/reset-password/{{ u.id }}" style="display:flex;gap:6px;margin-bottom:8px;">
+                  <input type="password" name="password" placeholder="Νέος κωδικός" required style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                  <button type="submit" class="btn" style="background:#475569;color:white;font-size:12px;padding:6px 12px;">Reset</button>
+                </form>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <form method="POST" action="/dashboard/toggle-user/{{ u.id }}"><button type="submit" class="btn" style="background:#fde68a;color:#92400e;font-size:12px;padding:6px 12px;">{{ 'Απενεργοποίηση' if u.is_active else 'Ενεργοποίηση' }}</button></form>
+                  {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή χρήστη;')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}
+                </div>
+              </div>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-user-plus"></i> Νέος χρήστης</div>
+    <form method="POST" action="/dashboard/add-user">
+      <div class="add-form">
+        <input type="text" name="full_name" placeholder="Ονοματεπώνυμο" required>
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <input type="email" name="email" placeholder="Email (προαιρετικό)">
+        <input type="text" name="phone" placeholder="Κινητό (προαιρετικό)">
+        <select name="role">{% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if rk=='staff' }}>{{ rl }}</option>{% endfor %}</select>
+        <select name="language"><option value="el">Ελληνικά</option><option value="en">English</option></select>
+        <button type="submit" class="btn btn-primary">Προσθήκη</button>
+      </div>
+    </form>
   </div>
 
 </div>
