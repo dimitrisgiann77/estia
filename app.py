@@ -94,6 +94,49 @@ POOL_LIMITS = {
     'orp':               (650.0, None),
 }
 
+PARAM_LABELS = {
+    'free_chlorine': 'Ελεύθερο χλώριο', 'combined_chlorine': 'Συνδεδεμένο χλώριο',
+    'ph': 'pH', 'temp': 'Θερμοκρασία', 'turbidity': 'Θολότητα',
+    'cyanuric_acid': 'Κυανουρικό οξύ', 'total_alkalinity': 'Ολική αλκαλικότητα', 'orp': 'ORP',
+}
+
+# Κανόνας ενεργειών όταν τιμή εκτός ορίων (low = κάτω από min, high = πάνω από max)
+ACTION_RULES = {
+    'free_chlorine':     {'low': 'Χαμηλό χλώριο — κάνε χλωρίωση και επανέλεγξε σε 30΄.',
+                          'high': 'Υψηλό χλώριο — σταμάτα τη δοσομέτρηση/άσε να πέσει· απόφυγε χρήση μέχρι <1.5 mg/L.'},
+    'combined_chlorine': {'high': 'Υψηλό δεσμευμένο χλώριο — υπερχλωρίωση (shock) + αερισμός· έλεγξε ανανέωση νερού.'},
+    'ph':                {'low': 'Χαμηλό pH — πρόσθεσε pH plus (ανθρακική σόδα).',
+                          'high': 'Υψηλό pH — πρόσθεσε pH minus (οξύ), σταδιακά.'},
+    'temp':              {'high': 'Υψηλή θερμοκρασία — έλεγξε/μείωσε θέρμανση· παρακολούθησε χλώριο.'},
+    'turbidity':         {'high': 'Θολό νερό — backwash φίλτρου, έλεγξε διήθηση/κυκλοφορία, εξέτασε κροκίδωση.'},
+    'cyanuric_acid':     {'high': 'Υψηλό κυανουρικό οξύ — μερική ανανέωση νερού (αραίωση)· μείωσε σταθεροποιητή.'},
+    'total_alkalinity':  {'low': 'Χαμηλή αλκαλικότητα — πρόσθεσε alkalinity up (ανθρακική σόδα).',
+                          'high': 'Υψηλή αλκαλικότητα — πρόσθεσε οξύ σταδιακά.'},
+    'orp':               {'low': 'Χαμηλό ORP — ανέβασε ελεύθερο χλώριο και ρύθμισε pH στο 7.2–7.6.'},
+}
+SAFETY_NOTE = 'Ποτέ μην αναμειγνύεις χημικά μεταξύ τους (ειδικά χλώριο με οξύ). Πρόσθεσε ένα-ένα, με την κυκλοφορία ανοιχτή.'
+
+def _urgent(param, val):
+    return ((param == 'free_chlorine' and val < 0.2) or
+            (param == 'combined_chlorine' and val > 1.0) or
+            (param == 'turbidity' and val > 2.0))
+
+def compute_pool_actions(rec):
+    out = []
+    for key, rule in ACTION_RULES.items():
+        val = getattr(rec, key, None)
+        if val is None:
+            continue
+        mn, mx = POOL_LIMITS.get(key, (None, None))
+        action = None
+        if mn is not None and val < mn:
+            action = rule.get('low')
+        elif mx is not None and val > mx:
+            action = rule.get('high')
+        if action:
+            out.append({'label': PARAM_LABELS.get(key, key), 'action': action, 'urgent': _urgent(key, val)})
+    return out
+
 # ──────────────────────────────────────────────────────────────────────────
 #  MODELS
 # ──────────────────────────────────────────────────────────────────────────
@@ -334,6 +377,12 @@ def send_pool_report_email(record, user):
         rows += row('Ολικη αλκαλικοτητα', record.total_alkalinity, 'mg/L', 'total_alkalinity')
         rows += row('ORP (Redox)', record.orp, 'mV', 'orp')
     backwash = 'Ναι' if record.backwash_done else 'Οχι'
+    _acts = compute_pool_actions(record)
+    if _acts:
+        _li = ''.join('<li style="margin-bottom:4px;' + ('color:#b91c1c;font-weight:600;' if a['urgent'] else '') + '">' + ('ΕΠΕΙΓΟΝ — ' if a['urgent'] else '') + a['label'] + ': ' + a['action'] + '</li>' for a in _acts)
+        actions_html = '<h2 style="font-size:15px;color:#b45309;margin-top:18px;">Προτεινομενες ενεργειες</h2><ul style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 12px 12px 28px;color:#333;">' + _li + '</ul><p style="font-size:11px;color:#888;">' + SAFETY_NOTE + '</p>'
+    else:
+        actions_html = ''
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0e7490;color:white;padding:20px;border-radius:8px 8px 0 0;">
@@ -347,6 +396,7 @@ def send_pool_report_email(record, user):
           {rows}
         </table>
         <p style="margin-top:14px;font-size:13px;color:#555;">Ανταποπλυση φιλτρου (backwash): <b>{backwash}</b></p>
+        {actions_html}
         {f'<h2 style="font-size:15px;color:#333;margin-top:16px;">Παρατηρησεις</h2><p style="background:#fff;padding:10px;border:1px solid #eee;">{record.notes}</p>' if record.notes else ''}
       </div>
       <div style="background:#f0f0f0;padding:12px;text-align:center;font-size:12px;color:#888;border-radius:0 0 8px 8px;">
@@ -510,7 +560,16 @@ def build_pool_report_pdf(rep_date, records):
         line('Αλκαλικότητα', r.total_alkalinity, 'total_alkalinity', ' mg/L')
         line('ORP', r.orp, 'orp', ' mV')
         if r.notes:
-            pdf.set_font('dv', '', 9); pdf.set_text_color(*GREY); pdf.multi_cell(0, 5, '   Σημ: ' + r.notes)
+            pdf.set_x(pdf.l_margin); pdf.set_font('dv', '', 9); pdf.set_text_color(*GREY)
+            pdf.multi_cell(pdf.epw, 5, '   Σημ: ' + r.notes)
+        _acts = compute_pool_actions(r)
+        if _acts:
+            pdf.set_x(pdf.l_margin); pdf.set_font('dv', 'B', 9); pdf.set_text_color(180, 83, 9)
+            pdf.multi_cell(pdf.epw, 5, 'Προτεινόμενες ενέργειες:')
+            for a in _acts:
+                pdf.set_x(pdf.l_margin); pdf.set_font('dv', '', 9)
+                pdf.set_text_color(185, 28, 28) if a['urgent'] else pdf.set_text_color(80, 80, 80)
+                pdf.multi_cell(pdf.epw, 4.6, ('• ΕΠΕΙΓΟΝ — ' if a['urgent'] else '• ') + a['label'] + ': ' + a['action'])
     return bytes(pdf.output())
 
 
@@ -701,7 +760,8 @@ def pools_app():
     for r in todays:
         done.setdefault(str(r.pool_id), []).append(r.period)
     return render_template('pools.html', user=user, hotels=hotels,
-                           hotels_json=hotels_json, done=done, limits=POOL_LIMITS)
+                           hotels_json=hotels_json, done=done, limits=POOL_LIMITS,
+                           action_rules=ACTION_RULES, param_labels=PARAM_LABELS, safety_note=SAFETY_NOTE)
 
 @app.route('/submit-pool', methods=['POST'])
 def submit_pool():

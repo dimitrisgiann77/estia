@@ -91,13 +91,22 @@ function badge(val, min_v, max_v) {
   return `<div class="sbadge ok"><i class="ti ti-check"></i>${LANG==='en'?'OK':'Εντός ορίων'} (${val})</div>`;
 }
 
+function actionFor(id, val, mn, mx) {
+  if (typeof ACTIONS === 'undefined' || isNaN(val)) return '';
+  const rule = ACTIONS[id]; if (!rule) return '';
+  let txt = null;
+  if (mn != null && val < mn) txt = rule.low;
+  else if (mx != null && val > mx) txt = rule.high;
+  if (!txt) return '';
+  return `<div class="action-tip"><i class="ti ti-arrow-right"></i><span>${txt}</span></div>`;
+}
 function setBadge(id) {
   const el = document.getElementById(id);
   const st = document.getElementById(id + '_st');
   if (!el || !st) return;
   const val = parseFloat(el.value);
   const [mn, mx] = LIMITS[id] || [null, null];
-  st.innerHTML = isNaN(val) ? '' : badge(val, mn, mx);
+  st.innerHTML = isNaN(val) ? '' : (badge(val, mn, mx) + actionFor(id, val, mn, mx));
 }
 
 function validate() {
