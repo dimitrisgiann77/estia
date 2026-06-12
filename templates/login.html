@@ -22,12 +22,17 @@ button[type=submit]:hover { background:#122a36; }
 .lang-switch { text-align:center; margin-top:20px; font-size:13px; color:#aaa; }
 .lang-switch a { color:#193847; text-decoration:none; font-weight:500; }
 </style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
+<style>body{background:linear-gradient(135deg,var(--brand) 0%,var(--brand) 100%)!important;} button[type=submit]{background:var(--brand)!important;}</style>
 </head>
 <body>
 <div class="card">
   <div class="logo">
-    <img src="/static/img/logo-mark.png" alt="CONDIAN" style="height:60px;margin-bottom:4px;">
-    <div class="hotel-name">CONDIAN HOTELS</div>
+    <img src="{{ theme.logo or '/static/img/logo-mark.png' }}" alt="logo" style="height:60px;margin-bottom:4px;">
+    <div class="hotel-name">{{ theme.app_title }}</div>
     <div class="subtitle">Water Log — Νερά Χρήσης</div>
   </div>
   {% if error %}<div class="error">{{ error }}</div>{% endif %}

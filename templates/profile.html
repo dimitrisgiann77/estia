@@ -8,6 +8,10 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
 <style>.app-header{background:#193847;} .save-btn{width:100%;padding:14px;background:#193847;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;}</style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 </head>
 <body>
 <header class="app-header">

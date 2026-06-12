@@ -29,6 +29,10 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
 .composer button:disabled { background:#9bbcc6; }
 .welcome { text-align:center; color:#7a98a3; font-size:13px; margin-top:30px; padding:0 20px; }
 </style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 </head>
 <body>
 

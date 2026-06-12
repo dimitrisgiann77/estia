@@ -47,6 +47,10 @@ tr:last-child td { border-bottom:none; }
 .btn-danger { background:#fee2e2; color:#dc2626; border:none; padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; }
 .success-msg { background:#dcfce7; color:#16a34a; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px; }
 </style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 </head>
 <body>
 
@@ -58,6 +62,8 @@ tr:last-child td { border-bottom:none; }
   <div>
     <a href="/app"><i class="ti ti-device-mobile"></i> Νερά Χρήσης</a>
     <a href="/pools/dashboard"><i class="ti ti-pool"></i> Πισίνες</a>
+    <a href="/dashboard/email"><i class="ti ti-mail"></i> Email</a>
+    <a href="/dashboard/theme"><i class="ti ti-palette"></i> Εμφάνιση</a>
     <a href="/dashboard/faults"><i class="ti ti-tool"></i> Βλάβες</a>
     <a href="/notifications"><i class="ti ti-bell"></i>{% if nav_unread %} {{ nav_unread }}{% endif %}</a>
     <a href="/profile"><i class="ti ti-user-circle"></i> Προφίλ</a>

@@ -3,7 +3,11 @@
 <title>Αναφορά βλάβης — CONDIAN</title><meta name="theme-color" content="#193847">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
-<style>.app-header{background:#193847;} .sbtn{width:100%;padding:14px;background:#b91c1c;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;} .self{width:100%;padding:10px 12px;border:1.5px solid #e0f0ff;border-radius:8px;font-size:15px;background:#f8fcff;}</style></head><body>
+<style>.app-header{background:#193847;} .sbtn{width:100%;padding:14px;background:#b91c1c;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;} .self{width:100%;padding:10px 12px;border:1.5px solid #e0f0ff;border-radius:8px;font-size:15px;background:#f8fcff;}</style><style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
+</head><body>
 <header class="app-header"><div class="header-left">
   <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
   <img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;">

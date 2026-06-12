@@ -38,6 +38,10 @@ tr:last-child td { border-bottom:none; }
 .pool-item { display:flex; align-items:center; justify-content:space-between; padding:6px 0 6px 14px; border-bottom:1px solid #f5f5f5; font-size:13px; }
 .muted { color:#aaa; }
 </style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 </head>
 <body>
 

@@ -15,7 +15,11 @@
 textarea{width:100%;min-height:60px;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;}
 .btn{padding:7px 14px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-p{background:#193847;color:white;} .btn-g{background:#16a34a;color:white;} .btn-o{background:#fde68a;color:#92400e;}
-</style></head><body>
+</style><style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
+</head><body>
 <div class="topbar">
   <div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Αναφορές βλαβών</strong></div>
   <div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div>

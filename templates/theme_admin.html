@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εμφάνιση — CONDIAN</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;color:#1a1a1a;}
+.topbar{background:#193847;color:white;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
+.topbar a{color:white;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,0.15);border-radius:6px;}
+.container{max-width:760px;margin:0 auto;padding:24px;}
+.card{background:white;border-radius:12px;padding:20px;border:1px solid #d6eef3;margin-bottom:16px;}
+.row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;}
+.row label{font-weight:500;font-size:14px;} .row .hint{font-size:12px;color:#999;}
+input[type=color]{width:54px;height:36px;border:1px solid #ddd;border-radius:8px;cursor:pointer;background:white;}
+input[type=text]{padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:260px;}
+.btn{padding:12px 22px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;background:#193847;color:white;}
+.saved{background:#dcfce7;color:#16a34a;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;}
+#pv-header{border-radius:10px 10px 0 0;color:white;padding:16px;display:flex;align-items:center;gap:10px;}
+#pv-body{border:1px solid #e0f0ff;border-top:none;border-radius:0 0 10px 10px;padding:16px;}
+#pv-btn{border:none;border-radius:8px;color:white;padding:10px 16px;font-weight:600;}
+#pv-tab{display:inline-block;padding:8px 14px;border-bottom:3px solid;font-weight:600;}
+</style></head><body>
+<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Εμφάνιση εφαρμογής</strong></div><div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div></div>
+<div class="container">
+  {% if request.args.get('saved') %}<div class="saved">Αποθηκεύτηκε! (ανανέωσε τις άλλες σελίδες για να δεις την αλλαγή)</div>{% endif %}
+  <form method="POST" enctype="multipart/form-data">
+    <div class="card">
+      <div class="row"><div><label>Κύριο χρώμα</label><div class="hint">Κεφαλίδες & κουμπιά</div></div>
+        <input type="color" name="primary" id="primary" value="{{ theme.primary }}" oninput="pv()"></div>
+      <div class="row"><div><label>Χρώμα τόνου (accent)</label><div class="hint">Ενεργές καρτέλες/λεπτομέρειες</div></div>
+        <input type="color" name="accent" id="accent" value="{{ theme.accent }}" oninput="pv()"></div>
+      <div class="row"><div><label>Τίτλος εφαρμογής</label><div class="hint">Εμφανίζεται στο login</div></div>
+        <input type="text" name="app_title" id="title" value="{{ theme.app_title }}" oninput="pv()"></div>
+      <div class="row"><div><label>Λογότυπο (login)</label><div class="hint">PNG/SVG, έως 400KB</div></div>
+        <input type="file" name="logo" accept="image/*"></div>
+      {% if theme.logo %}<div class="row"><img src="{{ theme.logo }}" style="height:40px;"><label style="font-weight:400;font-size:13px;"><input type="checkbox" name="reset_logo" value="1"> Αφαίρεση λογοτύπου</label></div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-weight:600;margin-bottom:12px;">Προεπισκόπηση</div>
+      <div id="pv-header" style="background:{{ theme.primary }};"><i class="ti ti-pool"></i> <span id="pv-title">{{ theme.app_title }}</span></div>
+      <div id="pv-body">
+        <span id="pv-tab" style="border-color:{{ theme.accent }};color:{{ theme.primary }};">Πρωί</span>
+        <div style="margin-top:14px;"><button type="button" id="pv-btn" style="background:{{ theme.primary }};">Υποβολή</button></div>
+      </div>
+    </div>
+    <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+  </form>
+</div>
+<script>
+function pv(){
+  var p=document.getElementById('primary').value, a=document.getElementById('accent').value, t=document.getElementById('title').value;
+  document.getElementById('pv-header').style.background=p;
+  document.getElementById('pv-btn').style.background=p;
+  document.getElementById('pv-tab').style.borderColor=a;
+  document.getElementById('pv-tab').style.color=p;
+  document.getElementById('pv-title').textContent=t;
+}
+</script>
+</body></html>

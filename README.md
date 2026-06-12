@@ -113,3 +113,9 @@ python app.py
 - **Auto-migration**: οι νέες στήλες (`user.email/phone/approved`, `pool.volume_m3`) προστίθενται μόνες τους.
 
 Νέες env: `REG_CODE`, `ENABLE_SCHEDULER`, `REMINDER_HOUR` (δες `.env.example`).
+
+## v9 — Microsoft Graph email & theming
+
+- **Email μέσω Microsoft Graph (Office 365)**: ορίζεις `GRAPH_TENANT_ID/CLIENT_ID/CLIENT_SECRET/SENDER` → όλα τα email φεύγουν μέσω 365 (αλλιώς SMTP). Ενοποιημένη `send_email()` + **log απεσταλμένων**.
+- **Admin: `/dashboard/email`** — δοκιμαστικό email, χειροκίνητη υπενθύμιση, log.
+- **Admin theming: `/dashboard/theme`** — κύριο χρώμα, accent, τίτλος, λογότυπο (με προεπισκόπηση). Εφαρμόζεται παντού.

@@ -3,7 +3,11 @@
 <title>Ειδοποιήσεις — CONDIAN</title><meta name="theme-color" content="#193847">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
-<style>.app-header{background:#193847;} .nitem{background:white;border:1px solid #e0f0ff;border-radius:10px;padding:12px 14px;margin-bottom:8px;} .nitem.unread{border-left:4px solid #BB9549;background:#fffdf5;} .ntime{font-size:11px;color:#999;margin-top:4px;}</style></head><body>
+<style>.app-header{background:#193847;} .nitem{background:white;border:1px solid #e0f0ff;border-radius:10px;padding:12px 14px;margin-bottom:8px;} .nitem.unread{border-left:4px solid #BB9549;background:#fffdf5;} .ntime{font-size:11px;color:#999;margin-top:4px;}</style><style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
+.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
+</head><body>
 <header class="app-header"><div class="header-left">
   <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
   <img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;">

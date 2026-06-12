@@ -13,7 +13,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text
 from datetime import datetime, date, timedelta
-import os, smtplib, threading, json, time, urllib.request, urllib.error
+import os, smtplib, threading, json, time, urllib.request, urllib.error, urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -40,6 +40,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REG_CODE = os.environ.get('REG_CODE', 'condian2026')          # κωδικός εγγραφής προσωπικού
 ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', 'true').lower() in ('1','true','yes','on')
 REMINDER_HOUR = int(os.environ.get('REMINDER_HOUR', '18'))    # ώρα υπενθύμισης (Europe/Athens)
+
+# Microsoft Graph (Office 365) — ενεργό αν οριστεί GRAPH_CLIENT_ID
+GRAPH_TENANT_ID     = os.environ.get('GRAPH_TENANT_ID', '')
+GRAPH_CLIENT_ID     = os.environ.get('GRAPH_CLIENT_ID', '')
+GRAPH_CLIENT_SECRET = os.environ.get('GRAPH_CLIENT_SECRET', '')
+GRAPH_SENDER        = os.environ.get('GRAPH_SENDER', EMAIL_FROM)
 
 # ── AI Assistant config (provider-agnostic) ──
 AI_PROVIDER       = os.environ.get('AI_PROVIDER', 'auto')   # auto | anthropic | openai
@@ -156,7 +162,7 @@ def notify_admins(text, link=None):
         notify(u.id, text, link)
 
 def send_fault_email(fr):
-    if not EMAIL_PASSWORD:
+    if not EMAIL_PASSWORD and not GRAPH_CLIENT_ID:
         return False
     label = AREA_LABELS.get(fr.area, fr.area)
     who = fr.user.full_name if fr.user else '-'
@@ -166,15 +172,7 @@ def send_fault_email(fr):
             '<div style="background:#f9f9f9;padding:16px;border:1px solid #eee;">'
             + '<p><b>Τομεας:</b> ' + label + '</p><p><b>Σημειο:</b> ' + where + '</p><p><b>Απο:</b> ' + who + '</p>'
             + '<p><b>Περιγραφη:</b><br>' + (fr.message or '') + '</p></div></div>')
-    try:
-        msg = MIMEMultipart(); msg['From'] = EMAIL_FROM; msg['To'] = ', '.join(EMAIL_TO_LIST)
-        msg['Subject'] = 'Αναφορα βλαβης - ' + label
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
-        sv = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT); sv.login(EMAIL_FROM, EMAIL_PASSWORD)
-        sv.sendmail(EMAIL_FROM, EMAIL_TO_LIST, msg.as_string()); sv.quit()
-        return True
-    except Exception as e:
-        print('fault email error:', e); return False
+    return send_email('Αναφορα βλαβης - ' + label, html, EMAIL_TO_LIST)
 
 
 # ── ROLES & PERMISSIONS ──
@@ -194,6 +192,10 @@ def inject_nav():
     uid = session.get('user_id')
     unread = Notification.query.filter_by(user_id=uid, is_read=False).count() if uid else 0
     return {'nav_unread': unread}
+
+@app.context_processor
+def inject_theme():
+    return {'theme': get_theme()}
 
 def has_rank(min_rank):
     u = current_user()
@@ -361,12 +363,87 @@ class Notification(db.Model):
     is_read    = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class EmailLog(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    subject    = db.Column(db.String(200))
+    recipients = db.Column(db.String(300))
+    ok         = db.Column(db.Boolean, default=False)
+    via        = db.Column(db.String(10))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Setting(db.Model):
+    key   = db.Column(db.String(40), primary_key=True)
+    value = db.Column(db.Text)
+
 
 def flt(data, key):
     try:
         return float(data[key]) if data.get(key) not in (None, '') else None
     except (ValueError, TypeError):
         return None
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  EMAIL (Microsoft Graph ή SMTP) + log
+# ──────────────────────────────────────────────────────────────────────────
+def _graph_token():
+    data = urllib.parse.urlencode({
+        'client_id': GRAPH_CLIENT_ID, 'client_secret': GRAPH_CLIENT_SECRET,
+        'scope': 'https://graph.microsoft.com/.default', 'grant_type': 'client_credentials',
+    }).encode()
+    req = urllib.request.Request('https://login.microsoftonline.com/' + GRAPH_TENANT_ID + '/oauth2/v2.0/token', data=data)
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode())['access_token']
+
+def _send_graph(subject, html, recips):
+    token = _graph_token()
+    payload = {'message': {'subject': subject, 'body': {'contentType': 'HTML', 'content': html},
+               'toRecipients': [{'emailAddress': {'address': a}} for a in recips]}, 'saveToSentItems': True}
+    req = urllib.request.Request('https://graph.microsoft.com/v1.0/users/' + GRAPH_SENDER + '/sendMail',
+        data=json.dumps(payload).encode(),
+        headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.status in (200, 202)
+
+def _send_smtp(subject, html, recips):
+    msg = MIMEMultipart(); msg['From'] = EMAIL_FROM; msg['To'] = ', '.join(recips); msg['Subject'] = subject
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+    sv = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT); sv.login(EMAIL_FROM, EMAIL_PASSWORD)
+    sv.sendmail(EMAIL_FROM, recips, msg.as_string()); sv.quit()
+    return True
+
+def send_email(subject, html, recips=None):
+    recips = recips or EMAIL_TO_LIST
+    via = 'graph' if GRAPH_CLIENT_ID else ('smtp' if EMAIL_PASSWORD else 'none')
+    ok = False
+    if via != 'none':
+        try:
+            ok = _send_graph(subject, html, recips) if via == 'graph' else _send_smtp(subject, html, recips)
+        except Exception as e:
+            print('email error (' + via + '):', e); ok = False
+    try:
+        db.session.add(EmailLog(subject=(subject or '')[:200], recipients=', '.join(recips)[:300], ok=ok, via=via))
+        db.session.commit()
+    except Exception:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+    return ok
+
+
+THEME_DEFAULTS = {'primary': '#193847', 'accent': '#BB9549', 'app_title': 'CONDIAN HOTELS', 'logo': ''}
+
+def get_theme():
+    t = dict(THEME_DEFAULTS)
+    try:
+        for row in Setting.query.filter(Setting.key.like('theme_%')).all():
+            k = row.key[6:]
+            if k in t and row.value is not None:
+                t[k] = row.value
+    except Exception:
+        pass
+    return t
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -394,7 +471,7 @@ def apply_record(record, data, period):
         record.ph_tank         = flt(data, 'ph_tank')
 
 def send_report_email(record, user):
-    if not EMAIL_PASSWORD:
+    if not EMAIL_PASSWORD and not GRAPH_CLIENT_ID:
         return False
     period_gr = 'Πρωι' if record.period == 'morning' else 'Απογευμα'
     def row(label, val, unit='', min_v=None, max_v=None):
@@ -446,20 +523,7 @@ def send_report_email(record, user):
         Sergios Hotel - Water Log - {record.record_date.strftime('%d/%m/%Y')} - {period_gr}
       </div>
     </div>"""
-    try:
-        msg = MIMEMultipart()
-        msg['From']    = EMAIL_FROM
-        msg['To']      = ', '.join(EMAIL_TO_LIST)
-        msg['Subject'] = f'Sergios Hotel - Water Log {period_gr} {record.record_date.strftime("%d/%m/%Y")}'
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
-        s = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-        s.login(EMAIL_FROM, EMAIL_PASSWORD)
-        s.sendmail(EMAIL_FROM, EMAIL_TO_LIST, msg.as_string())
-        s.quit()
-        return True
-    except Exception as e:
-        print(f'Email error: {e}')
-        return False
+    return send_email(f'Sergios Hotel - Water Log {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -479,7 +543,7 @@ def apply_pool_record(record, data, period):
         record.orp              = flt(data, 'orp')
 
 def send_pool_report_email(record, user):
-    if not EMAIL_PASSWORD:
+    if not EMAIL_PASSWORD and not GRAPH_CLIENT_ID:
         return False
     period_gr = 'Πρωι' if record.period == 'morning' else 'Απογευμα'
     pool   = record.pool
@@ -537,20 +601,7 @@ def send_pool_report_email(record, user):
         {hotel} - Πισινα {pool.name if pool else ''} - {record.record_date.strftime('%d/%m/%Y')} - {period_gr}
       </div>
     </div>"""
-    try:
-        msg = MIMEMultipart()
-        msg['From']    = EMAIL_FROM
-        msg['To']      = ', '.join(EMAIL_TO_LIST)
-        msg['Subject'] = f'{hotel} - Πισινα {pool.name if pool else ""} {period_gr} {record.record_date.strftime("%d/%m/%Y")}'
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
-        s = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
-        s.login(EMAIL_FROM, EMAIL_PASSWORD)
-        s.sendmail(EMAIL_FROM, EMAIL_TO_LIST, msg.as_string())
-        s.quit()
-        return True
-    except Exception as e:
-        print(f'Pool email error: {e}')
-        return False
+    return send_email(f'{hotel} - Πισινα {pool.name if pool else ""} {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -707,6 +758,26 @@ def build_pool_report_pdf(rep_date, records):
     return bytes(pdf.output())
 
 
+# ── Background email senders (τρέχουν σε thread, με app context) ──
+def _bg_send_water(rid, uid):
+    with app.app_context():
+        r = WaterRecord.query.get(rid); u = User.query.get(uid)
+        if r and u:
+            send_report_email(r, u)
+
+def _bg_send_pool(rid, uid):
+    with app.app_context():
+        r = PoolRecord.query.get(rid); u = User.query.get(uid)
+        if r and u:
+            send_pool_report_email(r, u)
+
+def _bg_send_fault(fid):
+    with app.app_context():
+        fr = FaultReport.query.get(fid)
+        if fr:
+            send_fault_email(fr)
+
+
 # ──────────────────────────────────────────────────────────────────────────
 #  AUTH
 # ──────────────────────────────────────────────────────────────────────────
@@ -831,9 +902,7 @@ def submit():
         apply_record(record, data, period)
         db.session.add(record)
     db.session.commit()
-    t = threading.Thread(target=send_report_email, args=(record, user))
-    t.daemon = True
-    t.start()
+    threading.Thread(target=_bg_send_water, args=(record.id, user.id), daemon=True).start()
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
     return jsonify({'success': True, 'message': f'Καταγραφη {period_gr} αποθηκευτηκε!'})
 
@@ -944,9 +1013,7 @@ def submit_pool():
     _a = compute_pool_actions(record)
     if _a:
         notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _a) else '') + 'Μέτρηση εκτός ορίων: ' + pool.name), '/pools/dashboard')
-    t = threading.Thread(target=send_pool_report_email, args=(record, user))
-    t.daemon = True
-    t.start()
+    threading.Thread(target=_bg_send_pool, args=(record.id, user.id), daemon=True).start()
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
     return jsonify({'success': True, 'message': f'Καταγραφη {pool.name} ({period_gr}) αποθηκευτηκε!'})
 
@@ -1215,7 +1282,7 @@ def fault_report():
             log_activity('fault_report', area)
             where = (' / ' + pool.name) if pool else ''
             notify_admins('Νέα αναφορά βλάβης: ' + AREA_LABELS.get(area, area) + where, '/dashboard/faults')
-            threading.Thread(target=send_fault_email, args=(fr,), daemon=True).start()
+            threading.Thread(target=_bg_send_fault, args=(fr.id,), daemon=True).start()
             return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=True)
     return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=False)
 
@@ -1276,6 +1343,66 @@ def fault_reopen(fid):
     if fr:
         fr.status = 'open'; fr.resolved_at = None; db.session.commit()
     return redirect(url_for('faults_inbox'))
+
+# ── Email admin (Graph/SMTP, test, manual, log) ──
+@app.route('/dashboard/email')
+def email_admin():
+    if not is_admin():
+        return redirect(url_for('login'))
+    logs = EmailLog.query.order_by(EmailLog.id.desc()).limit(50).all()
+    mode = 'Microsoft Graph (365)' if GRAPH_CLIENT_ID else ('SMTP (' + SMTP_SERVER + ')' if EMAIL_PASSWORD else 'Δεν έχει ρυθμιστεί')
+    return render_template('email_admin.html', logs=logs, mode=mode)
+
+@app.route('/dashboard/email/test', methods=['POST'])
+def email_test():
+    if not is_admin():
+        return redirect(url_for('login'))
+    to = request.form.get('to', '').strip()
+    recips = [to] if to else EMAIL_TO_LIST
+    send_email('CONDIAN - Δοκιμαστικο email', '<p>Δοκιμαστικο email απο την εφαρμογη CONDIAN. Αν το βλεπεις, η αποστολη λειτουργει.</p>', recips)
+    log_activity('email_test', ', '.join(recips))
+    return redirect(url_for('email_admin'))
+
+@app.route('/dashboard/email/reminder', methods=['POST'])
+def email_reminder_now():
+    if not is_admin():
+        return redirect(url_for('login'))
+    miss = missing_today()
+    if miss:
+        send_reminder_email(miss)
+    log_activity('email_reminder_manual', str(len(miss)))
+    return redirect(url_for('email_admin'))
+
+# ── Theming (admin) ──
+@app.route('/dashboard/theme', methods=['GET', 'POST'])
+def theme_admin():
+    if not is_admin():
+        return redirect(url_for('login'))
+    import re as _re
+    if request.method == 'POST':
+        def setk(k, v):
+            row = Setting.query.get('theme_' + k)
+            if row:
+                row.value = v
+            else:
+                db.session.add(Setting(key='theme_' + k, value=v))
+        for k in ['primary', 'accent']:
+            v = request.form.get(k, '')
+            if _re.match(r'^#[0-9a-fA-F]{6}$', v):
+                setk(k, v)
+        setk('app_title', (request.form.get('app_title', 'CONDIAN HOTELS') or 'CONDIAN HOTELS')[:60])
+        if request.form.get('reset_logo'):
+            setk('logo', '')
+        else:
+            logo = request.files.get('logo')
+            if logo and logo.filename and logo.mimetype and logo.mimetype.startswith('image/'):
+                raw = logo.read()
+                if 0 < len(raw) <= 400 * 1024:
+                    import base64
+                    setk('logo', 'data:' + logo.mimetype + ';base64,' + base64.b64encode(raw).decode())
+        db.session.commit(); log_activity('theme_update')
+        return redirect(url_for('theme_admin') + '?saved=1')
+    return render_template('theme_admin.html', theme=get_theme())
 
 @app.route('/dashboard/add-hotel', methods=['POST'])
 def add_hotel():
@@ -1429,7 +1556,7 @@ def missing_today():
     return miss
 
 def send_reminder_email(miss):
-    if not EMAIL_PASSWORD or not miss:
+    if (not EMAIL_PASSWORD and not GRAPH_CLIENT_ID) or not miss:
         return False
     recips = list(EMAIL_TO_LIST)
     for u in User.query.filter_by(is_active=True, approved=True).all():
@@ -1437,15 +1564,7 @@ def send_reminder_email(miss):
             recips.append(u.email)
     items = ''.join(f'<li>{m}</li>' for m in miss)
     html = f'<div style="font-family:Arial,sans-serif"><h3 style="color:#193847">Εκκρεμείς καταγραφές σήμερα</h3><ul>{items}</ul><p style="color:#888;font-size:12px">CONDIAN Hotels — αυτόματη υπενθύμιση</p></div>'
-    try:
-        msg = MIMEMultipart(); msg['From'] = EMAIL_FROM; msg['To'] = ', '.join(recips)
-        msg['Subject'] = 'Υπενθυμιση καταγραφων - ' + date.today().strftime('%d/%m/%Y')
-        msg.attach(MIMEText(html, 'html', 'utf-8'))
-        sv = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT); sv.login(EMAIL_FROM, EMAIL_PASSWORD)
-        sv.sendmail(EMAIL_FROM, recips, msg.as_string()); sv.quit()
-        return True
-    except Exception as e:
-        print('reminder email error:', e); return False
+    return send_email('Υπενθυμιση καταγραφων - ' + date.today().strftime('%d/%m/%Y'), html, recips)
 
 def reminder_tick():
     with app.app_context():
