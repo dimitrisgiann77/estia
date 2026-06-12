@@ -71,6 +71,7 @@ tr:last-child td { border-bottom:none; }
 
   <div style="margin-bottom:16px;">
     <a href="/pools/report.pdf" class="btn btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;"><i class="ti ti-file-type-pdf"></i> Κατέβασε PDF (σήμερα)</a>
+    <form action="/pools/report.pdf" method="get" style="display:inline-flex;gap:6px;align-items:center;margin-left:8px;"><input type="date" name="date" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;"><button class="btn btn-primary" type="submit" style="border:none;cursor:pointer;"><i class="ti ti-file-type-pdf"></i> PDF ημέρας</button></form>
     {% if is_admin %}<a href="/admin/seed-demo" onclick="return confirm('Δημιουργία τυχαίων demo καταγραφών για 1-31/5;')" class="btn" style="background:#94a3b8;color:white;text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-left:8px;"><i class="ti ti-database-plus"></i> Demo δεδομένα (Μάιος)</a>{% endif %}
   </div>
 

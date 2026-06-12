@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Template: {{ tpl.name }}</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;}
+.topbar{background:#193847;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;}.topbar a{color:#fff;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,.15);border-radius:6px;}
+.container{max-width:1000px;margin:0 auto;padding:24px;}.card{background:#fff;border-radius:12px;padding:18px;border:1px solid #d6eef3;margin-bottom:16px;overflow-x:auto;}.card-title{font-weight:600;margin-bottom:12px;}
+label{font-size:12px;color:#888;display:block;margin-bottom:3px;}input,select{padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;width:100%;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th{text-align:left;padding:6px;color:#888;font-size:11px;border-bottom:1px solid #eee;}td{padding:5px;border-bottom:1px solid #f7f7f7;vertical-align:top;}
+.btn{padding:11px 22px;border:none;border-radius:9px;background:#193847;color:#fff;font-weight:600;cursor:pointer;}.head{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:8px;}
+.saved{background:#dcfce7;color:#16a34a;padding:10px 14px;border-radius:8px;margin-bottom:14px;}</style><style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn,.btn{background:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head><body>
+<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Template: {{ tpl.name }}</strong></div><div><a href="/dashboard/templates"><i class="ti ti-arrow-left"></i> Templates</a></div></div>
+<div class="container">
+  {% if request.args.get('saved') %}<div class="saved">Αποθηκεύτηκε!</div>{% endif %}
+  <form method="POST">
+    <div class="card"><div class="head">
+      <div><label>Όνομα</label><input name="name" value="{{ tpl.name }}"></div>
+      <div><label>Icon</label><input name="icon" value="{{ tpl.icon }}"></div>
+      <div><label>Συχνότητα</label><select name="frequency">{% for fk,fl in freq_label.items() %}<option value="{{ fk }}" {{ 'selected' if tpl.frequency==fk }}>{{ fl }}</option>{% endfor %}</select></div>
+    </div></div>
+    <div class="card"><div class="card-title"><i class="ti ti-list-details"></i> Παράμετροι (όρια & ενέργειες)</div>
+      <table><thead><tr><th>Όνομα</th><th>Μον.</th><th>Min</th><th>Max</th><th>Ενέργεια αν χαμηλό</th><th>Ενέργεια αν υψηλό</th><th>Πρωί μόνο</th><th>Διαγρ.</th></tr></thead><tbody>
+      {% for p in tpl.params %}
+      <tr><td style="min-width:120px;"><input name="label_{{ p.id }}" value="{{ p.label }}"></td>
+        <td style="width:60px;"><input name="unit_{{ p.id }}" value="{{ p.unit or '' }}"></td>
+        <td style="width:70px;"><input name="min_{{ p.id }}" value="{{ p.min_v if p.min_v is not none else '' }}"></td>
+        <td style="width:70px;"><input name="max_{{ p.id }}" value="{{ p.max_v if p.max_v is not none else '' }}"></td>
+        <td><input name="alow_{{ p.id }}" value="{{ p.action_low or '' }}"></td>
+        <td><input name="ahigh_{{ p.id }}" value="{{ p.action_high or '' }}"></td>
+        <td style="text-align:center;"><input type="checkbox" name="per_{{ p.id }}" style="width:auto;" {{ 'checked' if p.periodic }}></td>
+        <td style="text-align:center;"><input type="checkbox" name="del_{{ p.id }}" style="width:auto;"></td></tr>
+      {% endfor %}
+      <tr style="background:#f8fafb;"><td><input name="new_label" placeholder="+ νέα παράμετρος"></td><td><input name="new_unit" placeholder="μον."></td>
+        <td><input name="new_min" placeholder="min"></td><td><input name="new_max" placeholder="max"></td>
+        <td><input name="new_alow" placeholder="ενέργεια"></td><td><input name="new_ahigh" placeholder="ενέργεια"></td>
+        <td colspan="2"><input name="new_pkey" placeholder="key (λατιν.)"></td></tr>
+      </tbody></table>
+    </div>
+    <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+  </form>
+</div></body></html>

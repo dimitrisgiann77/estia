@@ -1,0 +1,45 @@
+<!DOCTYPE html><html lang="{{ session.get('language','el') }}"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>Καταγραφή τομέων — CONDIAN</title><meta name="theme-color" content="#193847">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>.app-header{background:#193847;}.select-field{width:100%;padding:10px 12px;border:1.5px solid #cfe8ef;border-radius:8px;font-size:15px;background:#f8fcff;}.submit-btn{background:#193847;}.pool-pill{font-size:11px;padding:3px 8px;border-radius:10px;background:#dcfce7;color:#16a34a;margin-right:4px;}.period-btn.active{color:#193847;border-bottom-color:#BB9549;}</style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn,.btn{background:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head><body>
+<header class="app-header"><div class="header-left"><img src="/static/img/logo-white.svg" class="header-icon" style="height:24px;"><div><div class="header-title">Καταγραφή τομέων</div><div class="header-sub" id="today-date"></div></div></div>
+<div class="header-right"><a href="/areas/dashboard" class="logout-btn" title="Πίνακας"><i class="ti ti-layout-dashboard"></i></a><a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a></div></header>
+<div class="user-badge"><i class="ti ti-user-circle"></i><span>{{ user.full_name }}</span></div>
+{% if not areas_json %}
+<div class="app-content"><div class="section" style="text-align:center;color:#888;"><i class="ti ti-checklist" style="font-size:32px;"></i><p style="margin-top:10px;">Δεν υπάρχουν τομείς ακόμα.</p>{% if user.role in ['admin','masteradmin'] %}<p style="margin-top:6px;"><a href="/dashboard/areas" style="color:#193847;">Πρόσθεσε τομέα →</a></p>{% endif %}</div></div>
+{% else %}
+<div id="period-bar" class="period-bar" style="display:none;"></div>
+<div class="app-content"><form id="area-form">
+<input type="hidden" id="period-input" name="period" value="day">
+<div class="section"><div class="sec-title"><i class="ti ti-building"></i> Τομέας</div>
+  <div class="field"><label>Ξενοδοχείο</label><select id="hotel-sel" class="select-field" onchange="onHotel()"></select></div>
+  <div class="field"><label>Σημείο / Τομέας</label><select id="area-sel" name="area_id" class="select-field" onchange="onArea()"></select><div class="pool-pills" id="area-status" style="margin-top:8px;"></div></div></div>
+<div class="section"><div class="sec-title"><i class="ti ti-clipboard-data"></i> Μετρήσεις</div><div id="fields"></div></div>
+<div class="section"><div class="sec-title"><i class="ti ti-notes"></i> Παρατηρήσεις</div><textarea name="notes" style="width:100%;min-height:70px;padding:10px;border:1.5px solid #cfe8ef;border-radius:8px;"></textarea></div>
+<button type="button" class="submit-btn" onclick="submitArea()" id="submit-btn"><i class="ti ti-send"></i> Υποβολή</button>
+<div id="submit-msg" style="display:none;" class="submit-msg"></div></form></div>
+{% endif %}
+<script>
+const AREAS={{ areas_json|tojson }}, TEMPLATES={{ templates|tojson }}, DONE={{ done|tojson }};
+const FREQP={'twice':['morning','afternoon'],'daily':['day'],'weekly':['day'],'monthly':['day']};
+const PLABEL={morning:'Πρωί',afternoon:'Απόγευμα',day:'Καταγραφή'};
+let curPeriod='day';
+document.addEventListener('DOMContentLoaded',function(){var d=document.getElementById('today-date');if(d)d.textContent=new Date().toLocaleDateString('el-GR',{weekday:'long',day:'numeric',month:'long'});if(AREAS.length)buildHotels();});
+function buildHotels(){var hs=document.getElementById('hotel-sel');var hotels=[];AREAS.forEach(function(a){if(hotels.indexOf(a.hotel)<0)hotels.push(a.hotel);});hs.innerHTML='';hotels.forEach(function(h){var o=document.createElement('option');o.value=h;o.textContent=h;hs.appendChild(o);});onHotel();}
+function onHotel(){var h=document.getElementById('hotel-sel').value;var as=document.getElementById('area-sel');as.innerHTML='';AREAS.filter(function(a){return a.hotel===h;}).forEach(function(a){var o=document.createElement('option');o.value=a.id;o.textContent=a.location?(a.name+' — '+a.location):a.name;as.appendChild(o);});onArea();}
+function curArea(){var id=document.getElementById('area-sel').value;return AREAS.find(function(a){return String(a.id)===String(id);});}
+function onArea(){var a=curArea();if(!a)return;var tpl=TEMPLATES[a.template];var periods=FREQP[tpl.frequency]||['day'];curPeriod=periods[0];document.getElementById('period-input').value=curPeriod;buildPeriodBar(periods);buildFields();showStatus();}
+function buildPeriodBar(periods){var bar=document.getElementById('period-bar');if(periods.length<2){bar.style.display='none';return;}bar.style.display='flex';bar.innerHTML='';periods.forEach(function(p){var b=document.createElement('button');b.type='button';b.className='period-btn'+(p===curPeriod?' active':'');b.textContent=PLABEL[p]||p;b.onclick=function(){curPeriod=p;document.getElementById('period-input').value=p;buildPeriodBar(periods);buildFields();};bar.appendChild(b);});}
+function buildFields(){var a=curArea();var tpl=TEMPLATES[a.template];var box=document.getElementById('fields');box.innerHTML='';tpl.params.forEach(function(p){if(p.periodic&&curPeriod==='afternoon')return;var lim='';if(p.min!=null||p.max!=null){lim=' ('+(p.min!=null?'≥'+p.min:'')+(p.min!=null&&p.max!=null?' ':'')+(p.max!=null?'≤'+p.max:'')+')';}var div=document.createElement('div');div.className='field';div.innerHTML='<label>'+p.label+(p.unit?' ('+p.unit+')':'')+lim+'</label><input type="number" step="0.01" name="'+p.pkey+'" data-min="'+(p.min!=null?p.min:'')+'" data-max="'+(p.max!=null?p.max:'')+'" oninput="badge(this)"><div class="bstat"></div>';box.appendChild(div);});}
+function badge(el){var st=el.parentElement.querySelector('.bstat');var v=parseFloat(el.value);if(isNaN(v)){st.innerHTML='';return;}var mn=el.dataset.min!==''?parseFloat(el.dataset.min):null,mx=el.dataset.max!==''?parseFloat(el.dataset.max):null;var ok=(mn==null||v>=mn)&&(mx==null||v<=mx);st.innerHTML='<div class="sbadge '+(ok?'ok':'bad')+'">'+(ok?'Εντός ορίων':'Εκτός ορίων')+' ('+v+')</div>';}
+function showStatus(){var a=curArea();var box=document.getElementById('area-status');var pers=DONE[a.id]||[];box.innerHTML=pers.map(function(p){return '<span class="pool-pill">'+(PLABEL[p]||p)+' ✓</span>';}).join('');}
+async function submitArea(){var btn=document.getElementById('submit-btn'),msg=document.getElementById('submit-msg');var a=curArea();if(!a)return;btn.disabled=true;btn.innerHTML='Αποστολή...';var fd=new FormData(document.getElementById('area-form'));fd.set('period',curPeriod);try{var r=await fetch('/areas/submit',{method:'POST',body:fd});var d=await r.json();msg.style.display='block';msg.className='submit-msg '+(d.success?'success':'error');msg.textContent=d.message;if(d.success){DONE[a.id]=DONE[a.id]||[];if(DONE[a.id].indexOf(curPeriod)<0)DONE[a.id].push(curPeriod);showStatus();setTimeout(function(){btn.disabled=false;btn.innerHTML='<i class="ti ti-send"></i> Υποβολή';},1200);}else{btn.disabled=false;btn.innerHTML='<i class="ti ti-send"></i> Υποβολή';}}catch(e){msg.style.display='block';msg.className='submit-msg error';msg.textContent='Σφάλμα σύνδεσης.';btn.disabled=false;btn.innerHTML='<i class="ti ti-send"></i> Υποβολή';}}
+</script></body></html>

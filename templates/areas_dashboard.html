@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Τομείς — Πίνακας</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;}
+.topbar{background:#193847;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}.topbar a{color:#fff;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,.15);border-radius:6px;margin-left:6px;}
+.container{max-width:1200px;margin:0 auto;padding:24px;}.card{background:#fff;border-radius:12px;padding:18px;border:1px solid #d6eef3;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}th{text-align:left;padding:8px;color:#888;border-bottom:1px solid #eee;white-space:nowrap;}td{padding:8px;border-bottom:1px solid #f5f5f5;vertical-align:top;}
+.chip{display:inline-block;font-size:11px;padding:2px 7px;border-radius:5px;background:#eef2ff;color:#193847;margin:1px;}.chip.bad{background:#fee2e2;color:#dc2626;font-weight:600;}
+.badge{font-size:11px;padding:2px 8px;border-radius:4px;}.badge-am{background:#e0f2fe;color:#0369a1;}.badge-pm{background:#fef3c7;color:#d97706;}.badge-day{background:#f0f0f0;color:#555;}</style><style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
+.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
+.submit-btn,.submit-btn.pool,.btn-primary,.save-btn,.btn{background:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head><body>
+<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Τομείς — Πίνακας</strong></div>
+<div><a href="/areas"><i class="ti ti-edit"></i> Καταγραφή</a>{% if is_admin %}<a href="/dashboard/areas"><i class="ti ti-settings"></i> Διαχείριση</a><a href="/dashboard/templates"><i class="ti ti-template"></i> Templates</a>{% endif %}</div></div>
+<div class="container"><div class="card">
+<table><thead><tr><th>Ημ/νία</th><th>Περ.</th><th>Ξενοδοχείο</th><th>Τομέας</th><th>Υπεύθυνος</th><th>Τιμές</th><th>Σημ.</th></tr></thead><tbody>
+{% for r, cells in rows %}
+<tr><td>{{ r.record_date.strftime('%d/%m/%y') }}</td>
+<td><span class="badge badge-{{ 'am' if r.period=='morning' else 'pm' if r.period=='afternoon' else 'day' }}">{{ {'morning':'Πρωί','afternoon':'Απόγ.','day':'—'}.get(r.period, r.period) }}</span></td>
+<td>{{ r.area.hotel.name if r.area and r.area.hotel else '—' }}</td>
+<td>{{ r.area.name if r.area else '—' }}</td>
+<td>{{ r.user.full_name if r.user else '—' }}</td>
+<td>{% for c in cells %}{% if c.value is not none %}<span class="chip {{ '' if c.ok else 'bad' }}">{{ c.label }}: {{ c.value }}{{ c.unit }}</span>{% endif %}{% endfor %}</td>
+<td style="font-size:12px;color:#666;max-width:140px;">{{ r.notes or '' }}</td></tr>
+{% else %}<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px;">Καμία καταγραφή ακόμα</td></tr>{% endfor %}
+</tbody></table></div></div></body></html>
