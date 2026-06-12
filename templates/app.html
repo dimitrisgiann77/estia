@@ -8,6 +8,14 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
+<style>
+/* v12.3 — επιλογέας δικτύου: ΙΔΙΟ στυλ με τον επιλογέα πισίνας (pools.html) */
+.select-field { width:100%; padding:10px 12px; border:1.5px solid #cfe8ef; border-radius:8px; font-size:15px; background:#f8fcff; color:#1a1a1a; }
+.select-field:focus { outline:none; border-color:#193847; background:white; }
+.pool-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pool-pill { font-size:11px; padding:3px 8px; border-radius:10px; background:#e0f2fe; color:#193847; }
+.pool-pill.done { background:#dcfce7; color:#16a34a; }
+</style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
 .app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
 .submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
@@ -21,7 +29,7 @@
   <div class="header-left">
     <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
     <div>
-      <div class="header-title">ΕΣΤΙΑ — Νερά Χρήσης · Sergios</div>
+      <div class="header-title">ΕΣΤΙΑ — Νερά Χρήσης · <span id="hdr-net">—</span></div>
       <div class="header-sub" id="today-date"></div>
     </div>
   </div>
@@ -51,36 +59,39 @@
 <div class="user-badge">
   <i class="ti ti-user-circle"></i>
   <span>{{ user.full_name }}</span>
-  <div style="margin-left:auto; display:flex; gap:5px;">
-    {% if today_morning %}
-    <a href="/edit/{{ today_morning.id }}" class="submitted-badge" style="text-decoration:none;">
-      <i class="ti ti-check"></i> Πρωί <i class="ti ti-edit" style="font-size:11px;"></i>
-    </a>
-    {% endif %}
-    {% if today_afternoon %}
-    <a href="/edit/{{ today_afternoon.id }}" class="submitted-badge" style="text-decoration:none;">
-      <i class="ti ti-check"></i> Απόγευμα <i class="ti ti-edit" style="font-size:11px;"></i>
-    </a>
-    {% endif %}
-  </div>
+  <div style="margin-left:auto; display:flex; gap:5px;" id="done-badges"></div>
 </div>
 
 <div class="period-bar">
   <button class="period-btn active" id="btn-morning" onclick="setPeriod('morning')">
     <i class="ti ti-sun"></i>
     <span data-el="Πρωί" data-en="Morning">Πρωί</span>
-    {% if today_morning %}<span class="done-dot"></span>{% endif %}
+    <span class="done-dot" id="dot-morning" style="display:none;"></span>
   </button>
   <button class="period-btn" id="btn-afternoon" onclick="setPeriod('afternoon')">
     <i class="ti ti-moon"></i>
     <span data-el="Απόγευμα" data-en="Afternoon">Απόγευμα</span>
-    {% if today_afternoon %}<span class="done-dot"></span>{% endif %}
+    <span class="done-dot" id="dot-afternoon" style="display:none;"></span>
   </button>
 </div>
 
 <div class="app-content">
 <form id="water-form">
 <input type="hidden" id="period-input" name="period" value="morning">
+
+<!-- v12.3 — Επιλογή ξενοδοχείου & δικτύου νερού (πάνω-πάνω, ίδιο στυλ με πισίνες) -->
+<div class="section">
+  <div class="sec-title"><i class="ti ti-building"></i> <span data-el="Ξενοδοχείο & Δίκτυο Νερού" data-en="Hotel & Water System">Ξενοδοχείο & Δίκτυο Νερού</span></div>
+  <div class="field">
+    <label data-el="Ξενοδοχείο" data-en="Hotel">Ξενοδοχείο</label>
+    <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
+  </div>
+  <div class="field">
+    <label data-el="Δίκτυο Νερού" data-en="Water System">Δίκτυο Νερού</label>
+    <select id="system-select" name="water_system_id" class="select-field" onchange="onSystemChange()"></select>
+    <div class="pool-pills" id="system-status"></div>
+  </div>
+</div>
 
 <!-- CLO2 -->
 <div class="section">
@@ -239,7 +250,11 @@
 </form>
 </div>
 
+<script>
+const LANG = '{{ session.get("language", "el") }}';
+const HOTELS = {{ systems_json|tojson }};
+const DONE = {{ done|tojson }};
+</script>
 <script src="/static/app.js"></script>
-<script>const LANG = '{{ session.get("language", "el") }}';</script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Εστία — Νερά Χρήσης · Dashboard</title>
+<title>Sergios Hotel — Water Dashboard</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -318,85 +318,4 @@ tr:last-child td { border-bottom:none; }
       <tbody>
       {% for u in users %}
         <tr>
-          <td>{% if u.avatar %}<img src="{{ u.avatar }}" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;object-fit:cover;margin-right:6px;">{% endif %}{{ u.full_name }}</td>
-          <td><code style="font-size:12px;">{{ u.username }}</code>{% if u.email %}<div style="font-size:11px;color:#999;">{{ u.email }}</div>{% endif %}</td>
-          <td><span class="badge badge-{{ u.role }}">{{ role_labels.get(u.role, u.role) }}</span></td>
-          <td style="font-size:12px;color:#666;max-width:160px;">{% if u.role in ['admin','masteradmin'] %}<em>όλα</em>{% else %}{{ u.hotels|map(attribute='name')|join(', ') or '—' }}{% endif %}</td>
-          <td>{% if u.is_active %}<span class="badge badge-ok">ενεργός</span>{% else %}<span class="badge badge-bad">ανενεργός</span>{% endif %}</td>
-          <td>
-            {% if not (u.role=='masteradmin' and me.role!='masteradmin') %}
-            <details><summary style="cursor:pointer;color:#193847;font-size:12px;font-weight:500;">⚙ Διαχείριση</summary>
-              <div style="background:#f8fafb;border:1px solid #e0f0ff;border-radius:8px;padding:12px;margin-top:8px;min-width:260px;">
-                <form method="POST" action="/dashboard/edit-user/{{ u.id }}" style="margin-bottom:10px;">
-                  <input type="text" name="full_name" value="{{ u.full_name }}" placeholder="Ονοματεπώνυμο" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <input type="email" name="email" value="{{ u.email or '' }}" placeholder="Email" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <input type="text" name="phone" value="{{ u.phone or '' }}" placeholder="Κινητό" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <select name="role" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                    {% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if u.role==rk }}>{{ rl }}</option>{% endfor %}
-                  </select>
-                  <div style="font-size:11px;color:#888;margin:4px 0;">Ανατεθειμένα ξενοδοχεία (manager/staff/viewer):</div>
-                  <div style="max-height:96px;overflow:auto;font-size:12px;margin-bottom:8px;border:1px solid #eee;border-radius:6px;padding:6px;">
-                    {% for h in all_hotels %}<label style="display:block;margin-bottom:2px;"><input type="checkbox" name="hotel_ids" value="{{ h.id }}" {{ 'checked' if h in u.hotels }}> {{ h.name }}</label>{% else %}<span class="muted">—</span>{% endfor %}
-                  </div>
-                  <button type="submit" class="btn btn-primary" style="font-size:12px;padding:6px 14px;">Αποθήκευση</button>
-                </form>
-                <form method="POST" action="/dashboard/reset-password/{{ u.id }}" style="display:flex;gap:6px;margin-bottom:8px;">
-                  <input type="password" name="password" placeholder="Νέος κωδικός" required style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <button type="submit" class="btn" style="background:#475569;color:white;font-size:12px;padding:6px 12px;">Reset</button>
-                </form>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                  <form method="POST" action="/dashboard/toggle-user/{{ u.id }}"><button type="submit" class="btn" style="background:#fde68a;color:#92400e;font-size:12px;padding:6px 12px;">{{ 'Απενεργοποίηση' if u.is_active else 'Ενεργοποίηση' }}</button></form>
-                  {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή χρήστη;')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}
-                </div>
-              </div>
-            </details>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><i class="ti ti-user-plus"></i> Νέος χρήστης</div>
-    <form method="POST" action="/dashboard/add-user">
-      <div class="add-form">
-        <input type="text" name="full_name" placeholder="Ονοματεπώνυμο" required>
-        <input type="text" name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <input type="email" name="email" placeholder="Email (προαιρετικό)">
-        <input type="text" name="phone" placeholder="Κινητό (προαιρετικό)">
-        <select name="role">{% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if rk=='staff' }}>{{ rl }}</option>{% endfor %}</select>
-        <select name="language"><option value="el">Ελληνικά</option><option value="en">English</option></select>
-        <button type="submit" class="btn btn-primary">Προσθήκη</button>
-      </div>
-    </form>
-  </div>
-
-</div>
-
-<script>
-// v12.3 — τα γραφήματα ακολουθούν το φίλτρο δικτύου (αλλιώς πρώτο διαθέσιμο)
-const CHART_SID = {{ f_system or (systems[0].id if systems else 0) }};
-fetch('/api/history' + (CHART_SID ? '?system_id=' + CHART_SID : '')).then(r=>r.json()).then(data=>{
-  const labels = data.map(d=>d.date).reverse();
-  new Chart(document.getElementById('clo2-chart'),{
-    type:'line',
-    data:{labels,datasets:[{label:'CLO₂ ppm',data:data.map(d=>d.clo2_tank).reverse(),borderColor:'#193847',backgroundColor:'rgba(3,105,161,0.1)',tension:0.3,fill:true}]},
-    options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:3,grid:{color:'#f0f0f0'}}}}
-  });
-  new Chart(document.getElementById('temp-chart'),{
-    type:'line',
-    data:{labels,datasets:[
-      {label:'ΖΝΧ Αναχ.',data:data.map(d=>d.temp_dhw_out).reverse(),borderColor:'#dc2626',tension:0.3},
-      {label:'ΖΝΧ Επιστρ.',data:data.map(d=>d.temp_dhw_return).reverse(),borderColor:'#d97706',tension:0.3},
-      {label:'Δεξαμενή',data:data.map(d=>d.temp_tank).reverse(),borderColor:'#193847',tension:0.3}
-    ]},
-    options:{plugins:{legend:{display:true}},scales:{y:{grid:{color:'#f0f0f0'}}}}
-  });
-});
-</script>
-</body>
-</html>
+          <td>{% if u.avatar %}<img src="{{ u.avatar }}" style="width:22px;height:22px;b

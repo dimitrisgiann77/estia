@@ -1,9 +1,9 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.2)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.3)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
-  - Water Log (νερά χρήσης) — single hotel (Sergios)
+  - Water Log (νερά χρήσης) — multi-hotel / multi-δίκτυο (v12.3)
   - Pool Log (πισίνες) — multi-hotel / multi-pool
   - AI Pool Assistant (Βοηθός Πισίνας) — provider-agnostic (Anthropic/OpenAI)
 """
@@ -18,7 +18,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'sergios-water-secret-2024')
+# ΣΗΜ. ασφάλειας: όρισε SECRET_KEY στο Railway (env). Το fallback υπάρχει μόνο για τοπικό dev.
+app.secret_key = os.environ.get('SECRET_KEY') or 'estia-dev-secret-change-me'
 
 # Railway/Heroku δίνουν 'postgres://' — η SQLAlchemy 2.x θέλει 'postgresql://'
 _db_url = os.environ.get('DATABASE_URL', 'sqlite:///water.db')
@@ -31,10 +32,11 @@ app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024   # 2MB (avatar upload)
 
 SMTP_SERVER    = 'condian.gr'
 SMTP_PORT      = 465
+# ΣΗΜ.: όρισε EMAIL_FROM/GRAPH_SENDER σε πραγματικό mailbox @condianhotels.gr μέσω env στο Railway
 EMAIL_FROM     = os.environ.get('EMAIL_FROM', 'report@condian.gr')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 EMAIL_TO_LIST  = ['dimitris@condianhotels.gr', 'm.xypakis@condianhotels.gr', 'g.giakoumakis@condianhotels.gr']
-HOTEL_NAME     = 'Sergios Hotel'
+APP_URL        = os.environ.get('APP_URL', 'https://estia.condianhotels.gr')   # βάση για absolute links
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REG_CODE = os.environ.get('REG_CODE', 'condian2026')          # κωδικός εγγραφής προσωπικού
@@ -274,6 +276,17 @@ def can_access_pool(u, pool):
     if not assigned:
         return True   # χωρίς ανάθεση = όλα
     return pool.hotel_id in assigned
+
+def can_access_water_system(u, ws):
+    """v12.3 — scoping δικτύου νερού (mirror can_access_pool)."""
+    if u is None or ws is None:
+        return False
+    if role_rank(u.role) >= ROLE_RANK['admin']:
+        return True
+    assigned = {h.id for h in u.hotels if h.is_active}
+    if not assigned:
+        return True   # χωρίς ανάθεση = όλα
+    return ws.hotel_id in assigned
 
 def log_activity(action, detail=''):
     try:
@@ -629,6 +642,12 @@ def send_report_email(record, user):
     if not EMAIL_PASSWORD and not GRAPH_CLIENT_ID:
         return False
     period_gr = 'Πρωι' if record.period == 'morning' else 'Απογευμα'
+    # v12.3 — δυναμικό ξενοδοχείο + δίκτυο (αντί hardcoded «Sergios»)
+    _ws = record.water_system
+    place = ''
+    if _ws:
+        place = (_ws.hotel.name + ' · ' + _ws.name) if _ws.hotel else _ws.name
+    place_sfx = f' ({place})' if place else ''
     def row(label, val, unit='', min_v=None, max_v=None):
         if val is None:
             return f'<tr><td style="padding:7px 8px;border:1px solid #eee;">{label}</td><td style="padding:7px 8px;border:1px solid #eee;">-</td><td style="padding:7px 8px;border:1px solid #eee;color:#888;">{unit}</td></tr>'
@@ -663,7 +682,7 @@ def send_report_email(record, user):
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0369a1;color:white;padding:20px;border-radius:8px 8px 0 0;">
-        <h1 style="margin:0;font-size:20px;">Εστία — Νερά Χρήσης (Sergios) {period_gr}</h1>
+        <h1 style="margin:0;font-size:20px;">Εστία — Νερά Χρήσης{place_sfx} {period_gr}</h1>
         <p style="margin:5px 0 0;opacity:0.8;">{record.record_date.strftime('%d/%m/%Y')} | Υπευθυνος: {user.full_name}</p>
       </div>
       <div style="background:#f9f9f9;padding:20px;border:1px solid #eee;">
@@ -682,10 +701,10 @@ def send_report_email(record, user):
         {f'<h2 style="font-size:15px;color:#333;margin-top:20px;">Παρατηρησεις</h2><p style="background:#fff;padding:10px;border:1px solid #eee;">{record.notes}</p>' if record.notes else ''}
       </div>
       <div style="background:#f0f0f0;padding:12px;text-align:center;font-size:12px;color:#888;border-radius:0 0 8px 8px;">
-        Εστία — CONDIAN HOTELS · {record.record_date.strftime('%d/%m/%Y')} · {period_gr}
+        Εστία — CONDIAN HOTELS{place_sfx} · {record.record_date.strftime('%d/%m/%Y')} · {period_gr}
       </div>
     </div>"""
-    return send_email(f'Εστία — Νερά Χρήσης (Sergios) {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
+    return send_email(f'Εστία — Νερά Χρήσης{place_sfx} {period_gr} {record.record_date.strftime("%d/%m/%Y")}', html, EMAIL_TO_LIST)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -1039,6 +1058,21 @@ def profile():
 # ──────────────────────────────────────────────────────────────────────────
 #  WATER LOG ROUTES
 # ──────────────────────────────────────────────────────────────────────────
+def water_systems_payload(user=None):
+    """v12.3 — allowed ξενοδοχεία + ενεργά δίκτυα νερού τους (mirror hotels_payload)."""
+    if user is not None and role_rank(user.role) < ROLE_RANK['admin']:
+        hotels = allowed_hotels(user)
+    else:
+        hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    payload = []
+    for h in hotels:
+        systems = (WaterSystem.query.filter_by(hotel_id=h.id, is_active=True)
+                   .order_by(WaterSystem.name).all())
+        payload.append({'id': h.id, 'name': h.name,
+                        'systems': [{'id': s.id, 'name': s.name, 'location': s.location or ''}
+                                    for s in systems]})
+    return hotels, payload
+
 @app.route('/app')
 def water_app():
     if 'user_id' not in session:
@@ -1046,11 +1080,14 @@ def water_app():
     if not can_log():
         return redirect(url_for('pools_dashboard'))
     user = User.query.get(session['user_id'])
-    today_morning   = WaterRecord.query.filter_by(record_date=date.today(), period='morning').first()
-    today_afternoon = WaterRecord.query.filter_by(record_date=date.today(), period='afternoon').first()
-    return render_template('app.html', user=user,
-                           today_morning=today_morning,
-                           today_afternoon=today_afternoon)
+    hotels, systems_json = water_systems_payload(user)
+    # σημερινές καταγραφές ανά δίκτυο: {system_id: {period: record_id}}
+    done = {}
+    for r in WaterRecord.query.filter_by(record_date=date.today()).all():
+        if r.water_system_id:
+            done.setdefault(str(r.water_system_id), {})[r.period] = r.id
+    return render_template('app.html', user=user, hotels=hotels,
+                           systems_json=systems_json, done=done)
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -1059,22 +1096,35 @@ def submit():
     user   = User.query.get(session['user_id'])
     data   = request.form
     period = data.get('period', 'morning')
-    record = WaterRecord.query.filter_by(record_date=date.today(), period=period).first()
+    ws_id  = data.get('water_system_id')
+    ws = WaterSystem.query.filter_by(id=ws_id, is_active=True).first() if ws_id else None
+    if not ws:
+        return jsonify({'success': False, 'message': 'Επιλεξτε δικτυο νερου'}), 400
+    if not can_access_water_system(user, ws):
+        return jsonify({'success': False, 'message': 'Δεν εχεις προσβαση σε αυτο το δικτυο'}), 403
+    # v12.3 — dedup ΑΝΑ δίκτυο (όχι πια κοινό record για όλους)
+    record = WaterRecord.query.filter_by(water_system_id=ws.id,
+                                         record_date=date.today(), period=period).first()
     if record:
         apply_record(record, data, period)
         record.updated_at = datetime.utcnow()
         record.updated_by = user.id
     else:
-        record = WaterRecord(user_id=user.id, record_date=date.today(), period=period)
+        record = WaterRecord(user_id=user.id, water_system_id=ws.id,
+                             record_date=date.today(), period=period)
         apply_record(record, data, period)
         db.session.add(record)
     db.session.commit()
+    place = (ws.hotel.name + ' · ' + ws.name) if ws.hotel else ws.name
+    log_activity('water_submit', f'{place} ({period})')
     _wa = compute_water_actions(record)
     if _wa:
-        notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _wa) else '') + 'Μέτρηση νερού/ΖΝΧ εκτός ορίων — δες την αναφορά.'), '/dashboard')
+        notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _wa) else '')
+                       + f'Μέτρηση νερού/ΖΝΧ εκτός ορίων — {place}.'), '/dashboard')
     threading.Thread(target=_bg_send_water, args=(record.id, user.id), daemon=True).start()
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
-    return jsonify({'success': True, 'message': f'Καταγραφη {period_gr} αποθηκευτηκε!'})
+    return jsonify({'success': True, 'record_id': record.id,
+                    'message': f'Καταγραφη {ws.name} ({period_gr}) αποθηκευτηκε!'})
 
 @app.route('/edit/<int:record_id>', methods=['GET', 'POST'])
 def edit_record(record_id):
@@ -1082,7 +1132,9 @@ def edit_record(record_id):
         return redirect(url_for('login'))
     user   = User.query.get(session['user_id'])
     record = WaterRecord.query.get_or_404(record_id)
-    if user.role != 'admin' and record.record_date != date.today():
+    if record.water_system and not can_access_water_system(user, record.water_system):
+        return redirect(url_for('water_app'))
+    if not is_admin() and record.record_date != date.today():
         return redirect(url_for('water_app'))
     if request.method == 'POST':
         apply_record(record, request.form, record.period)
@@ -1099,8 +1151,12 @@ def api_record(record_id):
     if 'user_id' not in session:
         return jsonify({}), 401
     r = WaterRecord.query.get_or_404(record_id)
+    _ws = r.water_system
     return jsonify({
         'id': r.id, 'period': r.period,
+        'water_system_id': r.water_system_id,
+        'water_system': (_ws.name if _ws else None),
+        'hotel': (_ws.hotel.name if _ws and _ws.hotel else None),
         'record_date': r.record_date.strftime('%d/%m/%Y'),
         'clo2_tank': r.clo2_tank, 'clo2_kitchen': r.clo2_kitchen,
         'clo2_remote': r.clo2_remote, 'clo2_dhw_out': r.clo2_dhw_out,
@@ -1285,14 +1341,35 @@ def api_assistant():
 def dashboard():
     if not is_admin():
         return redirect(url_for('login'))
-    records = WaterRecord.query.order_by(WaterRecord.record_date.desc(), WaterRecord.period).limit(60).all()
+    hotels  = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    systems = (WaterSystem.query.filter_by(is_active=True)
+               .order_by(WaterSystem.hotel_id, WaterSystem.name).all())
+    # v12.3 — φίλτρα ανά ξενοδοχείο / δίκτυο / χρήστη
+    f_hotel  = request.args.get('hotel_id', type=int)
+    f_system = request.args.get('system_id', type=int)
+    f_staff  = request.args.get('staff_id', type=int)
+    def _scope(q):
+        if f_system:
+            return q.filter(WaterRecord.water_system_id == f_system)
+        if f_hotel:
+            sids = [s.id for s in systems if s.hotel_id == f_hotel]
+            return q.filter(WaterRecord.water_system_id.in_(sids or [-1]))
+        return q
+    q = _scope(WaterRecord.query)
+    if f_staff:
+        q = q.filter(WaterRecord.user_id == f_staff)
+    records = q.order_by(WaterRecord.record_date.desc(), WaterRecord.period).limit(60).all()
     users   = User.query.filter_by(is_active=True, approved=True).all()
     pending = User.query.filter_by(is_active=True, approved=False).all()
-    today_m = WaterRecord.query.filter_by(record_date=date.today(), period='morning').first()
-    today_a = WaterRecord.query.filter_by(record_date=date.today(), period='afternoon').first()
+    today_q = _scope(WaterRecord.query.filter_by(record_date=date.today()))
+    today_records = today_q.order_by(WaterRecord.water_system_id).all()
+    today_m = [r for r in today_records if r.period == 'morning']
+    today_a = [r for r in today_records if r.period == 'afternoon']
     return render_template('dashboard.html', records=records, users=users, pending=pending,
-                           today_morning=today_m, today_afternoon=today_a,
-                           all_hotels=Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all(),
+                           today_morning_list=today_m, today_afternoon_list=today_a,
+                           hotels=hotels, systems=systems,
+                           f_hotel=f_hotel, f_system=f_system, f_staff=f_staff,
+                           all_hotels=hotels,
                            role_labels=ROLE_LABELS, me=current_user())
 
 @app.route('/pools/dashboard')
@@ -1933,6 +2010,47 @@ def delete_pool(pool_id):
     return redirect(url_for('pools_dashboard'))
 
 
+# ── v12.3 — Διαχείριση Δικτύων Νερού (mirror add/delete pool) ──
+@app.route('/dashboard/add-water-system', methods=['POST'])
+def add_water_system():
+    if not is_admin():
+        return redirect(url_for('login'))
+    data = request.form
+    hotel_id = data.get('hotel_id')
+    name = (data.get('name') or '').strip()
+    if hotel_id and name:
+        db.session.add(WaterSystem(hotel_id=int(hotel_id), name=name,
+                                   location=(data.get('location') or '').strip()))
+        db.session.commit()
+        log_activity('water_system_add', name)
+    return redirect(url_for('dashboard') + '?success=system_added')
+
+@app.route('/dashboard/edit-water-system/<int:system_id>', methods=['POST'])
+def edit_water_system(system_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    ws = WaterSystem.query.get(system_id)
+    if ws:
+        name = (request.form.get('name') or '').strip()
+        if name:
+            ws.name = name
+        ws.location = (request.form.get('location') or '').strip()
+        db.session.commit()
+        log_activity('water_system_edit', ws.name)
+    return redirect(url_for('dashboard') + '?success=system_edited')
+
+@app.route('/dashboard/delete-water-system/<int:system_id>', methods=['POST'])
+def delete_water_system(system_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    ws = WaterSystem.query.get(system_id)
+    if ws:
+        ws.is_active = False   # soft delete — οι καταγραφές μένουν
+        db.session.commit()
+        log_activity('water_system_delete', ws.name)
+    return redirect(url_for('dashboard'))
+
+
 # ──────────────────────────────────────────────────────────────────────────
 #  CHART APIs
 # ──────────────────────────────────────────────────────────────────────────
@@ -1940,7 +2058,11 @@ def delete_pool(pool_id):
 def api_history():
     if 'user_id' not in session:
         return jsonify([])
-    records = WaterRecord.query.filter_by(period='morning').order_by(WaterRecord.record_date.desc()).limit(14).all()
+    q = WaterRecord.query.filter_by(period='morning')
+    sid = request.args.get('system_id', type=int)   # v12.3 — προαιρετικό φίλτρο δικτύου
+    if sid:
+        q = q.filter_by(water_system_id=sid)
+    records = q.order_by(WaterRecord.record_date.desc()).limit(14).all()
     return jsonify([{
         'date': r.record_date.strftime('%d/%m'),
         'clo2_tank': r.clo2_tank,
@@ -2069,9 +2191,13 @@ def missing_today():
         if gaps:
             hotel = p.hotel.name if p.hotel else ''
             miss.append(f"{hotel} — {p.name}: " + ', '.join('Πρωί' if g == 'morning' else 'Απόγευμα' for g in gaps))
-    for per, label in (('morning', 'Πρωί'), ('afternoon', 'Απόγευμα')):
-        if not WaterRecord.query.filter_by(record_date=today, period=per).first():
-            miss.append('Νερά Χρήσης (Sergios): ' + label)
+    # v12.3 — έλεγχος ανά δίκτυο νερού (όχι πια ενιαίο/Sergios)
+    for ws in WaterSystem.query.filter_by(is_active=True).all():
+        recs = {r.period for r in WaterRecord.query.filter_by(water_system_id=ws.id, record_date=today).all()}
+        gaps = [per for per in ('morning', 'afternoon') if per not in recs]
+        if gaps:
+            hotel = ws.hotel.name if ws.hotel else ''
+            miss.append(f"Νερά Χρήσης — {hotel} · {ws.name}: " + ', '.join('Πρωί' if g == 'morning' else 'Απόγευμα' for g in gaps))
     return miss
 
 def send_reminder_email(miss):
