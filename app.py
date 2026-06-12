@@ -1,16 +1,18 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.6)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.7)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
   - Water Log (νερά χρήσης) — multi-hotel / multi-δίκτυο (v12.3)
   - Pool Log (πισίνες) — multi-hotel / multi-pool
-  - EstiaAI (chat bubble) — provider-agnostic (Anthropic/OpenAI)
+  - SpithaAI (chat bubble) — provider-agnostic (Anthropic/OpenAI)
   - Records feed (v12.4) — ενιαία λίστα υποβολών πισινών & νερών
   - v12.5 — Πίνακας Πισινών: κεντρικό πάνελ (σημερινές μετρήσεις + charts + φίλτρα)·
             Records: εξαγωγή PDF & XLSX (έτοιμα προς εκτύπωση)
   - v12.6 — Shell header: ζωντανό ρολόι + καιρός/location, κουμπιά Guest/Staff/Admin (placeholder)·
             Footer (Εστία · All Rights Reserved 2026 · version/build · CONDIAN Hotels)
+  - v12.7 — Βοηθός μετονομάστηκε «SpithaAI»· Διαχείριση Ξενοδοχείων & Πισινών (/dashboard/hotels) —
+            μεταφέρθηκε από τον Πίνακα Πισινών στο μενού Διαχείρισης
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -60,7 +62,7 @@ ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY    = os.environ.get('OPENAI_API_KEY', '')
 AI_MODEL          = os.environ.get('AI_MODEL', '')          # override; αλλιώς default ανά πάροχο
 
-POOL_ASSISTANT_PROMPT = """Είσαι το «EstiaAI», ο ψηφιακός βοηθός της πλατφόρμας Εστία (CONDIAN HOTELS).
+POOL_ASSISTANT_PROMPT = """Είσαι το «SpithaAI», ο ψηφιακός βοηθός της πλατφόρμας Εστία (CONDIAN HOTELS).
 Βοηθάς το προσωπικό συντήρησης και τους υπεύθυνους βάρδιας στην ασφαλή, καθαρή και
 νόμιμη καθημερινή λειτουργία των πισινών και των δικτύων νερού/ΖΝΧ (νερά χρήσης, legionella).
 # ΑΡΜΟΔΙΟΤΗΤΕΣ
@@ -252,8 +254,8 @@ def inject_nav():
 def inject_theme():
     return {'theme': get_theme()}
 
-# v12.6 — έκδοση/build για το footer του shell
-APP_VERSION = '12.6'
+# έκδοση/build για το footer του shell
+APP_VERSION = '12.7'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -2170,6 +2172,15 @@ def seed_demo():
             '<p><a href="/pools/dashboard" style="color:#193847;">→ Pool dashboard</a> &nbsp; '
             '<a href="/pools/coverage" style="color:#193847;">→ Κάλυψη</a></p></div>')
 
+# v12.7 — Διαχείριση Ξενοδοχείων & Πισινών (μεταφέρθηκε από τον Πίνακα Πισινών)
+@app.route('/dashboard/hotels')
+def hotels_admin():
+    if not is_admin():
+        return redirect(url_for('login'))
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    pools  = Pool.query.filter_by(is_active=True).all()
+    return render_template('hotels_admin.html', hotels=hotels, pools=pools, is_admin=True)
+
 @app.route('/dashboard/add-hotel', methods=['POST'])
 def add_hotel():
     if not is_admin():
@@ -2178,7 +2189,7 @@ def add_hotel():
     if name and not Hotel.query.filter_by(name=name).first():
         db.session.add(Hotel(name=name))
         db.session.commit()
-    return redirect(url_for('pools_dashboard') + '?success=hotel_added')
+    return redirect(url_for('hotels_admin') + '?success=hotel_added')
 
 @app.route('/dashboard/delete-hotel/<int:hotel_id>', methods=['POST'])
 def delete_hotel(hotel_id):
@@ -2190,7 +2201,7 @@ def delete_hotel(hotel_id):
         for p in hotel.pools:
             p.is_active = False
         db.session.commit()
-    return redirect(url_for('pools_dashboard'))
+    return redirect(url_for('hotels_admin'))
 
 @app.route('/dashboard/add-pool', methods=['POST'])
 def add_pool():
@@ -2208,7 +2219,7 @@ def add_pool():
             volume_m3=flt(data, 'volume_m3')
         ))
         db.session.commit()
-    return redirect(url_for('pools_dashboard') + '?success=pool_added')
+    return redirect(url_for('hotels_admin') + '?success=pool_added')
 
 @app.route('/dashboard/delete-pool/<int:pool_id>', methods=['POST'])
 def delete_pool(pool_id):
@@ -2218,7 +2229,7 @@ def delete_pool(pool_id):
     if pool:
         pool.is_active = False
         db.session.commit()
-    return redirect(url_for('pools_dashboard'))
+    return redirect(url_for('hotels_admin'))
 
 
 # ── v12.3 — Διαχείριση Δικτύων Νερού (mirror add/delete pool) ──

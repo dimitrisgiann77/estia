@@ -190,71 +190,7 @@ tr:last-child td { border-bottom:none; }
     </div>
   </div>
 
-  <div class="grid2">
-    <!-- Ξενοδοχεία & Πισίνες -->
-    <div class="card">
-      <div class="card-title"><i class="ti ti-building"></i> Ξενοδοχεία & Πισίνες</div>
-      {% for h in hotels %}
-      <div class="hotel-group">
-        <div class="hotel-name">
-          <span><i class="ti ti-building"></i> {{ h.name }}</span>
-          {% if is_admin %}<form method="POST" action="/dashboard/delete-hotel/{{ h.id }}" onsubmit="return confirm('Διαγραφή ξενοδοχείου & πισινών του;')" style="display:inline;">
-            <button type="submit" class="btn-danger">Διαγραφή</button>
-          </form>{% endif %}
-        </div>
-        {% for p in h.pools if p.is_active %}
-        <div class="pool-item">
-          <span>🏊 {{ p.name }}{% if p.location %} <span class="muted">— {{ p.location }}</span>{% endif %}</span>
-          {% if is_admin %}<form method="POST" action="/dashboard/delete-pool/{{ p.id }}" onsubmit="return confirm('Διαγραφή πισίνας;')" style="display:inline;">
-            <button type="submit" class="btn-danger">Διαγραφή</button>
-          </form>{% endif %}
-        </div>
-        {% else %}
-        <div class="pool-item muted">Καμία πισίνα</div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="muted">Δεν υπάρχουν ξενοδοχεία ακόμα.</p>
-      {% endfor %}
-    </div>
-
-    {% if is_admin %}
-    <!-- Φόρμες προσθήκης -->
-    <div>
-      <div class="card">
-        <div class="card-title"><i class="ti ti-plus"></i> Νέο ξενοδοχείο</div>
-        <form method="POST" action="/dashboard/add-hotel">
-          <div class="add-form">
-            <input type="text" name="name" placeholder="Όνομα ξενοδοχείου" required>
-            <button type="submit" class="btn btn-primary">Προσθήκη</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card">
-        <div class="card-title"><i class="ti ti-plus"></i> Νέα πισίνα</div>
-        <form method="POST" action="/dashboard/add-pool">
-          <div class="add-form">
-            <select name="hotel_id" required>
-              <option value="" disabled selected>Ξενοδοχείο…</option>
-              {% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
-            </select>
-            <input type="text" name="name" placeholder="Όνομα πισίνας" required>
-            <input type="text" name="location" placeholder="Σημείο / περιοχή (προαιρετικό)">
-            <input type="number" name="volume_m3" step="1" min="0" placeholder="Όγκος m³ (για δοσολογία)">
-            <select name="pool_type">
-              <option value="pool">Πισίνα</option>
-              <option value="kids">Παιδική</option>
-              <option value="jacuzzi">Jacuzzi</option>
-              <option value="indoor">Εσωτερική</option>
-            </select>
-            <button type="submit" class="btn btn-primary">Προσθήκη</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    {% endif %}
-  </div>
+  {% if is_admin %}<p class="muted" style="font-size:12px;margin-top:4px;">Διαχείριση ξενοδοχείων & πισινών: <a href="/dashboard/hotels?embed=1" style="color:#193847;font-weight:600;">Διαχείριση → Ξενοδοχεία &amp; Πισίνες</a></p>{% endif %}
 
 </div>
 
