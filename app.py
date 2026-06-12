@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.4)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.5)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -7,6 +7,8 @@ Modules:
   - Pool Log (πισίνες) — multi-hotel / multi-pool
   - EstiaAI (chat bubble) — provider-agnostic (Anthropic/OpenAI)
   - Records feed (v12.4) — ενιαία λίστα υποβολών πισινών & νερών
+  - v12.5 — Πίνακας Πισινών: κεντρικό πάνελ (σημερινές μετρήσεις + charts + φίλτρα)·
+            Records: εξαγωγή PDF & XLSX (έτοιμα προς εκτύπωση)
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -247,6 +249,14 @@ def inject_nav():
 @app.context_processor
 def inject_theme():
     return {'theme': get_theme()}
+
+# v12.6 — έκδοση/build για το footer του shell
+APP_VERSION = '12.6'
+APP_BUILD   = '2026-06-13'
+
+@app.context_processor
+def inject_version():
+    return {'app_version': APP_VERSION, 'app_build': APP_BUILD}
 
 def has_rank(min_rank):
     u = current_user()
@@ -942,6 +952,100 @@ def build_pool_report_pdf(rep_date, records):
     return bytes(pdf.output())
 
 
+# v12.5 — Records: print-ready εξαγωγές (PDF + XLSX)
+_RECORDS_HEADERS = ['Ημ/νία', 'Ώρα', 'Τύπος', 'Βάρδια', 'Ξενοδοχείο', 'Πισίνα / Δίκτυο', 'Υπεύθυνος', 'Διόρθωση']
+
+def _records_row(it):
+    return [
+        it['date'].strftime('%d/%m/%Y') if it.get('date') else '',
+        it['when'].strftime('%H:%M') if it.get('when') else '',
+        'Πισίνα' if it['kind'] == 'pool' else 'Νερά',
+        'Πρωί' if it['period'] == 'morning' else 'Απόγευμα',
+        it.get('hotel') or '', it.get('place') or '', it.get('user') or '',
+        'διορθώθηκε' if it.get('updated') else '',
+    ]
+
+def build_records_pdf(items, ftype='all'):
+    """Branded, print-ready PDF λίστας υποβολών (Records) — fpdf2 landscape."""
+    from fpdf import FPDF
+    NAVY=(25,56,71); GREY=(120,120,120)
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.set_auto_page_break(True, margin=12)
+    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.add_page()
+    try:
+        pdf.image(os.path.join(BASE_DIR, 'static', 'img', 'logo.png'), x=12, y=9, h=13)
+    except Exception:
+        pass
+    pdf.set_xy(30, 10); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'Εστία — CONDIAN HOTELS · Records', ln=1)
+    pdf.set_x(30); pdf.set_font('dv', '', 10); pdf.set_text_color(*GREY)
+    pdf.cell(0, 6, _RECORDS_TYPE_LABEL.get(ftype, 'Όλες οι υποβολές')
+             + ' · Εκτύπωση: ' + date.today().strftime('%d/%m/%Y')
+             + ' · Σύνολο: ' + str(len(items)), ln=1)
+    pdf.ln(6)
+    widths = [24, 16, 22, 24, 62, 62, 50, 26]
+    pdf.set_font('dv', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*NAVY)
+    for h, w in zip(_RECORDS_HEADERS, widths):
+        pdf.cell(w, 8, h, border=0, fill=True, align='L')
+    pdf.ln(8)
+    if not items:
+        pdf.set_font('dv', '', 11); pdf.set_text_color(*GREY)
+        pdf.cell(0, 10, 'Δεν υπάρχουν υποβολές.', ln=1)
+        return bytes(pdf.output())
+    fill = False
+    for it in items:
+        pdf.set_fill_color(243, 247, 250) if fill else pdf.set_fill_color(255, 255, 255)
+        pdf.set_font('dv', '', 8.5); pdf.set_text_color(40, 40, 40)
+        for val, w in zip(_records_row(it), widths):
+            s = str(val)
+            while s and pdf.get_string_width(s) > w - 2 and len(s) > 3:
+                s = s[:-2]
+            pdf.cell(w, 7, s, border=0, fill=True, align='L')
+        pdf.ln(7)
+        fill = not fill
+    return bytes(pdf.output())
+
+def build_records_xlsx(items, ftype='all'):
+    """Print-ready Excel (.xlsx) λίστας υποβολών — openpyxl."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.properties import PageSetupProperties
+    wb = Workbook(); ws = wb.active; ws.title = 'Records'
+    ncol = len(_RECORDS_HEADERS)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncol)
+    t = ws.cell(row=1, column=1,
+                value='Εστία — CONDIAN HOTELS · Records (' + _RECORDS_TYPE_LABEL.get(ftype, 'Όλες οι υποβολές') + ')')
+    t.font = Font(bold=True, size=14, color='193847')
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncol)
+    ws.cell(row=2, column=1,
+            value='Εκτύπωση: ' + date.today().strftime('%d/%m/%Y') + ' · Σύνολο: ' + str(len(items))
+            ).font = Font(size=10, color='777777')
+    hdr = 4
+    navy = PatternFill('solid', fgColor='193847')
+    thin = Side(style='thin', color='DDDDDD')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for j, h in enumerate(_RECORDS_HEADERS, 1):
+        c = ws.cell(row=hdr, column=j, value=h)
+        c.font = Font(bold=True, color='FFFFFF'); c.fill = navy
+        c.alignment = Alignment(horizontal='left', vertical='center'); c.border = border
+    for i, it in enumerate(items):
+        for j, v in enumerate(_records_row(it), 1):
+            c = ws.cell(row=hdr + 1 + i, column=j, value=v)
+            c.border = border; c.alignment = Alignment(horizontal='left', vertical='center')
+    for j, w in enumerate([13, 8, 11, 12, 26, 26, 22, 13], 1):
+        ws.column_dimensions[get_column_letter(j)].width = w
+    ws.freeze_panes = 'A%d' % (hdr + 1)
+    ws.print_title_rows = '%d:%d' % (hdr, hdr)
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.fitToWidth = 1; ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+
 # ── Background email senders (τρέχουν σε thread, με app context) ──
 def _bg_send_water(rid, uid):
     with app.app_context():
@@ -1385,13 +1489,11 @@ def users_admin():
 
 
 # v12.4 — Records: ενιαίο feed υποβολών (πισίνες + νερά χρήσης), role-scoped
-@app.route('/records')
-def records_feed():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = current_user()
+_RECORDS_TYPE_LABEL = {'all': 'Όλες οι υποβολές', 'pools': 'Πισίνες', 'water': 'Νερά Χρήσης'}
+
+def _records_items(user, ftype='all'):
+    """Κοινός builder της λίστας Records (page + εξαγωγές PDF/XLSX)."""
     hids = {h.id for h in allowed_hotels(user)}
-    ftype = request.args.get('type', 'all')          # all | pools | water
     items = []
     if ftype in ('all', 'pools'):
         pids = [p.id for p in Pool.query.all() if p.hotel_id in hids]
@@ -1421,7 +1523,42 @@ def records_feed():
                 'edit_url': '/edit/%d' % r.id,
             })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
-    return render_template('records.html', items=items[:150], ftype=ftype, user=user)
+    return items[:150]
+
+@app.route('/records')
+def records_feed():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    ftype = request.args.get('type', 'all')          # all | pools | water
+    items = _records_items(user, ftype)
+    return render_template('records.html', items=items, ftype=ftype, user=user)
+
+# v12.5 — Εξαγωγές Records (έτοιμες προς εκτύπωση)
+@app.route('/records/export.pdf')
+def records_export_pdf():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    ftype = request.args.get('type', 'all')
+    items = _records_items(user, ftype)
+    pdf_bytes = build_records_pdf(items, ftype)
+    fname = 'estia-records-%s-%s.pdf' % (ftype, date.today().strftime('%Y-%m-%d'))
+    return Response(pdf_bytes, mimetype='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename=' + fname})
+
+@app.route('/records/export.xlsx')
+def records_export_xlsx():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = current_user()
+    ftype = request.args.get('type', 'all')
+    items = _records_items(user, ftype)
+    xlsx_bytes = build_records_xlsx(items, ftype)
+    fname = 'estia-records-%s-%s.xlsx' % (ftype, date.today().strftime('%Y-%m-%d'))
+    return Response(xlsx_bytes,
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': 'attachment; filename=' + fname})
 
 @app.route('/pools/dashboard')
 def pools_dashboard():
@@ -1432,12 +1569,33 @@ def pools_dashboard():
     hids = {h.id for h in hotels}
     pools = [p for p in Pool.query.filter_by(is_active=True).all() if p.hotel_id in hids]
     pids = {p.id for p in pools}
-    q = PoolRecord.query
+    # v12.5 — φίλτρα ανά ξενοδοχείο / πισίνα / χρήστη (mirror Πίνακα Νερών)
+    f_hotel = request.args.get('hotel_id', type=int)
+    f_pool  = request.args.get('pool_id', type=int)
+    f_staff = request.args.get('staff_id', type=int)
+    def _scope(q):
+        if f_pool:
+            return q.filter(PoolRecord.pool_id == f_pool)
+        if f_hotel:
+            hpids = [p.id for p in pools if p.hotel_id == f_hotel]
+            return q.filter(PoolRecord.pool_id.in_(hpids or [-1]))
+        return q
+    base = PoolRecord.query
     if role_rank(user.role) < ROLE_RANK['admin']:
-        q = q.filter(PoolRecord.pool_id.in_(pids if pids else [-1]))
+        base = base.filter(PoolRecord.pool_id.in_(pids if pids else [-1]))
+    q = _scope(base)
+    if f_staff:
+        q = q.filter(PoolRecord.user_id == f_staff)
     records = q.order_by(PoolRecord.record_date.desc(), PoolRecord.recorded_at.desc()).limit(80).all()
+    users = User.query.filter_by(is_active=True, approved=True).all()
+    today_records = (_scope(base.filter(PoolRecord.record_date == date.today()))
+                     .order_by(PoolRecord.pool_id).all())
+    today_m = [r for r in today_records if r.period == 'morning']
+    today_a = [r for r in today_records if r.period == 'afternoon']
     return render_template('pools_dashboard.html', hotels=hotels, pools=pools,
-                           records=records, limits=POOL_LIMITS,
+                           records=records, limits=POOL_LIMITS, users=users,
+                           today_morning_list=today_m, today_afternoon_list=today_a,
+                           f_hotel=f_hotel, f_pool=f_pool, f_staff=f_staff,
                            is_admin=is_admin(), user=user)
 
 @app.route('/dashboard/add-user', methods=['POST'])

@@ -28,6 +28,8 @@ tr:last-child td { border-bottom:none; }
 .tab { padding:8px 16px; border-radius:8px; font-size:13px; text-decoration:none; color:#33454d; background:#fff; border:1px solid #d6eef3; }
 .tab.active { background:#193847; color:#fff; border-color:#193847; font-weight:600; }
 .muted { color:#999; }
+.exp { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#fff; background:#193847; border:none; cursor:pointer; }
+.exp.xlsx { background:#15803d; }
 </style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
 .app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
@@ -51,6 +53,12 @@ tr:last-child td { border-bottom:none; }
       <a class="tab {{ 'active' if ftype == 'all' }}" href="/records?type=all"><i class="ti ti-list-details"></i> Όλα</a>
       <a class="tab {{ 'active' if ftype == 'pools' }}" href="/records?type=pools"><i class="ti ti-pool"></i> Πισίνες</a>
       <a class="tab {{ 'active' if ftype == 'water' }}" href="/records?type=water"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+      <span class="muted" style="font-size:12px;">Εξαγωγή (έτοιμη προς εκτύπωση):</span>
+      <a class="exp" href="/records/export.pdf?type={{ ftype }}"><i class="ti ti-file-type-pdf"></i> PDF</a>
+      <a class="exp xlsx" href="/records/export.xlsx?type={{ ftype }}"><i class="ti ti-file-type-xls"></i> Excel</a>
     </div>
 
     <div style="overflow-x:auto;">

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CONDIAN HOTELS — Pool Dashboard</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
 body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#eff9fb; color:#1a1a1a; }
@@ -26,6 +27,14 @@ tr:last-child td { border-bottom:none; }
 .badge-pm { background:#fef3c7; color:#d97706; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media(max-width:800px){ .grid2 { grid-template-columns:1fr; } }
+.grid3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+.stat-card { background:#f7fbfc; border-radius:10px; padding:14px; border:1px solid #e3f1f5; }
+.stat-label { font-size:12px; color:#888; margin-bottom:6px; }
+.stat-value { font-size:22px; font-weight:600; }
+.stat-sub { font-size:11px; color:#aaa; margin-top:4px; }
+.ok { color:#16a34a; }
+.bad { color:#dc2626; }
+.section-title { font-size:16px; font-weight:600; margin-bottom:16px; color:#333; }
 .add-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 @media(max-width:500px){ .add-form { grid-template-columns:1fr; } }
 .add-form input, .add-form select { padding:10px 12px; border:1px solid #d6eef3; border-radius:8px; font-size:14px; width:100%; }
@@ -75,9 +84,79 @@ tr:last-child td { border-bottom:none; }
     {% if is_admin %}<a href="/admin/seed-demo" onclick="return confirm('Δημιουργία τυχαίων demo καταγραφών για 1-31/5;')" class="btn" style="background:#94a3b8;color:white;text-decoration:none;display:inline-flex;align-items:center;gap:6px;margin-left:8px;"><i class="ti ti-database-plus"></i> Demo δεδομένα (Μάιος)</a>{% endif %}
   </div>
 
+  <!-- v12.5 — Κεντρικό πάνελ: Σημερινές μετρήσεις (mirror Πίνακα Νερών) -->
+  <h2 class="section-title">Σημερινές μετρήσεις</h2>
+  {% if today_morning_list or today_afternoon_list %}
+  <div class="grid2" style="margin-bottom:24px;">
+    {% for tr in today_morning_list %}
+    <div class="card">
+      <div class="card-title"><span class="badge badge-am">ΠΡΩΙ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at.strftime('%H:%M') if tr.recorded_at else '' }}</div>
+      <div class="grid3">
+        <div class="stat-card"><div class="stat-label">Ελεύθερο χλώριο</div><div class="stat-value {{ 'ok' if tr.free_chlorine is not none and 0.4 <= tr.free_chlorine <= 1.5 else 'bad' if tr.free_chlorine is not none else '' }}">{{ tr.free_chlorine if tr.free_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · 0.4–1.5</div></div>
+        <div class="stat-card"><div class="stat-label">Συνδ. χλώριο</div><div class="stat-value {{ 'ok' if tr.combined_chlorine is not none and tr.combined_chlorine <= 0.5 else 'bad' if tr.combined_chlorine is not none else '' }}">{{ tr.combined_chlorine if tr.combined_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · ≤0.5</div></div>
+        <div class="stat-card"><div class="stat-label">pH</div><div class="stat-value {{ 'ok' if tr.ph is not none and 7.2 <= tr.ph <= 7.8 else 'bad' if tr.ph is not none else '' }}">{{ tr.ph if tr.ph is not none else '—' }}</div><div class="stat-sub">7.2–7.8</div></div>
+        <div class="stat-card"><div class="stat-label">Θερμοκρασία</div><div class="stat-value {{ 'ok' if tr.temp is not none and tr.temp <= 32 else 'bad' if tr.temp is not none else '' }}">{{ tr.temp if tr.temp is not none else '—' }}</div><div class="stat-sub">°C · ≤32</div></div>
+        <div class="stat-card"><div class="stat-label">Θολότητα</div><div class="stat-value {{ 'ok' if tr.turbidity is not none and tr.turbidity <= 1 else 'bad' if tr.turbidity is not none else '' }}">{{ tr.turbidity if tr.turbidity is not none else '—' }}</div><div class="stat-sub">NTU · ≤1</div></div>
+      </div>
+    </div>
+    {% endfor %}
+    {% for tr in today_afternoon_list %}
+    <div class="card">
+      <div class="card-title"><span class="badge badge-pm">ΑΠΟΓΕΥΜΑ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at.strftime('%H:%M') if tr.recorded_at else '' }}</div>
+      <div class="grid3">
+        <div class="stat-card"><div class="stat-label">Ελεύθερο χλώριο</div><div class="stat-value {{ 'ok' if tr.free_chlorine is not none and 0.4 <= tr.free_chlorine <= 1.5 else 'bad' if tr.free_chlorine is not none else '' }}">{{ tr.free_chlorine if tr.free_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · 0.4–1.5</div></div>
+        <div class="stat-card"><div class="stat-label">Συνδ. χλώριο</div><div class="stat-value {{ 'ok' if tr.combined_chlorine is not none and tr.combined_chlorine <= 0.5 else 'bad' if tr.combined_chlorine is not none else '' }}">{{ tr.combined_chlorine if tr.combined_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · ≤0.5</div></div>
+        <div class="stat-card"><div class="stat-label">pH</div><div class="stat-value {{ 'ok' if tr.ph is not none and 7.2 <= tr.ph <= 7.8 else 'bad' if tr.ph is not none else '' }}">{{ tr.ph if tr.ph is not none else '—' }}</div><div class="stat-sub">7.2–7.8</div></div>
+        <div class="stat-card"><div class="stat-label">Θερμοκρασία</div><div class="stat-value {{ 'ok' if tr.temp is not none and tr.temp <= 32 else 'bad' if tr.temp is not none else '' }}">{{ tr.temp if tr.temp is not none else '—' }}</div><div class="stat-sub">°C · ≤32</div></div>
+        <div class="stat-card"><div class="stat-label">Θολότητα</div><div class="stat-value {{ 'ok' if tr.turbidity is not none and tr.turbidity <= 1 else 'bad' if tr.turbidity is not none else '' }}">{{ tr.turbidity if tr.turbidity is not none else '—' }}</div><div class="stat-sub">NTU · ≤1</div></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:40px;color:#888;margin-bottom:24px;">
+    <i class="ti ti-clock" style="font-size:32px;"></i>
+    <p style="margin-top:10px;">Δεν υπάρχει καταγραφή πισίνας για σήμερα ακόμα.</p>
+  </div>
+  {% endif %}
+
+  <!-- v12.5 — Γραφήματα (τελευταίες 14 ημέρες, πρωί) -->
+  {% set chart_pool = (pools | selectattr('id', 'equalto', f_pool) | first) if f_pool else (pools[0] if pools else None) %}
+  {% if chart_pool %}
+  <div class="grid2" style="margin-bottom:24px;">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-line"></i> Ελεύθερο χλώριο — 14 ημέρες (πρωί) · <span style="color:#0369a1;">{{ chart_pool.hotel.name if chart_pool.hotel else '' }} — {{ chart_pool.name }}</span></div>
+      <canvas id="cl-chart" height="120"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-line"></i> pH & Θερμοκρασία — 14 ημέρες (πρωί) · <span style="color:#0369a1;">{{ chart_pool.hotel.name if chart_pool.hotel else '' }} — {{ chart_pool.name }}</span></div>
+      <canvas id="phtemp-chart" height="120"></canvas>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Ιστορικό μετρήσεων -->
   <div class="card">
     <div class="card-title"><i class="ti ti-history"></i> Ιστορικό μετρήσεων (τελευταίες 80)</div>
+
+    <!-- v12.5 — Φίλτρα ανά ξενοδοχείο / πισίνα / χρήστη -->
+    <form method="GET" action="/pools/dashboard" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;">
+      <select name="hotel_id" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:13px;">
+        <option value="">Όλα τα ξενοδοχεία</option>
+        {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if f_hotel == h.id }}>{{ h.name }}</option>{% endfor %}
+      </select>
+      <select name="pool_id" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:13px;">
+        <option value="">Όλες οι πισίνες</option>
+        {% for p in pools %}<option value="{{ p.id }}" {{ 'selected' if f_pool == p.id }}>{{ p.hotel.name if p.hotel else '' }} — {{ p.name }}</option>{% endfor %}
+      </select>
+      <select name="staff_id" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:13px;">
+        <option value="">Όλοι οι χρήστες</option>
+        {% for u in users %}<option value="{{ u.id }}" {{ 'selected' if f_staff == u.id }}>{{ u.full_name }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-primary" style="font-size:13px;padding:8px 14px;border:none;cursor:pointer;"><i class="ti ti-filter"></i> Φίλτρο</button>
+      {% if f_hotel or f_pool or f_staff %}<a href="/pools/dashboard" style="font-size:12px;color:#888;">Καθαρισμός ✕</a>{% endif %}
+    </form>
+
     <div style="overflow-x:auto;">
       <table>
         <thead>
@@ -178,5 +257,31 @@ tr:last-child td { border-bottom:none; }
   </div>
 
 </div>
+
+{% if chart_pool %}
+<script>
+// v12.5 — γραφήματα πισίνας (ακολουθούν το φίλτρο πισίνας, αλλιώς πρώτη διαθέσιμη)
+const POOL_ID = {{ chart_pool.id }};
+fetch('/api/pool-history/' + POOL_ID).then(r=>r.json()).then(data=>{
+  const labels = data.map(d=>d.date).reverse();
+  new Chart(document.getElementById('cl-chart'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Ελ. χλώριο mg/L',data:data.map(d=>d.free_chlorine).reverse(),borderColor:'#193847',backgroundColor:'rgba(3,105,161,0.1)',tension:0.3,fill:true}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:3,grid:{color:'#f0f0f0'}}}}
+  });
+  new Chart(document.getElementById('phtemp-chart'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'pH',data:data.map(d=>d.ph).reverse(),borderColor:'#0369a1',tension:0.3,yAxisID:'yph'},
+      {label:'°C',data:data.map(d=>d.temp).reverse(),borderColor:'#dc2626',tension:0.3,yAxisID:'yt'}
+    ]},
+    options:{plugins:{legend:{display:true}},scales:{
+      yph:{type:'linear',position:'left',min:6,max:9,grid:{color:'#f0f0f0'}},
+      yt:{type:'linear',position:'right',min:0,max:40,grid:{display:false}}
+    }}
+  });
+});
+</script>
+{% endif %}
 </body>
 </html>
