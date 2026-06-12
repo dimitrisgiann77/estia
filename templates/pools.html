@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language','el') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CONDIAN HOTELS — Pool Log</title>
+<meta name="theme-color" content="#0e7490">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+.app-header.pool { background:#0e7490; }
+.period-btn.pool.active { color:#0e7490; border-bottom-color:#0e7490; }
+.submit-btn.pool { background:#0e7490; }
+.submit-btn.pool:hover { background:#0c5a70; }
+.select-field { width:100%; padding:10px 12px; border:1.5px solid #cfe8ef; border-radius:8px; font-size:15px; background:#f8fcff; color:#1a1a1a; }
+.select-field:focus { outline:none; border-color:#0e7490; background:white; }
+.pool-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.pool-pill { font-size:11px; padding:3px 8px; border-radius:10px; background:#e0f2fe; color:#0369a1; }
+.pool-pill.done { background:#dcfce7; color:#16a34a; }
+.check-row { display:flex; align-items:center; gap:8px; font-size:14px; color:#444; }
+.check-row input { width:18px; height:18px; }
+</style>
+</head>
+<body>
+
+<header class="app-header pool">
+  <div class="header-left">
+    <span class="header-icon">🏊</span>
+    <div>
+      <div class="header-title">CONDIAN HOTELS — Pool Log</div>
+      <div class="header-sub" id="today-date"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/app" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
+      <i class="ti ti-droplet" style="font-size:14px;"></i> Νερά
+    </a>
+    {% if user.role == 'admin' %}
+    <a href="/pools/dashboard" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
+      <i class="ti ti-layout-dashboard" style="font-size:14px;"></i> Dashboard
+    </a>
+    {% endif %}
+    <div class="lang-toggle">
+      <a href="/set-language/el" class="{{ 'active' if session.get('language','el')=='el' }}">ΕΛ</a>
+      <span>|</span>
+      <a href="/set-language/en" class="{{ 'active' if session.get('language','el')=='en' }}">EN</a>
+    </div>
+    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
+  </div>
+</header>
+
+<div class="user-badge">
+  <i class="ti ti-user-circle"></i>
+  <span>{{ user.full_name }}</span>
+</div>
+
+{% if not hotels %}
+<div class="app-content">
+  <div class="section" style="text-align:center;color:#888;">
+    <i class="ti ti-pool" style="font-size:32px;"></i>
+    <p style="margin-top:10px;" data-el="Δεν υπάρχουν πισίνες ακόμα." data-en="No pools yet.">Δεν υπάρχουν πισίνες ακόμα.</p>
+    {% if user.role == 'admin' %}<p style="margin-top:6px;"><a href="/pools/dashboard" style="color:#0e7490;">Πρόσθεσε ξενοδοχείο & πισίνα →</a></p>{% endif %}
+  </div>
+</div>
+{% else %}
+
+<div class="period-bar">
+  <button class="period-btn pool active" id="btn-morning" onclick="setPeriod('morning')">
+    <i class="ti ti-sun"></i>
+    <span data-el="Πρωί" data-en="Morning">Πρωί</span>
+  </button>
+  <button class="period-btn pool" id="btn-afternoon" onclick="setPeriod('afternoon')">
+    <i class="ti ti-moon"></i>
+    <span data-el="Απόγευμα" data-en="Afternoon">Απόγευμα</span>
+  </button>
+</div>
+
+<div class="app-content">
+<form id="pool-form">
+<input type="hidden" id="period-input" name="period" value="morning">
+
+<!-- Επιλογή ξενοδοχείου & πισίνας -->
+<div class="section">
+  <div class="sec-title"><i class="ti ti-building"></i> <span data-el="Ξενοδοχείο & Πισίνα" data-en="Hotel & Pool">Ξενοδοχείο & Πισίνα</span></div>
+  <div class="field">
+    <label data-el="Ξενοδοχείο" data-en="Hotel">Ξενοδοχείο</label>
+    <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
+  </div>
+  <div class="field">
+    <label data-el="Πισίνα" data-en="Pool">Πισίνα</label>
+    <select id="pool-select" name="pool_id" class="select-field" onchange="onPoolChange()"></select>
+    <div class="pool-pills" id="pool-status"></div>
+  </div>
+</div>
+
+<!-- Χημικές μετρήσεις -->
+<div class="section">
+  <div class="sec-title"><i class="ti ti-flask"></i> <span data-el="Χημικές μετρήσεις" data-en="Chemical readings">Χημικές μετρήσεις</span></div>
+  <div class="grid2">
+    <div class="field">
+      <label data-el="Ελεύθερο χλώριο (0.4–1.5)" data-en="Free chlorine (0.4–1.5)">Ελεύθερο χλώριο (0.4–1.5)</label>
+      <input type="number" name="free_chlorine" id="free_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()">
+      <div id="free_chlorine_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="Συνδεδεμένο χλώριο (≤0.5)" data-en="Combined chlorine (≤0.5)">Συνδεδεμένο χλώριο (≤0.5)</label>
+      <input type="number" name="combined_chlorine" id="combined_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()">
+      <div id="combined_chlorine_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="pH (7.2–7.8)" data-en="pH (7.2–7.8)">pH (7.2–7.8)</label>
+      <input type="number" name="ph" id="ph" min="0" max="14" step="0.1" placeholder="pH" oninput="validate()">
+      <div id="ph_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="Θερμοκρασία (≤32°C)" data-en="Temperature (≤32°C)">Θερμοκρασία (≤32°C)</label>
+      <input type="number" name="temp" id="temp" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()">
+      <div id="temp_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="Θολότητα (≤1 NTU)" data-en="Turbidity (≤1 NTU)">Θολότητα (≤1 NTU)</label>
+      <input type="number" name="turbidity" id="turbidity" min="0" max="20" step="0.1" placeholder="NTU" oninput="validate()">
+      <div id="turbidity_st"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Περιοδικά (πρωί) -->
+<div class="section" id="morning-extra">
+  <div class="sec-title"><i class="ti ti-test-pipe"></i> <span data-el="Περιοδικά (πρωί)" data-en="Periodic (morning)">Περιοδικά (πρωί)</span></div>
+  <div class="grid2">
+    <div class="field">
+      <label data-el="Κυανουρικό οξύ (≤75)" data-en="Cyanuric acid (≤75)">Κυανουρικό οξύ (≤75)</label>
+      <input type="number" name="cyanuric_acid" id="cyanuric_acid" min="0" max="300" step="1" placeholder="mg/L" oninput="validate()">
+      <div id="cyanuric_acid_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="Ολική αλκαλικότητα (80–120)" data-en="Total alkalinity (80–120)">Ολική αλκαλικότητα (80–120)</label>
+      <input type="number" name="total_alkalinity" id="total_alkalinity" min="0" max="400" step="1" placeholder="mg/L" oninput="validate()">
+      <div id="total_alkalinity_st"></div>
+    </div>
+    <div class="field">
+      <label data-el="ORP / Redox (≥650)" data-en="ORP / Redox (≥650)">ORP / Redox (≥650)</label>
+      <input type="number" name="orp" id="orp" min="0" max="1200" step="1" placeholder="mV" oninput="validate()">
+      <div id="orp_st"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Λειτουργικά -->
+<div class="section">
+  <div class="sec-title"><i class="ti ti-filter"></i> <span data-el="Λειτουργικά" data-en="Operational">Λειτουργικά</span></div>
+  <label class="check-row">
+    <input type="checkbox" name="backwash_done" value="1">
+    <span data-el="Έγινε ανταπόπλυση φίλτρου (backwash)" data-en="Filter backwash done">Έγινε ανταπόπλυση φίλτρου (backwash)</span>
+  </label>
+</div>
+
+<!-- Παρατηρήσεις -->
+<div class="section">
+  <div class="sec-title"><i class="ti ti-notes"></i> <span data-el="Παρατηρήσεις" data-en="Notes">Παρατηρήσεις</span></div>
+  <textarea name="notes" id="notes" placeholder="..." style="width:100%;min-height:70px;padding:10px;border:1.5px solid #cfe8ef;border-radius:8px;font-size:14px;resize:vertical;background:#f8fcff;"></textarea>
+</div>
+
+<button type="button" class="submit-btn pool" onclick="submitForm()" id="submit-btn">
+  <i class="ti ti-send"></i>
+  <span data-el="Υποβολή αναφοράς" data-en="Submit report">Υποβολή αναφοράς</span>
+</button>
+
+<div id="submit-msg" style="display:none;" class="submit-msg"></div>
+
+</form>
+</div>
+{% endif %}
+
+<script>
+const LANG = '{{ session.get("language", "el") }}';
+const HOTELS = {{ hotels_json|tojson }};
+const DONE = {{ done|tojson }};
+</script>
+<script src="/static/pools.js"></script>
+</body>
+</html>
