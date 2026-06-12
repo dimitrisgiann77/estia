@@ -1,17 +1,19 @@
 """
-CONDIAN HOTELS - Water & Pool Log App v3
-Backend: Flask + PostgreSQL + SMTP
+CONDIAN HOTELS - Water & Pool Log App v4
+Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
   - Water Log (νερά χρήσης) — single hotel (Sergios)
   - Pool Log (πισίνες) — multi-hotel / multi-pool
+  - AI Pool Assistant (Βοηθός Πισίνας) — provider-agnostic (Anthropic/OpenAI)
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import text
 from datetime import datetime, date
-import os, smtplib, threading
+import os, smtplib, threading, json, urllib.request, urllib.error
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -33,21 +35,58 @@ EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 EMAIL_TO_LIST  = ['dimitris@condianhotels.gr', 'm.xypakis@condianhotels.gr', 'g.giakoumakis@condianhotels.gr']
 HOTEL_NAME     = 'Sergios Hotel'
 
+# ── AI Assistant config (provider-agnostic) ──
+AI_PROVIDER       = os.environ.get('AI_PROVIDER', 'auto')   # auto | anthropic | openai
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+OPENAI_API_KEY    = os.environ.get('OPENAI_API_KEY', '')
+AI_MODEL          = os.environ.get('AI_MODEL', '')          # override; αλλιώς default ανά πάροχο
+
+POOL_ASSISTANT_PROMPT = """Είσαι ο «Βοηθός Πισίνας», ψηφιακός βοηθός στην εφαρμογή διαχείρισης του ξενοδοχείου.
+Βοηθάς το προσωπικό συντήρησης και τους υπεύθυνους βάρδιας στην ασφαλή, καθαρή και
+νόμιμη καθημερινή λειτουργία των πισινών.
+# ΑΡΜΟΔΙΟΤΗΤΕΣ
+- Χημεία νερού: ερμηνεία μετρήσεων (pH, ελεύθερο/ολικό χλώριο, αλκαλικότητα,
+  κυανουρικό οξύ, σκληρότητα ασβεστίου, θερμοκρασία) και προτάσεις διόρθωσης.
+- Δοσολογία χημικών: υπολογισμός ποσότητας με βάση τον όγκο κάθε πισίνας και την
+  απόκλιση από τις επιθυμητές τιμές.
+- Πρόγραμμα καθαρισμού: skimming, βούρτσισμα, σκούπισμα πυθμένα, καθαρισμός
+  καλαθιών skimmer/προφίλτρου, backwash φίλτρων.
+- Έλεγχοι εξοπλισμού: αντλίες, κυκλοφορία, στάθμη νερού, πίεση φίλτρων, διαρροές.
+- Ασφάλεια & συμμόρφωση: διαύγεια νερού, σήμανση, βάθη, ναυαγοσώστης, τήρηση
+  αρχείου μετρήσεων.
+- Ημερολόγιο: καταγραφή μετρήσεων και ενεργειών ανά βάρδια και ανά πισίνα.
+# ΛΕΙΤΟΥΡΓΙΑ
+1. Ρώτα πρώτα ποια πισίνα αφορά και ζήτα τις τρέχουσες μετρήσεις αν δεν τις έχεις.
+2. Δίνε σαφή, πρακτικά βήματα — «τι να κάνω τώρα», όχι θεωρία.
+3. Στη δοσολογία δείξε όγκο, απόκλιση και τελική ποσότητα προϊόντος. Πάντα
+   επιβεβαίωνε τον όγκο της πισίνας.
+4. Σήμανε ως ΕΠΕΙΓΟΝ ό,τι είναι εκτός ορίων (χλώριο, θολό νερό, βλάβη αντλίας).
+5. Αν μια τιμή ήταν προβληματική νωρίτερα, υπενθύμισε επανέλεγχο.
+# ΟΡΙΑ ΑΣΦΑΛΕΙΑΣ
+- Δεν αντικαθιστάς πιστοποιημένο τεχνικό ή τη νομοθεσία· τα όρια τιμών διαφέρουν
+  ανά περιοχή — σύστησε επαλήθευση με τους τοπικούς υγειονομικούς κανονισμούς.
+- Σε σοβαρά περιστατικά (υπερδοσολογία, ηλεκτρικό πρόβλημα, ατύχημα) δώσε άμεση
+  οδηγία ασφαλείας, σύστησε κλείσιμο πισίνας και ειδοποίηση υπευθύνου.
+- ΠΟΤΕ μην προτείνεις ανάμειξη χλωρίου με οξέα ή χημικών μεταξύ τους.
+# ΥΦΟΣ
+- Σύντομος, πρακτικός, απλή γλώσσα για προσωπικό βάρδιας.
+- Checklists για ελέγχους και προγράμματα.
+- Στο τέλος κάθε αναφοράς, πρότεινε τι να καταγραφεί στο log."""
+
 db = SQLAlchemy(app)
 
 # ──────────────────────────────────────────────────────────────────────────
 #  POOL LIMITS  (min, max) — None means no limit on that side.
-#  Βασισμένα σε τυπικά όρια πισινών ξενοδοχείων (ρυθμίσιμα).
 # ──────────────────────────────────────────────────────────────────────────
 POOL_LIMITS = {
-    'free_chlorine':     (0.4, 1.5),    # mg/L ελεύθερο υπολειμματικό χλώριο
-    'combined_chlorine': (None, 0.5),   # mg/L συνδεδεμένο χλώριο (max)
-    'ph':                (7.2, 7.8),     # pH
-    'temp':              (None, 32.0),   # °C θερμοκρασία νερού
-    'turbidity':         (None, 1.0),    # NTU θολότητα (max)
-    'cyanuric_acid':     (None, 75.0),   # mg/L κυανουρικό οξύ (max)
-    'total_alkalinity':  (80.0, 120.0),  # mg/L ολική αλκαλικότητα
-    'orp':               (650.0, None),  # mV δυναμικό οξειδοαναγωγής (min)
+    'free_chlorine':     (0.4, 1.5),
+    'combined_chlorine': (None, 0.5),
+    'ph':                (7.2, 7.8),
+    'temp':              (None, 32.0),
+    'turbidity':         (None, 1.0),
+    'cyanuric_acid':     (None, 75.0),
+    'total_alkalinity':  (80.0, 120.0),
+    'orp':               (650.0, None),
 }
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -71,20 +110,14 @@ class WaterRecord(db.Model):
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at  = db.Column(db.DateTime, nullable=True)
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-
-    # CLO2
     clo2_tank        = db.Column(db.Float)
     clo2_kitchen     = db.Column(db.Float)
     clo2_remote      = db.Column(db.Float)
     clo2_dhw_out     = db.Column(db.Float)
     clo2_dhw_return  = db.Column(db.Float)
     clo2_ro          = db.Column(db.Float)
-
-    # Σημεία
     location_kitchen = db.Column(db.String(100))
     location_remote  = db.Column(db.String(100))
-
-    # Θερμοκρασία
     temp_tank         = db.Column(db.Float)
     temp_dhw_out      = db.Column(db.Float)
     temp_dhw_return   = db.Column(db.Float)
@@ -93,59 +126,47 @@ class WaterRecord(db.Model):
     temp_kitchen_hot  = db.Column(db.Float)
     temp_remote_cold  = db.Column(db.Float)
     temp_remote_hot   = db.Column(db.Float)
-
     ph_tank = db.Column(db.Float)
     notes   = db.Column(db.Text)
-
     user         = db.relationship('User', foreign_keys=[user_id], backref='water_records')
     updated_user = db.relationship('User', foreign_keys=[updated_by])
-
 
 class Hotel(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     name       = db.Column(db.String(120), unique=True, nullable=False)
     is_active  = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
     pools = db.relationship('Pool', backref='hotel', order_by='Pool.name')
-
 
 class Pool(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False)
-    name       = db.Column(db.String(120), nullable=False)   # π.χ. Κύρια Πισίνα, Jacuzzi
-    location   = db.Column(db.String(120))                   # σημείο / περιοχή
-    pool_type  = db.Column(db.String(20), default='pool')    # pool / kids / jacuzzi / indoor
+    name       = db.Column(db.String(120), nullable=False)
+    location   = db.Column(db.String(120))
+    pool_type  = db.Column(db.String(20), default='pool')
+    volume_m3  = db.Column(db.Float)          # όγκος σε m³ (για δοσολογία)
     is_active  = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 
 class PoolRecord(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     pool_id     = db.Column(db.Integer, db.ForeignKey('pool.id'), nullable=False)
     user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     record_date = db.Column(db.Date, default=date.today, nullable=False)
-    period      = db.Column(db.String(10), nullable=False)   # morning / afternoon
+    period      = db.Column(db.String(10), nullable=False)
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at  = db.Column(db.DateTime, nullable=True)
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-
-    # Μετρήσεις ανά περίοδο
-    free_chlorine     = db.Column(db.Float)   # mg/L
-    combined_chlorine = db.Column(db.Float)   # mg/L
+    free_chlorine     = db.Column(db.Float)
+    combined_chlorine = db.Column(db.Float)
     ph                = db.Column(db.Float)
-    temp              = db.Column(db.Float)    # °C
-    turbidity         = db.Column(db.Float)    # NTU
-
-    # Περιοδικά (πρωί)
-    cyanuric_acid     = db.Column(db.Float)    # mg/L
-    total_alkalinity  = db.Column(db.Float)    # mg/L
-    orp               = db.Column(db.Float)    # mV
-
-    # Λειτουργικά
+    temp              = db.Column(db.Float)
+    turbidity         = db.Column(db.Float)
+    cyanuric_acid     = db.Column(db.Float)
+    total_alkalinity  = db.Column(db.Float)
+    orp               = db.Column(db.Float)
     backwash_done     = db.Column(db.Boolean, default=False)
     notes             = db.Column(db.Text)
-
     pool         = db.relationship('Pool')
     user         = db.relationship('User', foreign_keys=[user_id])
     updated_user = db.relationship('User', foreign_keys=[updated_by])
@@ -159,7 +180,7 @@ def flt(data, key):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-#  WATER LOG  (αμετάβλητο)
+#  WATER LOG
 # ──────────────────────────────────────────────────────────────────────────
 def apply_record(record, data, period):
     record.clo2_tank        = flt(data, 'clo2_tank')
@@ -186,7 +207,6 @@ def send_report_email(record, user):
     if not EMAIL_PASSWORD:
         return False
     period_gr = 'Πρωι' if record.period == 'morning' else 'Απογευμα'
-
     def row(label, val, unit='', min_v=None, max_v=None):
         if val is None:
             return f'<tr><td style="padding:7px 8px;border:1px solid #eee;">{label}</td><td style="padding:7px 8px;border:1px solid #eee;">-</td><td style="padding:7px 8px;border:1px solid #eee;color:#888;">{unit}</td></tr>'
@@ -195,10 +215,8 @@ def send_report_email(record, user):
         icon  = 'OK' if ok else 'ΠΡΟΣΟΧΗ'
         limit = f'min {min_v}{unit}' if min_v else (f'max {max_v}{unit}' if max_v else '')
         return f'<tr><td style="padding:7px 8px;border:1px solid #eee;">{label}</td><td style="padding:7px 8px;border:1px solid #eee;color:{color};font-weight:500;">{icon}: {val} {unit}</td><td style="padding:7px 8px;border:1px solid #eee;color:#888;">{limit}</td></tr>'
-
     loc_kit = f' ({record.location_kitchen})' if record.location_kitchen else ''
     loc_rem = f' ({record.location_remote})' if record.location_remote else ''
-
     clo2_rows  = row('Δεξαμενη', record.clo2_tank, 'ppm', 1.0, 2.0)
     clo2_rows += row(f'Κουζινα{loc_kit}', record.clo2_kitchen, 'ppm', 1.0, 2.0)
     clo2_rows += row(f'Απομακρυσμενο{loc_rem}', record.clo2_remote, 'ppm', 1.0, 2.0)
@@ -206,7 +224,6 @@ def send_report_email(record, user):
         clo2_rows += row('Αναχωρηση ΖΝΧ', record.clo2_dhw_out, 'ppm', 1.0, 2.0)
         clo2_rows += row('Επιστροφη ΖΝΧ', record.clo2_dhw_return, 'ppm', 1.0, 2.0)
         clo2_rows += row('Αντ. Οσμωση', record.clo2_ro, 'ppm', 1.0, 2.0)
-
     temp_rows  = row('Δεξαμενη', record.temp_tank, 'C', None, 20.0)
     temp_rows += row('Κολεκτερ ΖΝΧ (Αναχ.)', record.temp_dhw_out, 'C', 60.0, None)
     temp_rows += row('Κολεκτερ Ανακυκλ. (Επιστρ.)', record.temp_dhw_return, 'C', 50.0, None)
@@ -215,7 +232,6 @@ def send_report_email(record, user):
     temp_rows += row(f'Κουζινα Ζεστο{loc_kit}', record.temp_kitchen_hot, 'C', 50.0, None)
     temp_rows += row(f'Απομακρυσμενο Κρυο{loc_rem}', record.temp_remote_cold, 'C')
     temp_rows += row(f'Απομακρυσμενο Ζεστο{loc_rem}', record.temp_remote_hot, 'C', 50.0, None)
-
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0369a1;color:white;padding:20px;border-radius:8px 8px 0 0;">
@@ -240,7 +256,6 @@ def send_report_email(record, user):
         Sergios Hotel - Water Log - {record.record_date.strftime('%d/%m/%Y')} - {period_gr}
       </div>
     </div>"""
-
     try:
         msg = MIMEMultipart()
         msg['From']    = EMAIL_FROM
@@ -273,7 +288,6 @@ def apply_pool_record(record, data, period):
         record.total_alkalinity = flt(data, 'total_alkalinity')
         record.orp              = flt(data, 'orp')
 
-
 def send_pool_report_email(record, user):
     if not EMAIL_PASSWORD:
         return False
@@ -281,7 +295,6 @@ def send_pool_report_email(record, user):
     pool   = record.pool
     hotel  = pool.hotel.name if pool and pool.hotel else ''
     point  = f' — {pool.location}' if pool and pool.location else ''
-
     def row(label, val, unit, key):
         min_v, max_v = POOL_LIMITS.get(key, (None, None))
         if val is None:
@@ -298,7 +311,6 @@ def send_pool_report_email(record, user):
         else:
             limit = unit
         return f'<tr><td style="padding:7px 8px;border:1px solid #eee;">{label}</td><td style="padding:7px 8px;border:1px solid #eee;color:{color};font-weight:500;">{icon}: {val} {unit}</td><td style="padding:7px 8px;border:1px solid #eee;color:#888;">{limit}</td></tr>'
-
     rows  = row('Ελευθερο χλωριο', record.free_chlorine, 'mg/L', 'free_chlorine')
     rows += row('Συνδεδεμενο χλωριο', record.combined_chlorine, 'mg/L', 'combined_chlorine')
     rows += row('pH', record.ph, '', 'ph')
@@ -308,9 +320,7 @@ def send_pool_report_email(record, user):
         rows += row('Κυανουρικο οξυ', record.cyanuric_acid, 'mg/L', 'cyanuric_acid')
         rows += row('Ολικη αλκαλικοτητα', record.total_alkalinity, 'mg/L', 'total_alkalinity')
         rows += row('ORP (Redox)', record.orp, 'mV', 'orp')
-
     backwash = 'Ναι' if record.backwash_done else 'Οχι'
-
     html = f"""
     <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;">
       <div style="background:#0e7490;color:white;padding:20px;border-radius:8px 8px 0 0;">
@@ -330,7 +340,6 @@ def send_pool_report_email(record, user):
         {hotel} - Πισινα {pool.name if pool else ''} - {record.record_date.strftime('%d/%m/%Y')} - {period_gr}
       </div>
     </div>"""
-
     try:
         msg = MIMEMultipart()
         msg['From']    = EMAIL_FROM
@@ -345,6 +354,100 @@ def send_pool_report_email(record, user):
     except Exception as e:
         print(f'Pool email error: {e}')
         return False
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  AI ASSISTANT helpers
+# ──────────────────────────────────────────────────────────────────────────
+def resolve_provider():
+    if AI_PROVIDER == 'anthropic' and ANTHROPIC_API_KEY:
+        return 'anthropic'
+    if AI_PROVIDER == 'openai' and OPENAI_API_KEY:
+        return 'openai'
+    if AI_PROVIDER == 'auto':
+        if ANTHROPIC_API_KEY:
+            return 'anthropic'
+        if OPENAI_API_KEY:
+            return 'openai'
+    return None
+
+def call_llm(system_prompt, messages):
+    """messages: list of {'role':'user'|'assistant','content':str}. Returns (reply, error)."""
+    provider = resolve_provider()
+    if not provider:
+        return None, 'not_configured'
+    try:
+        if provider == 'anthropic':
+            model = AI_MODEL or 'claude-sonnet-4-6'
+            payload = {'model': model, 'max_tokens': 1024,
+                       'system': system_prompt, 'messages': messages}
+            req = urllib.request.Request(
+                'https://api.anthropic.com/v1/messages',
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'content-type': 'application/json',
+                         'x-api-key': ANTHROPIC_API_KEY,
+                         'anthropic-version': '2023-06-01'})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.loads(r.read().decode('utf-8'))
+            return data['content'][0]['text'], None
+        else:  # openai
+            model = AI_MODEL or 'gpt-4o-mini'
+            msgs = [{'role': 'system', 'content': system_prompt}] + messages
+            payload = {'model': model, 'max_tokens': 1024, 'messages': msgs}
+            req = urllib.request.Request(
+                'https://api.openai.com/v1/chat/completions',
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'content-type': 'application/json',
+                         'authorization': f'Bearer {OPENAI_API_KEY}'})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                data = json.loads(r.read().decode('utf-8'))
+            return data['choices'][0]['message']['content'], None
+    except urllib.error.HTTPError as e:
+        body = ''
+        try:
+            body = e.read().decode('utf-8')[:300]
+        except Exception:
+            pass
+        return None, f'http_{e.code}: {body}'
+    except Exception as e:
+        return None, str(e)
+
+def build_pool_context(pool):
+    if not pool:
+        return 'Δεν έχει επιλεγεί συγκεκριμένη πισίνα — ρώτα τον χρήστη ποια πισίνα αφορά.'
+    lines = [
+        f'Ξενοδοχείο: {pool.hotel.name if pool.hotel else "-"}',
+        f'Πισίνα: {pool.name}' + (f' ({pool.location})' if pool.location else ''),
+        f'Τύπος: {pool.pool_type}',
+        f'Όγκος: {(str(pool.volume_m3) + " m3") if pool.volume_m3 else "ΑΓΝΩΣΤΟΣ — ζήτησε να τον επιβεβαιώσει ο χρήστης"}',
+    ]
+    recs = (PoolRecord.query.filter_by(pool_id=pool.id)
+            .order_by(PoolRecord.record_date.desc(), PoolRecord.recorded_at.desc())
+            .limit(2).all())
+    if recs:
+        lines.append('Τελευταίες μετρήσεις:')
+        for r in recs:
+            per = 'Πρωί' if r.period == 'morning' else 'Απόγευμα'
+            parts = []
+            def add(lbl, val, key, unit=''):
+                if val is None:
+                    return
+                mn, mx = POOL_LIMITS.get(key, (None, None))
+                ok = (mn is None or val >= mn) and (mx is None or val <= mx)
+                parts.append(f'{lbl}={val}{unit}' + ('' if ok else ' [ΕΚΤΟΣ ΟΡΙΩΝ]'))
+            add('ελ.χλώριο', r.free_chlorine, 'free_chlorine', ' mg/L')
+            add('συνδ.χλώριο', r.combined_chlorine, 'combined_chlorine', ' mg/L')
+            add('pH', r.ph, 'ph')
+            add('θερμ', r.temp, 'temp', ' C')
+            add('θολότητα', r.turbidity, 'turbidity', ' NTU')
+            add('κυανουρικό', r.cyanuric_acid, 'cyanuric_acid', ' mg/L')
+            add('αλκαλικότητα', r.total_alkalinity, 'total_alkalinity', ' mg/L')
+            add('ORP', r.orp, 'orp', ' mV')
+            lines.append(f'  {r.record_date.strftime("%d/%m")} {per}: ' + (', '.join(parts) if parts else '—'))
+    else:
+        lines.append('Δεν υπάρχουν καταγεγραμμένες μετρήσεις για αυτή την πισίνα ακόμα.')
+    lines.append('Επιθυμητά όρια: ελ.χλώριο 0.4-1.5 mg/L, συνδ.χλώριο <=0.5, pH 7.2-7.8, θερμ <=32C, θολότητα <=1 NTU, κυανουρικό <=75, αλκαλικότητα 80-120, ORP >=650 mV.')
+    return '\n'.join(lines)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -399,11 +502,9 @@ def water_app():
 def submit():
     if 'user_id' not in session:
         return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
-
     user   = User.query.get(session['user_id'])
     data   = request.form
     period = data.get('period', 'morning')
-
     record = WaterRecord.query.filter_by(record_date=date.today(), period=period).first()
     if record:
         apply_record(record, data, period)
@@ -413,12 +514,10 @@ def submit():
         record = WaterRecord(user_id=user.id, record_date=date.today(), period=period)
         apply_record(record, data, period)
         db.session.add(record)
-
     db.session.commit()
     t = threading.Thread(target=send_report_email, args=(record, user))
     t.daemon = True
     t.start()
-
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
     return jsonify({'success': True, 'message': f'Καταγραφη {period_gr} αποθηκευτηκε!'})
 
@@ -428,10 +527,8 @@ def edit_record(record_id):
         return redirect(url_for('login'))
     user   = User.query.get(session['user_id'])
     record = WaterRecord.query.get_or_404(record_id)
-
     if user.role != 'admin' and record.record_date != date.today():
         return redirect(url_for('water_app'))
-
     if request.method == 'POST':
         apply_record(record, request.form, record.period)
         record.updated_at = datetime.utcnow()
@@ -440,7 +537,6 @@ def edit_record(record_id):
         if user.role == 'admin':
             return redirect(url_for('dashboard') + '?success=updated')
         return redirect(url_for('water_app'))
-
     return render_template('edit.html', user=user, record=record)
 
 @app.route('/api/record/<int:record_id>')
@@ -476,25 +572,26 @@ def set_language(lang):
 # ──────────────────────────────────────────────────────────────────────────
 #  POOL LOG ROUTES
 # ──────────────────────────────────────────────────────────────────────────
+def hotels_payload():
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    payload = [{
+        'id': h.id, 'name': h.name,
+        'pools': [{'id': p.id, 'name': p.name, 'location': p.location or '',
+                   'type': p.pool_type, 'volume_m3': p.volume_m3}
+                  for p in h.pools if p.is_active]
+    } for h in hotels]
+    return hotels, payload
+
 @app.route('/pools')
 def pools_app():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    user   = User.query.get(session['user_id'])
-    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
-
-    # σημερινές καταγραφές ανά (pool_id, period) για ένδειξη "✓"
+    user = User.query.get(session['user_id'])
+    hotels, hotels_json = hotels_payload()
     todays = PoolRecord.query.filter_by(record_date=date.today()).all()
     done = {}
     for r in todays:
         done.setdefault(str(r.pool_id), []).append(r.period)
-
-    hotels_json = [{
-        'id': h.id, 'name': h.name,
-        'pools': [{'id': p.id, 'name': p.name, 'location': p.location or '', 'type': p.pool_type}
-                  for p in h.pools if p.is_active]
-    } for h in hotels]
-
     return render_template('pools.html', user=user, hotels=hotels,
                            hotels_json=hotels_json, done=done, limits=POOL_LIMITS)
 
@@ -502,16 +599,13 @@ def pools_app():
 def submit_pool():
     if 'user_id' not in session:
         return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
-
     user   = User.query.get(session['user_id'])
     data   = request.form
     period = data.get('period', 'morning')
     pool_id = data.get('pool_id')
-
     pool = Pool.query.filter_by(id=pool_id, is_active=True).first() if pool_id else None
     if not pool:
         return jsonify({'success': False, 'message': 'Επιλεξτε πισινα'}), 400
-
     record = PoolRecord.query.filter_by(pool_id=pool.id, record_date=date.today(), period=period).first()
     if record:
         apply_pool_record(record, data, period)
@@ -521,12 +615,10 @@ def submit_pool():
         record = PoolRecord(pool_id=pool.id, user_id=user.id, record_date=date.today(), period=period)
         apply_pool_record(record, data, period)
         db.session.add(record)
-
     db.session.commit()
     t = threading.Thread(target=send_pool_report_email, args=(record, user))
     t.daemon = True
     t.start()
-
     period_gr = 'Πρωι' if period == 'morning' else 'Απογευμα'
     return jsonify({'success': True, 'message': f'Καταγραφη {pool.name} ({period_gr}) αποθηκευτηκε!'})
 
@@ -536,10 +628,8 @@ def edit_pool_record(record_id):
         return redirect(url_for('login'))
     user   = User.query.get(session['user_id'])
     record = PoolRecord.query.get_or_404(record_id)
-
     if user.role != 'admin' and record.record_date != date.today():
         return redirect(url_for('pools_app'))
-
     if request.method == 'POST':
         apply_pool_record(record, request.form, record.period)
         record.updated_at = datetime.utcnow()
@@ -548,7 +638,6 @@ def edit_pool_record(record_id):
         if user.role == 'admin':
             return redirect(url_for('pools_dashboard') + '?success=updated')
         return redirect(url_for('pools_app'))
-
     return render_template('pool_edit.html', user=user, record=record, limits=POOL_LIMITS)
 
 @app.route('/api/pool-record/<int:record_id>')
@@ -564,6 +653,45 @@ def api_pool_record(record_id):
         'cyanuric_acid': r.cyanuric_acid, 'total_alkalinity': r.total_alkalinity,
         'orp': r.orp, 'backwash_done': r.backwash_done, 'notes': r.notes or ''
     })
+
+
+# ──────────────────────────────────────────────────────────────────────────
+#  AI ASSISTANT ROUTES
+# ──────────────────────────────────────────────────────────────────────────
+@app.route('/assistant')
+def assistant_page():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    hotels, hotels_json = hotels_payload()
+    return render_template('assistant.html', user=user,
+                           hotels_json=hotels_json,
+                           configured=(resolve_provider() is not None))
+
+@app.route('/api/assistant', methods=['POST'])
+def api_assistant():
+    if 'user_id' not in session:
+        return jsonify({'reply': '', 'error': 'auth'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    raw  = data.get('messages', [])
+    pool_id = data.get('pool_id')
+    messages = []
+    for m in raw[-12:]:
+        role = m.get('role')
+        content = (m.get('content') or '').strip()
+        if role in ('user', 'assistant') and content:
+            messages.append({'role': role, 'content': content[:4000]})
+    if not messages:
+        return jsonify({'reply': '', 'error': 'empty'}), 400
+    pool = Pool.query.filter_by(id=pool_id, is_active=True).first() if pool_id else None
+    context = build_pool_context(pool)
+    system = POOL_ASSISTANT_PROMPT + '\n\n# ΔΕΔΟΜΕΝΑ ΕΦΑΡΜΟΓΗΣ (τρέχουσα κατάσταση)\n' + context
+    reply, err = call_llm(system, messages)
+    if err == 'not_configured':
+        return jsonify({'reply': '', 'error': 'not_configured'})
+    if err:
+        return jsonify({'reply': '', 'error': err}), 502
+    return jsonify({'reply': reply, 'error': None})
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -652,7 +780,8 @@ def add_pool():
             hotel_id=int(hotel_id),
             name=name,
             location=data.get('location', '').strip(),
-            pool_type=data.get('pool_type', 'pool')
+            pool_type=data.get('pool_type', 'pool'),
+            volume_m3=flt(data, 'volume_m3')
         ))
         db.session.commit()
     return redirect(url_for('pools_dashboard') + '?success=pool_added')
@@ -699,11 +828,26 @@ def api_pool_history(pool_id):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-#  INIT
+#  INIT  (τρέχει και κάτω από gunicorn)
 # ──────────────────────────────────────────────────────────────────────────
+def ensure_columns():
+    """Ελαφρύ migration: πρόσθεσε νέες στήλες σε ήδη υπάρχουσα βάση."""
+    try:
+        insp = db.inspect(db.engine)
+        if 'pool' in insp.get_table_names():
+            cols = [c['name'] for c in insp.get_columns('pool')]
+            if 'volume_m3' not in cols:
+                db.session.execute(text('ALTER TABLE pool ADD COLUMN volume_m3 FLOAT'))
+                db.session.commit()
+                print('Migration: pool.volume_m3 added')
+    except Exception as e:
+        db.session.rollback()
+        print(f'ensure_columns skipped: {e}')
+
 def init_db():
     with app.app_context():
         db.create_all()
+        ensure_columns()
         try:
             if not User.query.filter_by(username='admin').first():
                 db.session.add(User(username='admin', password=generate_password_hash('sergios2024'), full_name='Δημητρης Γιαννουλακης', role='admin', language='el'))
@@ -711,24 +855,19 @@ def init_db():
                 db.session.add(User(username='xypakis', password=generate_password_hash('water2024'), full_name='Μανος Χυπακης', role='staff', language='el'))
                 db.session.commit()
                 print('Βαση δεδομενων και χρηστες δημιουργηθηκαν')
-
-            # Seed example hotel + pools (μόνο αν δεν υπάρχουν ξενοδοχεια)
             if not Hotel.query.first():
                 sergios = Hotel(name='Sergios Hotel')
                 db.session.add(sergios)
                 db.session.flush()
-                db.session.add(Pool(hotel_id=sergios.id, name='Κύρια Πισίνα', location='Pool bar', pool_type='pool'))
-                db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids'))
+                db.session.add(Pool(hotel_id=sergios.id, name='Κύρια Πισίνα', location='Pool bar', pool_type='pool', volume_m3=200))
+                db.session.add(Pool(hotel_id=sergios.id, name='Παιδική Πισίνα', location='Pool bar', pool_type='kids', volume_m3=20))
                 db.session.commit()
                 print('Δημιουργηθηκε δειγμα ξενοδοχειου & πισινων')
         except Exception as e:
-            # Σε race μεταξύ gunicorn workers το seeding μπορεί να συγκρουστεί — αγνόησέ το
             db.session.rollback()
             print(f'init_db seed skipped: {e}')
 
 
-# ΣΗΜΑΝΤΙΚΟ: τρέχει και κάτω από gunicorn (Railway), όχι μόνο με `python app.py`,
-# ώστε να δημιουργούνται οι πίνακες & οι χρήστες στην παραγωγή.
 init_db()
 
 if __name__ == '__main__':

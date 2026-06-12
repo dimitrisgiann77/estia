@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language','el') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Βοηθός Πισίνας — CONDIAN HOTELS</title>
+<meta name="theme-color" content="#0e7490">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
+.app-header.pool { background:#0e7490; flex-shrink:0; }
+.asst-tools { background:white; border-bottom:1px solid #e0f0ff; padding:10px 14px; flex-shrink:0; }
+.asst-tools .row { display:flex; gap:8px; }
+.select-field { flex:1; padding:8px 10px; border:1.5px solid #cfe8ef; border-radius:8px; font-size:14px; background:#f8fcff; color:#1a1a1a; }
+.notice { background:#fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12.5px; margin-top:8px; display:flex; gap:6px; align-items:flex-start; }
+.chat { flex:1; overflow-y:auto; padding:14px; background:#f0f7ff; }
+.msg { max-width:85%; padding:10px 13px; border-radius:14px; margin-bottom:10px; font-size:14px; line-height:1.45; white-space:pre-wrap; word-wrap:break-word; }
+.msg.user { background:#0e7490; color:white; margin-left:auto; border-bottom-right-radius:4px; }
+.msg.bot { background:white; color:#1a1a1a; border:1px solid #e0f0ff; border-bottom-left-radius:4px; }
+.msg.bot.err { background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
+.typing { font-size:13px; color:#0e7490; padding:4px 6px; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; padding:0 14px 8px; background:#f0f7ff; }
+.chip { font-size:12px; padding:6px 10px; border:1px solid #cfe8ef; background:white; border-radius:14px; cursor:pointer; color:#0e7490; }
+.chip:hover { background:#e0f2fe; }
+.composer { flex-shrink:0; display:flex; gap:8px; padding:10px 12px; background:white; border-top:1px solid #e0f0ff; }
+.composer textarea { flex:1; resize:none; border:1.5px solid #cfe8ef; border-radius:10px; padding:10px 12px; font-size:15px; background:#f8fcff; max-height:120px; }
+.composer button { background:#0e7490; color:white; border:none; border-radius:10px; width:48px; font-size:20px; cursor:pointer; }
+.composer button:disabled { background:#9bbcc6; }
+.welcome { text-align:center; color:#7a98a3; font-size:13px; margin-top:30px; padding:0 20px; }
+</style>
+</head>
+<body>
+
+<header class="app-header pool">
+  <div class="header-left">
+    <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
+    <span class="header-icon">🤖</span>
+    <div>
+      <div class="header-title">Βοηθός Πισίνας</div>
+      <div class="header-sub">CONDIAN HOTELS</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
+  </div>
+</header>
+
+<div class="asst-tools">
+  <div class="row">
+    <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
+    <select id="pool-select" class="select-field"></select>
+  </div>
+  {% if not configured %}
+  <div class="notice">
+    <i class="ti ti-alert-triangle" style="flex-shrink:0;"></i>
+    <span>Ο βοηθός δεν έχει ρυθμιστεί ακόμα. Πρόσθεσε ένα <b>ANTHROPIC_API_KEY</b> ή <b>OPENAI_API_KEY</b> στις μεταβλητές του Railway για να ενεργοποιηθεί.</span>
+  </div>
+  {% endif %}
+</div>
+
+<div class="chat" id="chat">
+  <div class="welcome" id="welcome">
+    <i class="ti ti-robot" style="font-size:34px;"></i>
+    <p style="margin-top:10px;">Διάλεξε πισίνα και ρώτησέ με για χημεία νερού, δοσολογία, καθαρισμό ή ελέγχους εξοπλισμού.</p>
+  </div>
+</div>
+
+<div class="chips" id="chips">
+  <div class="chip" onclick="quick(this)">Ερμήνευσε τις τελευταίες μετρήσεις</div>
+  <div class="chip" onclick="quick(this)">Δοσολογία για διόρθωση pH</div>
+  <div class="chip" onclick="quick(this)">Πρόγραμμα καθαρισμού σήμερα</div>
+  <div class="chip" onclick="quick(this)">Έλεγχοι εξοπλισμού</div>
+</div>
+
+<div class="composer">
+  <textarea id="input" rows="1" placeholder="Γράψε το μήνυμά σου…" onkeydown="onKey(event)"></textarea>
+  <button id="send" onclick="send()"><i class="ti ti-send"></i></button>
+</div>
+
+<script>
+const HOTELS = {{ hotels_json|tojson }};
+let messages = [];
+let busy = false;
+
+function buildHotels(){
+  const hs = document.getElementById('hotel-select');
+  if(!HOTELS.length){ hs.innerHTML='<option>—</option>'; document.getElementById('pool-select').innerHTML='<option>Καμία πισίνα</option>'; return; }
+  hs.innerHTML='';
+  HOTELS.forEach((h,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=h.name; hs.appendChild(o); });
+  onHotelChange();
+}
+function onHotelChange(){
+  const hi=+document.getElementById('hotel-select').value;
+  const ps=document.getElementById('pool-select'); ps.innerHTML='';
+  (HOTELS[hi]?.pools||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.location?`${p.name} — ${p.location}`:p.name; ps.appendChild(o); });
+}
+function currentPoolId(){ return document.getElementById('pool-select').value || null; }
+
+function addMsg(text, cls){
+  const w=document.getElementById('welcome'); if(w) w.remove();
+  const d=document.createElement('div'); d.className='msg '+cls; d.textContent=text;
+  document.getElementById('chat').appendChild(d);
+  document.getElementById('chat').scrollTop=1e9;
+  return d;
+}
+function quick(el){ document.getElementById('input').value=el.textContent; send(); }
+function onKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } }
+
+async function send(){
+  if(busy) return;
+  const inp=document.getElementById('input');
+  const text=inp.value.trim(); if(!text) return;
+  inp.value='';
+  addMsg(text,'user');
+  messages.push({role:'user',content:text});
+  busy=true; document.getElementById('send').disabled=true;
+  const typing=addMsg('…','bot'); typing.classList.add('typing');
+  try{
+    const res=await fetch('/api/assistant',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({pool_id:currentPoolId(), messages})});
+    const data=await res.json();
+    typing.remove();
+    if(data.error==='not_configured'){
+      addMsg('Ο βοηθός δεν έχει ρυθμιστεί ακόμα (λείπει API key). Πρόσθεσε ANTHROPIC_API_KEY ή OPENAI_API_KEY στο Railway.','bot err');
+    } else if(data.error){
+      addMsg('Σφάλμα: '+data.error,'bot err');
+    } else {
+      addMsg(data.reply,'bot');
+      messages.push({role:'assistant',content:data.reply});
+    }
+  }catch(e){
+    typing.remove(); addMsg('Σφάλμα σύνδεσης.','bot err');
+  }
+  busy=false; document.getElementById('send').disabled=false;
+}
+buildHotels();
+</script>
+</body>
+</html>
