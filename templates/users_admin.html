@@ -22,8 +22,11 @@ tr:last-child td { border-bottom:none; }
 .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; }
 .badge-ok { background:#dcfce7; color:#16a34a; }
 .badge-bad { background:#fee2e2; color:#dc2626; }
+.badge-masteradmin { background:#f3e8ff; color:#7e22ce; }
 .badge-admin { background:#dbeafe; color:#185FA5; }
-.badge-staff { background:#f0f0f0; color:#666; }
+.badge-manager { background:#fef3c7; color:#b45309; }
+.badge-staff { background:#e2e8f0; color:#475569; }
+.badge-viewer { background:#f1f5f9; color:#64748b; }
 .add-form { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 @media(max-width:500px){ .add-form { grid-template-columns:1fr; } }
 .add-form input, .add-form select { padding:10px 12px; border:1px solid #e5e5e0; border-radius:8px; font-size:14px; width:100%; }
@@ -32,6 +35,18 @@ tr:last-child td { border-bottom:none; }
 .btn-danger { background:#fee2e2; color:#dc2626; border:none; padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer; }
 .success-msg { background:#dcfce7; color:#16a34a; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:13px; }
 .muted { color:#999; }
+.gear { background:#eef5f8; border:none; border-radius:8px; padding:7px 10px; cursor:pointer; color:#193847; font-size:15px; }
+.gear:hover { background:#dceaf2; }
+.umodal { display:none; position:fixed; inset:0; z-index:200; background:rgba(10,20,28,.55); align-items:flex-start; justify-content:center; padding:5vh 16px; overflow:auto; }
+.umodal.open { display:flex; }
+.umodal-box { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:440px; box-shadow:0 24px 70px rgba(0,0,0,.35); }
+.umodal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; font-size:15px; font-weight:600; color:#193847; }
+.umodal-head .x { background:none; border:none; cursor:pointer; font-size:20px; color:#94a3b8; line-height:1; }
+.umodal-head .x:hover { color:#475569; }
+html[data-theme="dark"] .umodal-box { background:#141d2a; color:#e6edf3; }
+html[data-theme="dark"] .umodal-head { color:#cfe0ee; }
+html[data-theme="dark"] .gear { background:#1b2735; color:#cfe0ee; }
+html[data-theme="dark"] .umodal-box .muted { color:#7b8a98; }
 </style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
 .app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
@@ -101,8 +116,10 @@ tr:last-child td { border-bottom:none; }
           <td>{% if u.is_active %}<span class="badge badge-ok">ενεργός</span>{% else %}<span class="badge badge-bad">ανενεργός</span>{% endif %}</td>
           <td>
             {% if not (u.role=='masteradmin' and me.role!='masteradmin') %}
-            <details><summary style="cursor:pointer;color:#193847;font-size:12px;font-weight:500;">⚙ Διαχείριση</summary>
-              <div style="background:#f8fafb;border:1px solid #e0f0ff;border-radius:8px;padding:12px;margin-top:8px;min-width:260px;">
+            <button type="button" class="gear" onclick="openUM({{ u.id }})" title="Διαχείριση"><i class="ti ti-settings"></i></button>
+            <div class="umodal" id="um-{{ u.id }}" onclick="if(event.target===this)closeUM({{ u.id }})">
+              <div class="umodal-box">
+                <div class="umodal-head"><span><i class="ti ti-user-cog"></i> {{ u.full_name }}</span><button type="button" class="x" onclick="closeUM({{ u.id }})"><i class="ti ti-x"></i></button></div>
                 <form method="POST" action="/dashboard/edit-user/{{ u.id }}" style="margin-bottom:10px;">
                   <input type="text" name="full_name" value="{{ u.full_name }}" placeholder="Ονοματεπώνυμο" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
                   <input type="text" name="username" value="{{ u.username }}" placeholder="Username" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
@@ -135,7 +152,7 @@ tr:last-child td { border-bottom:none; }
                   {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή χρήστη;')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}
                 </div>
               </div>
-            </details>
+            </div>
             {% endif %}
           </td>
         </tr>
@@ -162,5 +179,10 @@ tr:last-child td { border-bottom:none; }
   </div>
 
 </div>
+<script>
+function openUM(id){ var m=document.getElementById('um-'+id); if(m){ m.classList.add('open'); document.body.style.overflow='hidden'; } }
+function closeUM(id){ var m=document.getElementById('um-'+id); if(m){ m.classList.remove('open'); document.body.style.overflow=''; } }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ document.querySelectorAll('.umodal.open').forEach(function(m){m.classList.remove('open');}); document.body.style.overflow=''; } });
+</script>
 </body>
 </html>

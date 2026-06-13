@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.12)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.13)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -24,6 +24,8 @@ Modules:
              + social links (facebook/linkedin)· αφαιρέθηκε ο κύκλος πίσω από το logo
   - v12.12 — Dark mode ΠΑΝΤΟΥ μέσω after_request (auto-inject theme snippet σε κάθε σελίδα,
              εκτός login/register)· Χρήστες: πλήρες edit (username+γλώσσα) + reveal νέου κωδικού
+  - v12.13 — Χρήστες: χρωματικά badges για όλους τους ρόλους (masteradmin/admin/manager/staff/viewer)·
+             η διαχείριση χρήστη σε pop-up modal (αντί για ανάπτυξη)· delete μέσα στο modal
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -267,7 +269,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.12'
+APP_VERSION = '12.13'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
