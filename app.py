@@ -314,11 +314,18 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.36'
-APP_BUILD   = '316'
+APP_VERSION = '12.37'
+APP_BUILD   = '317'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.37', 'b': '317', 'date': '14/06/2026', 'title': 'Νέο Dashboard: ελεύθερο πλέγμα με resizable widgets',
+     'items': ['Η «Σύνοψη» μετονομάστηκε σε Dashboard.',
+               'Τα widgets αλλάζουν μέγεθος & θέση με το ποντίκι (με ελάχιστα όρια ώστε να μένουν ευανάγνωστα).',
+               'Κουμπί «+ Προσθήκη widget» με μπάρα κατηγοριών — διάλεξε & πρόσθεσε εύκολα.',
+               'Διακριτικό glow περίγραμμα στα tiles (έμπνευση από την οθόνη σύνδεσης).',
+               'Πλήρης υποστήριξη σκούρου θέματος σε όλα τα tiles.',
+               'Διόρθωση: το μενού προφίλ εμφανίζει σωστά όλες τις επιλογές.']},
     {'v': '12.36', 'b': '316', 'date': '13/06/2026', 'title': 'Ειδοποιήσεις popup · «Τι νέο» · γυάλισμα Σύνοψης & παλετών',
      'items': ['Το καμπανάκι ανοίγει popup με λίστα ειδοποιήσεων — διαβάζονται & φεύγουν επιτόπου.',
                'Νέα επιλογή «Ειδοποιήσεις» στο μενού προφίλ.',
@@ -2296,23 +2303,28 @@ def areas_dashboard():
 
 # ── v12.34 — Προσωπικό dashboard με tiles (drag&drop, ανά χρήστη) ─────────────
 # Κατάλογος διαθέσιμων tiles. kind: 'kpi'|'widget'. scope: 'all'=όλοι · 'admin'=admin/master.
+# v12.37 — κατηγορίες (ομάδες) + γεωμετρία πλέγματος (GridStack 12 στηλών)
+CAT_LABELS = {'quality':'Ποιότητα','faults':'Βλάβες','records':'Καταγραφές','org':'Οργανισμός','people':'Χρήστες'}
+CATEGORIES = [('quality','Ποιότητα','ti-checkup-list'),('faults','Βλάβες','ti-tool'),
+              ('records','Καταγραφές','ti-clipboard-check'),('org','Οργανισμός','ti-building'),
+              ('people','Χρήστες','ti-users')]
 TILE_CATALOG = [
-    {'id':'compliance',   'title':'Συμμόρφωση σήμερα',          'icon':'ti-checkup-list',   'kind':'kpi',    'scope':'all'},
-    {'id':'alerts',       'title':'Εκτός ορίων',                'icon':'ti-alert-triangle', 'kind':'kpi',    'scope':'all'},
-    {'id':'open_faults',  'title':'Ανοιχτές βλάβες',            'icon':'ti-tool',           'kind':'kpi',    'scope':'all'},
-    {'id':'my_faults',    'title':'Δικές μου βλάβες',           'icon':'ti-user-cog',       'kind':'kpi',    'scope':'all'},
-    {'id':'pool_today',   'title':'Μετρήσεις πισινών σήμερα',   'icon':'ti-pool',           'kind':'kpi',    'scope':'all'},
-    {'id':'water_today',  'title':'Μετρήσεις νερών σήμερα',     'icon':'ti-droplet',        'kind':'kpi',    'scope':'all'},
-    {'id':'surveys_today','title':'Απαντήσεις ερωτημ. σήμερα',  'icon':'ti-clipboard-check','kind':'kpi',    'scope':'all'},
-    {'id':'hotels',       'title':'Ξενοδοχεία',                 'icon':'ti-building',       'kind':'kpi',    'scope':'all'},
-    {'id':'checkpoints',  'title':'Σημεία ελέγχου',             'icon':'ti-map-pin',        'kind':'kpi',    'scope':'all'},
-    {'id':'users',        'title':'Χρήστες',                    'icon':'ti-users',          'kind':'kpi',    'scope':'admin'},
-    {'id':'pending',      'title':'Εκκρεμείς εγγραφές',         'icon':'ti-user-plus',      'kind':'kpi',    'scope':'admin'},
-    {'id':'coverage',     'title':'Κάλυψη ανά ξενοδοχείο',      'icon':'ti-checkup-list',   'kind':'widget', 'scope':'all'},
-    {'id':'alerts_list',  'title':'Εκτός ορίων (πρόσφατα)',     'icon':'ti-alert-triangle', 'kind':'widget', 'scope':'all'},
-    {'id':'faults_list',  'title':'Ανοιχτές βλάβες (λίστα)',    'icon':'ti-tool',           'kind':'widget', 'scope':'all'},
-    {'id':'activity',     'title':'Πρόσφατη δραστηριότητα',     'icon':'ti-history',        'kind':'widget', 'scope':'all'},
-    {'id':'pending_list', 'title':'Εκκρεμείς εγγραφές (λίστα)', 'icon':'ti-user-plus',      'kind':'widget', 'scope':'admin'},
+    {'id':'compliance',   'title':'Συμμόρφωση σήμερα',          'icon':'ti-checkup-list',   'kind':'kpi',    'scope':'all',  'cat':'quality','w':3,'h':2,'minw':2,'minh':2},
+    {'id':'alerts',       'title':'Εκτός ορίων',                'icon':'ti-alert-triangle', 'kind':'kpi',    'scope':'all',  'cat':'quality','w':3,'h':2,'minw':2,'minh':2},
+    {'id':'open_faults',  'title':'Ανοιχτές βλάβες',            'icon':'ti-tool',           'kind':'kpi',    'scope':'all',  'cat':'faults', 'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'my_faults',    'title':'Δικές μου βλάβες',           'icon':'ti-user-cog',       'kind':'kpi',    'scope':'all',  'cat':'faults', 'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'pool_today',   'title':'Μετρήσεις πισινών σήμερα',   'icon':'ti-pool',           'kind':'kpi',    'scope':'all',  'cat':'records','w':3,'h':2,'minw':2,'minh':2},
+    {'id':'water_today',  'title':'Μετρήσεις νερών σήμερα',     'icon':'ti-droplet',        'kind':'kpi',    'scope':'all',  'cat':'records','w':3,'h':2,'minw':2,'minh':2},
+    {'id':'surveys_today','title':'Απαντήσεις ερωτημ. σήμερα',  'icon':'ti-clipboard-check','kind':'kpi',    'scope':'all',  'cat':'records','w':3,'h':2,'minw':2,'minh':2},
+    {'id':'hotels',       'title':'Ξενοδοχεία',                 'icon':'ti-building',       'kind':'kpi',    'scope':'all',  'cat':'org',    'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'checkpoints',  'title':'Σημεία ελέγχου',             'icon':'ti-map-pin',        'kind':'kpi',    'scope':'all',  'cat':'org',    'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'users',        'title':'Χρήστες',                    'icon':'ti-users',          'kind':'kpi',    'scope':'admin','cat':'people', 'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'pending',      'title':'Εκκρεμείς εγγραφές',         'icon':'ti-user-plus',      'kind':'kpi',    'scope':'admin','cat':'people', 'w':3,'h':2,'minw':2,'minh':2},
+    {'id':'coverage',     'title':'Κάλυψη ανά ξενοδοχείο',      'icon':'ti-checkup-list',   'kind':'widget', 'scope':'all',  'cat':'org',    'w':5,'h':4,'minw':3,'minh':3},
+    {'id':'alerts_list',  'title':'Εκτός ορίων (πρόσφατα)',     'icon':'ti-alert-triangle', 'kind':'widget', 'scope':'all',  'cat':'quality','w':4,'h':4,'minw':3,'minh':3},
+    {'id':'faults_list',  'title':'Ανοιχτές βλάβες (λίστα)',    'icon':'ti-tool',           'kind':'widget', 'scope':'all',  'cat':'faults', 'w':4,'h':4,'minw':3,'minh':3},
+    {'id':'activity',     'title':'Πρόσφατη δραστηριότητα',     'icon':'ti-history',        'kind':'widget', 'scope':'all',  'cat':'people', 'w':4,'h':4,'minw':3,'minh':3},
+    {'id':'pending_list', 'title':'Εκκρεμείς εγγραφές (λίστα)', 'icon':'ti-user-plus',      'kind':'widget', 'scope':'admin','cat':'people', 'w':4,'h':3,'minw':3,'minh':2},
 ]
 DEFAULT_TILES_ADMIN = ['compliance','alerts','open_faults','pending','hotels','checkpoints',
                        'coverage','alerts_list','faults_list','pending_list']
@@ -2322,23 +2334,36 @@ DEFAULT_TILES_STAFF = ['my_faults','open_faults','pool_today','water_today','sur
 def _tile_allowed(t, admin):
     return admin or t.get('scope') != 'admin'
 
-def _user_tiles(user, admin):
-    """Ordered λίστα tile ids για τον χρήστη (saved ή default), φιλτραρισμένη σε επιτρεπτά."""
-    valid = {t['id'] for t in TILE_CATALOG if _tile_allowed(t, admin)}
-    ids = None
+def _user_layout(user, admin):
+    """Λίστα {id,x,y,w,h} για τον χρήστη (saved geometry ή default auto-flow), φιλτραρισμένη."""
+    valid = {t['id']: t for t in TILE_CATALOG if _tile_allowed(t, admin)}
+    items = None
     try:
         raw = getattr(user, 'dashboard', None)
         if raw:
             data = json.loads(raw)
-            ids = data.get('tiles') if isinstance(data, dict) else (data if isinstance(data, list) else None)
+            if isinstance(data, dict) and isinstance(data.get('items'), list):
+                items = []
+                for it in data['items']:
+                    tid = it.get('id')
+                    if tid in valid:
+                        d = valid[tid]
+                        items.append({'id': tid, 'x': it.get('x'), 'y': it.get('y'),
+                                      'w': max(d['minw'], int(it.get('w') or d['w'])),
+                                      'h': max(d['minh'], int(it.get('h') or d['h']))})
+            elif isinstance(data, dict) and isinstance(data.get('tiles'), list):
+                items = [{'id': i, 'x': None, 'y': None, 'w': valid[i]['w'], 'h': valid[i]['h']} for i in data['tiles'] if i in valid]
+            elif isinstance(data, list):
+                items = [{'id': i, 'x': None, 'y': None, 'w': valid[i]['w'], 'h': valid[i]['h']} for i in data if i in valid]
     except Exception:
-        ids = None
-    if not ids:
-        ids = DEFAULT_TILES_ADMIN if admin else DEFAULT_TILES_STAFF
-    out, seen = [], set()
-    for i in ids:
-        if i in valid and i not in seen:
-            out.append(i); seen.add(i)
+        items = None
+    if not items:
+        deflist = DEFAULT_TILES_ADMIN if admin else DEFAULT_TILES_STAFF
+        items = [{'id': i, 'x': None, 'y': None, 'w': valid[i]['w'], 'h': valid[i]['h']} for i in deflist if i in valid]
+    seen, out = set(), []
+    for it in items:
+        if it['id'] not in seen:
+            seen.add(it['id']); out.append(it)
     return out
 
 @app.route('/overview')
@@ -2419,13 +2444,13 @@ def overview():
         'cov': cov, 'alerts_list': alerts, 'faults_list': faults, 'pending_list': pending, 'activity': activity,
     }
     catalog = [t for t in TILE_CATALOG if _tile_allowed(t, admin)]
-    order = _user_tiles(user, admin)
     cmap = {t['id']: t for t in catalog}
-    shown_tiles = [cmap[i] for i in order if i in cmap]
-    _shset = set(order)
-    hidden_tiles = [t for t in catalog if t['id'] not in _shset]
-    return render_template('overview.html', tiledata=tiledata, catalog=catalog, order=order,
-                           shown_tiles=shown_tiles, hidden_tiles=hidden_tiles,
+    layout = _user_layout(user, admin)
+    shown_ids = {it['id'] for it in layout}
+    items = [{**cmap[it['id']], **it} for it in layout if it['id'] in cmap]
+    available = [t for t in catalog if t['id'] not in shown_ids]
+    return render_template('overview.html', tiledata=tiledata, items=items, catalog=catalog,
+                           available=available, categories=CATEGORIES, cat_labels=CAT_LABELS,
                            is_admin=admin, areas_labels=AREA_LABELS, action_labels=ACTION_LABELS)
 
 @app.route('/overview/layout', methods=['POST'])
@@ -2441,11 +2466,29 @@ def overview_layout():
             user.dashboard = None
             db.session.commit()
             return ('', 204)
-        clean, seen = [], set()
-        for i in payload.get('tiles', []):
-            if i in valid and i not in seen:
-                clean.append(i); seen.add(i)
-        user.dashboard = json.dumps({'tiles': clean})
+        cmap = {t['id']: t for t in TILE_CATALOG if _tile_allowed(t, admin)}
+        out, seen = [], set()
+        # νέα μορφή: items με γεωμετρία
+        for it in (payload.get('items') or []):
+            tid = it.get('id')
+            if tid in cmap and tid not in seen:
+                seen.add(tid); d = cmap[tid]
+                def _ci(v, dv):
+                    try: return int(v)
+                    except Exception: return dv
+                w = max(d['minw'], min(12, _ci(it.get('w'), d['w'])))
+                h = max(d['minh'], _ci(it.get('h'), d['h']))
+                rec = {'id': tid, 'w': w, 'h': h}
+                if it.get('x') is not None: rec['x'] = max(0, _ci(it.get('x'), 0))
+                if it.get('y') is not None: rec['y'] = max(0, _ci(it.get('y'), 0))
+                out.append(rec)
+        # συμβατότητα: παλιά μορφή tiles[]
+        if not out and isinstance(payload.get('tiles'), list):
+            for tid in payload['tiles']:
+                if tid in cmap and tid not in seen:
+                    seen.add(tid); d = cmap[tid]
+                    out.append({'id': tid, 'w': d['w'], 'h': d['h']})
+        user.dashboard = json.dumps({'items': out})
         db.session.commit()
         return ('', 204)
     except Exception as e:
