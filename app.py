@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.27'
-APP_BUILD   = '2026-06-13'
+APP_VERSION = '12.28'
+APP_BUILD   = '308'
 
 @app.context_processor
 def inject_version():
@@ -396,6 +396,76 @@ def set_hotel(hid):
 def inject_hotelscope():
     u = current_user()
     return {'nav_hotels': (allowed_hotels(u) if u else []), 'active_hid': active_hotel_id()}
+
+# ── v12.28 — Global φίλτρο περιόδου (session scope) ───────────────────────────
+PERIOD_LABELS = [
+    ('all', 'Όλα'), ('today', 'Σήμερα'), ('yesterday', 'Χθες'),
+    ('l7', 'Τελευταίες 7 ημέρες'), ('week', 'Τρέχουσα εβδομάδα'),
+    ('month', 'Τρέχων μήνας'), ('l30', 'Τελευταίες 30 ημέρες'),
+    ('ytd', 'Από αρχή έτους (YTD)'), ('year', 'Τρέχον έτος'),
+    ('ly', 'Πέρσι (LY)'), ('custom', 'Προσαρμογή…'),
+]
+
+def _period_bounds(key, today=None):
+    t = today or datetime.utcnow().date()
+    if key == 'today': return t, t
+    if key == 'yesterday': d = t - timedelta(days=1); return d, d
+    if key == 'l7': return t - timedelta(days=6), t
+    if key == 'week': sft = t - timedelta(days=t.weekday()); return sft, sft + timedelta(days=6)
+    if key == 'month':
+        sft = t.replace(day=1)
+        nm = (sft.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return sft, nm - timedelta(days=1)
+    if key == 'l30': return t - timedelta(days=29), t
+    if key == 'ytd': return t.replace(month=1, day=1), t
+    if key == 'year': return t.replace(month=1, day=1), t.replace(month=12, day=31)
+    if key == 'ly': return date(t.year - 1, 1, 1), date(t.year - 1, 12, 31)
+    return None, None
+
+def active_period():
+    key = session.get('active_period', 'all')
+    label = dict(PERIOD_LABELS).get(key, 'Όλα')
+    start = end = None
+    if key == 'custom':
+        try: start = datetime.strptime(session.get('period_from', ''), '%Y-%m-%d').date()
+        except Exception: start = None
+        try: end = datetime.strptime(session.get('period_to', ''), '%Y-%m-%d').date()
+        except Exception: end = None
+        label = ('%s → %s' % (start.strftime('%d/%m/%Y'), end.strftime('%d/%m/%Y'))) if (start and end) else 'Προσαρμογή'
+    elif key != 'all':
+        start, end = _period_bounds(key)
+    return {'key': key, 'label': label, 'start': start, 'end': end,
+            'from': session.get('period_from', '') if key == 'custom' else '',
+            'to':   session.get('period_to', '')   if key == 'custom' else ''}
+
+def apply_period(q, col, dt=False):
+    """Φιλτράρει query με την ενεργή περίοδο. col=date column (ή datetime αν dt=True). 'Όλα' = no-op."""
+    p = active_period()
+    sft, e = p['start'], p['end']
+    if sft is None and e is None:
+        return q
+    if dt:
+        if sft: q = q.filter(col >= datetime(sft.year, sft.month, sft.day))
+        if e:   q = q.filter(col < datetime(e.year, e.month, e.day) + timedelta(days=1))
+    else:
+        if sft: q = q.filter(col >= sft)
+        if e:   q = q.filter(col <= e)
+    return q
+
+@app.route('/set-period/<key>')
+def set_period(key):
+    if 'user_id' not in session:
+        return ('', 401)
+    keys = [k for k, _ in PERIOD_LABELS]
+    session['active_period'] = key if key in keys else 'all'
+    if key == 'custom':
+        session['period_from'] = (request.args.get('from') or '').strip()
+        session['period_to'] = (request.args.get('to') or '').strip()
+    return ('', 204)
+
+@app.context_processor
+def inject_period():
+    return {'active_period': active_period(), 'PERIOD_LABELS': PERIOD_LABELS}
 
 def can_access_pool(u, pool):
     if u is None or pool is None:
@@ -1657,6 +1727,7 @@ def dashboard():
     q = _scope(WaterRecord.query)
     if f_staff:
         q = q.filter(WaterRecord.user_id == f_staff)
+    q = apply_period(q, WaterRecord.record_date)
     records = q.order_by(WaterRecord.record_date.desc(), WaterRecord.period).limit(60).all()
     users   = User.query.filter_by(is_active=True, approved=True).all()
     today_q = _scope(WaterRecord.query.filter_by(record_date=date.today()))
@@ -1700,8 +1771,8 @@ def _records_items(user, ftype='all'):
     items = []
     if ftype in ('all', 'pools'):
         pids = [p.id for p in Pool.query.all() if p.hotel_id in hids]
-        for r in (PoolRecord.query.filter(PoolRecord.pool_id.in_(pids or [-1]))
-                  .order_by(PoolRecord.recorded_at.desc()).limit(120).all()):
+        _pq = apply_period(PoolRecord.query.filter(PoolRecord.pool_id.in_(pids or [-1])), PoolRecord.record_date)
+        for r in (_pq.order_by(PoolRecord.recorded_at.desc()).limit(120).all()):
             items.append({
                 'kind': 'pool', 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
@@ -1713,8 +1784,8 @@ def _records_items(user, ftype='all'):
             })
     if ftype in ('all', 'water'):
         sids = [s.id for s in WaterSystem.query.all() if s.hotel_id in hids]
-        for r in (WaterRecord.query.filter(WaterRecord.water_system_id.in_(sids or [-1]))
-                  .order_by(WaterRecord.recorded_at.desc()).limit(120).all()):
+        _wq = apply_period(WaterRecord.query.filter(WaterRecord.water_system_id.in_(sids or [-1])), WaterRecord.record_date)
+        for r in (_wq.order_by(WaterRecord.recorded_at.desc()).limit(120).all()):
             ws = r.water_system
             items.append({
                 'kind': 'water', 'when': r.recorded_at, 'date': r.record_date,
@@ -1789,6 +1860,7 @@ def pools_dashboard():
     q = _scope(base)
     if f_staff:
         q = q.filter(PoolRecord.user_id == f_staff)
+    q = apply_period(q, PoolRecord.record_date)
     records = q.order_by(PoolRecord.record_date.desc(), PoolRecord.recorded_at.desc()).limit(80).all()
     users = User.query.filter_by(is_active=True, approved=True).all()
     today_records = (_scope(base.filter(PoolRecord.record_date == date.today()))
@@ -2244,8 +2316,8 @@ def activity_log():
     aid = active_hotel_id()                       # v12.22 — scope ανά ξενοδοχείο
     def hscope(query):
         return query.filter(ActivityLog.hotel_id == aid) if aid else query
-    base = hscope(ActivityLog.query)
-    q = hscope(ActivityLog.query)
+    base = apply_period(hscope(ActivityLog.query), ActivityLog.created_at, dt=True)
+    q = apply_period(hscope(ActivityLog.query), ActivityLog.created_at, dt=True)
     if chip == 'today':  q = q.filter(ActivityLog.created_at >= midnight)
     elif chip == '7d':   q = q.filter(ActivityLog.created_at >= now - timedelta(days=7))
     elif chip == '30d':  q = q.filter(ActivityLog.created_at >= now - timedelta(days=30))

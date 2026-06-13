@@ -12,7 +12,7 @@ import base64, threading
 from flask import request, redirect, url_for, render_template, session, jsonify
 from app import (app, db, current_user, is_admin, allowed_hotels, notify, notify_admins,
                  log_activity, Hotel, User, Pool, Setting, ROLE_RANK, role_rank, BASE_DIR,
-                 send_email, EMAIL_TO_LIST, active_hotel_id)
+                 send_email, EMAIL_TO_LIST, active_hotel_id, apply_period)
 
 # ── Σταθερές ─────────────────────────────────────────────────────────────────
 PRIORITIES = ('Υψηλή', 'Κανονική', 'Χαμηλή')
@@ -374,7 +374,8 @@ def faults_inbox():
     _aid = active_hotel_id()
     if _aid:
         base = base.filter(Fault.hotel_id == _aid)
-    q = visible_faults_query(user)
+    base = apply_period(base, Fault.submitted_at, dt=True)          # v12.28 global period
+    q = apply_period(visible_faults_query(user), Fault.submitted_at, dt=True)
     f_hotel = request.args.get('hotel_id', type=int) or active_hotel_id()
     f_status = request.args.get('status')
     f_priority = request.args.get('priority')
