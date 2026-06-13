@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.34'
-APP_BUILD   = '314'
+APP_VERSION = '12.35'
+APP_BUILD   = '315'
 
 @app.context_processor
 def inject_version():
@@ -2745,29 +2745,37 @@ def api_pool_history(pool_id):
 #  INIT  (τρέχει και κάτω από gunicorn)
 # ──────────────────────────────────────────────────────────────────────────
 def _add_col(table, col, ddl):
-    insp = db.inspect(db.engine)
-    if table in insp.get_table_names():
-        cols = [c['name'] for c in insp.get_columns(table)]
-        if col not in cols:
-            db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {ddl}'))
-            db.session.commit()
-            print(f'Migration: {table}.{col} added')
-
-def ensure_columns():
-    """Ελαφρύ migration: πρόσθεσε νέες στήλες σε ήδη υπάρχουσα βάση."""
+    """v12.35 — Ανθεκτικό, idempotent & race-safe (gunicorn 2 workers).
+    Postgres: ADD COLUMN IF NOT EXISTS. SQLite: inspect-check.
+    Κάθε στήλη έχει ΔΙΚΟ της try/except — μία αποτυχία ΔΕΝ μπλοκάρει τις υπόλοιπες."""
     try:
-        truth = 'true' if db.engine.dialect.name == 'postgresql' else '1'
-        _add_col('pool', 'volume_m3', 'volume_m3 FLOAT')
-        _add_col('user', 'email', 'email VARCHAR(120)')
-        _add_col('user', 'phone', 'phone VARCHAR(40)')
-        _add_col('user', 'approved', f'approved BOOLEAN DEFAULT {truth}')
-        _add_col('user', 'avatar', 'avatar TEXT')
-        _add_col('water_record', 'water_system_id', 'water_system_id INTEGER')  # v12.3
-        _add_col('activity_log', 'hotel_id', 'hotel_id INTEGER')  # v12.22
-        _add_col('survey_response', 'import_hash', 'import_hash VARCHAR(40)')  # v12.30
+        if db.engine.dialect.name == 'postgresql':
+            db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN IF NOT EXISTS {ddl}'))
+            db.session.commit()
+        else:
+            insp = db.inspect(db.engine)
+            if table in insp.get_table_names():
+                cols = [c['name'] for c in insp.get_columns(table)]
+                if col not in cols:
+                    db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {ddl}'))
+                    db.session.commit()
     except Exception as e:
         db.session.rollback()
-        print(f'ensure_columns skipped: {e}')
+        print(f'_add_col {table}.{col} skipped: {e}')
+
+def ensure_columns():
+    """Ελαφρύ migration: πρόσθεσε νέες στήλες σε ήδη υπάρχουσα βάση.
+    v12.35: κάθε _add_col αυτόνομο (δικό του commit/rollback) → καμία στήλη δεν παρασύρει τις άλλες."""
+    truth = 'true' if db.engine.dialect.name == 'postgresql' else '1'
+    _add_col('pool', 'volume_m3', 'volume_m3 FLOAT')
+    _add_col('user', 'email', 'email VARCHAR(120)')
+    _add_col('user', 'phone', 'phone VARCHAR(40)')
+    _add_col('user', 'approved', f'approved BOOLEAN DEFAULT {truth}')
+    _add_col('user', 'avatar', 'avatar TEXT')
+    _add_col('water_record', 'water_system_id', 'water_system_id INTEGER')  # v12.3
+    _add_col('activity_log', 'hotel_id', 'hotel_id INTEGER')  # v12.22
+    _add_col('survey_response', 'import_hash', 'import_hash VARCHAR(40)')  # v12.30
+    _add_col('user', 'dashboard', 'dashboard TEXT')  # v12.34 — προσωπική διάταξη tiles (JSON)
 
 def init_db():
     with app.app_context():
