@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.19)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.20)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -275,7 +275,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.19'
+APP_VERSION = '12.20'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor

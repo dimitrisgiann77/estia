@@ -1,92 +1,30 @@
+{% import '_monitoring.html' as mp %}
 <!DOCTYPE html>
 <html lang="el">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Εστία — Βλάβες</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-<style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
-.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
-.topbar-title { font-size:16px; font-weight:600; }
-.topbar-sub { font-size:12px; opacity:.75; margin-top:2px; }
-.topbar a.newbtn { color:#fff; text-decoration:none; font-size:13px; padding:6px 12px; background:rgba(255,255,255,.15); border-radius:6px; }
-.container { max-width:1240px; margin:0 auto; padding:24px; }
-.card { background:white; border-radius:12px; padding:18px; border:1px solid #e0f0ff; margin-bottom:18px; }
-/* KPI */
-.kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px; }
-.kpi { background:#fff; border:1px solid #e0f0ff; border-radius:12px; padding:14px 16px; text-decoration:none; display:block; transition:transform .08s, box-shadow .08s; }
-.kpi:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(25,56,71,.08); }
-.kpi .n { font-size:26px; font-weight:800; line-height:1; }
-.kpi .l { font-size:12px; color:#8aa0aa; margin-top:6px; font-weight:600; }
-.kpi.k-total .n{ color:#193847; } .kpi.k-open .n{ color:#185FA5; } .kpi.k-over .n{ color:#dc2626; }
-.kpi.k-today .n{ color:#b45309; } .kpi.k-done .n{ color:#16a34a; }
-.kpi.active { outline:2px solid var(--brand); }
-/* chips */
-.chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
-.chip { padding:7px 13px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:1px solid #d6eef3; color:#5b6b72; background:#fff; }
-.chip.on { background:#193847; color:#fff; border-color:transparent; }
-.chip.over.on { background:#dc2626; }
-.filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.filters select, .filters input { padding:8px 10px; border:1px solid #d6eef3; border-radius:8px; font-size:13px; }
-.btn { padding:8px 14px; border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; background:#193847; color:#fff; text-decoration:none; display:inline-block; }
-.btn-ok { background:#16a34a; }
-.toggle { display:inline-flex; border:1px solid #d6eef3; border-radius:9px; overflow:hidden; }
-.toggle button { border:none; background:#fff; padding:8px 14px; font-size:13px; font-weight:600; color:#5b6b72; cursor:pointer; }
-.toggle button.on { background:#193847; color:#fff; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th { text-align:left; padding:8px; color:#888; font-weight:500; border-bottom:1px solid #eee; white-space:nowrap; }
-td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
-.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
-.code { font-family:ui-monospace,monospace; font-size:12px; color:#193847; text-decoration:none; font-weight:600; }
-.muted { color:#9aa7ad; }
-.thumb { width:40px; height:40px; border-radius:7px; object-fit:cover; border:1px solid #e0f0ff; background:#f0f7ff; }
-.thumb.ph { display:flex; align-items:center; justify-content:center; color:#cfe0e6; font-size:18px; }
-.bulkbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding:10px 12px; background:#f7fbff; border:1px solid #e0f0ff; border-radius:9px; }
-/* kanban */
-.kanban { display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; }
-.klane { flex:0 0 250px; background:#f7fbff; border:1px solid #e0f0ff; border-radius:12px; padding:10px; }
-.klane h4 { font-size:12px; font-weight:700; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
-.klane h4 .cnt { background:#fff; border:1px solid #e0f0ff; border-radius:20px; padding:1px 8px; font-size:11px; color:#5b6b72; }
-.kcard { background:#fff; border:1px solid #e8f1f6; border-radius:9px; padding:10px; margin-bottom:8px; text-decoration:none; display:block; color:inherit; }
-.kcard:hover { box-shadow:0 4px 10px rgba(25,56,71,.08); }
-.kcard .kc-top { display:flex; justify-content:space-between; gap:6px; align-items:center; }
-.kcard .kc-desc { font-size:12px; color:#445; margin:6px 0; max-height:34px; overflow:hidden; }
-.kcard .kc-meta { font-size:11px; color:#9aa7ad; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-@media(max-width:900px){ .kpis { grid-template-columns:repeat(2,1fr); } }
-</style>
-<style>:root{--brand:{{ theme.primary }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}.btn-ok{background:#16a34a!important;}.code{color:var(--brand)!important;}.chip.on{background:var(--brand)!important;}.toggle button.on{background:var(--brand)!important;}</style>
-<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
-<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+{{ mp.head('Βλάβες', theme.primary) }}
 </head>
 <body>
-<div class="topbar">
-  <div>
-    <div class="topbar-title"><i class="ti ti-alert-triangle"></i> ΕΣΤΙΑ — Βλάβες</div>
-    <div class="topbar-sub">{{ faults|length }} εγγραφές στη λίστα · {{ open_n }} ανοιχτές</div>
-  </div>
-  <div><a class="newbtn" href="/fault?embed=1"><i class="ti ti-plus"></i> Νέα βλάβη</a></div>
-</div>
+{{ mp.topbar('alert-triangle', 'ΕΣΤΙΑ — Βλάβες', faults|length ~ ' εγγραφές στη λίστα · ' ~ open_n ~ ' ανοιχτές', 'Νέα βλάβη', '/fault?embed=1') }}
 <div class="container">
 
-  {% set e = '?embed=1' %}
-  <div class="kpis">
-    <a class="kpi k-total {{ 'active' if not chip }}" href="/dashboard/faults{{ e }}"><div class="n">{{ kpi.total }}</div><div class="l">Σύνολο</div></a>
-    <a class="kpi k-open {{ 'active' if chip=='open' }}" href="/dashboard/faults?chip=open&embed=1"><div class="n">{{ kpi.open }}</div><div class="l">Ανοιχτές</div></a>
-    <a class="kpi k-over {{ 'active' if chip=='overdue' }}" href="/dashboard/faults?chip=overdue&embed=1"><div class="n">{{ kpi.overdue }}</div><div class="l">Εκπρόθεσμες</div></a>
-    <a class="kpi k-today {{ 'active' if chip=='today' }}" href="/dashboard/faults?chip=today&embed=1"><div class="n">{{ kpi.today }}</div><div class="l">Σήμερα</div></a>
-    <a class="kpi k-done" href="/dashboard/faults?status=done&embed=1"><div class="n">{{ kpi.done }}</div><div class="l">Ολοκληρωμένες</div></a>
-  </div>
+  {% set kcards = [
+    {'n': kpi.total,   'label': 'Σύνολο',        'color': '#193847', 'href': '/dashboard/faults?embed=1',           'active': (not chip)},
+    {'n': kpi.open,    'label': 'Ανοιχτές',      'color': '#185FA5', 'href': '/dashboard/faults?chip=open&embed=1',  'active': chip=='open'},
+    {'n': kpi.overdue, 'label': 'Εκπρόθεσμες',   'color': '#dc2626', 'href': '/dashboard/faults?chip=overdue&embed=1','active': chip=='overdue'},
+    {'n': kpi.today,   'label': 'Σήμερα',        'color': '#b45309', 'href': '/dashboard/faults?chip=today&embed=1', 'active': chip=='today'},
+    {'n': kpi.done,    'label': 'Ολοκληρωμένες', 'color': '#16a34a', 'href': '/dashboard/faults?status=done&embed=1','active': false},
+  ] %}
+  {{ mp.kpis(kcards) }}
 
   <div class="card">
-    <div class="chips">
-      <a class="chip {{ 'on' if not chip and not f_status }}" href="/dashboard/faults{{ e }}">Όλες</a>
-      <a class="chip {{ 'on' if chip=='open' }}" href="/dashboard/faults?chip=open&embed=1">Ανοιχτές</a>
-      <a class="chip over {{ 'on' if chip=='overdue' }}" href="/dashboard/faults?chip=overdue&embed=1">⚠ Εκπρόθεσμες</a>
-      <a class="chip {{ 'on' if chip=='mine' }}" href="/dashboard/faults?chip=mine&embed=1">Δικές μου</a>
-      <a class="chip {{ 'on' if chip=='today' }}" href="/dashboard/faults?chip=today&embed=1">Σήμερα</a>
-    </div>
+    {{ mp.chips([
+      {'label': 'Όλες',          'href': '/dashboard/faults?embed=1',            'on': (not chip and not f_status)},
+      {'label': 'Ανοιχτές',      'href': '/dashboard/faults?chip=open&embed=1',  'on': chip=='open'},
+      {'label': '⚠ Εκπρόθεσμες', 'href': '/dashboard/faults?chip=overdue&embed=1','on': chip=='overdue', 'danger': true},
+      {'label': 'Δικές μου',     'href': '/dashboard/faults?chip=mine&embed=1',  'on': chip=='mine'},
+      {'label': 'Σήμερα',        'href': '/dashboard/faults?chip=today&embed=1', 'on': chip=='today'},
+    ]) }}
     <form class="filters" method="GET" action="/dashboard/faults" style="margin-top:10px;">
       <input type="text" name="q" value="{{ search }}" placeholder="🔍 κωδικός/περιγραφή" style="min-width:170px;">
       <select name="hotel_id"><option value="">Όλα τα ξενοδοχεία</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if f_hotel==h.id }}>{{ h.name }}</option>{% endfor %}</select>
@@ -103,15 +41,12 @@ td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
         <a class="btn" href="/dashboard/faults/export?fmt=csv&{{ qs }}" style="background:#475569;"><i class="ti ti-file-type-csv"></i> CSV</a>
         <a class="btn" href="/dashboard/faults/export?fmt=pdf&{{ qs }}"><i class="ti ti-file-type-pdf"></i> PDF</a>
       </div>
-      <div class="toggle">
-        <button type="button" id="btn-table" class="on" onclick="setView('table')"><i class="ti ti-table"></i> Πίνακας</button>
-        <button type="button" id="btn-kanban" onclick="setView('kanban')"><i class="ti ti-layout-kanban"></i> Kanban</button>
-      </div>
+      {{ mp.view_toggle() }}
     </div>
   </div>
 
   <!-- TABLE VIEW -->
-  <div class="card" id="view-table">
+  <div class="card" id="mp-view-table">
     <form method="POST" action="/dashboard/faults/bulk?embed=1" id="bulkform">
       {% if is_admin %}
       <div class="bulkbar">
@@ -136,9 +71,9 @@ td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
             <td>{{ f.hotel.name if f.hotel else '—' }}</td>
             <td style="max-width:200px;">{{ f.category.name if f.category else '—' }}</td>
             <td class="muted" style="max-width:150px;">{{ f.legacy_location or '' }}{% if f.legacy_room %}{{ ' · ' if f.legacy_location }}{{ f.legacy_room }}{% endif %}{% if not f.legacy_location and not f.legacy_room %}—{% endif %}</td>
-            <td><span class="badge" style="background:{{ PRIORITY_COLOR[f.priority][0] }};color:{{ PRIORITY_COLOR[f.priority][1] }};">{{ f.priority }}</span></td>
-            <td><span class="badge" style="background:{{ STATUS_COLOR[f.status][0] }};color:{{ STATUS_COLOR[f.status][1] }};">{{ STATUS_LABELS[f.status] }}</span>{% set sl = sla_state(f) %}{% if sl[0]=='overdue' %} <span class="badge" style="background:#fee2e2;color:#dc2626;">⚠ {{ sl[1] }}</span>{% elif sl[0]=='stale' %} <span class="badge" style="background:#fef3c7;color:#b45309;">{{ sl[1] }}</span>{% endif %}</td>
-            <td>{% if f.tag %}<span class="badge" style="background:#eef2ff;color:#4338ca;">{{ f.tag }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{{ mp.badge(f.priority, PRIORITY_COLOR[f.priority][0], PRIORITY_COLOR[f.priority][1]) }}</td>
+            <td>{{ mp.badge(STATUS_LABELS[f.status], STATUS_COLOR[f.status][0], STATUS_COLOR[f.status][1]) }}{% set sl = sla_state(f) %}{% if sl[0]=='overdue' %} {{ mp.badge('⚠ ' ~ sl[1], '#fee2e2', '#dc2626') }}{% elif sl[0]=='stale' %} {{ mp.badge(sl[1], '#fef3c7', '#b45309') }}{% endif %}</td>
+            <td>{% if f.tag %}{{ mp.badge(f.tag, '#eef2ff', '#4338ca') }}{% else %}<span class="muted">—</span>{% endif %}</td>
             <td>{{ f.assignee.full_name if f.assignee else '—' }}</td>
             <td class="muted">{{ f.submitted_at.strftime('%d/%m/%y %H:%M') if f.submitted_at else '—' }}{% if f.due_at %}<br><span style="color:#b45309;font-size:11px;">⏱ {{ f.due_at.strftime('%d/%m') }}</span>{% endif %}</td>
           </tr>
@@ -151,23 +86,23 @@ td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
   </div>
 
   <!-- KANBAN VIEW -->
-  <div class="card" id="view-kanban" style="display:none;">
+  <div class="card" id="mp-view-kanban" style="display:none;">
     <div class="kanban">
       {% for s in STATUSES %}
       {% set col = faults|selectattr('status','equalto',s)|list %}
       <div class="klane">
-        <h4><span><span class="badge" style="background:{{ STATUS_COLOR[s][0] }};color:{{ STATUS_COLOR[s][1] }};">{{ STATUS_LABELS[s] }}</span></span><span class="cnt">{{ col|length }}</span></h4>
+        <h4><span>{{ mp.badge(STATUS_LABELS[s], STATUS_COLOR[s][0], STATUS_COLOR[s][1]) }}</span><span class="cnt">{{ col|length }}</span></h4>
         {% for f in col %}
         <a class="kcard" href="/dashboard/fault/{{ f.id }}?embed=1">
           <div class="kc-top">
             <span class="code">{{ f.code }}</span>
-            <span class="badge" style="background:{{ PRIORITY_COLOR[f.priority][0] }};color:{{ PRIORITY_COLOR[f.priority][1] }};">{{ f.priority }}</span>
+            {{ mp.badge(f.priority, PRIORITY_COLOR[f.priority][0], PRIORITY_COLOR[f.priority][1]) }}
           </div>
           <div class="kc-desc">{{ (f.category.name + ' · ') if f.category else '' }}{{ f.description[:70] }}</div>
           <div class="kc-meta">
             {% if f.cover_image %}<img class="thumb" style="width:22px;height:22px;" src="{{ f.cover_image }}">{% endif %}
             <span>{{ f.hotel.name if f.hotel else '' }}</span>
-            {% set sl = sla_state(f) %}{% if sl[0]=='overdue' %}<span class="badge" style="background:#fee2e2;color:#dc2626;">⚠</span>{% endif %}
+            {% set sl = sla_state(f) %}{% if sl[0]=='overdue' %}{{ mp.badge('⚠', '#fee2e2', '#dc2626') }}{% endif %}
             {% if f.assignee %}<span>· {{ f.assignee.full_name }}</span>{% endif %}
           </div>
         </a>
@@ -179,15 +114,6 @@ td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
   </div>
 
 </div>
-<script>
-function setView(v){
-  document.getElementById('view-table').style.display   = (v==='table')?'block':'none';
-  document.getElementById('view-kanban').style.display  = (v==='kanban')?'block':'none';
-  document.getElementById('btn-table').classList.toggle('on', v==='table');
-  document.getElementById('btn-kanban').classList.toggle('on', v==='kanban');
-  try{ localStorage.setItem('estia_faults_view', v); }catch(e){}
-}
-try{ var v=localStorage.getItem('estia_faults_view'); if(v==='kanban') setView('kanban'); }catch(e){}
-</script>
+{{ mp.view_scripts('estia_faults_view') }}
 </body>
 </html>

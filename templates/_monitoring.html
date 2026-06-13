@@ -1,0 +1,130 @@
+{#  ───────────────────────────────────────────────────────────────────────────
+    Εστία — Κοινό «Monitoring Panel» component (v12.20, Φ.Α)
+    Επαναχρησιμοποιήσιμο από ΟΛΑ τα module boards (Βλάβες, Παράπονα, Αιτήματα,
+    Staff, Records κ.λπ.). Τα macros παίρνουν ό,τι χρειάζονται ως ορίσματα —
+    δεν εξαρτώνται από context — οπότε καλούνται με: {% import '_monitoring.html' as mp %}
+
+    Σύμβαση όψεων: βάλε το περιεχόμενο σε
+      <div id="mp-view-table"> … </div>
+      <div id="mp-view-kanban" style="display:none"> … </div>
+    και η εναλλαγή τα διαχειρίζεται αυτόματα (mp.view_toggle + mp.view_scripts).
+─────────────────────────────────────────────────────────────────────────── #}
+
+{# ── head(): tabler icons + πλήρες stylesheet σελίδας + embed/dark boilerplate ── #}
+{% macro head(title, brand='#193847') %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — {{ title }}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+{{ styles(brand) }}
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+{% endmacro %}
+
+{# ── styles(): όλο το CSS μιας monitoring σελίδας ── #}
+{% macro styles(brand='#193847') %}
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
+.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+.topbar-title { font-size:16px; font-weight:600; }
+.topbar-sub { font-size:12px; opacity:.75; margin-top:2px; }
+.topbar a.newbtn { color:#fff; text-decoration:none; font-size:13px; padding:6px 12px; background:rgba(255,255,255,.15); border-radius:6px; }
+.container { max-width:1240px; margin:0 auto; padding:24px; }
+.card { background:white; border-radius:12px; padding:18px; border:1px solid #e0f0ff; margin-bottom:18px; }
+.kpis { display:grid; grid-template-columns:repeat(var(--mp-cols,5),1fr); gap:12px; margin-bottom:18px; }
+.kpi { background:#fff; border:1px solid #e0f0ff; border-radius:12px; padding:14px 16px; text-decoration:none; display:block; transition:transform .08s, box-shadow .08s; }
+.kpi:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgba(25,56,71,.08); }
+.kpi .n { font-size:26px; font-weight:800; line-height:1; }
+.kpi .l { font-size:12px; color:#8aa0aa; margin-top:6px; font-weight:600; }
+.kpi.active { outline:2px solid var(--mp-brand); }
+.chips { display:flex; gap:8px; flex-wrap:wrap; }
+.chip { padding:7px 13px; border-radius:20px; font-size:13px; font-weight:600; text-decoration:none; border:1px solid #d6eef3; color:#5b6b72; background:#fff; }
+.chip.on { background:var(--mp-brand); color:#fff; border-color:transparent; }
+.chip.danger.on { background:#dc2626; }
+.filters { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.filters select, .filters input { padding:8px 10px; border:1px solid #d6eef3; border-radius:8px; font-size:13px; }
+.btn { padding:8px 14px; border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; background:var(--mp-brand); color:#fff; text-decoration:none; display:inline-block; }
+.btn-ok { background:#16a34a !important; }
+.toggle { display:inline-flex; border:1px solid #d6eef3; border-radius:9px; overflow:hidden; }
+.toggle button { border:none; background:#fff; padding:8px 14px; font-size:13px; font-weight:600; color:#5b6b72; cursor:pointer; }
+.toggle button.on { background:var(--mp-brand); color:#fff; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:8px; color:#888; font-weight:500; border-bottom:1px solid #eee; white-space:nowrap; }
+td { padding:8px; border-bottom:1px solid #f5f5f5; vertical-align:middle; }
+.badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+.code { font-family:ui-monospace,monospace; font-size:12px; color:var(--mp-brand); text-decoration:none; font-weight:600; }
+.muted { color:#9aa7ad; }
+.thumb { width:40px; height:40px; border-radius:7px; object-fit:cover; border:1px solid #e0f0ff; background:#f0f7ff; }
+.thumb.ph { display:inline-flex; align-items:center; justify-content:center; color:#cfe0e6; font-size:18px; }
+.bulkbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding:10px 12px; background:#f7fbff; border:1px solid #e0f0ff; border-radius:9px; }
+.kanban { display:flex; gap:12px; overflow-x:auto; padding-bottom:8px; }
+.klane { flex:0 0 250px; background:#f7fbff; border:1px solid #e0f0ff; border-radius:12px; padding:10px; }
+.klane h4 { font-size:12px; font-weight:700; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.klane h4 .cnt { background:#fff; border:1px solid #e0f0ff; border-radius:20px; padding:1px 8px; font-size:11px; color:#5b6b72; }
+.kcard { background:#fff; border:1px solid #e8f1f6; border-radius:9px; padding:10px; margin-bottom:8px; text-decoration:none; display:block; color:inherit; }
+.kcard:hover { box-shadow:0 4px 10px rgba(25,56,71,.08); }
+.kcard .kc-top { display:flex; justify-content:space-between; gap:6px; align-items:center; }
+.kcard .kc-desc { font-size:12px; color:#445; margin:6px 0; max-height:34px; overflow:hidden; }
+.kcard .kc-meta { font-size:11px; color:#9aa7ad; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+@media(max-width:900px){ .kpis { grid-template-columns:repeat(2,1fr); } }
+:root{ --mp-brand:{{ brand }}; }
+.topbar{ background:var(--mp-brand) !important; }
+</style>
+{% endmacro %}
+
+{# ── topbar(): επικεφαλίδα σελίδας με προαιρετικό κουμπί δράσης ── #}
+{% macro topbar(icon, title, subtitle='', action_label='', action_href='') %}
+<div class="topbar">
+  <div>
+    <div class="topbar-title"><i class="ti ti-{{ icon }}"></i> {{ title }}</div>
+    {% if subtitle %}<div class="topbar-sub">{{ subtitle }}</div>{% endif %}
+  </div>
+  {% if action_label %}<div><a class="newbtn" href="{{ action_href }}"><i class="ti ti-plus"></i> {{ action_label }}</a></div>{% endif %}
+</div>
+{% endmacro %}
+
+{# ── kpis(): cards = [{n,label,color,href,active}] ── #}
+{% macro kpis(cards) %}
+<div class="kpis" style="--mp-cols:{{ cards|length }};">
+  {% for c in cards %}
+  <a class="kpi {{ 'active' if c.active }}" href="{{ c.href or '#' }}"><div class="n" style="color:{{ c.color or 'var(--mp-brand)' }};">{{ c.n }}</div><div class="l">{{ c.label }}</div></a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── chips(): items = [{label,href,on,danger}] ── #}
+{% macro chips(items) %}
+<div class="chips">
+  {% for c in items %}
+  <a class="chip {{ 'danger' if c.danger }} {{ 'on' if c.on }}" href="{{ c.href }}">{{ c.label }}</a>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# ── view_toggle(): κουμπιά Πίνακας/Kanban ── #}
+{% macro view_toggle(table_label='Πίνακας', kanban_label='Kanban') %}
+<div class="toggle">
+  <button type="button" id="mp-btn-table" class="on" onclick="mpSetView('table')"><i class="ti ti-table"></i> {{ table_label }}</button>
+  <button type="button" id="mp-btn-kanban" onclick="mpSetView('kanban')"><i class="ti ti-layout-kanban"></i> {{ kanban_label }}</button>
+</div>
+{% endmacro %}
+
+{# ── view_scripts(): η λογική εναλλαγής (μνήμη ανά key) ── #}
+{% macro view_scripts(key='estia_panel_view') %}
+<script>
+function mpSetView(v){
+  var t=document.getElementById('mp-view-table'), k=document.getElementById('mp-view-kanban');
+  if(t) t.style.display=(v==='kanban')?'none':'block';
+  if(k) k.style.display=(v==='kanban')?'block':'none';
+  var bt=document.getElementById('mp-btn-table'), bk=document.getElementById('mp-btn-kanban');
+  if(bt) bt.classList.toggle('on', v!=='kanban');
+  if(bk) bk.classList.toggle('on', v==='kanban');
+  try{ localStorage.setItem('{{ key }}', v); }catch(e){}
+}
+try{ if(localStorage.getItem('{{ key }}')==='kanban') mpSetView('kanban'); }catch(e){}
+</script>
+{% endmacro %}
+
+{# ── badge(): απλό chip κατάστασης/ετικέτας ── #}
+{% macro badge(text, bg, fg) %}<span class="badge" style="background:{{ bg }};color:{{ fg }};">{{ text }}</span>{% endmacro %}
