@@ -7,7 +7,7 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eef4f8;color:#1a2b33;}
 .wrap{max-width:1280px;margin:0 auto;padding:16px 18px 50px;}
 .dbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
-.dbar .t{font-size:16px;font-weight:750;letter-spacing:-.2px;color:#16242c;display:flex;align-items:center;gap:9px;}
+.dbar .t{font-size:16px;font-weight:750;letter-spacing:-.2px;color:#16242c;display:flex;align-items:center;gap:9px;user-select:none;}
 .dbar .t .acc{width:5px;height:20px;border-radius:3px;background:var(--accent);}
 .dbar .tools{display:flex;gap:8px;align-items:center;}
 .tbtn{font-size:13px;padding:8px 13px;border-radius:10px;border:1px solid #d7e3ea;background:#fff;color:#3a4b54;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.13s;}
@@ -15,42 +15,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tbtn.primary{background:var(--brand);border-color:var(--brand);color:#fff;}
 .tbtn.primary:hover{filter:brightness(1.08);color:#fff;}
 .tbtn i{font-size:16px;}
-.reset{font-size:12px;color:#9aa7ad;background:none;border:none;cursor:pointer;}
-.reset:hover{color:#b04a4a;text-decoration:underline;}
-/* picker */
-.picker{display:none;background:#fff;border:1px solid #dde8ee;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 8px 30px rgba(25,56,71,.10);}
-.picker.show{display:block;}
-.picker .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;}
-.picker .ph .h{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;}
-.picker .ph .h i{color:var(--accent);}
-.picker .x{border:none;background:none;font-size:20px;color:#9aa7ad;cursor:pointer;line-height:1;}
-.catbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
-.catchip{font-size:12.5px;padding:7px 14px;border-radius:22px;border:1px solid #d7e3ea;background:#f5f9fb;color:#54656e;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.12s;}
-.catchip:hover{border-color:var(--accent);}
-.catchip.on{background:var(--brand);border-color:var(--brand);color:#fff;}
-.catchip i{font-size:15px;}
-.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:9px;max-height:300px;overflow:auto;padding:2px;}
-.pcard{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid #e3edf2;border-radius:12px;cursor:pointer;transition:.12s;background:#fbfdfe;}
-.pcard:hover{border-color:var(--accent);}
-.pcard.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,#fff);box-shadow:0 0 0 1px var(--accent) inset;}
-.pcard.added{opacity:.5;cursor:default;}
-.pcard .pch{width:34px;height:34px;border-radius:10px;background:#eef4f8;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.pcard .pn{font-size:13px;font-weight:600;color:#33454d;line-height:1.2;}
-.pcard .pcat{font-size:11px;color:#9aa7ad;margin-top:2px;}
-.pcard .pmark{margin-left:auto;color:var(--accent);font-size:18px;opacity:0;}
-.pcard.sel .pmark{opacity:1;}
-.pcard.added .pmark{opacity:1;color:#9aa7ad;}
-.picker .pf{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:14px;}
-.pcount{margin-right:auto;font-size:12px;color:#9aa7ad;}
+.reset{font-size:12px;color:#9aa7ad;background:none;border:none;cursor:pointer;padding:6px;}
+.reset:hover{color:#b04a4a;}
 /* grid + tiles */
-.grid-stack{background:transparent;}
+.grid-stack{background:transparent;min-height:120px;}
 .grid-stack-item-content{inset:0;border-radius:16px;overflow:visible;}
 .grid-stack-item-content::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1px;pointer-events:none;z-index:3;
   background:linear-gradient(125deg,color-mix(in srgb,var(--accent) 55%,transparent),transparent 42%,transparent 60%,color-mix(in srgb,var(--accent) 30%,transparent));
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.45;transition:opacity .2s;}
 .grid-stack-item-content:hover::before{opacity:.9;}
 .gs-tile{position:absolute;inset:0;background:#fff;border:1px solid #e3edf2;border-radius:16px;box-shadow:0 1px 2px rgba(25,56,71,.05);
-  display:flex;flex-direction:column;padding:14px 16px;overflow:hidden;transition:box-shadow .15s;}
+  display:flex;flex-direction:column;padding:14px 16px;overflow:hidden;transition:box-shadow .15s;user-select:none;}
 .gs-tile:hover{box-shadow:0 8px 22px rgba(25,56,71,.10);}
 .th{display:flex;align-items:center;gap:9px;margin-bottom:11px;cursor:move;flex-shrink:0;}
 .th .hch{width:30px;height:30px;border-radius:9px;background:#eef4f8;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
@@ -59,14 +34,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .gs-tile .rm{position:absolute;top:9px;right:9px;width:22px;height:22px;border-radius:50%;border:none;background:#fde7e7;color:#dc2626;font-size:14px;line-height:1;cursor:pointer;z-index:5;opacity:0;transition:.12s;}
 .gs-tile:hover .rm{opacity:1;}
 .tb{flex:1;min-height:0;overflow:auto;}
-/* KPI */
 .gs-tile.kpi .tb{display:flex;align-items:center;gap:14px;overflow:hidden;}
 .kv{font-size:clamp(24px,7vh,40px);font-weight:760;line-height:1;letter-spacing:-.7px;color:#1c2b34;}
 .kpi .th .grp{display:none;}
 .gs-tile.kpi.good .hch{background:#e7f6ec;color:#16a34a;}.gs-tile.kpi.good .kv{color:#16a34a;}
 .gs-tile.kpi.warn .hch{background:#fdf0dd;color:#d97706;}.gs-tile.kpi.warn .kv{color:#d97706;}
 .gs-tile.kpi.bad  .hch{background:#fde7e7;color:#dc2626;}.gs-tile.kpi.bad  .kv{color:#dc2626;}
-/* widget body */
 .cov{margin-bottom:12px;}.cov .top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;color:#3a4b54;}
 .bar{height:8px;border-radius:6px;background:#eef2f5;overflow:hidden;}.bar i{display:block;height:100%;border-radius:6px;}
 .li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f8;font-size:12.5px;align-items:center;}
@@ -76,29 +49,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .muted{color:#9aa7ad;white-space:nowrap;font-size:12px;}
 .empty{color:#9aa7ad;font-size:12.5px;padding:10px 0;text-align:center;}
 .btn{display:inline-flex;align-items:center;gap:5px;margin-top:10px;font-size:12px;color:var(--brand);text-decoration:none;font-weight:600;}
+.pinwrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;}
+.pinwrap .pi{width:46px;height:46px;border-radius:13px;background:#eef4f8;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;}
+.pinwrap .pt{font-size:13px;font-weight:600;color:#33454d;}
 .emptyState{text-align:center;padding:50px 0;color:#9aa7ad;font-size:14px;}
 .emptyState i{font-size:36px;display:block;margin-bottom:10px;opacity:.5;}
-/* dark — theme aware (fix coverage κ.λπ.) */
+/* right drawer palette */
+.scrim{position:fixed;inset:0;background:rgba(15,30,40,.18);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s;}
+.scrim.show{opacity:1;pointer-events:auto;}
+.palette{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:88vw;background:#fff;border-left:1px solid #e0eaf0;box-shadow:-12px 0 36px rgba(25,56,71,.14);
+  z-index:50;transform:translateX(100%);transition:transform .24s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;}
+.palette.show{transform:none;}
+.pal-h{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border-bottom:1px solid #eef2f5;flex-shrink:0;}
+.pal-h .h{font-weight:750;font-size:14.5px;display:flex;align-items:center;gap:8px;}
+.pal-h .h i{color:var(--accent);}
+.pal-h .x{border:none;background:none;font-size:22px;color:#9aa7ad;cursor:pointer;line-height:1;}
+.pal-cats{display:flex;gap:6px;flex-wrap:wrap;padding:11px 14px 4px;flex-shrink:0;}
+.pcat{font-size:11.5px;padding:5px 11px;border-radius:20px;border:1px solid #d7e3ea;background:#f5f9fb;color:#54656e;cursor:pointer;user-select:none;}
+.pcat.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+.pal-body{flex:1;overflow-y:auto;padding:8px 14px 12px;}
+.pal-sec{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#9aa7ad;margin:12px 2px 8px;font-weight:700;}
+.palette-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid #e3edf2;border-radius:12px;background:#fbfdfe;margin-bottom:8px;cursor:grab;user-select:none;transition:.12s;position:relative;}
+.palette-item:hover{border-color:var(--accent);box-shadow:0 3px 12px rgba(25,56,71,.08);}
+.palette-item:active{cursor:grabbing;}
+.palette-item.added{display:none;}
+.palette-item .pch{width:34px;height:34px;border-radius:10px;background:#eef4f8;color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.palette-item .pn{font-size:13px;font-weight:600;color:#33454d;line-height:1.2;}
+.palette-item .pcc{font-size:11px;color:#9aa7ad;margin-top:2px;}
+.palette-item .drag{margin-left:auto;color:#c3d2db;font-size:17px;}
+.palette-item .unpin{margin-left:auto;border:none;background:none;color:#b9c6cf;font-size:16px;cursor:pointer;padding:3px;border-radius:6px;}
+.palette-item .unpin:hover{background:#fde7e7;color:#dc2626;}
+.pal-empty{font-size:12px;color:#9aa7ad;padding:8px 4px;line-height:1.5;}
+.trash{margin:6px 14px 14px;flex-shrink:0;border:2px dashed #d7e3ea;border-radius:13px;padding:16px;text-align:center;color:#9aa7ad;font-size:12.5px;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.trash i{font-size:22px;}
+.trash.gs-drag-over,.trash.over{border-color:#dc2626;color:#dc2626;background:#fef4f4;}
+/* dark */
 html[data-theme="dark"] body{background:#0f1722;color:#e6edf3;}
 html[data-theme="dark"] .dbar .t{color:#eef4f8;}
-html[data-theme="dark"] .gs-tile,html[data-theme="dark"] .picker,html[data-theme="dark"] .pcard{background:#141d2a;border-color:#243140;box-shadow:none;}
-html[data-theme="dark"] .pcard{background:#16202e;}
-html[data-theme="dark"] .kv{color:#eef4f8;}
-html[data-theme="dark"] .th .hch,html[data-theme="dark"] .pcard .pch,html[data-theme="dark"] .th .grp{background:#1b2735;}
-html[data-theme="dark"] .th .ht,html[data-theme="dark"] .picker .ph .h{color:#dfe8ee;}
+html[data-theme="dark"] .gs-tile,html[data-theme="dark"] .palette,html[data-theme="dark"] .palette-item{background:#141d2a;border-color:#243140;box-shadow:none;}
+html[data-theme="dark"] .palette-item{background:#16202e;}
+html[data-theme="dark"] .kv,html[data-theme="dark"] .pinwrap .pt{color:#eef4f8;}
+html[data-theme="dark"] .th .hch,html[data-theme="dark"] .palette-item .pch,html[data-theme="dark"] .th .grp,html[data-theme="dark"] .pinwrap .pi{background:#1b2735;}
+html[data-theme="dark"] .th .ht,html[data-theme="dark"] .pal-h .h{color:#dfe8ee;}
 html[data-theme="dark"] .th .grp{color:#9fb0bd;}
 html[data-theme="dark"] .cov .top{color:#aab8c4;}
 html[data-theme="dark"] .li{border-bottom-color:#1e2a38;}html[data-theme="dark"] .li .lt{color:#b6c3cd;}
 html[data-theme="dark"] .bar{background:#1e2a38;}
-html[data-theme="dark"] .tbtn,html[data-theme="dark"] .catchip{background:#141d2a;border-color:#2c3a4a;color:#c4d0dc;}
-html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
+html[data-theme="dark"] .tbtn,html[data-theme="dark"] .pcat{background:#141d2a;border-color:#2c3a4a;color:#c4d0dc;}
+html[data-theme="dark"] .palette-item .pn{color:#cdd8e0;}
+html[data-theme="dark"] .pal-h,html[data-theme="dark"] .palette{border-color:#243140;}
 </style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed body{background:transparent!important;}</style>
 </head><body>
 
-{# ---- KPI value + status helpers ---- #}
 {% macro kval(t) %}{% set d=tiledata %}{%- if t.id=='compliance' -%}{{ d.compliance }}%{%- elif t.id=='alerts' -%}{{ d.alerts }}{%- elif t.id=='open_faults' -%}{{ d.open_faults }}{%- elif t.id=='my_faults' -%}{{ d.my_faults }}{%- elif t.id=='pool_today' -%}{{ d.pool_today }}{%- elif t.id=='water_today' -%}{{ d.water_today }}{%- elif t.id=='surveys_today' -%}{{ d.surveys_today }}{%- elif t.id=='hotels' -%}{{ d.hotels }}{%- elif t.id=='checkpoints' -%}{{ d.checkpoints }}{%- elif t.id=='users' -%}{{ d.users }}{%- elif t.id=='pending' -%}{{ d.pending }}{%- endif -%}{% endmacro %}
 {% macro kcls(t) %}{%- if t.id=='compliance' -%}{{ 'good' if tiledata.compliance>=80 else 'warn' if tiledata.compliance>=50 else 'bad' }}{%- elif t.id=='alerts' -%}{{ 'bad' if tiledata.alerts else 'good' }}{%- elif t.id=='open_faults' -%}{{ 'bad' if tiledata.open_faults else 'good' }}{%- elif t.id=='my_faults' -%}{{ 'warn' if tiledata.my_faults else '' }}{%- elif t.id=='pending' -%}{{ 'warn' if tiledata.pending else '' }}{%- else -%}{%- endif -%}{% endmacro %}
 
@@ -108,8 +113,8 @@ html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
   <div class="th"><span class="hch"><i class="ti {{ t.icon }}"></i></span><span class="ht">{{ t.title }}</span><span class="grp">{{ cat_labels.get(t.cat, '') }}</span></div>
   <div class="tb">
   {% set d=tiledata %}
-  {% if t.kind=='kpi' %}
-    <div class="kv">{{ kval(t)|trim }}</div>
+  {% if t.kind=='kpi' %}<div class="kv">{{ kval(t)|trim }}</div>
+  {% elif t.kind=='pinned' %}<div class="pinwrap"><div class="pi"><i class="ti {{ t.icon }}"></i></div><div class="pt">{{ t.title }}</div>{% if t.link %}<a class="btn" href="{{ t.link }}">Άνοιγμα <i class="ti ti-arrow-right"></i></a>{% endif %}</div>
   {% elif t.id=='coverage' %}
     {% for c in d.cov %}<div class="cov"><div class="top"><span>{{ c.hotel }}</span><span class="muted">{{ c.done }}/{{ c.exp }} · {{ c.pct }}%</span></div>
       <div class="bar"><i style="width:{{ c.pct }}%;background:{{ '#16a34a' if c.pct>=80 else '#d97706' if c.pct>=50 else '#dc2626' }};"></i></div></div>
@@ -132,31 +137,21 @@ html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
 </div>
 {% endmacro %}
 
+{% macro palette_item(t) %}
+<div class="palette-item" data-id="{{ t.id }}" data-cat="{{ t.cat }}" gs-w="{{ t.w }}" gs-h="{{ t.h }}" data-minw="{{ t.minw }}" data-minh="{{ t.minh }}">
+  <span class="pch"><i class="ti {{ t.icon }}"></i></span>
+  <div><div class="pn">{{ t.title }}</div><div class="pcc">{{ cat_labels.get(t.cat,'') }}{{ ' · KPI' if t.kind=='kpi' else (' · καρφιτσωμένο' if t.kind=='pinned' else ' · πίνακας') }}</div></div>
+  {% if t.kind=='pinned' %}<button class="unpin" data-pid="{{ t.pid }}" title="Αφαίρεση από τη μπάρα">×</button>{% else %}<i class="ti ti-grip-vertical drag"></i>{% endif %}
+</div>
+{% endmacro %}
+
 <div class="wrap">
   <div class="dbar">
     <div class="t"><span class="acc"></span>Dashboard</div>
     <div class="tools">
       <button class="reset" id="resetBtn" title="Επαναφορά προεπιλογής"><i class="ti ti-rotate"></i></button>
-      <button class="tbtn primary" id="addBtn"><i class="ti ti-plus"></i> Προσθήκη widget</button>
+      <button class="tbtn primary" id="openPal"><i class="ti ti-layout-sidebar-right-expand"></i> Widgets</button>
     </div>
-  </div>
-
-  <div class="picker" id="picker">
-    <div class="ph"><span class="h"><i class="ti ti-layout-grid-add"></i> Πρόσθεσε widgets</span><button class="x" id="pickClose">×</button></div>
-    <div class="catbar" id="catbar">
-      <span class="catchip on" data-cat="all"><i class="ti ti-apps"></i> Όλα</span>
-      {% for key,label,icon in categories %}<span class="catchip" data-cat="{{ key }}"><i class="ti {{ icon }}"></i> {{ label }}</span>{% endfor %}
-    </div>
-    <div class="plist" id="plist">
-      {% for t in catalog %}
-      <div class="pcard" data-id="{{ t.id }}" data-cat="{{ t.cat }}">
-        <span class="pch"><i class="ti {{ t.icon }}"></i></span>
-        <div><div class="pn">{{ t.title }}</div><div class="pcat">{{ cat_labels.get(t.cat,'') }}{{ ' · KPI' if t.kind=='kpi' else ' · πίνακας' }}</div></div>
-        <i class="ti ti-check pmark"></i>
-      </div>
-      {% endfor %}
-    </div>
-    <div class="pf"><span class="pcount" id="pcount"></span><button class="tbtn" id="pickCancel">Άκυρο</button><button class="tbtn primary" id="pickApply"><i class="ti ti-check"></i> Προσθήκη</button></div>
   </div>
 
   <div class="grid-stack" id="grid">
@@ -166,8 +161,29 @@ html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
     </div>
     {% endfor %}
   </div>
-  <div class="emptyState" id="emptyMsg" style="display:none;"><i class="ti ti-layout-grid-add"></i>Κενό dashboard. Πάτησε «Προσθήκη widget».</div>
+  <div class="emptyState" id="emptyMsg" style="display:none;"><i class="ti ti-layout-grid-add"></i>Κενό dashboard. Άνοιξε «Widgets» και σύρε ό,τι θες.</div>
 </div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="palette" id="palette">
+  <div class="pal-h"><span class="h"><i class="ti ti-apps"></i> Widgets</span><button class="x" id="palClose">×</button></div>
+  <div class="pal-cats" id="palCats">
+    <span class="pcat on" data-cat="all">Όλα</span>
+    {% for key,label,icon in categories %}<span class="pcat" data-cat="{{ key }}">{{ label }}</span>{% endfor %}
+  </div>
+  <div class="pal-body">
+    <div class="pal-sec">Προκαθορισμένα</div>
+    <div id="predefList">
+      {% for t in predefined %}{{ palette_item(t) }}{% endfor %}
+    </div>
+    <div class="pal-sec">Καρφιτσωμένα</div>
+    <div id="pinnedList">
+      {% for t in pinned %}{{ palette_item(t) }}{% endfor %}
+    </div>
+    {% if not pinned %}<div class="pal-empty" id="pinEmpty">Από οποιοδήποτε report ή γράφημα, πάτα «📌 Pin to dashboard» και θα εμφανίζεται εδώ. <em>(σύντομα)</em></div>{% endif %}
+  </div>
+  <div class="trash" id="trash"><i class="ti ti-trash"></i> Σύρε ένα widget εδώ για αφαίρεση</div>
+</aside>
 
 <div id="store" style="display:none;">
   {% for t in catalog %}<div data-store="{{ t.id }}">{{ gs_tile(t) }}</div>{% endfor %}
@@ -178,54 +194,67 @@ html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
 (function(){
   var META = {{ catalog|tojson }};
   var metaById = {}; META.forEach(function(m){ metaById[m.id]=m; });
-  var grid = GridStack.init({column:12, cellHeight:62, margin:8, float:false,
+  var grid = GridStack.init({column:12, cellHeight:62, margin:8, float:false, acceptWidgets:true,
+    removable:'#trash', removableOptions:{accept:'.grid-stack-item'},
     draggable:{handle:'.th'}, resizable:{handles:'se,e,s'}}, '#grid');
 
-  var saveTimer=null, emptyMsg=document.getElementById('emptyMsg');
+  var emptyMsg=document.getElementById('emptyMsg'), saveTimer=null;
+  function onBoard(id){ return grid.engine.nodes.some(function(n){return n.id===id;}); }
   function refreshEmpty(){ emptyMsg.style.display = grid.engine.nodes.length ? 'none':'block'; }
+  function storeHtml(id){ var el=document.querySelector('#store [data-store="'+id+'"]'); return el?el.innerHTML:''; }
+  function syncPalette(){ document.querySelectorAll('.palette-item').forEach(function(it){ it.classList.toggle('added', onBoard(it.dataset.id)); }); }
   function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){
-    var items = grid.save(false).map(function(n){ return {id:n.id, x:n.x, y:n.y, w:n.w, h:n.h}; });
+    var items=grid.save(false).map(function(n){return {id:n.id,x:n.x,y:n.y,w:n.w,h:n.h};});
     fetch('/overview/layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items})}).catch(function(){});
   },400); }
-  grid.on('change added removed', function(){ refreshEmpty(); save(); });
+  grid.on('change added removed', function(){ refreshEmpty(); syncPalette(); save(); });
 
-  function storeHtml(id){ var el=document.querySelector('#store [data-store="'+id+'"]'); return el?el.innerHTML:''; }
-  function onBoard(id){ return grid.engine.nodes.some(function(n){return n.id===id;}); }
-
-  // remove (×)
+  // remove via × button
   document.getElementById('grid').addEventListener('click', function(e){
     var rm=e.target.closest('.rm'); if(!rm) return;
     var item=e.target.closest('.grid-stack-item'); if(item) grid.removeWidget(item);
   });
 
-  // ----- picker -----
-  var picker=document.getElementById('picker'), plist=document.getElementById('plist'),
-      catbar=document.getElementById('catbar'), pcount=document.getElementById('pcount');
-  function syncPickerState(){
-    plist.querySelectorAll('.pcard').forEach(function(c){
-      var added=onBoard(c.dataset.id);
-      c.classList.toggle('added', added); if(added) c.classList.remove('sel');
-    });
-    updateCount();
-  }
-  function updateCount(){ var n=plist.querySelectorAll('.pcard.sel').length; pcount.textContent = n? (n+' επιλεγμένα') : ''; }
-  function openPicker(){ syncPickerState(); picker.classList.add('show'); picker.scrollIntoView({behavior:'smooth',block:'nearest'}); }
-  function closePicker(){ picker.classList.remove('show'); plist.querySelectorAll('.pcard.sel').forEach(function(c){c.classList.remove('sel');}); updateCount(); }
-  document.getElementById('addBtn').addEventListener('click', function(){ picker.classList.contains('show')?closePicker():openPicker(); });
-  document.getElementById('pickClose').addEventListener('click', closePicker);
-  document.getElementById('pickCancel').addEventListener('click', closePicker);
-  catbar.addEventListener('click', function(e){ var ch=e.target.closest('.catchip'); if(!ch) return;
-    catbar.querySelectorAll('.catchip').forEach(function(x){x.classList.remove('on');}); ch.classList.add('on');
-    var cat=ch.dataset.cat;
-    plist.querySelectorAll('.pcard').forEach(function(c){ c.style.display = (cat==='all'||c.dataset.cat===cat)?'':'none'; });
+  // drag-in from palette
+  GridStack.setupDragIn('.palette-item', {appendTo:'body', helper:'clone'});
+  grid.on('dropped', function(ev, prev, node){
+    if(!node||!node.el) return;
+    var el=node.el, id=el.getAttribute('data-id');
+    if(!id){ var inner=el.querySelector('[data-id]'); id=inner&&inner.getAttribute('data-id'); }
+    var x=node.x, y=node.y, m=metaById[id];
+    setTimeout(function(){
+      try{ grid.removeWidget(el, true); }catch(_){}
+      if(m && !onBoard(id)){
+        grid.addWidget({x:x,y:y,w:m.w,h:m.h,minW:m.minw,minH:m.minh,id:id,content:storeHtml(id)});
+      }
+      syncPalette();
+    },0);
   });
-  plist.addEventListener('click', function(e){ var c=e.target.closest('.pcard'); if(!c||c.classList.contains('added')) return;
-    c.classList.toggle('sel'); updateCount(); });
-  document.getElementById('pickApply').addEventListener('click', function(){
-    var sel=Array.prototype.slice.call(plist.querySelectorAll('.pcard.sel'));
-    sel.forEach(function(c){ var id=c.dataset.id; if(onBoard(id)) return; var m=metaById[id];
-      grid.addWidget({w:m.w,h:m.h,minW:m.minw,minH:m.minh,id:id,content:storeHtml(id)}); });
-    closePicker(); syncPickerState();
+
+  // palette open/close
+  var palette=document.getElementById('palette'), scrim=document.getElementById('scrim');
+  function openPal(){ syncPalette(); palette.classList.add('show'); scrim.classList.add('show'); }
+  function closePal(){ palette.classList.remove('show'); scrim.classList.remove('show'); }
+  document.getElementById('openPal').addEventListener('click', openPal);
+  document.getElementById('palClose').addEventListener('click', closePal);
+  scrim.addEventListener('click', closePal);
+
+  // category filter
+  document.getElementById('palCats').addEventListener('click', function(e){ var ch=e.target.closest('.pcat'); if(!ch) return;
+    this.querySelectorAll('.pcat').forEach(function(x){x.classList.remove('on');}); ch.classList.add('on');
+    var cat=ch.dataset.cat;
+    document.querySelectorAll('#predefList .palette-item, #pinnedList .palette-item').forEach(function(it){
+      it.style.display = (cat==='all'||it.dataset.cat===cat) ? '' : 'none';
+    });
+  });
+
+  // unpin
+  document.getElementById('pinnedList').addEventListener('click', function(e){
+    var b=e.target.closest('.unpin'); if(!b) return; e.stopPropagation();
+    var pid=b.dataset.pid, id='pin_'+pid;
+    var item=document.querySelector('.grid-stack-item[gs-id="'+id+'"]'); if(item) grid.removeWidget(item);
+    fetch('/dashboard/unpin/'+pid,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}}).catch(function(){});
+    var pe=b.closest('.palette-item'); if(pe) pe.remove();
   });
 
   document.getElementById('resetBtn').addEventListener('click', function(){
@@ -234,7 +263,7 @@ html[data-theme="dark"] .pcard .pn{color:#cdd8e0;}
       .then(function(){location.reload();}).catch(function(){location.reload();});
   });
 
-  refreshEmpty();
+  syncPalette(); refreshEmpty();
 })();
 </script>
 </body></html>

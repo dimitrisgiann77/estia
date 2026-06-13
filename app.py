@@ -314,11 +314,18 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.37'
-APP_BUILD   = '317'
+APP_VERSION = '12.38'
+APP_BUILD   = '318'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.38', 'b': '318', 'date': '14/06/2026', 'title': 'Dashboard: πλαϊνή μπάρα widgets με drag & drop',
+     'items': ['Η προσθήκη widget γίνεται από κομψή πλαϊνή μπάρα δεξιά — σύρε & άφησε στο πλέγμα.',
+               'Σύρε ένα widget στη ζώνη απόρριψης για να το αφαιρέσεις.',
+               'Τα προκαθορισμένα widgets μένουν πάντα διαθέσιμα στη μπάρα.',
+               'Θεμέλιο για «Pin to dashboard»: ενότητα «Καρφιτσωμένα» (κάρφιτσωμα reports έρχεται σύντομα).',
+               'Διόρθωση: το κλικ δεν επιλέγει πια κείμενο στα tiles.',
+               'Άνοιξε το Staff HUB (προς το παρόν δείχνει τις Καταγραφές).']},
     {'v': '12.37', 'b': '317', 'date': '14/06/2026', 'title': 'Νέο Dashboard: ελεύθερο πλέγμα με resizable widgets',
      'items': ['Η «Σύνοψη» μετονομάστηκε σε Dashboard.',
                'Τα widgets αλλάζουν μέγεθος & θέση με το ποντίκι (με ελάχιστα όρια ώστε να μένουν ευανάγνωστα).',
@@ -675,6 +682,15 @@ class Notification(db.Model):
     text       = db.Column(db.String(300))
     link       = db.Column(db.String(120))
     is_read    = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+# v12.38 — Καρφιτσωμένα widgets (pin to dashboard). Νέος πίνακας· create_all το δημιουργεί.
+class PinnedWidget(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title      = db.Column(db.String(80), nullable=False)
+    icon       = db.Column(db.String(40))
+    link       = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # v12.9 — Μηνύματα μεταξύ χρηστών (νέος πίνακας· create_all το δημιουργεί αυτόματα)
@@ -2304,7 +2320,7 @@ def areas_dashboard():
 # ── v12.34 — Προσωπικό dashboard με tiles (drag&drop, ανά χρήστη) ─────────────
 # Κατάλογος διαθέσιμων tiles. kind: 'kpi'|'widget'. scope: 'all'=όλοι · 'admin'=admin/master.
 # v12.37 — κατηγορίες (ομάδες) + γεωμετρία πλέγματος (GridStack 12 στηλών)
-CAT_LABELS = {'quality':'Ποιότητα','faults':'Βλάβες','records':'Καταγραφές','org':'Οργανισμός','people':'Χρήστες'}
+CAT_LABELS = {'quality':'Ποιότητα','faults':'Βλάβες','records':'Καταγραφές','org':'Οργανισμός','people':'Χρήστες','pinned':'Καρφιτσωμένα'}
 CATEGORIES = [('quality','Ποιότητα','ti-checkup-list'),('faults','Βλάβες','ti-tool'),
               ('records','Καταγραφές','ti-clipboard-check'),('org','Οργανισμός','ti-building'),
               ('people','Χρήστες','ti-users')]
@@ -2334,9 +2350,23 @@ DEFAULT_TILES_STAFF = ['my_faults','open_faults','pool_today','water_today','sur
 def _tile_allowed(t, admin):
     return admin or t.get('scope') != 'admin'
 
+def _pin_dict(pw):
+    return {'id': 'pin_%d' % pw.id, 'title': pw.title, 'icon': pw.icon or 'ti-pin',
+            'kind': 'pinned', 'scope': 'all', 'cat': 'pinned',
+            'w': 4, 'h': 3, 'minw': 3, 'minh': 2, 'link': pw.link or '', 'pid': pw.id}
+
+def _user_pinned(user):
+    try:
+        return [_pin_dict(p) for p in PinnedWidget.query.filter_by(user_id=user.id).order_by(PinnedWidget.id).all()]
+    except Exception:
+        return []
+
+def _allowed_catalog(user, admin):
+    return [t for t in TILE_CATALOG if _tile_allowed(t, admin)] + _user_pinned(user)
+
 def _user_layout(user, admin):
     """Λίστα {id,x,y,w,h} για τον χρήστη (saved geometry ή default auto-flow), φιλτραρισμένη."""
-    valid = {t['id']: t for t in TILE_CATALOG if _tile_allowed(t, admin)}
+    valid = {t['id']: t for t in _allowed_catalog(user, admin)}
     items = None
     try:
         raw = getattr(user, 'dashboard', None)
@@ -2443,14 +2473,14 @@ def overview():
         'users': User.query.filter_by(is_active=True, approved=True).count(), 'pending': len(pending),
         'cov': cov, 'alerts_list': alerts, 'faults_list': faults, 'pending_list': pending, 'activity': activity,
     }
-    catalog = [t for t in TILE_CATALOG if _tile_allowed(t, admin)]
+    catalog = _allowed_catalog(user, admin)
     cmap = {t['id']: t for t in catalog}
     layout = _user_layout(user, admin)
-    shown_ids = {it['id'] for it in layout}
     items = [{**cmap[it['id']], **it} for it in layout if it['id'] in cmap]
-    available = [t for t in catalog if t['id'] not in shown_ids]
+    predefined = [t for t in catalog if t.get('kind') != 'pinned']
+    pinned = [t for t in catalog if t.get('kind') == 'pinned']
     return render_template('overview.html', tiledata=tiledata, items=items, catalog=catalog,
-                           available=available, categories=CATEGORIES, cat_labels=CAT_LABELS,
+                           predefined=predefined, pinned=pinned, categories=CATEGORIES, cat_labels=CAT_LABELS,
                            is_admin=admin, areas_labels=AREA_LABELS, action_labels=ACTION_LABELS)
 
 @app.route('/overview/layout', methods=['POST'])
@@ -2466,7 +2496,7 @@ def overview_layout():
             user.dashboard = None
             db.session.commit()
             return ('', 204)
-        cmap = {t['id']: t for t in TILE_CATALOG if _tile_allowed(t, admin)}
+        cmap = {t['id']: t for t in _allowed_catalog(user, admin)}
         out, seen = [], set()
         # νέα μορφή: items με γεωμετρία
         for it in (payload.get('items') or []):
@@ -2494,6 +2524,31 @@ def overview_layout():
     except Exception as e:
         db.session.rollback()
         return (str(e), 400)
+
+@app.route('/dashboard/pin', methods=['POST'])
+def dashboard_pin():
+    user = current_user()
+    if not user:
+        return ('', 401)
+    p = request.get_json(silent=True) or {}
+    title = (p.get('title') or '').strip()[:80]
+    link = (p.get('link') or '').strip()[:300]
+    icon = (p.get('icon') or 'ti-pin').strip()[:40]
+    if not title:
+        return jsonify({'error': 'title required'}), 400
+    pw = PinnedWidget(user_id=user.id, title=title, link=link, icon=icon)
+    db.session.add(pw); db.session.commit()
+    return jsonify({'id': 'pin_%d' % pw.id, 'pid': pw.id})
+
+@app.route('/dashboard/unpin/<int:pid>', methods=['POST'])
+def dashboard_unpin(pid):
+    user = current_user()
+    if not user:
+        return ('', 401)
+    pw = PinnedWidget.query.filter_by(id=pid, user_id=user.id).first()
+    if pw:
+        db.session.delete(pw); db.session.commit()
+    return ('', 204)
 
 # ── v12.21 — Καταγραφή χρηστών (Activity Log) ────────────────────────────────
 ACTION_LABELS = {

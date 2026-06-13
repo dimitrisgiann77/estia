@@ -206,7 +206,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
     <div class="sp"></div>
     <div class="apps">
       <button class="hbtn active" data-ws="operations" onclick="setWorkspace('operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>
-      <button class="hbtn" onclick="estiaSoon('Staff HUB')" title="Staff HUB — σύντομα"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
+      <button class="hbtn" data-ws="staffhub" onclick="setWorkspace('staffhub')" title="Staff HUB"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
       {% if is_admin %}<button class="hbtn" data-ws="admin" onclick="setWorkspace('admin')" title="Admin"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% else %}<button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% endif %}
       <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
     </div>
@@ -266,9 +266,9 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
     <nav class="side" id="side">
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Dashboard</div>{% endif %}
       {% if can_log %}
-      <div class="grp" data-ws="operations">Καταγραφές</div>
-      <div class="item" data-ws="operations" data-url="/pools?embed=1"><i class="ti ti-pool"></i> Πισίνες</div>
-      <div class="item" data-ws="operations" data-url="/app?embed=1"><i class="ti ti-droplet"></i> Νερά Χρήσης</div>
+      <div class="grp" data-ws="operations staffhub">Καταγραφές</div>
+      <div class="item" data-ws="operations staffhub" data-url="/pools?embed=1"><i class="ti ti-pool"></i> Πισίνες</div>
+      <div class="item" data-ws="operations staffhub" data-url="/app?embed=1"><i class="ti ti-droplet"></i> Νερά Χρήσης</div>
       {% endif %}
       <div class="grp" data-ws="operations">Παρακολούθηση</div>
       <div class="item" data-ws="operations" data-url="/pools/dashboard?embed=1"><i class="ti ti-layout-dashboard"></i> Πίνακας Πισινών</div>
