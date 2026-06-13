@@ -837,6 +837,32 @@ def faults_export():
 
 # ── v12.26 (Φάση 3) — Import ιστορικών βλαβών HotelToolbox ────────────────────
 import gzip as _gzip
+import unicodedata as _ud
+
+# Ρητά aliases ονομάτων ξενοδοχείων (όνομα πηγής HT -> πιθανό όνομα στη ζωντανή βάση)
+HT_HOTEL_ALIASES = {
+    'Piskopiano Village': 'Piskopiano Village Resort',
+}
+
+def _norm_hotel(name):
+    """Κανονικοποίηση ονόματος ξενοδοχείου για ανθεκτικό match: πεζά, χωρίς τόνους,
+    χωρίς γενικές καταλήξεις (hotel/resort/village/the) & χωρίς μη-αλφαριθμητικά."""
+    s = (name or '').strip().lower()
+    s = ''.join(c for c in _ud.normalize('NFD', s) if _ud.category(c) != 'Mn')
+    for w in ('hotel', 'resort', 'village', 'the'):
+        s = s.replace(w, ' ')
+    return ''.join(ch for ch in s if ch.isalnum())
+
+def _resolve_hotel_id(name, hmap, norm_map):
+    """Exact -> alias -> normalized match. Επιστρέφει hotel_id ή None."""
+    name = (name or '').strip()
+    if name in hmap:
+        return hmap[name]
+    alias = HT_HOTEL_ALIASES.get(name)
+    if alias and alias in hmap:
+        return hmap[alias]
+    return norm_map.get(_norm_hotel(name))
+
 
 def _ht_parse_dt(s):
     s = (s or '').strip()
@@ -893,14 +919,18 @@ def import_ht_faults(commit=True, batch=500):
     path = ht_seed_path()
     if not os.path.exists(path):
         return {'error': 'Λείπει το αρχείο seed/faults_ht.csv.gz', 'added': 0, 'skipped': 0, 'nohotel': 0, 'total': 0}
-    hmap = {h.name: h.id for h in Hotel.query.all()}
+    _hotels = Hotel.query.all()
+    hmap = {h.name: h.id for h in _hotels}
+    norm_map = {}
+    for h in _hotels:
+        norm_map.setdefault(_norm_hotel(h.name), h.id)
     existing = set(c[0] for c in db.session.query(Fault.code)
                    .filter(Fault.imported_from == 'hoteltoolbox').all())
     ccache = {}
     added = skipped = nohotel = 0
     with _gzip.open(path, 'rt', encoding='utf-8') as gz:
         for row in csv.DictReader(gz):
-            hid = hmap.get((row.get('hotel') or '').strip())
+            hid = _resolve_hotel_id(row.get('hotel'), hmap, norm_map)
             if not hid:
                 nohotel += 1
                 continue
