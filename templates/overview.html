@@ -54,9 +54,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .pinwrap .pt{font-size:13px;font-weight:600;color:#33454d;}
 .emptyState{text-align:center;padding:50px 0;color:#9aa7ad;font-size:14px;}
 .emptyState i{font-size:36px;display:block;margin-bottom:10px;opacity:.5;}
-/* right drawer palette */
-.scrim{position:fixed;inset:0;background:rgba(15,30,40,.18);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s;}
-.scrim.show{opacity:1;pointer-events:auto;}
+/* right drawer palette + side tab */
+.paltab{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:49;background:var(--brand);color:#fff;border:none;cursor:pointer;
+  padding:16px 9px;border-radius:13px 0 0 13px;box-shadow:-5px 4px 18px rgba(25,56,71,.22);display:flex;flex-direction:column;align-items:center;gap:9px;transition:right .24s cubic-bezier(.2,.8,.2,1),filter .15s;}
+.paltab:hover{filter:brightness(1.1);}
+.paltab .lbl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;font-weight:600;letter-spacing:.07em;}
+.paltab i{font-size:19px;}
+.paltab.open{right:300px;}
+@media(max-width:560px){.paltab.open{right:88vw;}}
 .palette{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:88vw;background:#fff;border-left:1px solid #e0eaf0;box-shadow:-12px 0 36px rgba(25,56,71,.14);
   z-index:50;transform:translateX(100%);transition:transform .24s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;}
 .palette.show{transform:none;}
@@ -138,7 +143,7 @@ html[data-theme="dark"] .pal-h,html[data-theme="dark"] .palette{border-color:#24
 {% endmacro %}
 
 {% macro palette_item(t) %}
-<div class="palette-item" data-id="{{ t.id }}" data-cat="{{ t.cat }}" gs-w="{{ t.w }}" gs-h="{{ t.h }}" data-minw="{{ t.minw }}" data-minh="{{ t.minh }}">
+<div class="palette-item" title="Σύρε ή κλικ για προσθήκη" data-id="{{ t.id }}" data-cat="{{ t.cat }}" gs-w="{{ t.w }}" gs-h="{{ t.h }}" data-minw="{{ t.minw }}" data-minh="{{ t.minh }}">
   <span class="pch"><i class="ti {{ t.icon }}"></i></span>
   <div><div class="pn">{{ t.title }}</div><div class="pcc">{{ cat_labels.get(t.cat,'') }}{{ ' · KPI' if t.kind=='kpi' else (' · καρφιτσωμένο' if t.kind=='pinned' else ' · πίνακας') }}</div></div>
   {% if t.kind=='pinned' %}<button class="unpin" data-pid="{{ t.pid }}" title="Αφαίρεση από τη μπάρα">×</button>{% else %}<i class="ti ti-grip-vertical drag"></i>{% endif %}
@@ -150,7 +155,6 @@ html[data-theme="dark"] .pal-h,html[data-theme="dark"] .palette{border-color:#24
     <div class="t"><span class="acc"></span>Dashboard</div>
     <div class="tools">
       <button class="reset" id="resetBtn" title="Επαναφορά προεπιλογής"><i class="ti ti-rotate"></i></button>
-      <button class="tbtn primary" id="openPal"><i class="ti ti-layout-sidebar-right-expand"></i> Widgets</button>
     </div>
   </div>
 
@@ -164,13 +168,14 @@ html[data-theme="dark"] .pal-h,html[data-theme="dark"] .palette{border-color:#24
   <div class="emptyState" id="emptyMsg" style="display:none;"><i class="ti ti-layout-grid-add"></i>Κενό dashboard. Άνοιξε «Widgets» και σύρε ό,τι θες.</div>
 </div>
 
-<div class="scrim" id="scrim"></div>
+<button class="paltab" id="palTab" title="Widgets"><i class="ti ti-layout-grid-add"></i><span class="lbl">WIDGETS</span></button>
 <aside class="palette" id="palette">
   <div class="pal-h"><span class="h"><i class="ti ti-apps"></i> Widgets</span><button class="x" id="palClose">×</button></div>
   <div class="pal-cats" id="palCats">
     <span class="pcat on" data-cat="all">Όλα</span>
     {% for key,label,icon in categories %}<span class="pcat" data-cat="{{ key }}">{{ label }}</span>{% endfor %}
   </div>
+  <div class="pal-hint" style="font-size:11.5px;color:#9aa7ad;padding:2px 16px 8px;">Σύρε στο πλέγμα ή κάνε κλικ για προσθήκη.</div>
   <div class="pal-body">
     <div class="pal-sec">Προκαθορισμένα</div>
     <div id="predefList">
@@ -231,13 +236,18 @@ html[data-theme="dark"] .pal-h,html[data-theme="dark"] .palette{border-color:#24
     },0);
   });
 
-  // palette open/close
-  var palette=document.getElementById('palette'), scrim=document.getElementById('scrim');
-  function openPal(){ syncPalette(); palette.classList.add('show'); scrim.classList.add('show'); }
-  function closePal(){ palette.classList.remove('show'); scrim.classList.remove('show'); }
-  document.getElementById('openPal').addEventListener('click', openPal);
+  // palette open/close (side tab, χωρίς scrim ώστε να μη μπλοκάρει το drop)
+  var palette=document.getElementById('palette'), palTab=document.getElementById('palTab');
+  function openPal(){ syncPalette(); palette.classList.add('show'); palTab.classList.add('open'); }
+  function closePal(){ palette.classList.remove('show'); palTab.classList.remove('open'); }
+  palTab.addEventListener('click', function(){ palette.classList.contains('show')?closePal():openPal(); });
   document.getElementById('palClose').addEventListener('click', closePal);
-  scrim.addEventListener('click', closePal);
+
+  // click-to-add (εφεδρεία/συμπλήρωμα του drag&drop)
+  function addTile(id){ var m=metaById[id]; if(!m||onBoard(id)) return;
+    grid.addWidget({w:m.w,h:m.h,minW:m.minw,minH:m.minh,id:id,content:storeHtml(id)}); syncPalette(); }
+  document.getElementById('predefList').addEventListener('click', function(e){ var it=e.target.closest('.palette-item'); if(it&&!it.classList.contains('added')) addTile(it.dataset.id); });
+  document.getElementById('pinnedList').addEventListener('click', function(e){ if(e.target.closest('.unpin')) return; var it=e.target.closest('.palette-item'); if(it&&!it.classList.contains('added')) addTile(it.dataset.id); });
 
   // category filter
   document.getElementById('palCats').addEventListener('click', function(e){ var ch=e.target.closest('.pcat'); if(!ch) return;
