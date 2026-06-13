@@ -44,7 +44,7 @@ select, textarea, input { padding:9px 11px; border:1px solid #d6eef3; border-rad
 
   <div class="card">
     <div class="kv"><span class="k">Ξενοδοχείο</span><span class="v">{{ f.hotel.name if f.hotel else '—' }}</span></div>
-    <div class="kv"><span class="k">Κατηγορία</span><span class="v">{{ cat_path or '—' }}</span></div>
+    <div class="kv"><span class="k">Κατηγορία</span><span class="v">{{ cat_path or f.legacy_category or '—' }}</span></div>
     <div class="kv"><span class="k">Προτεραιότητα</span><span class="v"><span class="badge" style="background:{{ PRIORITY_COLOR[f.priority][0] }};color:{{ PRIORITY_COLOR[f.priority][1] }};">{{ f.priority }}</span></span></div>
     <div class="kv"><span class="k">Υποβολέας</span><span class="v">{{ f.submitter.full_name if f.submitter else (f.legacy_from or '—') }}</span></div>
     <div class="kv"><span class="k">Ανάθεση</span><span class="v">{{ f.assignee.full_name if f.assignee else '— (καμία)' }}</span></div>

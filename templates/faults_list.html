@@ -69,7 +69,7 @@
             <td>{% if f.cover_image %}<img class="thumb" src="{{ f.cover_image }}" alt="">{% else %}<span class="thumb ph"><i class="ti ti-photo-off"></i></span>{% endif %}</td>
             <td><a class="code" href="/dashboard/fault/{{ f.id }}?embed=1">{{ f.code }}</a></td>
             <td>{{ f.hotel.name if f.hotel else '—' }}</td>
-            <td style="max-width:200px;">{{ f.category.name if f.category else '—' }}</td>
+            <td style="max-width:200px;">{{ f.category.name if f.category else (f.legacy_category or '—') }}</td>
             <td class="muted" style="max-width:150px;">{{ f.legacy_location or '' }}{% if f.legacy_room %}{{ ' · ' if f.legacy_location }}{{ f.legacy_room }}{% endif %}{% if not f.legacy_location and not f.legacy_room %}—{% endif %}</td>
             <td>{{ mp.badge(f.priority, PRIORITY_COLOR[f.priority][0], PRIORITY_COLOR[f.priority][1]) }}</td>
             <td>{{ mp.badge(STATUS_LABELS[f.status], STATUS_COLOR[f.status][0], STATUS_COLOR[f.status][1]) }}{% set sl = sla_state(f) %}{% if sl[0]=='overdue' %} {{ mp.badge('⚠ ' ~ sl[1], '#fee2e2', '#dc2626') }}{% elif sl[0]=='stale' %} {{ mp.badge(sl[1], '#fef3c7', '#b45309') }}{% endif %}</td>
@@ -98,7 +98,7 @@
             <span class="code">{{ f.code }}</span>
             {{ mp.badge(f.priority, PRIORITY_COLOR[f.priority][0], PRIORITY_COLOR[f.priority][1]) }}
           </div>
-          <div class="kc-desc">{{ (f.category.name + ' · ') if f.category else '' }}{{ f.description[:70] }}</div>
+          <div class="kc-desc">{{ (f.category.name + ' · ') if f.category else ((f.legacy_category + ' · ') if f.legacy_category else '') }}{{ f.description[:70] }}</div>
           <div class="kc-meta">
             {% if f.cover_image %}<img class="thumb" style="width:22px;height:22px;" src="{{ f.cover_image }}">{% endif %}
             <span>{{ f.hotel.name if f.hotel else '' }}</span>

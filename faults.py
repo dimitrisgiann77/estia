@@ -835,5 +835,134 @@ def faults_export():
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition': 'attachment; filename=%s.xlsx' % fname})
 
+# ── v12.26 (Φάση 3) — Import ιστορικών βλαβών HotelToolbox ────────────────────
+import gzip as _gzip
+
+def _ht_parse_dt(s):
+    s = (s or '').strip()
+    if not s:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            pass
+    return None
+
+def _ht_resolve_category(cat_str, cache):
+    """Ταιριάζει το string κατηγορίας HT (π.χ. 'Β. ΗΛΕΚΤΡΟΛΟΓΙΚΑ/1. ΛΑΜΠΑ') στο δέντρο
+    FaultCategory, κατεβαίνοντας όσο βαθιά γίνεται. Επιστρέφει το id του βαθύτερου match (ή None)."""
+    cat_str = (cat_str or '').strip()
+    if not cat_str:
+        return None
+    if cat_str in cache:
+        return cache[cat_str]
+    parts = [p.strip() for p in cat_str.split('/') if p.strip()]
+    node = None
+    parent_id = None
+    for p in parts:
+        q = FaultCategory.query.filter_by(name=p, parent_id=parent_id).first()
+        if not q:
+            break
+        node = q
+        parent_id = q.id
+    cid = node.id if node else None
+    cache[cat_str] = cid
+    return cid
+
+def ht_seed_path():
+    return os.path.join(BASE_DIR, 'seed', 'faults_ht.csv.gz')
+
+def ht_available_count():
+    """Πόσες εγγραφές περιέχει το κεντρικό αρχείο (γρήγορο, χωρίς import)."""
+    path = ht_seed_path()
+    if not os.path.exists(path):
+        return 0
+    try:
+        n = 0
+        with _gzip.open(path, 'rt', encoding='utf-8') as gz:
+            for _ in csv.DictReader(gz):
+                n += 1
+        return n
+    except Exception:
+        return 0
+
+def import_ht_faults(commit=True, batch=500):
+    """Idempotent: δημιουργεί Fault από το seed/faults_ht.csv.gz. Dedup σε code (PREFIX-HT-<htcode>).
+    Επιστρέφει {'added','skipped','nohotel','total'}."""
+    path = ht_seed_path()
+    if not os.path.exists(path):
+        return {'error': 'Λείπει το αρχείο seed/faults_ht.csv.gz', 'added': 0, 'skipped': 0, 'nohotel': 0, 'total': 0}
+    hmap = {h.name: h.id for h in Hotel.query.all()}
+    existing = set(c[0] for c in db.session.query(Fault.code)
+                   .filter(Fault.imported_from == 'hoteltoolbox').all())
+    ccache = {}
+    added = skipped = nohotel = 0
+    with _gzip.open(path, 'rt', encoding='utf-8') as gz:
+        for row in csv.DictReader(gz):
+            hid = hmap.get((row.get('hotel') or '').strip())
+            if not hid:
+                nohotel += 1
+                continue
+            prefix = HOTEL_PREFIX.get((row.get('hotel') or '').strip(), 'GEN')
+            code = '%s-HT-%s' % (prefix, (row.get('htcode') or '').strip())
+            if code in existing:
+                skipped += 1
+                continue
+            sub = _ht_parse_dt(row.get('submitted_at'))
+            upd = _ht_parse_dt(row.get('updated_at'))
+            st = (row.get('status') or 'auto_assigned').strip()
+            if st not in STATUSES:
+                st = 'auto_assigned'
+            completed_at = None
+            resolution = None
+            if st in TERMINAL:
+                completed_at = upd or sub
+                if sub and completed_at:
+                    try:
+                        resolution = max(0, int((completed_at - sub).total_seconds()))
+                    except Exception:
+                        resolution = None
+            pr = (row.get('priority') or 'Κανονική').strip()
+            if pr not in PRIORITIES:
+                pr = 'Κανονική'
+            cid = _ht_resolve_category(row.get('category'), ccache)
+            f = Fault(
+                code=code, hotel_id=hid, category_id=cid,
+                description=(row.get('description') or '').strip() or '(χωρίς περιγραφή)',
+                priority=pr, status=st,
+                source=(row.get('source') or 'Ενδοξενοδοχειακά').strip(),
+                submitted_at=sub or datetime.utcnow(), updated_at=upd,
+                completed_at=completed_at, resolution_seconds=resolution,
+                imported_from='hoteltoolbox',
+                legacy_from=((row.get('from') or '').strip()[:120] or None),
+                legacy_assignee=((row.get('assignee') or '').strip()[:120] or None),
+                legacy_completed_by=((row.get('completed_by') or '').strip()[:120] or None),
+                legacy_category=((row.get('category') or '').strip()[:200] or None),
+                legacy_location=((row.get('location') or '').strip()[:200] or None),
+                legacy_room=((row.get('room') or '').strip()[:80] or None),
+            )
+            db.session.add(f)
+            existing.add(code)
+            added += 1
+            if commit and (added % batch == 0):
+                db.session.commit()
+    if commit:
+        db.session.commit()
+    return {'added': added, 'skipped': skipped, 'nohotel': nohotel, 'total': added + skipped}
+
+@app.route('/dashboard/faults/import', methods=['GET', 'POST'])
+def faults_import():
+    if not is_admin():
+        return redirect(url_for('login'))
+    avail = ht_available_count()
+    imported_n = Fault.query.filter_by(imported_from='hoteltoolbox').count()
+    result = None
+    if request.method == 'POST':
+        result = import_ht_faults(commit=True)
+        log_activity('faults_import_ht', 'added=%s skipped=%s' % (result.get('added'), result.get('skipped')))
+        imported_n = Fault.query.filter_by(imported_from='hoteltoolbox').count()
+    return render_template('faults_import.html', avail=avail, imported_n=imported_n, result=result)
+
 print('[faults] module loaded')
 

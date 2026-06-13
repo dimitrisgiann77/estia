@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Βλάβες · Εισαγωγή ιστορικών</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
+.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+.topbar-title { font-size:16px; font-weight:600; }
+.topbar a { color:#fff; text-decoration:none; font-size:13px; }
+.container { max-width:760px; margin:0 auto; padding:24px; }
+.card { background:white; border-radius:12px; padding:20px; border:1px solid #e0f0ff; margin-bottom:18px; }
+.card-title { font-size:15px; font-weight:600; color:#333; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.stats { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:8px; }
+.stat { flex:1; min-width:150px; background:#f6fbff; border:1px solid #e0f0ff; border-radius:10px; padding:14px 16px; }
+.stat .n { font-size:26px; font-weight:700; color:#193847; }
+.stat .l { font-size:12px; color:#64748b; margin-top:3px; }
+.btn { padding:11px 18px; border:none; border-radius:9px; font-size:14px; font-weight:600; cursor:pointer; background:#193847; color:#fff; display:inline-flex; align-items:center; gap:7px; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.note { font-size:13px; color:#64748b; line-height:1.65; }
+.ok { background:#dcfce7; color:#16a34a; padding:12px 15px; border-radius:9px; margin-bottom:16px; font-size:14px; display:flex; align-items:center; gap:8px; }
+.warn { background:#fff7ed; color:#b45309; padding:11px 14px; border-radius:9px; margin-bottom:14px; font-size:13px; }
+.muted { color:#9aa7ad; font-size:12px; }
+ul.r { list-style:none; margin:6px 0 0; }
+ul.r li { padding:4px 0; font-size:14px; display:flex; align-items:center; gap:8px; }
+</style>
+<style>:root{--brand:{{ theme.primary if theme else '#193847' }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title"><i class="ti ti-database-import"></i> ΕΣΤΙΑ — Βλάβες · Εισαγωγή ιστορικών</div>
+  <div><a href="/dashboard/faults?embed=1"><i class="ti ti-list-check"></i> Πίνακας Βλαβών</a></div>
+</div>
+<div class="container">
+
+  {% if result %}
+    {% if result.error %}
+      <div class="warn"><i class="ti ti-alert-triangle"></i> {{ result.error }}</div>
+    {% else %}
+      <div class="ok"><i class="ti ti-circle-check"></i>
+        Η εισαγωγή ολοκληρώθηκε — <b>{{ result.added }}</b> νέες βλάβες,
+        <b>{{ result.skipped }}</b> υπήρχαν ήδη{% if result.nohotel %}, {{ result.nohotel }} χωρίς αντιστοίχιση ξενοδοχείου{% endif %}.
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-history"></i> Ιστορικές βλάβες HotelToolbox</div>
+    <div class="stats">
+      <div class="stat"><div class="n">{{ avail }}</div><div class="l">Διαθέσιμες στο αρχείο</div></div>
+      <div class="stat"><div class="n">{{ imported_n }}</div><div class="l">Ήδη στη βάση</div></div>
+      <div class="stat"><div class="n">{{ (avail - imported_n) if avail > imported_n else 0 }}</div><div class="l">Εκκρεμούν εισαγωγή</div></div>
+    </div>
+    <p class="muted">Πηγή: 17 αρχεία εξαγωγής Hotel Toolbox, ενοποιημένα σε ένα κεντρικό αρχείο.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-bolt"></i> Εκτέλεση</div>
+    <p class="note">
+      Πάτα το κουμπί <b>μία φορά</b> για να φορτωθούν οι ιστορικές βλάβες στη βάση. Η διαδικασία είναι
+      <b>ασφαλής να επαναληφθεί</b>: κάθε βλάβη έχει μοναδικό κωδικό (<code>PREFIX-HT-…</code>) και όσες
+      υπάρχουν ήδη <b>παραλείπονται</b> — δεν δημιουργούνται διπλά. Καλή πρακτική: κράτα backup της βάσης πριν.
+    </p>
+    <ul class="r">
+      <li><i class="ti ti-check" style="color:#16a34a"></i> Καταστάσεις, ξενοδοχεία & προτεραιότητες αντιστοιχίζονται αυτόματα.</li>
+      <li><i class="ti ti-check" style="color:#16a34a"></i> Άτομα (υποβολή/ανάθεση/ολοκλήρωση) & αρχική κατηγορία διατηρούνται ως ιστορικά πεδία.</li>
+      <li><i class="ti ti-check" style="color:#16a34a"></i> Οι ολοκληρωμένες κρατούν ημ/νία & χρόνο ολοκλήρωσης.</li>
+    </ul>
+    <form method="POST" action="/dashboard/faults/import?embed=1" style="margin-top:16px;"
+          onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').innerHTML='<i class=\'ti ti-loader-2\'></i> Εισαγωγή σε εξέλιξη…';">
+      <button class="btn" type="submit"{% if avail == 0 %} disabled{% endif %}>
+        <i class="ti ti-database-import"></i> Εισαγωγή ιστορικών βλαβών
+      </button>
+      {% if avail == 0 %}<p class="warn" style="margin-top:12px;">Το κεντρικό αρχείο δεν βρέθηκε στον φάκελο <code>seed/</code>.</p>{% endif %}
+    </form>
+  </div>
+
+</div>
+</body>
+</html>
