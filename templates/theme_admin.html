@@ -32,9 +32,30 @@ input[type=text]{padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-
         <input type="color" name="accent" id="accent" value="{{ theme.accent }}" oninput="pv()"></div>
       <div class="row"><div><label>Τίτλος εφαρμογής</label><div class="hint">Εμφανίζεται στο login</div></div>
         <input type="text" name="app_title" id="title" value="{{ theme.app_title }}" oninput="pv()"></div>
-      <div class="row"><div><label>Λογότυπο (login)</label><div class="hint">PNG/SVG, έως 400KB</div></div>
+      <div class="row"><div><label>Λογότυπο (κεφαλίδα)</label><div class="hint">Στο πάνω μενού · PNG/SVG, έως 400KB</div></div>
         <input type="file" name="logo" accept="image/*"></div>
       {% if theme.logo %}<div class="row"><img src="{{ theme.logo }}" style="height:40px;"><label style="font-weight:400;font-size:13px;"><input type="checkbox" name="reset_logo" value="1"> Αφαίρεση λογοτύπου</label></div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-weight:600;margin-bottom:14px;"><i class="ti ti-login-2"></i> Σελίδα Login / Εγγραφή</div>
+      <div class="row"><div><label>Λογότυπο login</label><div class="hint">Ειδικό για login/εγγραφή (αν κενό, χρησιμοποιεί το λευκό) · PNG/SVG, έως 400KB</div></div>
+        <input type="file" name="login_logo" accept="image/*"></div>
+      {% if theme.login_logo %}<div class="row"><img src="{{ theme.login_logo }}" style="height:46px;background:#193847;border-radius:8px;padding:6px;"><label style="font-weight:400;font-size:13px;"><input type="checkbox" name="reset_login_logo" value="1"> Αφαίρεση</label></div>{% endif %}
+      <div class="row"><div><label>Μέγεθος λογοτύπου</label><div class="hint">σε px (24–200)</div></div>
+        <input type="text" name="login_logo_size" value="{{ theme.login_logo_size }}" style="width:90px;"></div>
+      <div class="row"><div><label>Γραμματοσειρά</label><div class="hint">Τίτλος & tagline</div></div>
+        <select name="login_font" style="padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:15px;width:200px;">
+          {% for f in login_fonts %}<option value="{{ f }}" {{ 'selected' if theme.login_font==f }}>{{ f }}</option>{% endfor %}
+        </select></div>
+      <div class="row"><div><label>Tagline</label><div class="hint">Κάτω από τον τίτλο</div></div>
+        <input type="text" name="login_tagline" value="{{ theme.login_tagline }}"></div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="font-weight:600;margin-bottom:14px;"><i class="ti ti-share"></i> Social links (footer login)</div>
+      <div class="row"><div><label><i class="ti ti-brand-facebook"></i> Facebook</label><div class="hint">πλήρες URL (κενό = κρυφό)</div></div>
+        <input type="text" name="social_facebook" value="{{ theme.social_facebook }}" placeholder="https://facebook.com/..."></div>
+      <div class="row"><div><label><i class="ti ti-brand-linkedin"></i> LinkedIn</label><div class="hint">πλήρες URL (κενό = κρυφό)</div></div>
+        <input type="text" name="social_linkedin" value="{{ theme.social_linkedin }}" placeholder="https://linkedin.com/company/..."></div>
     </div>
     <div class="card">
       <div class="card-title" style="font-weight:600;margin-bottom:12px;">Προεπισκόπηση</div>

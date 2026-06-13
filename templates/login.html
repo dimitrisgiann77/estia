@@ -6,8 +6,9 @@
 <title>Εστία — CONDIAN HOTELS</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+{% if theme.login_font and theme.login_font != 'System' %}<link href="https://fonts.googleapis.com/css2?family={{ theme.login_font|replace(' ','+') }}:wght@300;400;500;600&display=swap" rel="stylesheet">{% endif %}
 <link rel="stylesheet" href="/static/auth.css">
+<style>:root{ --auth-font:{{ ("'" ~ theme.login_font ~ "', ") if theme.login_font and theme.login_font != 'System' else '' }}-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }</style>
 </head>
 <body>
 <canvas id="bg"></canvas>
@@ -29,9 +30,9 @@
 
 <div class="card">
   <div class="logo-block">
-    <div class="logo-wrap"><img src="/static/img/logo-white.svg" alt="logo"></div>
+    <div class="logo-wrap"><img src="{{ theme.login_logo or theme.logo or '/static/img/logo-white.svg' }}" alt="logo" style="height:{{ theme.login_logo_size or '88' }}px"></div>
     <div class="brandname">{{ theme.app_title }}</div>
-    <div class="tagline">we reinvent the way we work</div>
+    <div class="tagline">{{ theme.login_tagline or 'we reinvent the way we work' }}</div>
     <div class="badge-ai"><span class="dot"></span> AI-Powered · SpithaAI</div>
   </div>
   {% if error %}<div class="msg error">{{ error }}</div>{% endif %}
@@ -52,8 +53,8 @@
 <footer class="auth-foot">
   <div class="cright">© 2026 CONDIAN Hotels — All rights reserved.</div>
   <div class="auth-social">
-    <a href="#" title="Facebook" target="_blank" rel="noopener"><i class="ti ti-brand-facebook"></i></a>
-    <a href="#" title="LinkedIn" target="_blank" rel="noopener"><i class="ti ti-brand-linkedin"></i></a>
+    {% if theme.social_facebook %}<a href="{{ theme.social_facebook }}" title="Facebook" target="_blank" rel="noopener"><i class="ti ti-brand-facebook"></i></a>{% endif %}
+    {% if theme.social_linkedin %}<a href="{{ theme.social_linkedin }}" title="LinkedIn" target="_blank" rel="noopener"><i class="ti ti-brand-linkedin"></i></a>{% endif %}
   </div>
 </footer>
 

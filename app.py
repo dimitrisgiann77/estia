@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.10)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.11)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -20,6 +20,8 @@ Modules:
   - v12.10 — Pre-login redesign (login + εγγραφή): κοινό static/auth.css + auth.js· μεγαλύτερο logo με glow·
              tagline «we reinvent the way we work» (Space Grotesk)· language selector (globe popover)·
              footer (© 2026 CONDIAN Hotels + facebook/linkedin)· εγγραφή με Google/Apple (UI placeholders)
+  - v12.11 — Εμφάνιση: ξεχωριστές ρυθμίσεις login/register (login_logo, μέγεθος, γραμματοσειρά, tagline)
+             + social links (facebook/linkedin)· αφαιρέθηκε ο κύκλος πίσω από το logo
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -263,7 +265,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.10'
+APP_VERSION = '12.11'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -623,7 +625,12 @@ def send_email(subject, html, recips=None):
     return ok
 
 
-THEME_DEFAULTS = {'primary': '#193847', 'accent': '#BB9549', 'app_title': 'Εστία', 'logo': ''}
+THEME_DEFAULTS = {'primary': '#193847', 'accent': '#BB9549', 'app_title': 'Εστία', 'logo': '',
+                  # v12.11 — εξατομίκευση σελίδας login/register
+                  'login_logo': '', 'login_logo_size': '88', 'login_font': 'Space Grotesk',
+                  'login_tagline': 'we reinvent the way we work',
+                  'social_facebook': '', 'social_linkedin': ''}
+LOGIN_FONTS = ['Space Grotesk', 'Poppins', 'Montserrat', 'Inter', 'Sora', 'System']
 
 def get_theme():
     t = dict(THEME_DEFAULTS)
@@ -1927,9 +1934,27 @@ def theme_admin():
                 if 0 < len(raw) <= 400 * 1024:
                     import base64
                     setk('logo', 'data:' + logo.mimetype + ';base64,' + base64.b64encode(raw).decode())
+        # v12.11 — εξατομίκευση login/register + social
+        lsz = (request.form.get('login_logo_size', '88') or '88').strip()
+        setk('login_logo_size', lsz if (lsz.isdigit() and 24 <= int(lsz) <= 200) else '88')
+        lf = request.form.get('login_font', 'Space Grotesk')
+        if lf in LOGIN_FONTS:
+            setk('login_font', lf)
+        setk('login_tagline', (request.form.get('login_tagline', '') or '')[:120])
+        setk('social_facebook', (request.form.get('social_facebook', '') or '').strip()[:200])
+        setk('social_linkedin', (request.form.get('social_linkedin', '') or '').strip()[:200])
+        if request.form.get('reset_login_logo'):
+            setk('login_logo', '')
+        else:
+            llogo = request.files.get('login_logo')
+            if llogo and llogo.filename and llogo.mimetype and llogo.mimetype.startswith('image/'):
+                lraw = llogo.read()
+                if 0 < len(lraw) <= 400 * 1024:
+                    import base64
+                    setk('login_logo', 'data:' + llogo.mimetype + ';base64,' + base64.b64encode(lraw).decode())
         db.session.commit(); log_activity('theme_update')
         return redirect(url_for('theme_admin') + '?saved=1')
-    return render_template('theme_admin.html', theme=get_theme())
+    return render_template('theme_admin.html', theme=get_theme(), login_fonts=LOGIN_FONTS)
 
 # ── AI σύνδεση (masteradmin) ──
 @app.route('/dashboard/ai', methods=['GET', 'POST'])
