@@ -23,4 +23,15 @@ html[data-theme="dark"] .hotel-group{border-color:#243140;}
 html[data-theme="dark"] .tab{background:#141d2a !important;border-color:#243140 !important;color:#c4d0dc !important;}
 html[data-theme="dark"] .success-msg{background:#14301f !important;color:#7fdca0 !important;}
 html[data-theme="dark"] a{color:#7fb2e6;}
+/* v12.12 — διεύρυνση κάλυψης για όλες τις σελίδες */
+html[data-theme="dark"] h1,html[data-theme="dark"] h2,html[data-theme="dark"] h3,html[data-theme="dark"] h4{color:#e6edf3 !important;}
+html[data-theme="dark"] code{background:#1b2735 !important;color:#cfe0ee !important;}
+html[data-theme="dark"] textarea::placeholder{color:#6b7b8c;}
+html[data-theme="dark"] details>div,html[data-theme="dark"] .panel,html[data-theme="dark"] .box{background:#16222f !important;border-color:#243140 !important;}
+html[data-theme="dark"] .badge-staff{background:#243140 !important;color:#c4d0dc !important;}
+html[data-theme="dark"] .ok{background:#14301f !important;color:#9af0bf !important;}
+html[data-theme="dark"] .error{background:#3a1d1d !important;color:#ffb4b4 !important;}
+html[data-theme="dark"] hr{border-color:#243140 !important;}
+html[data-theme="dark"] .hint,html[data-theme="dark"] small{color:#7b8a98 !important;}
+html[data-theme="dark"] tr:hover td{background:#16222f;}
 /* Διατηρούμε ως έχουν: .topbar (brand), .badge-* (έγχρωμα status), κουμπιά brand */

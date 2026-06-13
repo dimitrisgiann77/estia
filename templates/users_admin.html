@@ -105,21 +105,31 @@ tr:last-child td { border-bottom:none; }
               <div style="background:#f8fafb;border:1px solid #e0f0ff;border-radius:8px;padding:12px;margin-top:8px;min-width:260px;">
                 <form method="POST" action="/dashboard/edit-user/{{ u.id }}" style="margin-bottom:10px;">
                   <input type="text" name="full_name" value="{{ u.full_name }}" placeholder="Ονοματεπώνυμο" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                  <input type="text" name="username" value="{{ u.username }}" placeholder="Username" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
                   <input type="email" name="email" value="{{ u.email or '' }}" placeholder="Email" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
                   <input type="text" name="phone" value="{{ u.phone or '' }}" placeholder="Κινητό" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <select name="role" style="width:100%;margin-bottom:6px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                    {% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if u.role==rk }}>{{ rl }}</option>{% endfor %}
-                  </select>
+                  <div style="display:flex;gap:6px;margin-bottom:6px;">
+                    <select name="role" style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                      {% for rk, rl in role_labels.items() %}<option value="{{ rk }}" {{ 'selected' if u.role==rk }}>{{ rl }}</option>{% endfor %}
+                    </select>
+                    <select name="language" style="width:120px;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
+                      <option value="el" {{ 'selected' if u.language=='el' }}>🇬🇷 ΕΛ</option>
+                      <option value="en" {{ 'selected' if u.language=='en' }}>🇬🇧 EN</option>
+                      <option value="uk" {{ 'selected' if u.language=='uk' }}>🇺🇦 UK</option>
+                    </select>
+                  </div>
                   <div style="font-size:11px;color:#888;margin:4px 0;">Ανατεθειμένα ξενοδοχεία (manager/staff/viewer):</div>
                   <div style="max-height:96px;overflow:auto;font-size:12px;margin-bottom:8px;border:1px solid #eee;border-radius:6px;padding:6px;">
                     {% for h in all_hotels %}<label style="display:block;margin-bottom:2px;"><input type="checkbox" name="hotel_ids" value="{{ h.id }}" {{ 'checked' if h in u.hotels }}> {{ h.name }}</label>{% else %}<span class="muted">—</span>{% endfor %}
                   </div>
                   <button type="submit" class="btn btn-primary" style="font-size:12px;padding:6px 14px;">Αποθήκευση</button>
                 </form>
-                <form method="POST" action="/dashboard/reset-password/{{ u.id }}" style="display:flex;gap:6px;margin-bottom:8px;">
+                <form method="POST" action="/dashboard/reset-password/{{ u.id }}" style="display:flex;gap:6px;margin-bottom:4px;align-items:center;">
                   <input type="password" name="password" placeholder="Νέος κωδικός" required style="flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:6px;">
-                  <button type="submit" class="btn" style="background:#475569;color:white;font-size:12px;padding:6px 12px;">Reset</button>
+                  <button type="button" onclick="var i=this.previousElementSibling;i.type=(i.type==='password'?'text':'password');" title="Εμφάνιση/Απόκρυψη" style="background:#e2e8f0;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;"><i class="ti ti-eye"></i></button>
+                  <button type="submit" class="btn" style="background:#475569;color:white;font-size:12px;padding:6px 12px;">Ορισμός</button>
                 </form>
+                <div style="font-size:11px;color:#999;margin-bottom:8px;">👁 για να δεις/αντιγράψεις τον νέο κωδικό. Οι παλιοί κωδικοί είναι κρυπτογραφημένοι και δεν εμφανίζονται.</div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <form method="POST" action="/dashboard/toggle-user/{{ u.id }}"><button type="submit" class="btn" style="background:#fde68a;color:#92400e;font-size:12px;padding:6px 12px;">{{ 'Απενεργοποίηση' if u.is_active else 'Ενεργοποίηση' }}</button></form>
                   {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή χρήστη;')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}

@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.11)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.12)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -22,6 +22,8 @@ Modules:
              footer (© 2026 CONDIAN Hotels + facebook/linkedin)· εγγραφή με Google/Apple (UI placeholders)
   - v12.11 — Εμφάνιση: ξεχωριστές ρυθμίσεις login/register (login_logo, μέγεθος, γραμματοσειρά, tagline)
              + social links (facebook/linkedin)· αφαιρέθηκε ο κύκλος πίσω από το logo
+  - v12.12 — Dark mode ΠΑΝΤΟΥ μέσω after_request (auto-inject theme snippet σε κάθε σελίδα,
+             εκτός login/register)· Χρήστες: πλήρες edit (username+γλώσσα) + reveal νέου κωδικού
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -265,12 +267,30 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.11'
+APP_VERSION = '12.12'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
 def inject_version():
     return {'app_version': APP_VERSION, 'app_build': APP_BUILD}
+
+# v12.12 — Dark mode παντού: αυτόματη ένεση του theme snippet σε ΚΑΘΕ HTML σελίδα
+# (εξαιρούνται login/register που έχουν δικό τους σκούρο design, και όσες το έχουν ήδη).
+_DARK_SNIPPET = ('<script>(function(){try{var m=(document.cookie.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||"system";'
+                 'var d=m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches);'
+                 'if(d)document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();</script>'
+                 '<link rel="stylesheet" href="/static/estia-theme.css">')
+
+@app.after_request
+def _inject_dark(resp):
+    try:
+        if (resp.content_type or '').startswith('text/html'):
+            body = resp.get_data(as_text=True)
+            if '</head>' in body and '/static/estia-theme.css' not in body and '/static/auth.css' not in body:
+                resp.set_data(body.replace('</head>', _DARK_SNIPPET + '</head>', 1))
+    except Exception:
+        pass
+    return resp
 
 def has_rank(min_rank):
     u = current_user()
@@ -1733,6 +1753,12 @@ def edit_user(user_id):
     u.full_name = (fm.get('full_name') or u.full_name).strip() or u.full_name
     u.email = fm.get('email', '').strip()
     u.phone = fm.get('phone', '').strip()
+    # v12.12 — πλήρες edit: username (με έλεγχο μοναδικότητας) + γλώσσα
+    new_un = (fm.get('username') or '').strip()
+    if new_un and new_un != u.username and not User.query.filter_by(username=new_un).first():
+        u.username = new_un
+    if fm.get('language') in ('el', 'en', 'uk'):
+        u.language = fm['language']
     new_role = fm.get('role', u.role)
     if new_role in ROLE_RANK and role_rank(new_role) <= role_rank(actor.role):
         u.role = new_role
