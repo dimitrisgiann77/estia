@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.20)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.21)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -275,7 +275,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.20'
+APP_VERSION = '12.21'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -1197,6 +1197,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    log_activity('logout')
     session.clear()
     return redirect(url_for('login'))
 
@@ -1841,13 +1842,6 @@ def toggle_user(user_id):
         log_activity('user_toggle', u.username + (' -> active' if u.is_active else ' -> inactive'))
     return redirect(url_for('users_admin'))
 
-@app.route('/dashboard/activity')
-def activity_log_view():
-    if not is_admin():
-        return redirect(url_for('login'))
-    logs = ActivityLog.query.order_by(ActivityLog.id.desc()).limit(200).all()
-    return render_template('activity.html', logs=logs)
-
 # ── Εβδομαδιαία κάλυψη ──
 @app.route('/pools/coverage')
 def pools_coverage():
@@ -2152,6 +2146,70 @@ def overview():
             'pending': len(pending), 'alerts': len(alerts)}
     return render_template('overview.html', cov=cov, alerts=alerts, faults=faults,
                            pending=pending, kpis=kpis, areas_labels=AREA_LABELS)
+
+# ── v12.21 — Καταγραφή χρηστών (Activity Log) ────────────────────────────────
+ACTION_LABELS = {
+    'login': 'Σύνδεση', 'logout': 'Αποσύνδεση', 'profile_update': 'Ενημέρωση προφίλ',
+    'water_submit': 'Καταγραφή νερών', 'pool_submit': 'Καταγραφή πισίνας', 'pool_edit': 'Διόρθωση πισίνας',
+    'area_submit': 'Καταγραφή τομέα',
+    'user_add': 'Νέος χρήστης', 'user_delete': 'Διαγραφή χρήστη', 'user_approve': 'Έγκριση χρήστη',
+    'user_edit': 'Επεξεργασία χρήστη', 'user_reset_password': 'Επαναφορά κωδικού', 'user_toggle': 'Ενεργοπ./Απενεργ. χρήστη',
+    'email_test': 'Δοκιμή email', 'email_reminder_manual': 'Χειροκίνητη υπενθύμιση',
+    'theme_update': 'Αλλαγή εμφάνισης', 'ai_config': 'Ρύθμιση AI',
+    'area_add': 'Νέος τομέας', 'template_new': 'Νέο template', 'template_edit': 'Επεξεργασία template',
+    'seed_demo': 'Demo δεδομένα', 'water_system_add': 'Νέο δίκτυο νερού',
+    'water_system_edit': 'Επεξεργασία δικτύου', 'water_system_delete': 'Διαγραφή δικτύου',
+    'fault_report': 'Δήλωση βλάβης', 'faults_bulk': 'Μαζική ενέργεια βλαβών',
+}
+def _act_label(a):
+    return ACTION_LABELS.get(a, a or '—')
+
+@app.route('/dashboard/activity')
+def activity_log():
+    if not is_admin():
+        return redirect(url_for('login'))
+    user = current_user()
+    f_user   = request.args.get('user_id', type=int)
+    f_action = request.args.get('action')
+    search   = (request.args.get('q') or '').strip()
+    chip     = request.args.get('chip')          # today | 7d | 30d | logins
+    now = datetime.utcnow()
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    q = ActivityLog.query
+    if chip == 'today':  q = q.filter(ActivityLog.created_at >= midnight)
+    elif chip == '7d':   q = q.filter(ActivityLog.created_at >= now - timedelta(days=7))
+    elif chip == '30d':  q = q.filter(ActivityLog.created_at >= now - timedelta(days=30))
+    elif chip == 'logins': q = q.filter(ActivityLog.action == 'login')
+    if f_user:   q = q.filter(ActivityLog.user_id == f_user)
+    if f_action: q = q.filter(ActivityLog.action == f_action)
+    if search:
+        like = '%%%s%%' % search
+        q = q.filter((ActivityLog.detail.ilike(like)) | (ActivityLog.action.ilike(like)))
+    logs = q.order_by(ActivityLog.created_at.desc()).limit(400).all()
+    users = User.query.filter_by(is_active=True).order_by(User.full_name).all()
+    actions = sorted({a[0] for a in db.session.query(ActivityLog.action).distinct().all() if a[0]})
+    kpi = {
+        'today':        ActivityLog.query.filter(ActivityLog.created_at >= midnight).count(),
+        'active_today': db.session.query(ActivityLog.user_id).filter(ActivityLog.created_at >= midnight).distinct().count(),
+        'logins_today': ActivityLog.query.filter(ActivityLog.created_at >= midnight, ActivityLog.action == 'login').count(),
+        'week':         ActivityLog.query.filter(ActivityLog.created_at >= now - timedelta(days=7)).count(),
+    }
+    week_start = now - timedelta(days=7)
+    per_user = []
+    for u in users:
+        last = ActivityLog.query.filter_by(user_id=u.id).order_by(ActivityLog.created_at.desc()).first()
+        per_user.append({
+            'u': u,
+            'today': ActivityLog.query.filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= midnight).count(),
+            'week':  ActivityLog.query.filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= week_start).count(),
+            'last':  last,
+        })
+    per_user.sort(key=lambda x: (x['last'].created_at if x['last'] else datetime.min), reverse=True)
+    return render_template('activity_log.html', logs=logs, users=users, actions=actions,
+                           act_label=_act_label, ACTION_LABELS=ACTION_LABELS,
+                           f_user=f_user, f_action=f_action, search=search, chip=chip,
+                           kpi=kpi, per_user=per_user, user=user,
+                           qs=request.query_string.decode('utf-8'))
 
 # admin: areas management
 @app.route('/dashboard/areas', methods=['GET', 'POST'])

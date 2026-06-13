@@ -1,0 +1,105 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html>
+<html lang="el">
+<head>
+{{ mp.head('Καταγραφή χρηστών', theme.primary) }}
+<style>
+.ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+.ucard{background:#fff;border:1px solid #e8f1f6;border-radius:11px;padding:14px;}
+.ucard .uhead{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.ucard .uhead img{width:38px;height:38px;border-radius:50%;object-fit:cover;}
+.ucard .uhead .ph{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f0f7ff;color:#9ab;}
+.ucard .uname{font-weight:700;font-size:14px;}
+.ucard .urole{font-size:11px;color:#8aa0aa;}
+.ucard .ustats{display:flex;gap:8px;margin-top:8px;}
+.ucard .ustat{flex:1;text-align:center;background:#f7fbff;border:1px solid #e0f0ff;border-radius:8px;padding:7px;}
+.ucard .ustat b{display:block;font-size:18px;color:#193847;}
+.ucard .ustat span{font-size:10px;color:#8aa0aa;}
+.ucard .ulast{font-size:11px;color:#9aa7ad;margin-top:9px;}
+</style>
+</head>
+<body>
+{{ mp.topbar('history', 'ΕΣΤΙΑ — Καταγραφή χρηστών', logs|length ~ ' πρόσφατες ενέργειες') }}
+<div class="container">
+
+  {% set kcards = [
+    {'n': kpi.today,        'label': 'Ενέργειες σήμερα',   'color': '#193847', 'href': '/dashboard/activity?chip=today&embed=1',  'active': chip=='today'},
+    {'n': kpi.active_today,  'label': 'Ενεργοί χρήστες',    'color': '#185FA5', 'href': '/dashboard/activity?chip=today&embed=1',  'active': false},
+    {'n': kpi.logins_today,  'label': 'Συνδέσεις σήμερα',   'color': '#16a34a', 'href': '/dashboard/activity?chip=logins&embed=1', 'active': chip=='logins'},
+    {'n': kpi.week,          'label': 'Ενέργειες (7 ημ.)',  'color': '#b45309', 'href': '/dashboard/activity?chip=7d&embed=1',     'active': chip=='7d'},
+  ] %}
+  {{ mp.kpis(kcards) }}
+
+  <div class="card">
+    {{ mp.chips([
+      {'label': 'Όλα',        'href': '/dashboard/activity?embed=1',             'on': (not chip)},
+      {'label': 'Σήμερα',     'href': '/dashboard/activity?chip=today&embed=1',  'on': chip=='today'},
+      {'label': '7 ημέρες',   'href': '/dashboard/activity?chip=7d&embed=1',     'on': chip=='7d'},
+      {'label': '30 ημέρες',  'href': '/dashboard/activity?chip=30d&embed=1',    'on': chip=='30d'},
+      {'label': 'Συνδέσεις',  'href': '/dashboard/activity?chip=logins&embed=1', 'on': chip=='logins'},
+    ]) }}
+    <form class="filters" method="GET" action="/dashboard/activity" style="margin-top:10px;">
+      <input type="text" name="q" value="{{ search }}" placeholder="🔍 ενέργεια/λεπτομέρεια" style="min-width:180px;">
+      <select name="user_id"><option value="">Κάθε χρήστης</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if f_user==u.id }}>{{ u.full_name }}</option>{% endfor %}</select>
+      <select name="action"><option value="">Κάθε ενέργεια</option>{% for a in actions %}<option value="{{ a }}" {{ 'selected' if f_action==a }}>{{ ACTION_LABELS.get(a, a) }}</option>{% endfor %}</select>
+      <button class="btn" type="submit"><i class="ti ti-filter"></i> Φίλτρο</button>
+      <a href="/dashboard/activity?embed=1" class="muted" style="font-size:12px;text-decoration:none;">Καθαρισμός ✕</a>
+      <span style="flex:1"></span>
+      {{ mp.view_toggle('Ροή', 'Ανά χρήστη') }}
+    </form>
+    <div class="muted" style="font-size:11px;margin-top:8px;"><i class="ti ti-info-circle"></i> Η καταγραφή αφορά όλο τον οργανισμό (δεν φιλτράρεται ανά ξενοδοχείο).</div>
+  </div>
+
+  <!-- ΡΟΗ (feed) -->
+  <div class="card" id="mp-view-table">
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>Ώρα</th><th>Χρήστης</th><th>Ρόλος</th><th>Ενέργεια</th><th>Λεπτομέρεια</th></tr></thead>
+      <tbody>
+      {% for l in logs %}
+        {% set act = l.action or '' %}
+        {% if 'delete' in act %}{% set bg='#fee2e2' %}{% set fg='#dc2626' %}
+        {% elif act in ['login','logout'] %}{% set bg='#dcfce7' %}{% set fg='#16a34a' %}
+        {% elif act.startswith('user') %}{% set bg='#dbeafe' %}{% set fg='#185FA5' %}
+        {% elif 'submit' in act %}{% set bg='#e0f2fe' %}{% set fg='#0369a1' %}
+        {% else %}{% set bg='#f1f5f9' %}{% set fg='#64748b' %}{% endif %}
+        <tr>
+          <td class="muted" style="white-space:nowrap;">{{ l.created_at.strftime('%d/%m/%y %H:%M') if l.created_at else '—' }}</td>
+          <td>{{ l.user.full_name if l.user else '—' }}</td>
+          <td class="muted">{{ l.user.role if l.user else '' }}</td>
+          <td>{{ mp.badge(act_label(act), bg, fg) }}</td>
+          <td class="muted" style="max-width:340px;">{{ l.detail or '' }}</td>
+        </tr>
+      {% endfor %}
+      {% if not logs %}<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">Καμία ενέργεια</td></tr>{% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ΑΝΑ ΧΡΗΣΤΗ -->
+  <div class="card" id="mp-view-kanban" style="display:none;">
+    <div class="ugrid">
+      {% for r in per_user %}
+      <div class="ucard">
+        <div class="uhead">
+          {% if r.u.avatar %}<img src="{{ r.u.avatar }}">{% else %}<span class="ph"><i class="ti ti-user-circle" style="font-size:26px;"></i></span>{% endif %}
+          <div><div class="uname">{{ r.u.full_name }}</div><div class="urole">{{ r.u.role }}</div></div>
+        </div>
+        <div class="ustats">
+          <div class="ustat"><b>{{ r.today }}</b><span>σήμερα</span></div>
+          <div class="ustat"><b>{{ r.week }}</b><span>7 ημ.</span></div>
+        </div>
+        <div class="ulast">
+          {% if r.last %}<i class="ti ti-clock"></i> {{ act_label(r.last.action) }} · {{ r.last.created_at.strftime('%d/%m %H:%M') }}{% else %}<i class="ti ti-clock-off"></i> Καμία ενέργεια{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      {% if not per_user %}<div class="muted">Κανένας χρήστης</div>{% endif %}
+    </div>
+  </div>
+
+</div>
+{{ mp.view_scripts('estia_activity_view') }}
+</body>
+</html>
