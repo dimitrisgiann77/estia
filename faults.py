@@ -311,61 +311,102 @@ def _ctx_lists(user):
     cats = FaultCategory.query.filter_by(is_active=True).order_by(FaultCategory.level, FaultCategory.sort, FaultCategory.name).all()
     return hotels, cats
 
+def _submit_ctx(user):
+    hotels, cats = _ctx_lists(user)
+    cats_json = [{'id': c.id, 'name': c.name, 'level': c.level, 'parent_id': c.parent_id} for c in cats]
+    tags = FaultTag.query.filter_by(is_active=True).order_by(FaultTag.name).all()
+    return hotels, cats, cats_json, tags
+
 @app.route('/fault', methods=['GET', 'POST'])
 def fault_report():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = current_user()
-    hotels, cats = _ctx_lists(user)
+    hotels, cats, cats_json, tags = _submit_ctx(user)
     if request.method == 'POST':
         desc = (request.form.get('message') or request.form.get('description') or '').strip()
         hid = request.form.get('hotel_id', type=int)
         hotel = Hotel.query.get(hid) if hid else (hotels[0] if hotels else None)
         if not desc or not hotel:
             return render_template('fault_submit.html', done=False, error='Συμπλήρωσε ξενοδοχείο & περιγραφή',
-                                   hotels=hotels, cats=cats, priorities=PRIORITIES, user=user)
+                                   hotels=hotels, cats=cats, cats_json=cats_json, tags=tags, priorities=PRIORITIES, user=user)
+        due = None
+        dd = (request.form.get('due_date') or '').strip()
+        if dd:
+            try: due = datetime.strptime(dd, '%Y-%m-%d')
+            except Exception: due = None
+        tag = (request.form.get('tag') or '').strip() or None
         f = Fault(code=gen_code(hotel), hotel_id=hotel.id,
                   category_id=request.form.get('category_id', type=int) or None,
                   description=desc, priority=request.form.get('priority', 'Κανονική'),
+                  tag=tag, due_at=due,
+                  legacy_location=((request.form.get('loc_text') or '').strip()[:200] or None),
+                  legacy_room=((request.form.get('room_text') or '').strip()[:80] or None),
                   submitted_by=user.id, source='Ενδοξενοδοχειακά', status='pending_assign')
         db.session.add(f); db.session.flush()
         log_change(f, 'πεδίο', 'δημιουργία', '', f.code, user.id)
-        _save_cover(f, request.files.get('cover'))
+        files = list(request.files.getlist('photos') or [])
+        single = request.files.get('cover')
+        if single and getattr(single, 'filename', ''):
+            files = [single] + files
+        for file in files:
+            url = _img_dataurl(file)
+            if url:
+                db.session.add(FaultAttachment(fault_id=f.id, url=url, by_user_id=user.id))
+                if not f.cover_image:
+                    f.cover_image = url
         auto_assign(f)
         db.session.commit()
         log_activity('fault_report', f.code)
         notify_admins('Νέα βλάβη: %s' % f.code, '/dashboard/fault/%d?embed=1' % f.id)
         threading.Thread(target=_bg_fault_email, args=(f.id,), daemon=True).start()
         return render_template('fault_submit.html', done=True, code=f.code, hotels=hotels, cats=cats,
-                               priorities=PRIORITIES, user=user)
+                               cats_json=cats_json, tags=tags, priorities=PRIORITIES, user=user)
     return render_template('fault_submit.html', done=False, hotels=hotels, cats=cats,
-                           priorities=PRIORITIES, user=user)
+                           cats_json=cats_json, tags=tags, priorities=PRIORITIES, user=user)
 
 @app.route('/dashboard/faults')
 def faults_inbox():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     user = current_user()
+    base = visible_faults_query(user)
     q = visible_faults_query(user)
     f_hotel = request.args.get('hotel_id', type=int)
     f_status = request.args.get('status')
     f_priority = request.args.get('priority')
     f_assignee = request.args.get('assigned_user_id', type=int)
     search = (request.args.get('q') or '').strip()
+    chip = request.args.get('chip')          # mine | today | overdue | open
     if f_hotel:    q = q.filter(Fault.hotel_id == f_hotel)
     if f_status:   q = q.filter(Fault.status == f_status)
     if f_priority: q = q.filter(Fault.priority == f_priority)
     if f_assignee: q = q.filter(Fault.assigned_user_id == f_assignee)
     if search:     q = q.filter((Fault.description.ilike('%%%s%%' % search)) | (Fault.code.ilike('%%%s%%' % search)))
+    midnight = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    if chip == 'mine':   q = q.filter(Fault.assigned_user_id == user.id)
+    elif chip == 'today': q = q.filter(Fault.submitted_at >= midnight)
+    elif chip == 'open':  q = q.filter(~Fault.status.in_(TERMINAL))
     faults = q.order_by(Fault.id.desc()).limit(400).all()
+    if chip == 'overdue':
+        faults = [f for f in faults if sla_state(f)[0] == 'overdue']
     hotels = allowed_hotels(user)
     users = User.query.filter_by(is_active=True, approved=True).order_by(User.full_name).all()
     open_n = sum(1 for f in faults if f.status not in TERMINAL)
+    # ── KPI (στο συνολικό ορατό πεδίο, ανεξάρτητα φίλτρων) ──
+    kpi = {
+        'total':   base.count(),
+        'open':    base.filter(~Fault.status.in_(TERMINAL)).count(),
+        'today':   base.filter(Fault.submitted_at >= midnight).count(),
+        'done':    base.filter(Fault.status == 'done').count(),
+    }
+    open_rows = base.filter(~Fault.status.in_(TERMINAL)).limit(2000).all()
+    kpi['overdue'] = sum(1 for f in open_rows if sla_state(f)[0] == 'overdue')
     return render_template('faults_list.html', faults=faults, hotels=hotels, users=users,
                            STATUS_LABELS=STATUS_LABELS, STATUS_COLOR=STATUS_COLOR, PRIORITY_COLOR=PRIORITY_COLOR,
                            PRIORITIES=PRIORITIES, STATUSES=STATUSES, is_admin=is_admin(),
                            f_hotel=f_hotel, f_status=f_status, f_priority=f_priority, f_assignee=f_assignee,
-                           search=search, open_n=open_n, user=user, sla_state=sla_state,
+                           search=search, open_n=open_n, chip=chip, kpi=kpi, user=user, sla_state=sla_state,
                            qs=request.query_string.decode('utf-8'))
 
 @app.route('/dashboard/fault/<int:fid>')

@@ -11,21 +11,34 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; backg
 .topbar { background:#193847; color:white; padding:14px 24px; }
 .topbar-title { font-size:16px; font-weight:600; }
 .topbar-sub { font-size:12px; opacity:.75; margin-top:2px; }
-.container { max-width:680px; margin:0 auto; padding:24px; }
+.container { max-width:720px; margin:0 auto; padding:24px; }
 .card { background:white; border-radius:12px; padding:22px; border:1px solid #e0f0ff; margin-bottom:18px; }
-label { display:block; font-size:13px; color:#555; margin:12px 0 6px; font-weight:500; }
-input, select, textarea { width:100%; padding:11px 13px; border:1px solid #d6eef3; border-radius:9px; font-size:15px; font-family:inherit; }
+label { display:block; font-size:13px; color:#555; margin:14px 0 6px; font-weight:500; }
+.hint { font-size:11px; color:#9aa7ad; font-weight:400; }
+input, select, textarea { width:100%; padding:11px 13px; border:1px solid #d6eef3; border-radius:9px; font-size:15px; font-family:inherit; background:#fff; }
 textarea { min-height:110px; resize:vertical; }
-.btn { width:100%; margin-top:16px; padding:13px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; background:#193847; color:#fff; }
+.btn { width:100%; margin-top:18px; padding:13px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; background:#193847; color:#fff; }
 .error { background:#fee2e2; color:#dc2626; border:1px solid #fecaca; border-radius:9px; padding:10px 14px; font-size:13px; margin-bottom:12px; }
 .done { text-align:center; padding:30px 10px; }
 .done .ico { font-size:48px; color:#16a34a; }
 .done .code { font-size:22px; font-weight:700; color:#193847; margin:10px 0; letter-spacing:.5px; }
 .muted { color:#888; font-size:13px; }
 .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-@media(max-width:520px){ .row2 { grid-template-columns:1fr; } }
+.row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.sectionlabel { font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#193847; font-weight:700; margin:18px 0 2px; opacity:.7; }
+.thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.thumbs .t { width:64px; height:64px; border-radius:8px; object-fit:cover; border:1px solid #e0f0ff; }
+.prio { display:flex; gap:8px; }
+.prio label { flex:1; margin:0; cursor:pointer; }
+.prio input { display:none; }
+.prio span { display:block; text-align:center; padding:9px; border:1px solid #d6eef3; border-radius:9px; font-size:13px; font-weight:600; color:#64748b; background:#f8fafc; }
+.prio input:checked + span { color:#fff; border-color:transparent; }
+.prio .p-Υψηλή input:checked + span { background:#dc2626; }
+.prio .p-Κανονική input:checked + span { background:#b45309; }
+.prio .p-Χαμηλή input:checked + span { background:#475569; }
+@media(max-width:560px){ .row2,.row3 { grid-template-columns:1fr; } }
 </style>
-<style>:root{--brand:{{ theme.primary }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}.done .code{color:var(--brand)!important;}</style>
+<style>:root{--brand:{{ theme.primary }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}.done .code{color:var(--brand)!important;}.sectionlabel{color:var(--brand)!important;}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head>
@@ -45,34 +58,106 @@ textarea { min-height:110px; resize:vertical; }
   {% else %}
   <div class="card">
     {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <form method="POST" action="/fault?embed=1" enctype="multipart/form-data">
+    <form method="POST" action="/fault?embed=1" enctype="multipart/form-data" id="faultform">
       <label>Ξενοδοχείο</label>
       <select name="hotel_id" required>
         {% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
       </select>
-      <div class="row2">
+
+      <div class="sectionlabel">Κατηγορία βλάβης</div>
+      <input type="hidden" name="category_id" id="category_id" value="">
+      <div class="row3">
         <div>
-          <label>Κατηγορία</label>
-          <select name="category_id">
-            <option value="">— Επιλογή —</option>
-            {% for c in cats %}<option value="{{ c.id }}">{{ '· ' * (c.level-1) }}{{ c.name }}</option>{% endfor %}
+          <label>Κλάδος</label>
+          <select id="cat1"><option value="">— Επιλογή —</option>
+            {% for c in cats if c.level==1 %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
           </select>
         </div>
         <div>
-          <label>Προτεραιότητα</label>
-          <select name="priority">
-            {% for p in priorities %}<option value="{{ p }}" {{ 'selected' if p=='Κανονική' }}>{{ p }}</option>{% endfor %}
-          </select>
+          <label>Υποκατηγορία</label>
+          <select id="cat2" disabled><option value="">—</option></select>
+        </div>
+        <div>
+          <label>Λεπτομέρεια</label>
+          <select id="cat3" disabled><option value="">—</option></select>
         </div>
       </div>
+
+      <div class="sectionlabel">Πού είναι η βλάβη</div>
+      <div class="row2">
+        <div>
+          <label>Τοποθεσία <span class="hint">(χώρος/κτίριο/όροφος)</span></label>
+          <input type="text" name="loc_text" placeholder="π.χ. Κεντρικό κτίριο, 2ος όροφος / Πισίνα">
+        </div>
+        <div>
+          <label>Δωμάτιο / σημείο <span class="hint">(προαιρετικά)</span></label>
+          <input type="text" name="room_text" placeholder="π.χ. Δωμάτιο 214, Κουζίνα, Λεβητοστάσιο">
+        </div>
+      </div>
+
+      <div class="sectionlabel">Στοιχεία διαχείρισης</div>
+      <label>Προτεραιότητα</label>
+      <div class="prio">
+        {% for p in priorities %}
+        <label class="p-{{ p }}"><input type="radio" name="priority" value="{{ p }}" {{ 'checked' if p=='Κανονική' }}><span>{{ p }}</span></label>
+        {% endfor %}
+      </div>
+      <div class="row2">
+        <div>
+          <label>Ετικέτα <span class="hint">(προαιρετικά)</span></label>
+          <select name="tag">
+            <option value="">— Καμία —</option>
+            {% for t in tags %}<option value="{{ t.name }}">{{ t.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Προθεσμία <span class="hint">(προαιρετικά)</span></label>
+          <input type="date" name="due_date">
+        </div>
+      </div>
+
       <label>Περιγραφή</label>
-      <textarea name="message" placeholder="Περίγραψε τη βλάβη (τι, πού, πόσο επείγον)…" required></textarea>
-      <label>Φωτογραφία (προαιρετικά)</label>
-      <input type="file" name="cover" accept="image/*">
+      <textarea name="message" placeholder="Περίγραψε τη βλάβη (τι ακριβώς συμβαίνει, πόσο επείγον)…" required></textarea>
+
+      <label>Φωτογραφίες <span class="hint">(μπορείς να ανεβάσεις πολλές)</span></label>
+      <input type="file" name="photos" id="photos" accept="image/*" multiple>
+      <div class="thumbs" id="thumbs"></div>
+
       <button class="btn" type="submit"><i class="ti ti-send"></i> Υποβολή βλάβης</button>
     </form>
   </div>
   {% endif %}
 </div>
+<script>
+var CATS = {{ cats_json|tojson }};
+(function(){
+  var s1=document.getElementById('cat1'), s2=document.getElementById('cat2'), s3=document.getElementById('cat3'), hid=document.getElementById('category_id');
+  if(!s1) return;
+  function fill(sel, parentId){
+    sel.innerHTML='<option value="">— Επιλογή —</option>';
+    var kids=CATS.filter(function(c){return c.parent_id==parentId;});
+    kids.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+    sel.disabled = kids.length===0;
+    if(kids.length===0){ sel.innerHTML='<option value="">—</option>'; }
+  }
+  function deepest(){ hid.value = s3.value || s2.value || s1.value || ''; }
+  s1.addEventListener('change', function(){ fill(s2, s1.value); s3.innerHTML='<option value="">—</option>'; s3.disabled=true; deepest(); });
+  s2.addEventListener('change', function(){ fill(s3, s2.value); deepest(); });
+  s3.addEventListener('change', deepest);
+})();
+(function(){
+  var inp=document.getElementById('photos'), box=document.getElementById('thumbs');
+  if(!inp) return;
+  inp.addEventListener('change', function(){
+    box.innerHTML='';
+    Array.prototype.slice.call(inp.files).forEach(function(f){
+      if(!f.type.startsWith('image/')) return;
+      var img=document.createElement('img'); img.className='t';
+      var r=new FileReader(); r.onload=function(e){ img.src=e.target.result; }; r.readAsDataURL(f);
+      box.appendChild(img);
+    });
+  });
+})();
+</script>
 </body>
 </html>
