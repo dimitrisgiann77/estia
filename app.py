@@ -314,8 +314,35 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.35'
-APP_BUILD   = '315'
+APP_VERSION = '12.36'
+APP_BUILD   = '316'
+
+# ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
+CHANGELOG = [
+    {'v': '12.36', 'b': '316', 'date': '13/06/2026', 'title': 'Ειδοποιήσεις popup · «Τι νέο» · γυάλισμα Σύνοψης & παλετών',
+     'items': ['Το καμπανάκι ανοίγει popup με λίστα ειδοποιήσεων — διαβάζονται & φεύγουν επιτόπου.',
+               'Νέα επιλογή «Ειδοποιήσεις» στο μενού προφίλ.',
+               'Αυτή η σελίδα «Τι νέο»: ιστορικό εκδόσεων με τι άλλαξε.',
+               'Σύνοψη: ξαναδουλεμένη premium εμφάνιση (καθαρές κάρτες, accent, εικονίδια) — ίδια λειτουργία tiles.',
+               '4 παλέτες: το accent οδηγεί πλέον κουμπιά/links/καταστάσεις, βελτιωμένη αντίθεση.']},
+    {'v': '12.34', 'b': '315', 'date': '13/06/2026', 'title': 'Σύνοψη = προσωπικό dashboard με tiles',
+     'items': ['Η Σύνοψη έγινε προσωπικός πίνακας ανά χρήστη: διάλεξε & τακτοποίησε KPI/widget tiles (drag&drop).',
+               'Νέα tiles: Δικές μου βλάβες, Μετρήσεις σήμερα, Απαντήσεις ερωτηματολογίων, Σημεία ελέγχου, Πρόσφατη δραστηριότητα.',
+               'Σταθεροποίηση migration βάσης (race-safe).']},
+    {'v': '12.33', 'b': '313', 'date': '13/06/2026', 'title': 'Αντίγραφα ασφαλείας: ρυθμίσεις & χρονοδιάγραμμα',
+     'items': ['Ρυθμίσεις αυτόματου backup από το UI (ώρες/διατήρηση) χωρίς redeploy.',
+               'Ημερήσιο backup 2 φορές/μέρα προς SharePoint, με όνομα ανά έκδοση.']},
+    {'v': '12.31', 'b': '311', 'date': '13/06/2026', 'title': 'Module Αντιγράφων Ασφαλείας → SharePoint',
+     'items': ['Πλήρη αντίγραφα δεδομένων (μετρήσεις/βλάβες/ερωτηματολόγια + εικόνες) στο εταιρικό SharePoint.',
+               'Χειροκίνητο «Backup τώρα», τοπικό κατέβασμα, επαναφορά.']},
+    {'v': '12.29', 'b': '309', 'date': '13/06/2026', 'title': 'Κέντρο Εισαγωγής Δεδομένων',
+     'items': ['Ανέβασμα Excel/CSV με αυτόματη αντιστοίχιση στηλών & προεπισκόπηση.',
+               'Εισαγωγή ιστορικών βλαβών & ερωτηματολογίων.']},
+    {'v': '12.23', 'b': '—', 'date': '13/06/2026', 'title': 'Ερωτηματολόγια (Υποδοχή)',
+     'items': ['Builder ερωτηματολογίων, δημόσιος σύνδεσμος για πελάτες (QR-ready), αποτελέσματα/NPS.']},
+    {'v': '12.14', 'b': '—', 'date': '13/06/2026', 'title': 'Module Βλαβοληψία',
+     'items': ['Δήλωση βλάβης με κατηγορίες/φωτογραφίες, Πίνακας Βλαβών (KPIs/Kanban), αυτόματη ανάθεση, SLA.']},
+]
 
 @app.context_processor
 def inject_version():
@@ -2002,13 +2029,54 @@ def notifications():
     items = Notification.query.filter_by(user_id=session['user_id']).order_by(Notification.id.desc()).limit(100).all()
     return render_template('notifications.html', items=items)
 
+def _wants_json():
+    return (request.is_json or request.args.get('ajax')
+            or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or 'application/json' in (request.headers.get('Accept') or ''))
+
 @app.route('/notifications/read', methods=['POST'])
 def notifications_read():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return ('', 401) if _wants_json() else redirect(url_for('login'))
     Notification.query.filter_by(user_id=session['user_id'], is_read=False).update({'is_read': True})
     db.session.commit()
-    return redirect(url_for('notifications'))
+    return ('', 204) if _wants_json() else redirect(url_for('notifications'))
+
+@app.route('/notifications/read/<int:nid>', methods=['POST'])
+def notifications_read_one(nid):
+    if 'user_id' not in session:
+        return ('', 401)
+    n = Notification.query.filter_by(id=nid, user_id=session['user_id']).first()
+    if n and not n.is_read:
+        n.is_read = True
+        db.session.commit()
+    return ('', 204)
+
+@app.route('/notifications/list')
+def notifications_list():
+    if 'user_id' not in session:
+        return jsonify({'items': [], 'unread': 0}), 401
+    items = Notification.query.filter_by(user_id=session['user_id']).order_by(Notification.id.desc()).limit(20).all()
+    unread = Notification.query.filter_by(user_id=session['user_id'], is_read=False).count()
+    def _ago(dt):
+        if not dt: return ''
+        sec = (datetime.utcnow() - dt).total_seconds()
+        if sec < 60: return 'μόλις τώρα'
+        if sec < 3600: return f'{int(sec//60)}\' πριν'
+        if sec < 86400: return f'{int(sec//3600)}ω πριν'
+        if sec < 604800: return f'{int(sec//86400)}η πριν'
+        return dt.strftime('%d/%m %H:%M')
+    return jsonify({'unread': unread, 'items': [
+        {'id': n.id, 'text': n.text or '', 'link': (n.link or ''),
+         'is_read': bool(n.is_read), 'ago': _ago(n.created_at)} for n in items]})
+
+# ── v12.36 — «Τι νέο» (ιστορικό εκδόσεων, admin) ─────────────────────────────
+@app.route('/dashboard/whatsnew')
+def whatsnew():
+    if not is_admin():
+        return redirect(url_for('login'))
+    return render_template('whatsnew.html', changelog=CHANGELOG,
+                           cur_version=APP_VERSION, cur_build=APP_BUILD)
 
 # ── Inbox/διαχείριση βλαβών: μεταφέρθηκε στο faults.py (Module Βλαβοληψία v12.14) ──
 

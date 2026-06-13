@@ -137,6 +137,36 @@ html[data-theme="dark"] .pm-sep{background:#243140;}
 html[data-theme="dark"] .pm-pill{background:#1b2735;border-color:#2c3a4a;color:#c4d0dc;}
 html[data-theme="dark"] .pm-pill:hover{background:#243140;}
 html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
+/* v12.36 — Ειδοποιήσεις popup */
+.top .note{position:relative;}
+.note-menu{position:absolute;top:46px;right:0;width:340px;max-width:calc(100vw - 24px);background:#fff;color:#1a2530;
+  border:1px solid #e6eef2;border-radius:14px;box-shadow:0 16px 44px rgba(0,0,0,.22);padding:8px;display:none;z-index:135;}
+.note.open .note-menu{display:block;}
+.nm-head{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 10px;border-bottom:1px solid #eef2f5;margin-bottom:4px;}
+.nm-head .ttl{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px;}
+.nm-head .ttl i{color:var(--accent);}
+.nm-all{background:none;border:none;color:var(--brand);font-size:12px;font-weight:600;cursor:pointer;padding:4px 6px;border-radius:7px;}
+.nm-all:hover{background:#f3f7f9;}
+.nm-list{max-height:340px;overflow-y:auto;}
+.nm-row{display:flex;gap:10px;align-items:flex-start;padding:10px 8px;border-radius:9px;cursor:pointer;position:relative;}
+.nm-row:hover{background:#f5f9fb;}
+.nm-row .dot{flex-shrink:0;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:6px;}
+.nm-row.read .dot{background:transparent;border:1px solid #cdd8df;}
+.nm-row .body{flex:1;min-width:0;}
+.nm-row .txt{font-size:13px;line-height:1.4;color:#33454d;}
+.nm-row .ago{font-size:11px;color:#9aa7ad;margin-top:3px;}
+.nm-row .x{flex-shrink:0;opacity:0;border:none;background:none;color:#9aa7ad;cursor:pointer;font-size:15px;padding:2px;border-radius:6px;transition:.12s;}
+.nm-row:hover .x{opacity:1;}.nm-row .x:hover{background:#e9eef2;color:#dc2626;}
+.nm-empty{text-align:center;color:#9aa7ad;font-size:13px;padding:26px 10px;}
+.nm-empty i{font-size:28px;display:block;margin-bottom:8px;opacity:.6;}
+.nm-foot{display:block;text-align:center;font-size:12.5px;color:var(--brand);font-weight:600;text-decoration:none;padding:9px;border-top:1px solid #eef2f5;margin-top:4px;}
+.nm-foot:hover{background:#f3f7f9;border-radius:0 0 10px 10px;}
+html[data-theme="dark"] .note-menu{background:#141d2a;color:#e6edf3;border-color:#243140;}
+html[data-theme="dark"] .nm-head{border-bottom-color:#243140;}
+html[data-theme="dark"] .nm-row .txt{color:#c4d0dc;}
+html[data-theme="dark"] .nm-row:hover{background:#1b2735;}
+html[data-theme="dark"] .nm-all:hover,html[data-theme="dark"] .nm-foot:hover{background:#1b2735;}
+html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
 </style>
 </head>
 <body>
@@ -179,7 +209,14 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
       <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
     </div>
     <div class="ic" onclick="go('/messages?embed=1',null)" title="Μηνύματα"><i class="ti ti-mail"></i>{% if msg_unread %}<span class="badge">{{ msg_unread }}</span>{% endif %}</div>
-    <div class="ic" onclick="go('/notifications?embed=1',null)" title="Ειδοποιήσεις"><i class="ti ti-bell"></i>{% if nav_unread %}<span class="badge">{{ nav_unread }}</span>{% endif %}</div>
+    <div class="note" id="note">
+      <div class="ic" onclick="toggleNote(event)" title="Ειδοποιήσεις"><i class="ti ti-bell"></i><span class="badge" id="noteBadge" {{ '' if nav_unread else 'style="display:none;"' }}>{{ nav_unread or '' }}</span></div>
+      <div class="note-menu" id="note-menu">
+        <div class="nm-head"><span class="ttl"><i class="ti ti-bell"></i> Ειδοποιήσεις</span><button class="nm-all" onclick="markAllNotes(event)">Όλα διαβασμένα</button></div>
+        <div class="nm-list" id="nmList"><div class="nm-empty">Φόρτωση…</div></div>
+        <a class="nm-foot" href="#" onclick="navTo('/notifications?embed=1');closeNote();return false;">Όλες οι ειδοποιήσεις →</a>
+      </div>
+    </div>
     <div class="prof" id="prof">
       <button class="who" onclick="toggleProf(event)" title="{{ user.full_name }} · {{ user.role }}">
         {% if user.avatar %}<img src="{{ user.avatar }}">{% else %}<i class="ti ti-user-circle" style="font-size:24px;"></i>{% endif %}
@@ -193,6 +230,7 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
         </div>
         <a class="pm-item" href="#" onclick="navTo('/profile?embed=1');return false;"><i class="ti ti-user"></i> Το προφίλ μου</a>
         <a class="pm-item" href="#" onclick="navTo('/messages?embed=1');return false;"><i class="ti ti-mail"></i> Μηνύματα{% if msg_unread %}<span class="pm-badge">{{ msg_unread }}</span>{% endif %}</a>
+        <a class="pm-item" href="#" onclick="navTo('/notifications?embed=1');return false;"><i class="ti ti-bell"></i> Ειδοποιήσεις{% if nav_unread %}<span class="pm-badge">{{ nav_unread }}</span>{% endif %}</a>
         <div class="pm-sep"></div>
         <div class="pm-label">Γλώσσα</div>
         <div class="pm-row" id="pm-langs">
@@ -259,6 +297,7 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
       <div class="item" data-ws="admin" data-url="/dashboard/backup?embed=1"><i class="ti ti-database-export"></i> Αντίγραφα ασφαλείας</div>
       <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
       <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/whatsnew?embed=1"><i class="ti ti-sparkles"></i> Τι νέο</div>
       {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
       {% endif %}
     </nav>
@@ -298,7 +337,48 @@ function estiaSoon(name){
 function toggleProf(e){ e.stopPropagation(); document.getElementById('prof').classList.toggle('open'); }
 function closeProf(){ var p=document.getElementById('prof'); if(p) p.classList.remove('open'); }
 document.addEventListener('click', function(e){ var p=document.getElementById('prof'); if(p && !p.contains(e.target)) p.classList.remove('open'); });
-function navTo(url){ closeProf(); if(window.go) go(url,null); }
+function navTo(url){ closeProf(); closeNote(); if(window.go) go(url,null); }
+// v12.36 — Ειδοποιήσεις popup
+function closeNote(){ var n=document.getElementById('note'); if(n) n.classList.remove('open'); }
+function toggleNote(e){ e.stopPropagation(); closeProf();
+  var n=document.getElementById('note'); if(!n) return;
+  var willOpen=!n.classList.contains('open'); n.classList.toggle('open');
+  if(willOpen) loadNotes(); }
+function setNoteBadge(c){ var b=document.getElementById('noteBadge'); if(!b) return;
+  if(c>0){ b.textContent=c; b.style.display=''; } else { b.style.display='none'; } }
+function escapeHtml(t){ var d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+function loadNotes(){
+  var list=document.getElementById('nmList'); if(!list) return;
+  list.innerHTML='<div class="nm-empty">Φόρτωση…</div>';
+  fetch('/notifications/list',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+    .then(function(r){return r.json();}).then(function(d){ renderNotes(d.items||[]); setNoteBadge(d.unread||0); })
+    .catch(function(){ list.innerHTML='<div class="nm-empty"><i class="ti ti-cloud-off"></i>Σφάλμα φόρτωσης</div>'; });
+}
+function renderNotes(items){
+  var list=document.getElementById('nmList'); if(!list) return;
+  if(!items.length){ list.innerHTML='<div class="nm-empty"><i class="ti ti-bell-off"></i>Καμία ειδοποίηση</div>'; return; }
+  list.innerHTML='';
+  items.forEach(function(n){
+    var row=document.createElement('div'); row.className='nm-row'+(n.is_read?' read':''); row.dataset.id=n.id;
+    row.innerHTML='<span class="dot"></span><div class="body"><div class="txt">'+escapeHtml(n.text)+'</div><div class="ago">'+escapeHtml(n.ago)+'</div></div><button class="x" title="Διαβασμένο">&times;</button>';
+    row.querySelector('.x').addEventListener('click', function(e){ e.stopPropagation(); markNote(n.id, row); });
+    row.addEventListener('click', function(){ markNote(n.id, row, n.link); });
+    list.appendChild(row);
+  });
+}
+function _decBadge(){ var b=document.getElementById('noteBadge'); var c=parseInt(b&&b.textContent||'0',10)||0; setNoteBadge(Math.max(0,c-1)); }
+function markNote(id, row, link){
+  fetch('/notifications/read/'+id,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}}).catch(function(){});
+  if(row && !row.classList.contains('read')) _decBadge();
+  if(row){ row.style.transition='opacity .15s'; row.style.opacity='0';
+    setTimeout(function(){ row.remove(); var l=document.getElementById('nmList'); if(l && !l.children.length) renderNotes([]); }, 160); }
+  if(link){ closeNote(); navTo(link.indexOf('embed=')<0 ? (link+(link.indexOf('?')<0?'?':'&')+'embed=1') : link); }
+}
+function markAllNotes(e){ if(e) e.stopPropagation();
+  fetch('/notifications/read',{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}}).catch(function(){});
+  renderNotes([]); setNoteBadge(0);
+}
+document.addEventListener('click', function(e){ var n=document.getElementById('note'); if(n && !n.contains(e.target)) n.classList.remove('open'); });
 function _ck(n){ return (document.cookie.match(new RegExp('(?:^|; )'+n+'=([^;]+)'))||[])[1]; }
 function setLang(code){ document.cookie='estia_lang='+code+';path=/;max-age=31536000'; location.href='/set-language/'+code; }
 function applyTheme(){

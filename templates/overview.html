@@ -1,112 +1,121 @@
 <!DOCTYPE html><html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Σύνοψη — CONDIAN</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff5f8;color:#1a2b33;}
-.topbar{background:#193847;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-.topbar .ttl{display:flex;align-items:center;font-weight:700;}
-.topbar .act{display:flex;gap:8px;align-items:center;}
-.btnbar{color:#fff;text-decoration:none;font-size:13px;padding:7px 14px;background:rgba(255,255,255,.15);border-radius:8px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
-.btnbar:hover{background:rgba(255,255,255,.28);}
-.btnbar.on{background:#fff;color:#193847;font-weight:700;}
-.wrap{max-width:1200px;margin:0 auto;padding:20px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eef4f8;color:#1a2b33;}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 22px 40px;}
+/* hero / greeting */
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+.hero h1{font-size:21px;font-weight:750;letter-spacing:-.3px;color:#16242c;display:flex;align-items:center;gap:9px;}
+.hero h1 .acc{width:5px;height:22px;border-radius:3px;background:var(--accent);display:inline-block;}
+.hero .sub{font-size:12.5px;color:#7d8d96;margin-top:5px;margin-left:14px;}
+.hero .tools{display:flex;gap:8px;align-items:center;}
+.tbtn{font-size:13px;padding:8px 14px;border-radius:10px;border:1px solid #d7e3ea;background:#fff;color:#3a4b54;cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-decoration:none;transition:.13s;}
+.tbtn:hover{border-color:var(--accent);color:var(--brand);}
+.tbtn.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+.tbtn i{font-size:16px;}
 /* customize bar */
-.cust{background:#fff;border:1px solid #dbe7ee;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:none;}
+.cust{background:#fff;border:1px solid #dde8ee;border-radius:14px;padding:15px 16px;margin-bottom:18px;display:none;box-shadow:0 1px 3px rgba(25,56,71,.05);}
 .cust.show{display:block;}
-.cust .hint{font-size:12px;color:#7a8b94;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.cust .hint{font-size:12px;color:#7a8b94;margin-bottom:11px;display:flex;align-items:center;gap:7px;}
+.cust .hint i{color:var(--accent);}
 .chips{display:flex;flex-wrap:wrap;gap:8px;}
-.chip{font-size:12px;padding:6px 12px;border-radius:20px;border:1px solid #cfdde6;background:#f3f8fb;color:#5a6b73;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:6px;transition:.12s;}
-.chip:hover{border-color:#9ab6c5;}
-.chip.on{background:var(--accent,#193847);border-color:var(--accent,#193847);color:#fff;}
-.chip.on i.ck::before{content:"\ea5e";}
-.cust .reset{margin-top:12px;font-size:12px;color:#b04a4a;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;}
+.chip{font-size:12.5px;padding:7px 13px;border-radius:22px;border:1px solid #d3e0e8;background:#f4f9fb;color:#5a6b73;cursor:pointer;user-select:none;display:inline-flex;align-items:center;gap:7px;transition:.12s;}
+.chip:hover{border-color:#a7c0cd;}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.chip .ck{font-size:13px;}
+.cust .reset{margin-top:13px;font-size:12px;color:#b04a4a;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;}
 /* grid */
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
-@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr);}}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;}
+@media(max-width:920px){.grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:560px){.grid{grid-template-columns:1fr;}}
-.tile{position:relative;}
+.tile{position:relative;background:#fff;border:1px solid #e3edf2;border-radius:16px;box-shadow:0 1px 2px rgba(25,56,71,.04);transition:box-shadow .15s,transform .08s,border-color .15s;}
 .tile.hidden{display:none;}
-.tile.kpi{grid-column:span 1;background:#fff;border:1px solid #dbe7ee;border-radius:12px;padding:16px;}
-.tile.card{grid-column:span 2;background:#fff;border:1px solid #dbe7ee;border-radius:12px;padding:16px 18px;}
+.tile.kpi{grid-column:span 1;display:flex;align-items:center;gap:14px;padding:17px 18px;}
+.tile.card{grid-column:span 2;padding:17px 19px;}
 @media(max-width:560px){.tile.card{grid-column:span 1;}}
-.kpi .v{font-size:26px;font-weight:700;line-height:1;color:#193847;}.kpi .l{font-size:12px;color:#7a8b94;margin-top:8px;}
-.kpi.good .v{color:#16a34a;}.kpi.warn .v{color:#d97706;}.kpi.bad .v{color:#dc2626;}
-.kpi .ic{position:absolute;top:14px;right:14px;color:#cfdde6;font-size:18px;}
-.card h2{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px;color:#27323a;}
-.cov{margin-bottom:12px;}.cov .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;}
-.bar{height:9px;border-radius:6px;background:#edf1f4;overflow:hidden;}.bar i{display:block;height:100%;border-radius:6px;}
-.li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f3f6f8;font-size:13px;}
-.li:last-child{border-bottom:none;}.tag{font-size:11px;padding:2px 8px;border-radius:5px;background:#eef2ff;color:#193847;white-space:nowrap;}
-.tag.bad{background:#fee2e2;color:#dc2626;font-weight:600;}.muted{color:#9aa7ad;}.empty{color:#9aa7ad;font-size:13px;padding:8px 0;}
-.btn{display:inline-block;margin-top:10px;font-size:12px;color:#193847;text-decoration:none;font-weight:600;}
-/* customize-mode affordances */
-.grid.editing .tile{cursor:grab;outline:2px dashed transparent;transition:outline .12s,transform .08s;}
-.grid.editing .tile:hover{outline-color:#9ab6c5;}
-.grid.editing .tile.kpi,.grid.editing .tile.card{box-shadow:0 2px 10px rgba(25,56,71,.08);}
-.tile .rm{display:none;position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:none;background:#fee2e2;color:#dc2626;font-size:14px;line-height:1;cursor:pointer;z-index:2;}
+.tile:hover{box-shadow:0 6px 20px rgba(25,56,71,.09);}
+/* KPI */
+.kchip{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;background:#eef4f8;color:var(--accent);flex-shrink:0;}
+.kbody{min-width:0;}
+.kpi .v{font-size:27px;font-weight:750;line-height:1;letter-spacing:-.6px;color:#1c2b34;}
+.kpi .l{font-size:12px;color:#7a8b94;margin-top:7px;font-weight:500;}
+.kpi.good .kchip{background:#e7f6ec;color:#16a34a;}.kpi.good .v{color:#16a34a;}
+.kpi.warn .kchip{background:#fdf0dd;color:#d97706;}.kpi.warn .v{color:#d97706;}
+.kpi.bad  .kchip{background:#fde7e7;color:#dc2626;}.kpi.bad  .v{color:#dc2626;}
+/* widget card */
+.card h2{font-size:13.5px;font-weight:650;margin-bottom:15px;display:flex;align-items:center;gap:10px;color:#27323a;}
+.card h2 .hch{width:30px;height:30px;border-radius:9px;background:#eef4f8;color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.cov{margin-bottom:13px;}.cov:last-child{margin-bottom:0;}
+.cov .top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:#3a4b54;}
+.bar{height:8px;border-radius:6px;background:#eef2f5;overflow:hidden;}.bar i{display:block;height:100%;border-radius:6px;transition:width .4s;}
+.li{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f1f5f8;font-size:13px;align-items:center;}
+.li:last-child{border-bottom:none;}
+.li .lt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#3c4d56;}
+.tag{font-size:11px;padding:3px 9px;border-radius:6px;background:#eef4f8;color:var(--brand);white-space:nowrap;font-weight:500;}
+.tag.bad{background:#fde7e7;color:#dc2626;font-weight:600;}
+.muted{color:#9aa7ad;white-space:nowrap;font-size:12px;}
+.empty{color:#9aa7ad;font-size:13px;padding:14px 0;text-align:center;}
+.btn{display:inline-flex;align-items:center;gap:5px;margin-top:12px;font-size:12.5px;color:var(--brand);text-decoration:none;font-weight:600;}
+.btn:hover{gap:8px;}
+/* customize affordances */
+.grid.editing .tile{cursor:grab;border-style:dashed;border-color:#c3d4de;}
+.grid.editing .tile:hover{border-color:var(--accent);}
+.tile .rm{display:none;position:absolute;top:9px;right:9px;width:23px;height:23px;border-radius:50%;border:none;background:#fde7e7;color:#dc2626;font-size:15px;line-height:1;cursor:pointer;z-index:2;}
 .grid.editing .tile .rm{display:flex;align-items:center;justify-content:center;}
-.grid.editing .tile.kpi .ic{display:none;}
 .tile.dragging{opacity:.4;}
-.tile.dragover{outline-color:var(--accent,#193847)!important;outline-style:solid!important;}
-.drag-h{display:none;}.grid.editing .drag-h{display:inline-flex;color:#b8c7d0;margin-right:4px;}
+.tile.dragover{border-color:var(--accent)!important;border-style:solid!important;box-shadow:0 0 0 2px var(--accent) inset;}
+.drag-h{display:none;}.grid.editing .drag-h{display:inline-flex;color:#b8c7d0;}
+.emptyState{text-align:center;padding:46px 0;color:#9aa7ad;font-size:14px;}
+.emptyState i{font-size:34px;display:block;margin-bottom:10px;opacity:.5;}
+/* dark */
+html[data-theme="dark"] body{background:#0f1722;color:#e6edf3;}
+html[data-theme="dark"] .hero h1{color:#eef4f8;}
+html[data-theme="dark"] .tile,html[data-theme="dark"] .cust{background:#141d2a;border-color:#243140;box-shadow:none;}
+html[data-theme="dark"] .kpi .v{color:#eef4f8;}
+html[data-theme="dark"] .kchip,html[data-theme="dark"] .card h2 .hch{background:#1b2735;}
+html[data-theme="dark"] .card h2{color:#dfe8ee;}
+html[data-theme="dark"] .li{border-bottom-color:#1e2a38;}html[data-theme="dark"] .li .lt{color:#b6c3cd;}
+html[data-theme="dark"] .bar{background:#1e2a38;}
+html[data-theme="dark"] .tbtn{background:#141d2a;border-color:#2c3a4a;color:#c4d0dc;}
+html[data-theme="dark"] .chip{background:#1b2735;border-color:#2c3a4a;color:#c4d0dc;}
 </style>
-<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}.topbar{background:var(--brand)!important;}.chip.on{background:var(--accent)!important;border-color:var(--accent)!important;}</style>
+<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
-<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+<style>.embed body{background:transparent!important;}</style>
 </head><body>
 
-{# ---------- tile content macro ---------- #}
 {% macro tile_body(t) %}
 {% set d = tiledata %}
 {% if t.kind == 'kpi' %}
-  {% if t.id == 'compliance' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.compliance }}%</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'alerts' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.alerts }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'open_faults' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.open_faults }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'my_faults' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.my_faults }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'pool_today' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.pool_today }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'water_today' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.water_today }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'surveys_today' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.surveys_today }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'hotels' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.hotels }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'checkpoints' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.checkpoints }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'users' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.users }}</div><div class="l">{{ t.title }}</div>
-  {% elif t.id == 'pending' %}
-    <i class="ti {{ t.icon }} ic"></i><div class="v">{{ d.pending }}</div><div class="l">{{ t.title }}</div>
-  {% endif %}
+  {% set val = {'compliance': d.compliance|string + '%','alerts': d.alerts,'open_faults': d.open_faults,'my_faults': d.my_faults,'pool_today': d.pool_today,'water_today': d.water_today,'surveys_today': d.surveys_today,'hotels': d.hotels,'checkpoints': d.checkpoints,'users': d.users,'pending': d.pending} %}
+  <div class="kchip"><i class="ti {{ t.icon }}"></i></div>
+  <div class="kbody"><div class="v">{{ val[t.id] }}</div><div class="l">{{ t.title }}</div></div>
 {% else %}
   <button class="rm" title="Αφαίρεση">×</button>
-  <h2><span class="drag-h"><i class="ti ti-grip-vertical"></i></span><i class="ti {{ t.icon }}"></i> {{ t.title }}</h2>
+  <h2><span class="drag-h"><i class="ti ti-grip-vertical"></i></span><span class="hch"><i class="ti {{ t.icon }}"></i></span> {{ t.title }}</h2>
   {% if t.id == 'coverage' %}
     {% for c in d.cov %}
     <div class="cov"><div class="top"><span>{{ c.hotel }}</span><span class="muted">{{ c.done }}/{{ c.exp }} · {{ c.pct }}%</span></div>
       <div class="bar"><i style="width:{{ c.pct }}%;background:{{ '#16a34a' if c.pct>=80 else '#d97706' if c.pct>=50 else '#dc2626' }};"></i></div></div>
     {% else %}<div class="empty">Δεν υπάρχουν ξενοδοχεία.</div>{% endfor %}
   {% elif t.id == 'alerts_list' %}
-    {% for a in d.alerts_list %}<div class="li"><span>{{ a.where }} — {{ a.label }}</span><span class="tag bad">{{ 'ΕΠΕΙΓΟΝ' if a.urgent else a.date.strftime('%d/%m') }}</span></div>
+    {% for a in d.alerts_list %}<div class="li"><span class="lt">{{ a.where }} — {{ a.label }}</span><span class="tag bad">{{ 'ΕΠΕΙΓΟΝ' if a.urgent else a.date.strftime('%d/%m') }}</span></div>
     {% else %}<div class="empty">Όλα εντός ορίων 👍</div>{% endfor %}
   {% elif t.id == 'faults_list' %}
-    {% for f in d.faults_list %}<div class="li"><span>{{ f.code }}{% if f.legacy_category %} — {{ f.legacy_category }}{% elif f.description %} — {{ f.description[:40] }}{% endif %}</span><span class="muted">{{ f.submitted_at.strftime('%d/%m') if f.submitted_at else '' }}</span></div>
+    {% for f in d.faults_list %}<div class="li"><span class="lt">{{ f.code }}{% if f.legacy_category %} — {{ f.legacy_category }}{% elif f.description %} — {{ f.description[:40] }}{% endif %}</span><span class="muted">{{ f.submitted_at.strftime('%d/%m') if f.submitted_at else '' }}</span></div>
     {% else %}<div class="empty">Καμία ανοιχτή βλάβη.</div>{% endfor %}
-    <a class="btn" href="/dashboard/faults">Διαχείριση βλαβών →</a>
+    <a class="btn" href="/dashboard/faults">Διαχείριση βλαβών <i class="ti ti-arrow-right"></i></a>
   {% elif t.id == 'pending_list' %}
-    {% for u in d.pending_list %}<div class="li"><span>{{ u.full_name }} <span class="muted">({{ u.username }})</span></span><span class="muted">{{ u.email or '' }}</span></div>
+    {% for u in d.pending_list %}<div class="li"><span class="lt">{{ u.full_name }} <span class="muted">({{ u.username }})</span></span><span class="muted">{{ u.email or '' }}</span></div>
     {% else %}<div class="empty">Καμία εκκρεμότητα.</div>{% endfor %}
   {% elif t.id == 'activity' %}
-    {% for a in d.activity %}<div class="li"><span>{{ action_labels.get(a.action, a.action) }}{% if a.detail %} <span class="muted">— {{ a.detail[:42] }}</span>{% endif %}</span><span class="muted">{{ a.created_at.strftime('%d/%m %H:%M') if a.created_at else '' }}</span></div>
+    {% for a in d.activity %}<div class="li"><span class="lt">{{ action_labels.get(a.action, a.action) }}{% if a.detail %} <span class="muted">— {{ a.detail[:42] }}</span>{% endif %}</span><span class="muted">{{ a.created_at.strftime('%d/%m %H:%M') if a.created_at else '' }}</span></div>
     {% else %}<div class="empty">Καμία δραστηριότητα.</div>{% endfor %}
   {% endif %}
 {% endif %}
 {% endmacro %}
 
-{# kpi colour class #}
 {% macro kpi_cls(t) %}
 {%- if t.id=='compliance' -%}{{ 'good' if tiledata.compliance>=80 else 'warn' if tiledata.compliance>=50 else 'bad' }}
 {%- elif t.id=='alerts' -%}{{ 'bad' if tiledata.alerts else 'good' }}
@@ -116,21 +125,23 @@
 {%- else -%}{% endif %}
 {% endmacro %}
 
-<div class="topbar">
-  <div class="ttl"><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">Σύνοψη</div>
-  <div class="act">
-    <a class="btnbar" href="/areas/dashboard"><i class="ti ti-clipboard-list"></i> Τομείς</a>
-    <a class="btnbar" href="/pools/dashboard"><i class="ti ti-pool"></i> Πισίνες</a>
-    <button class="btnbar" id="custBtn"><i class="ti ti-layout-grid-add"></i> Προσαρμογή</button>
-  </div>
-</div>
-
 <div class="wrap">
+  <div class="hero">
+    <div>
+      <h1><span class="acc"></span><span id="greet">Σύνοψη</span></h1>
+      <div class="sub" id="subdate"></div>
+    </div>
+    <div class="tools">
+      <a class="tbtn" href="/pools/dashboard"><i class="ti ti-pool"></i> Πισίνες</a>
+      <button class="tbtn" id="custBtn"><i class="ti ti-layout-grid-add"></i> Προσαρμογή</button>
+    </div>
+  </div>
+
   <div class="cust" id="custBar">
-    <div class="hint"><i class="ti ti-arrows-move"></i> Πάτησε ένα πλακίδιο για εμφάνιση/απόκρυψη, ή σύρε τα πλακίδια του πίνακα για αναδιάταξη. Αποθηκεύεται αυτόματα.</div>
+    <div class="hint"><i class="ti ti-arrows-move"></i> Πάτησε ένα πλακίδιο για εμφάνιση/απόκρυψη, ή σύρε τα πλακίδια για αναδιάταξη. Αποθηκεύεται αυτόματα.</div>
     <div class="chips" id="chips">
       {% for t in catalog %}
-      <span class="chip {{ 'on' if t.id in order else '' }}" data-tid="{{ t.id }}"><i class="ti ti-check ck" style="font-size:13px;{{ '' if t.id in order else 'visibility:hidden;' }}"></i>{{ t.title }}</span>
+      <span class="chip {{ 'on' if t.id in order else '' }}" data-tid="{{ t.id }}"><i class="ti ti-check ck" style="{{ '' if t.id in order else 'visibility:hidden;' }}"></i>{{ t.title }}</span>
       {% endfor %}
     </div>
     <button class="reset" id="resetBtn">Επαναφορά προεπιλογής</button>
@@ -144,51 +155,43 @@
     <div class="tile {{ t.kind }} {% if t.kind=='kpi' %}{{ kpi_cls(t)|trim }}{% endif %} hidden" data-id="{{ t.id }}" data-kind="{{ t.kind }}">{{ tile_body(t) }}</div>
     {% endfor %}
   </div>
-  <div class="empty" id="emptyMsg" style="display:none;text-align:center;padding:40px 0;">Δεν έχεις επιλεγμένα πλακίδια. Πάτησε «Προσαρμογή» για να προσθέσεις.</div>
+  <div class="emptyState" id="emptyMsg" style="display:none;"><i class="ti ti-layout-grid-add"></i>Δεν έχεις επιλεγμένα πλακίδια. Πάτησε «Προσαρμογή» για να προσθέσεις.</div>
 </div>
 
 <script>
 (function(){
+  // greeting
+  try{
+    var h=new Date().getHours(), g = h<5?'Καλό βράδυ' : h<12?'Καλημέρα' : h<18?'Καλησπέρα' : 'Καλό απόγευμα';
+    document.getElementById('greet').textContent = g;
+    var dd=new Date().toLocaleDateString('el-GR',{weekday:'long',day:'numeric',month:'long'});
+    document.getElementById('subdate').textContent = dd.charAt(0).toUpperCase()+dd.slice(1);
+  }catch(e){ document.getElementById('greet').textContent='Σύνοψη'; }
+
   var grid=document.getElementById('grid'), custBtn=document.getElementById('custBtn'),
       custBar=document.getElementById('custBar'), chips=document.getElementById('chips'),
       resetBtn=document.getElementById('resetBtn'), emptyMsg=document.getElementById('emptyMsg');
   var editing=false, saveTimer=null;
 
-  function shownIds(){
-    return Array.from(grid.querySelectorAll('.tile:not(.hidden)')).map(function(t){return t.dataset.id;});
-  }
+  function shownIds(){ return Array.from(grid.querySelectorAll('.tile:not(.hidden)')).map(function(t){return t.dataset.id;}); }
   function refreshEmpty(){ emptyMsg.style.display = shownIds().length ? 'none':'block'; }
-  function save(){
-    clearTimeout(saveTimer);
-    saveTimer=setTimeout(function(){
-      fetch('/overview/layout',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({tiles:shownIds()})}).catch(function(){});
-    },350);
-  }
+  function save(){ clearTimeout(saveTimer); saveTimer=setTimeout(function(){
+      fetch('/overview/layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tiles:shownIds()})}).catch(function(){}); },350); }
   function tileById(id){ return grid.querySelector('.tile[data-id="'+id+'"]'); }
 
-  // toggle customize mode
   custBtn.addEventListener('click',function(){
-    editing=!editing;
-    custBtn.classList.toggle('on',editing);
-    custBar.classList.toggle('show',editing);
-    grid.classList.toggle('editing',editing);
+    editing=!editing; custBtn.classList.toggle('on',editing); custBar.classList.toggle('show',editing); grid.classList.toggle('editing',editing);
     custBtn.innerHTML = editing ? '<i class="ti ti-check"></i> Τέλος' : '<i class="ti ti-layout-grid-add"></i> Προσαρμογή';
     setDraggable(editing);
   });
-
-  // chip = show/hide a tile
   chips.addEventListener('click',function(e){
     var chip=e.target.closest('.chip'); if(!chip) return;
     var id=chip.dataset.tid, tile=tileById(id); if(!tile) return;
-    var nowHidden=tile.classList.toggle('hidden');
-    chip.classList.toggle('on',!nowHidden);
+    var nowHidden=tile.classList.toggle('hidden'); chip.classList.toggle('on',!nowHidden);
     var ck=chip.querySelector('.ck'); if(ck) ck.style.visibility = nowHidden ? 'hidden':'visible';
-    if(!nowHidden) grid.appendChild(tile); // re-added tiles go to the end
+    if(!nowHidden) grid.appendChild(tile);
     refreshEmpty(); save();
   });
-
-  // remove button on widget tiles
   grid.addEventListener('click',function(e){
     var rm=e.target.closest('.rm'); if(!rm) return;
     var tile=e.target.closest('.tile'); if(!tile) return;
@@ -197,38 +200,25 @@
     if(chip){chip.classList.remove('on');var ck=chip.querySelector('.ck');if(ck)ck.style.visibility='hidden';}
     refreshEmpty(); save();
   });
-
-  // reset
   resetBtn.addEventListener('click',function(){
-    fetch('/overview/layout',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({reset:true})}).then(function(){location.reload();}).catch(function(){location.reload();});
+    fetch('/overview/layout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reset:true})}).then(function(){location.reload();}).catch(function(){location.reload();});
   });
 
-  // native HTML5 drag & drop reorder
   var dragEl=null;
-  function setDraggable(on){
-    grid.querySelectorAll('.tile').forEach(function(t){
-      if(on){ t.setAttribute('draggable','true'); } else { t.removeAttribute('draggable'); }
-    });
-  }
-  grid.addEventListener('dragstart',function(e){
-    var t=e.target.closest('.tile'); if(!t||!editing) return;
-    dragEl=t; t.classList.add('dragging'); e.dataTransfer.effectAllowed='move';
-    try{e.dataTransfer.setData('text/plain',t.dataset.id);}catch(_){}
-  });
-  grid.addEventListener('dragend',function(){ if(dragEl){dragEl.classList.remove('dragging');} 
+  function setDraggable(on){ grid.querySelectorAll('.tile').forEach(function(t){ if(on){t.setAttribute('draggable','true');}else{t.removeAttribute('draggable');} }); }
+  grid.addEventListener('dragstart',function(e){ var t=e.target.closest('.tile'); if(!t||!editing) return;
+    dragEl=t; t.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',t.dataset.id);}catch(_){ } });
+  grid.addEventListener('dragend',function(){ if(dragEl){dragEl.classList.remove('dragging');}
     grid.querySelectorAll('.dragover').forEach(function(x){x.classList.remove('dragover');}); dragEl=null; save(); });
-  grid.addEventListener('dragover',function(e){
-    if(!dragEl) return; e.preventDefault(); e.dataTransfer.dropEffect='move';
-    var over=e.target.closest('.tile'); 
+  grid.addEventListener('dragover',function(e){ if(!dragEl) return; e.preventDefault(); e.dataTransfer.dropEffect='move';
+    var over=e.target.closest('.tile');
     grid.querySelectorAll('.dragover').forEach(function(x){if(x!==over)x.classList.remove('dragover');});
     if(!over||over===dragEl||over.classList.contains('hidden')) return;
     over.classList.add('dragover');
-    var r=over.getBoundingClientRect();
-    var after = (e.clientY - r.top) > r.height/2;
+    var r=over.getBoundingClientRect(); var after=(e.clientY-r.top)>r.height/2;
     grid.insertBefore(dragEl, after ? over.nextSibling : over);
   });
-  grid.addEventListener('drop',function(e){ if(dragEl){e.preventDefault();} 
+  grid.addEventListener('drop',function(e){ if(dragEl){e.preventDefault();}
     grid.querySelectorAll('.dragover').forEach(function(x){x.classList.remove('dragover');}); });
 
   refreshEmpty();

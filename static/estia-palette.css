@@ -24,10 +24,19 @@ html[data-palette="business"]:not([data-theme="dark"]) .content{background:linea
 html[data-palette="business"]:not([data-theme="dark"]) .item.active{background:#e9eff4;}
 html[data-palette="business"]:not([data-theme="dark"]) .kpi{border-color:#e9eef3;}
 /* Soft Rose */
-html[data-palette="girlie"]{--brand:#c0367a;--accent:#f48fb1;--mp-brand:#c0367a;--b:#c0367a;}
+html[data-palette="girlie"]{--brand:#c0367a;--accent:#d6377e;--mp-brand:#c0367a;--b:#c0367a;}  /* v12.36 accent πιο ευανάγνωστο (ήταν #f48fb1) */
 html[data-palette="girlie"] .top{background:linear-gradient(110deg,#c0367a,#8e2058)!important;}
 html[data-palette="girlie"] .topbar{background:linear-gradient(110deg,#c0367a,#8e2058)!important;}
 html[data-palette="girlie"]:not(.embed):not([data-theme="dark"]) body{background:linear-gradient(165deg,#fff2f8,#fbe3ee);}
 html[data-palette="girlie"]:not([data-theme="dark"]) .content{background:linear-gradient(165deg,#fff2f8,#fbe3ee);}
 html[data-palette="girlie"]:not([data-theme="dark"]) .item.active{background:#fce4f0;}
 html[data-palette="girlie"]:not([data-theme="dark"]) .kpi{border-color:#fbe3ee;}
+
+/* v12.36 — Γυάλισμα παλετών: accent definition line κάτω από το header + accent focus ring παντού */
+html[data-palette] .top,
+html[data-palette] .topbar,
+html[data-palette] .app-header{box-shadow:inset 0 -2px 0 var(--accent);}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+/* accent στα ενεργά tabs/περιόδους κοινών σελίδων */
+html[data-palette] .period-btn.active,
+html[data-palette] .period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}
