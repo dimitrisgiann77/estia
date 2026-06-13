@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.30'
-APP_BUILD   = '310'
+APP_VERSION = '12.31'
+APP_BUILD   = '311'
 
 @app.context_processor
 def inject_version():
@@ -2831,11 +2831,13 @@ def seed_team():
 import faults          # v12.14 — Module Βλαβοληψία (μοντέλα + routes)· ΠΡΙΝ το create_all
 import surveys         # v12.23 — Module Ερωτηματολόγια (μοντέλα + routes)· ΠΡΙΝ το create_all
 import imports         # v12.29 — Κέντρο Εισαγωγής Δεδομένων (μοντέλο ImportUpload + routes)· ΠΡΙΝ το create_all
+import backup          # v12.31 — Module Αντιγράφων Ασφαλείας (BackupLog + routes)· ΠΡΙΝ το create_all
 init_db()
 seed_team()
 faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
 surveys.seed_surveys() # seed δείγμα ερωτηματολογίου (idempotent)
 start_scheduler()
+backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

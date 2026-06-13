@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Αντίγραφα Ασφαλείας</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
+.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+.topbar-title { font-size:16px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.container { max-width:1000px; margin:0 auto; padding:24px; }
+.intro { color:#64748b; font-size:13.5px; margin-bottom:18px; line-height:1.6; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.card { background:white; border-radius:14px; padding:18px; border:1px solid #e0f0ff; display:flex; flex-direction:column; }
+.card-h { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.card-h .ic { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; }
+.card-t { font-size:15px; font-weight:700; color:#193847; }
+.card-s { font-size:12px; color:#94a3b8; }
+.badge { font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; background:#eef5f8; color:#475569; }
+.badge.live { background:#dcfce7; color:#16a34a; }
+.badge.soon { background:#fff7ed; color:#b45309; }
+.badge.off  { background:#fee2e2; color:#dc2626; }
+.stat-row { display:flex; gap:10px; margin:12px 0; }
+.stat { flex:1; background:#f6fbff; border:1px solid #e0f0ff; border-radius:9px; padding:9px 11px; }
+.stat .n { font-size:18px; font-weight:700; color:#193847; }
+.stat .l { font-size:11px; color:#64748b; }
+.opt { border-top:1px solid #f0f4f7; padding-top:12px; margin-top:6px; }
+.opt-t { font-size:12.5px; font-weight:600; color:#334155; margin-bottom:7px; display:flex; align-items:center; gap:6px; }
+.btn { padding:9px 14px; border:none; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; background:#193847; color:#fff; display:inline-flex; align-items:center; gap:7px; text-decoration:none; }
+.btn.ghost { background:#eef5f8; color:#193847; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.muted { color:#9aa7ad; font-size:12px; }
+.recent { margin-top:24px; background:white; border-radius:14px; padding:18px; border:1px solid #e0f0ff; }
+.recent h3 { font-size:14px; color:#193847; margin-bottom:10px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+td,th { padding:7px 6px; border-bottom:1px solid #f0f4f7; text-align:left; }
+th { color:#64748b; font-weight:600; font-size:11.5px; }
+.err { background:#fee2e2; color:#dc2626; padding:10px 14px; border-radius:9px; margin-bottom:14px; font-size:13px; }
+.ok  { background:#dcfce7; color:#16a34a; padding:10px 14px; border-radius:9px; margin-bottom:14px; font-size:13px; }
+.kv { font-size:12.5px; color:#475569; line-height:1.8; }
+.kv b { color:#193847; }
+.danger { border-color:#fca5a5; }
+.danger .card-t { color:#dc2626; }
+input[type=file],input[type=text] { font-size:12px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:7px; max-width:100%; }
+</style>
+<style>:root{--brand:{{ theme.primary if theme else '#193847' }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}.btn.ghost{background:#eef5f8!important;color:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title"><i class="ti ti-database-export"></i> ΕΣΤΙΑ — Αντίγραφα Ασφαλείας</div>
+</div>
+<div class="container">
+
+  {% if request.args.get('msg')=='ok' %}<div class="ok">Το αντίγραφο δημιουργήθηκε και ανέβηκε στο SharePoint.</div>{% endif %}
+  {% if request.args.get('msg')=='restored' %}<div class="ok">Η επαναφορά ολοκληρώθηκε.</div>{% endif %}
+  {% if request.args.get('err')=='cfg' %}<div class="err">Δεν έχει ρυθμιστεί ο προορισμός (Graph + SharePoint env vars).</div>{% endif %}
+  {% if request.args.get('err')=='err' %}<div class="err">Το backup απέτυχε — δες το ιστορικό παρακάτω για το μήνυμα σφάλματος.</div>{% endif %}
+  {% if request.args.get('err')=='confirm' %}<div class="err">Λάθος επιβεβαίωση. Πληκτρολόγησε ακριβώς: ΕΠΑΝΑΦΟΡΑ</div>{% endif %}
+  {% if request.args.get('err')=='nofile' %}<div class="err">Δεν επιλέχθηκε αρχείο.</div>{% endif %}
+  {% if request.args.get('err')=='restore' %}<div class="err">Η επαναφορά απέτυχε (έλεγξε ότι το αρχείο είναι έγκυρο estia-backup .json.gz).</div>{% endif %}
+
+  <p class="intro">Πλήρες <b>off-site</b> αντίγραφο όλων των δεδομένων (μετρήσεις, βλάβες, ερωτηματολόγια <b>και εικόνες</b>) σε συμπιεσμένο αρχείο, που ανεβαίνει στο <b>εταιρικό SharePoint</b> μέσω Microsoft 365. Ανεξάρτητο από το Railway.</p>
+
+  <div class="grid">
+
+    <!-- ΚΑΤΑΣΤΑΣΗ / BACKUP NOW -->
+    <div class="card">
+      <div class="card-h">
+        <div class="ic" style="background:#0ea5e9;"><i class="ti ti-cloud-up"></i></div>
+        <div style="flex:1;"><div class="card-t">Αντίγραφο τώρα</div><div class="card-s">Χειροκίνητο backup → SharePoint</div></div>
+        {% if cfg_ok %}<span class="badge live">Έτοιμο</span>{% else %}<span class="badge off">Χρειάζεται ρύθμιση</span>{% endif %}
+      </div>
+      <div class="stat-row">
+        <div class="stat"><div class="n">{% if last_ok %}{{ last_ok.created_at.strftime('%d/%m %H:%M') }}{% else %}—{% endif %}</div><div class="l">τελευταίο επιτυχές</div></div>
+        <div class="stat"><div class="n">{{ remote|length }}</div><div class="l">αρχεία στο SharePoint</div></div>
+      </div>
+      <div class="opt">
+        <form method="POST" action="/dashboard/backup/run?embed=1">
+          <button class="btn" type="submit" {% if not cfg_ok %}disabled{% endif %}><i class="ti ti-cloud-up"></i> Backup τώρα</button>
+        </form>
+        {% if not cfg_ok %}<p class="muted" style="margin-top:8px;">Όρισε στο Railway: <b>SP_HOST</b>, <b>SP_SITE_PATH</b> (+ Graph & permission <b>Sites.ReadWrite.All</b>).</p>{% endif %}
+      </div>
+      <div class="opt">
+        <div class="opt-t"><i class="ti ti-download"></i> Τοπικό αντίγραφο (χωρίς SharePoint)</div>
+        <form method="POST" action="/dashboard/backup/download?embed=1" target="_blank">
+          <button class="btn ghost" type="submit"><i class="ti ti-download"></i> Κατέβασμα .json.gz</button>
+        </form>
+        <p class="muted" style="margin-top:6px;">Κατεβάζει το αντίγραφο στον υπολογιστή σου — δουλεύει ακόμη κι αν δεν έχει ρυθμιστεί το SharePoint.</p>
+      </div>
+    </div>
+
+    <!-- ΡΥΘΜΙΣΕΙΣ / ΧΡΟΝΟΔΙΑΓΡΑΜΜΑ -->
+    <div class="card">
+      <div class="card-h">
+        <div class="ic" style="background:#16a34a;"><i class="ti ti-clock-cog"></i></div>
+        <div style="flex:1;"><div class="card-t">Αυτόματο πρόγραμμα</div><div class="card-s">Ημερήσιο backup</div></div>
+        {% if enabled %}<span class="badge live">Ενεργό</span>{% else %}<span class="badge off">Ανενεργό</span>{% endif %}
+      </div>
+      <div class="kv" style="margin-top:8px;">
+        <div>Ώρα: <b>{{ '%02d:00'|format(hour) }}</b> (Ελλάδας)</div>
+        <div>Διατήρηση: <b>τελευταία {{ keep }}</b> αρχεία</div>
+        <div>Microsoft Graph: {% if graph_ok %}<b style="color:#16a34a;">συνδεδεμένο</b>{% else %}<b style="color:#dc2626;">όχι</b>{% endif %}</div>
+        <div>Προορισμός: <b>{{ sp_host or '—' }}{{ sp_site }}</b> / <b>{{ sp_folder }}</b></div>
+      </div>
+      <p class="muted" style="margin-top:10px;">Ρυθμίζεται με env vars στο Railway: <b>BACKUP_ENABLED</b>, <b>BACKUP_HOUR</b>, <b>BACKUP_KEEP</b>.</p>
+    </div>
+
+  </div>
+
+  <!-- ΑΡΧΕΙΑ ΣΤΟ SHAREPOINT -->
+  {% if cfg_ok %}
+  <div class="recent">
+    <h3>Αρχεία στο SharePoint ({{ sp_folder }})</h3>
+    {% if remote %}
+    <table>
+      <tr><th>Αρχείο</th><th>Μέγεθος</th><th>Δημιουργήθηκε</th></tr>
+      {% for it in remote %}
+      <tr>
+        <td>{{ it.name }}</td>
+        <td>{{ (it.size or 0)//1024 }} KB</td>
+        <td>{{ it.createdDateTime }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">Κανένα αρχείο ακόμη — πάτησε «Backup τώρα».</p>{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ΙΣΤΟΡΙΚΟ -->
+  {% if recent %}
+  <div class="recent">
+    <h3>Ιστορικό backup</h3>
+    <table>
+      <tr><th>Αρχείο</th><th>Κατάσταση</th><th>Πίνακες</th><th>Γραμμές</th><th>Μέγεθος</th><th>Πότε</th></tr>
+      {% for b in recent %}
+      <tr>
+        <td>{{ b.filename }}</td>
+        <td>
+          {% if b.status=='done' %}<span class="badge live">OK</span>
+          {% elif b.status=='error' %}<span class="badge off" title="{{ b.error }}">Σφάλμα</span>
+          {% else %}<span class="badge soon">…</span>{% endif %}
+        </td>
+        <td>{{ b.n_tables }}</td>
+        <td>{{ b.n_rows }}</td>
+        <td>{{ (b.size_bytes or 0)//1024 }} KB</td>
+        <td>{{ b.created_at.strftime('%d/%m %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- RESTORE (masteradmin) -->
+  {% if is_master %}
+  <div class="recent danger" style="margin-top:24px; border:1px solid #fca5a5;">
+    <h3 style="color:#dc2626;"><i class="ti ti-alert-triangle"></i> Επαναφορά (restore)</h3>
+    <p class="muted" style="margin-bottom:12px;">ΠΡΟΣΟΧΗ: αντικαθιστά <b>όλα</b> τα τρέχοντα δεδομένα με αυτά του αρχείου. Ανέβασε ένα <b>estia-backup-*.json.gz</b> και πληκτρολόγησε <b>ΕΠΑΝΑΦΟΡΑ</b> για επιβεβαίωση.</p>
+    <form method="POST" action="/dashboard/backup/restore?embed=1" enctype="multipart/form-data" onsubmit="return confirm('Σίγουρα; Θα αντικατασταθούν όλα τα δεδομένα.');">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="file" name="file" accept=".gz,.json.gz" required>
+        <input type="text" name="confirm" placeholder="Γράψε: ΕΠΑΝΑΦΟΡΑ" required>
+        <button class="btn" style="background:#dc2626!important;" type="submit"><i class="ti ti-rotate"></i> Επαναφορά</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>
