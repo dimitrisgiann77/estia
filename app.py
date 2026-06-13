@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.33'
-APP_BUILD   = '313'
+APP_VERSION = '12.34'
+APP_BUILD   = '314'
 
 @app.context_processor
 def inject_version():
@@ -528,6 +528,7 @@ class User(db.Model):
     phone      = db.Column(db.String(40))
     approved   = db.Column(db.Boolean, default=True)
     avatar     = db.Column(db.Text)                       # data URL (base64) εικόνας προφίλ
+    dashboard  = db.Column(db.Text)                       # v12.34 — προσωπική διάταξη tiles (JSON)
     is_active  = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     hotels     = db.relationship('Hotel', secondary=user_hotels, backref='members')
@@ -2225,15 +2226,66 @@ def areas_dashboard():
     return render_template('areas_dashboard.html', areas=areas, rows=rows,
                            is_admin=is_admin(), templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all())
 
+# ── v12.34 — Προσωπικό dashboard με tiles (drag&drop, ανά χρήστη) ─────────────
+# Κατάλογος διαθέσιμων tiles. kind: 'kpi'|'widget'. scope: 'all'=όλοι · 'admin'=admin/master.
+TILE_CATALOG = [
+    {'id':'compliance',   'title':'Συμμόρφωση σήμερα',          'icon':'ti-checkup-list',   'kind':'kpi',    'scope':'all'},
+    {'id':'alerts',       'title':'Εκτός ορίων',                'icon':'ti-alert-triangle', 'kind':'kpi',    'scope':'all'},
+    {'id':'open_faults',  'title':'Ανοιχτές βλάβες',            'icon':'ti-tool',           'kind':'kpi',    'scope':'all'},
+    {'id':'my_faults',    'title':'Δικές μου βλάβες',           'icon':'ti-user-cog',       'kind':'kpi',    'scope':'all'},
+    {'id':'pool_today',   'title':'Μετρήσεις πισινών σήμερα',   'icon':'ti-pool',           'kind':'kpi',    'scope':'all'},
+    {'id':'water_today',  'title':'Μετρήσεις νερών σήμερα',     'icon':'ti-droplet',        'kind':'kpi',    'scope':'all'},
+    {'id':'surveys_today','title':'Απαντήσεις ερωτημ. σήμερα',  'icon':'ti-clipboard-check','kind':'kpi',    'scope':'all'},
+    {'id':'hotels',       'title':'Ξενοδοχεία',                 'icon':'ti-building',       'kind':'kpi',    'scope':'all'},
+    {'id':'checkpoints',  'title':'Σημεία ελέγχου',             'icon':'ti-map-pin',        'kind':'kpi',    'scope':'all'},
+    {'id':'users',        'title':'Χρήστες',                    'icon':'ti-users',          'kind':'kpi',    'scope':'admin'},
+    {'id':'pending',      'title':'Εκκρεμείς εγγραφές',         'icon':'ti-user-plus',      'kind':'kpi',    'scope':'admin'},
+    {'id':'coverage',     'title':'Κάλυψη ανά ξενοδοχείο',      'icon':'ti-checkup-list',   'kind':'widget', 'scope':'all'},
+    {'id':'alerts_list',  'title':'Εκτός ορίων (πρόσφατα)',     'icon':'ti-alert-triangle', 'kind':'widget', 'scope':'all'},
+    {'id':'faults_list',  'title':'Ανοιχτές βλάβες (λίστα)',    'icon':'ti-tool',           'kind':'widget', 'scope':'all'},
+    {'id':'activity',     'title':'Πρόσφατη δραστηριότητα',     'icon':'ti-history',        'kind':'widget', 'scope':'all'},
+    {'id':'pending_list', 'title':'Εκκρεμείς εγγραφές (λίστα)', 'icon':'ti-user-plus',      'kind':'widget', 'scope':'admin'},
+]
+DEFAULT_TILES_ADMIN = ['compliance','alerts','open_faults','pending','hotels','checkpoints',
+                       'coverage','alerts_list','faults_list','pending_list']
+DEFAULT_TILES_STAFF = ['my_faults','open_faults','pool_today','water_today','surveys_today',
+                       'coverage','alerts_list','faults_list']
+
+def _tile_allowed(t, admin):
+    return admin or t.get('scope') != 'admin'
+
+def _user_tiles(user, admin):
+    """Ordered λίστα tile ids για τον χρήστη (saved ή default), φιλτραρισμένη σε επιτρεπτά."""
+    valid = {t['id'] for t in TILE_CATALOG if _tile_allowed(t, admin)}
+    ids = None
+    try:
+        raw = getattr(user, 'dashboard', None)
+        if raw:
+            data = json.loads(raw)
+            ids = data.get('tiles') if isinstance(data, dict) else (data if isinstance(data, list) else None)
+    except Exception:
+        ids = None
+    if not ids:
+        ids = DEFAULT_TILES_ADMIN if admin else DEFAULT_TILES_STAFF
+    out, seen = [], set()
+    for i in ids:
+        if i in valid and i not in seen:
+            out.append(i); seen.add(i)
+    return out
+
 @app.route('/overview')
 def overview():
-    if not is_admin():
+    user = current_user()
+    if not user:
         return redirect(url_for('login'))
+    admin = is_admin()
     today = date.today()
-    hotels = scoped_hotels(current_user())
+    hotels = scoped_hotels(user)
     hids = {h.id for h in hotels}
-    cov = []
-    total_exp = total_done = 0
+    F = __import__('faults').Fault
+
+    # — Κάλυψη ανά ξενοδοχείο + συμμόρφωση —
+    cov = []; total_exp = total_done = 0
     for h in hotels:
         exp = done = 0
         for p in [p for p in h.pools if p.is_active]:
@@ -2247,6 +2299,9 @@ def overview():
         pct = int(100 * done / exp) if exp else 100
         cov.append({'hotel': h.name, 'exp': exp, 'done': done, 'pct': pct})
         total_exp += exp; total_done += done
+    compliance = int(100 * total_done / total_exp) if total_exp else 100
+
+    # — Εκτός ορίων (alerts) —
     rec_dates = [today, today - timedelta(days=1)]
     alerts = []
     for r in PoolRecord.query.filter(PoolRecord.record_date.in_(rec_dates)).order_by(PoolRecord.recorded_at.desc()).limit(80).all():
@@ -2259,18 +2314,75 @@ def overview():
         for a in area_actions(r):
             alerts.append({'where': (r.area.hotel.name + ' / ' + r.area.name) if (r.area and r.area.hotel) else '—',
                            'label': a['label'], 'urgent': False, 'date': r.record_date})
-    alerts = sorted(alerts, key=lambda x: (not x['urgent'], x['date']), reverse=False)[:15]
-    faults = FaultReport.query.filter_by(status='open').order_by(FaultReport.id.desc()).limit(10).all()
+    alerts = sorted(alerts, key=lambda x: (not x['urgent'], x['date']))[:15]
+
+    # — Βλάβες (νέο μοντέλο Fault) —
+    _open = F.query.filter(F.hotel_id.in_(hids or [-1])).filter(~F.status.in_(('done','not_done','resubmitted')))
+    open_faults_n = _open.count()
+    faults = _open.order_by(F.submitted_at.desc()).limit(10).all()
+    my_faults_n = F.query.filter(F.hotel_id.in_(hids or [-1])).filter(
+        ~F.status.in_(('done','not_done','resubmitted'))).filter(
+        (F.assigned_user_id == user.id) | (F.submitted_by == user.id)).count()
+
+    # — Μετρήσεις σήμερα —
+    pool_today = PoolRecord.query.join(Pool, PoolRecord.pool_id == Pool.id).filter(
+        Pool.hotel_id.in_(hids or [-1]), PoolRecord.record_date == today).count()
+    try:
+        water_today = WaterRecord.query.filter(WaterRecord.record_date == today).count()
+    except Exception:
+        water_today = 0
+    try:
+        SR = __import__('surveys').SurveyResponse
+        _t0 = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        surveys_today = SR.query.filter(SR.submitted_at >= _t0).count()
+    except Exception:
+        surveys_today = 0
+
     pending = User.query.filter_by(is_active=True, approved=False).all()
-    kpis = {'hotels': len(hotels),
-            'pools': Pool.query.filter_by(is_active=True).count(),
-            'areas': Area.query.filter_by(is_active=True).count(),
-            'users': User.query.filter_by(is_active=True, approved=True).count(),
-            'compliance': int(100 * total_done / total_exp) if total_exp else 100,
-            'open_faults': (__import__('faults').Fault.query.filter(__import__('faults').Fault.hotel_id.in_(hids or [-1])).filter(~__import__('faults').Fault.status.in_(('done','not_done','resubmitted'))).count()),
-            'pending': len(pending), 'alerts': len(alerts)}
-    return render_template('overview.html', cov=cov, alerts=alerts, faults=faults,
-                           pending=pending, kpis=kpis, areas_labels=AREA_LABELS)
+    activity = ActivityLog.query.order_by(ActivityLog.id.desc()).limit(12).all()
+    checkpoints = sum(len([p for p in h.pools if p.is_active]) for h in hotels) + \
+                  Area.query.filter(Area.hotel_id.in_(hids or [-1]), Area.is_active == True).count()
+
+    tiledata = {
+        'compliance': compliance, 'alerts': len(alerts), 'open_faults': open_faults_n,
+        'my_faults': my_faults_n, 'pool_today': pool_today, 'water_today': water_today,
+        'surveys_today': surveys_today, 'hotels': len(hotels), 'checkpoints': checkpoints,
+        'users': User.query.filter_by(is_active=True, approved=True).count(), 'pending': len(pending),
+        'cov': cov, 'alerts_list': alerts, 'faults_list': faults, 'pending_list': pending, 'activity': activity,
+    }
+    catalog = [t for t in TILE_CATALOG if _tile_allowed(t, admin)]
+    order = _user_tiles(user, admin)
+    cmap = {t['id']: t for t in catalog}
+    shown_tiles = [cmap[i] for i in order if i in cmap]
+    _shset = set(order)
+    hidden_tiles = [t for t in catalog if t['id'] not in _shset]
+    return render_template('overview.html', tiledata=tiledata, catalog=catalog, order=order,
+                           shown_tiles=shown_tiles, hidden_tiles=hidden_tiles,
+                           is_admin=admin, areas_labels=AREA_LABELS, action_labels=ACTION_LABELS)
+
+@app.route('/overview/layout', methods=['POST'])
+def overview_layout():
+    user = current_user()
+    if not user:
+        return ('', 401)
+    admin = is_admin()
+    valid = {t['id'] for t in TILE_CATALOG if _tile_allowed(t, admin)}
+    try:
+        payload = request.get_json(silent=True) or {}
+        if payload.get('reset'):
+            user.dashboard = None
+            db.session.commit()
+            return ('', 204)
+        clean, seen = [], set()
+        for i in payload.get('tiles', []):
+            if i in valid and i not in seen:
+                clean.append(i); seen.add(i)
+        user.dashboard = json.dumps({'tiles': clean})
+        db.session.commit()
+        return ('', 204)
+    except Exception as e:
+        db.session.rollback()
+        return (str(e), 400)
 
 # ── v12.21 — Καταγραφή χρηστών (Activity Log) ────────────────────────────────
 ACTION_LABELS = {
