@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Εισαγωγή ερωτηματολογίου</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
+.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
+.topbar-title { font-size:16px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.topbar a { color:#fff; text-decoration:none; font-size:13px; }
+.container { max-width:1040px; margin:0 auto; padding:24px; }
+.card { background:white; border-radius:14px; padding:20px; border:1px solid #e0f0ff; margin-bottom:18px; }
+.card-title { font-size:14px; font-weight:600; color:#333; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.muted { color:#94a3b8; font-size:12.5px; }
+.frow { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:6px; }
+.fcol { display:flex; flex-direction:column; gap:5px; }
+.fcol label { font-size:12.5px; font-weight:600; color:#334155; }
+input[type=text], select { padding:8px 10px; border:1px solid #d6eef3; border-radius:8px; font-size:13.5px; background:#fff; min-width:200px; }
+.maprow { display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid #f4f7fa; }
+.maprow .fld { width:170px; font-size:13.5px; font-weight:600; color:#334155; }
+.btn { padding:11px 18px; border:none; border-radius:9px; font-size:14px; font-weight:600; cursor:pointer; background:#193847; color:#fff; display:inline-flex; align-items:center; gap:7px; }
+.btn.ghost { background:#eef5f8; color:#193847; text-decoration:none; }
+.err { background:#fee2e2; color:#dc2626; padding:11px 14px; border-radius:9px; margin-bottom:16px; font-size:13.5px; }
+.qgrid { display:flex; flex-wrap:wrap; gap:8px; }
+.qchip { display:flex; align-items:center; gap:7px; background:#f6fbff; border:1px solid #e0f0ff; border-radius:8px; padding:7px 11px; font-size:12.5px; }
+.qtype { font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:20px; background:#193847; color:#fff; }
+.qtype.rating{background:#0ea5e9;} .qtype.nps{background:#8b5cf6;} .qtype.choice{background:#f59e0b;} .qtype.yesno{background:#16a34a;} .qtype.text{background:#64748b;}
+.prev-wrap { overflow:auto; border:1px solid #e7eef4; border-radius:10px; }
+table.prev { border-collapse:collapse; font-size:12px; white-space:nowrap; }
+table.prev th, table.prev td { padding:6px 9px; border-bottom:1px solid #f0f4f7; border-right:1px solid #f4f7fa; text-align:left; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+table.prev th { background:#f6fbff; color:#475569; font-weight:600; }
+</style>
+<style>:root{--brand:{{ theme.primary if theme else '#193847' }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title"><i class="ti ti-clipboard-check"></i> Εισαγωγή ερωτηματολογίου</div>
+  <div><a href="/dashboard/imports?embed=1"><i class="ti ti-arrow-left"></i> Κέντρο Εισαγωγής</a></div>
+</div>
+<div class="container">
+
+  {% if error %}<div class="err"><i class="ti ti-alert-triangle"></i> {{ error }}</div>{% endif %}
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-file-spreadsheet"></i> {{ up.filename }} · {{ n_rows }} γραμμές</div>
+    <p class="muted">Κάθε γραμμή του αρχείου = μία απάντηση. Όρισε τις <b>μετα-στήλες</b> (ημερομηνία, όνομα…) — <b>όλες οι υπόλοιπες στήλες γίνονται ερωτήσεις</b> αυτόματα, με τον τύπο που εντόπισα.</p>
+  </div>
+
+  <form method="POST" action="/dashboard/imports/{{ up.id }}/commit?embed=1">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-settings"></i> Ρυθμίσεις ερωτηματολογίου</div>
+      <div class="frow">
+        <div class="fcol"><label>Τίτλος</label><input type="text" name="title" value="{{ default_title }}" style="min-width:320px;"></div>
+        <div class="fcol"><label>Ξενοδοχείο</label>
+          <select name="hotel_id">
+            <option value="">Όλα τα ξενοδοχεία</option>
+            {% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-arrows-split"></i> Μετα-στήλες (προαιρετικά)</div>
+      {% for key, label, syns in meta_fields %}
+      <div class="maprow">
+        <div class="fld">{{ label }}</div>
+        <select name="meta_{{ key }}">
+          <option value="-1">— (καμία) —</option>
+          {% for h in headers %}<option value="{{ loop.index0 }}" {{ 'selected' if meta_guess.get(key)==loop.index0 }}>{{ h or ('Στήλη ' ~ loop.index) }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-help-circle"></i> Ερωτήσεις που θα δημιουργηθούν ({{ qinfo|length }})</div>
+      <div class="qgrid">
+        {% for q in qinfo %}
+        <div class="qchip"><span>{{ q.text }}</span><span class="qtype {{ q.type }}">{{ q.label }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="muted" style="margin-top:12px;">Ο τύπος εντοπίστηκε αυτόματα από τις τιμές (1–5 = Βαθμολογία, 0–10 = NPS, Ναι/Όχι, λίγες επιλογές = Επιλογή, αλλιώς Κείμενο). Μπορείς να τον αλλάξεις αργότερα από τη σελίδα Ερωτηματολόγια.</p>
+      <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+        <button class="btn" type="submit"><i class="ti ti-database-import"></i> Εισαγωγή {{ n_rows }} απαντήσεων</button>
+        <a class="btn ghost" href="/dashboard/imports?embed=1">Άκυρο</a>
+        <span class="muted">Ασφαλές να επαναληφθεί — οι ίδιες απαντήσεις δεν διπλασιάζονται.</span>
+      </div>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="card-title"><i class="ti ti-eye"></i> Προεπισκόπηση</div>
+    <div class="prev-wrap">
+      <table class="prev">
+        <tr>{% for h in headers %}<th>{{ h or ('Στήλη ' ~ loop.index) }}</th>{% endfor %}</tr>
+        {% for row in preview %}
+        <tr>{% for h in headers %}<td>{{ row[loop.index0] if loop.index0 < row|length else '' }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

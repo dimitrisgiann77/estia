@@ -52,7 +52,7 @@ th { color:#64748b; font-weight:600; font-size:11.5px; }
   {% if request.args.get('err')=='nofile' %}<div class="err">Δεν επιλέχθηκε αρχείο.</div>{% endif %}
   {% if request.args.get('err')=='parse' %}<div class="err">Δεν ήταν δυνατή η ανάγνωση του αρχείου (έλεγξε ότι είναι .xlsx ή .csv).</div>{% endif %}
 
-  <p class="intro">Από εδώ φορτώνεις δεδομένα από <b>πολλές πηγές</b> σε διαφορετικά module της Εστίας — είτε από <b>έτοιμα αρχεία</b> (π.χ. ιστορικά HotelToolbox) είτε ανεβάζοντας <b>δικό σου Excel/CSV</b> με αντιστοίχιση στηλών.</p>
+  <p class="intro">Κάθε <b>τομέας</b> μπορεί να τροφοδοτηθεί από <b>οποιαδήποτε πηγή</b> — έτοιμα αρχεία (HotelToolbox), δικό σου <b>Excel/CSV</b>, ή μελλοντικές πηγές. Διάλεξε τομέα και τρόπο εισαγωγής.</p>
 
   <div class="grid">
 
@@ -78,18 +78,29 @@ th { color:#64748b; font-weight:600; font-size:11.5px; }
           <input type="file" name="file" accept=".xlsx,.xls,.csv,.tsv" required>
           <button class="btn" type="submit"><i class="ti ti-upload"></i> Ανέβασμα</button>
         </form>
-        <p class="muted" style="margin-top:6px;">Θα διαλέξεις ποια στήλη πάει σε ποιο πεδίο στο επόμενο βήμα.</p>
+        <p class="muted" style="margin-top:6px;">Στο επόμενο βήμα αντιστοιχίζεις στήλες σε πεδία.</p>
       </div>
     </div>
 
     <!-- ΕΡΩΤΗΜΑΤΟΛΟΓΙΑ -->
-    <div class="card soon">
+    <div class="card">
       <div class="card-h">
         <div class="ic" style="background:#0ea5e9;"><i class="ti ti-clipboard-check"></i></div>
         <div style="flex:1;"><div class="card-t">Ερωτηματολόγια</div><div class="card-s">Module Υποδοχή</div></div>
-        <span class="badge soon">Σύντομα</span>
+        <span class="badge live">Ενεργό</span>
       </div>
-      <p class="muted" style="margin-top:8px;">Εισαγωγή ιστορικών απαντήσεων (Asterias & 2023–2025) στη μηχανή ερωτηματολογίων. Επόμενο στη σειρά.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="n">{{ surv_imported }}</div><div class="l">απαντήσεις από αρχεία</div></div>
+      </div>
+      <div class="opt">
+        <div class="opt-t"><i class="ti ti-file-upload"></i> Ανέβασμα Excel/CSV</div>
+        <form class="file-row" method="POST" action="/dashboard/imports/upload?embed=1" enctype="multipart/form-data">
+          <input type="hidden" name="target" value="surveys">
+          <input type="file" name="file" accept=".xlsx,.xls,.csv,.tsv" required>
+          <button class="btn" type="submit"><i class="ti ti-upload"></i> Ανέβασμα</button>
+        </form>
+        <p class="muted" style="margin-top:6px;">Wide format: κάθε γραμμή = μία απάντηση, οι στήλες = ερωτήσεις. Ο τύπος κάθε ερώτησης εντοπίζεται αυτόματα.</p>
+      </div>
     </div>
 
     <!-- ΠΑΡΑΠΟΝΑ / ΣΥΜΒΑΝΤΑ -->
@@ -99,7 +110,27 @@ th { color:#64748b; font-weight:600; font-size:11.5px; }
         <div style="flex:1;"><div class="card-t">Παράπονα / Συμβάντα</div><div class="card-s">Logbooks Υποδοχής</div></div>
         <span class="badge soon">Σύντομα</span>
       </div>
-      <p class="muted" style="margin-top:8px;">1.762 ιστορικά. Χρειάζεται πρώτα το αντίστοιχο board (Φάση Β).</p>
+      <p class="muted" style="margin-top:8px;">1.762 ιστορικά. Χρειάζεται πρώτα το αντίστοιχο board.</p>
+    </div>
+
+    <!-- ΠΕΛΑΤΕΣ (CRM) -->
+    <div class="card soon">
+      <div class="card-h">
+        <div class="ic" style="background:#8b5cf6;"><i class="ti ti-users"></i></div>
+        <div style="flex:1;"><div class="card-t">Πελάτες (CRM)</div><div class="card-s">Βάση πελατών</div></div>
+        <span class="badge soon">Σύντομα</span>
+      </div>
+      <p class="muted" style="margin-top:8px;">Εισαγωγή από οποιαδήποτε πηγή — θέλει πρώτα το module πελατών.</p>
+    </div>
+
+    <!-- ΚΡΑΤΗΣΕΙΣ (PMS) -->
+    <div class="card soon">
+      <div class="card-h">
+        <div class="ic" style="background:#0e7490;"><i class="ti ti-calendar-event"></i></div>
+        <div style="flex:1;"><div class="card-t">Κρατήσεις (PMS)</div><div class="card-s">Property Management</div></div>
+        <span class="badge soon">Σύντομα</span>
+      </div>
+      <p class="muted" style="margin-top:8px;">Εισαγωγή κρατήσεων — θέλει πρώτα το module κρατήσεων.</p>
     </div>
 
   </div>

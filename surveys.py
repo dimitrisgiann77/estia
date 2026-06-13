@@ -53,6 +53,7 @@ class SurveyResponse(db.Model):
     name         = db.Column(db.String(120))
     room         = db.Column(db.String(60))
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    import_hash  = db.Column(db.String(40), index=True, nullable=True)   # v12.30 idempotent import
     hotel        = db.relationship('Hotel')
     answers      = db.relationship('SurveyAnswer', backref='response', cascade='all, delete-orphan')
 

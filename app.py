@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.29'
-APP_BUILD   = '309'
+APP_VERSION = '12.30'
+APP_BUILD   = '310'
 
 @app.context_processor
 def inject_version():
@@ -2652,6 +2652,7 @@ def ensure_columns():
         _add_col('user', 'avatar', 'avatar TEXT')
         _add_col('water_record', 'water_system_id', 'water_system_id INTEGER')  # v12.3
         _add_col('activity_log', 'hotel_id', 'hotel_id INTEGER')  # v12.22
+        _add_col('survey_response', 'import_hash', 'import_hash VARCHAR(40)')  # v12.30
     except Exception as e:
         db.session.rollback()
         print(f'ensure_columns skipped: {e}')

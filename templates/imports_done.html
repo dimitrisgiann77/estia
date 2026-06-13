@@ -27,6 +27,22 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; backg
 <body>
 <div class="topbar"><i class="ti ti-circle-check"></i> ΕΣΤΙΑ — Εισαγωγή ολοκληρώθηκε</div>
 <div class="container">
+
+{% if is_survey %}
+  <div class="ok"><i class="ti ti-circle-check"></i> Το αρχείο <b>{{ up.filename }}</b> εισήχθη στο ερωτηματολόγιο «<b>{{ res.survey_title }}</b>».</div>
+  <div class="card">
+    <div class="stat-row">
+      <div class="stat"><div class="n">{{ res.added }}</div><div class="l">νέες απαντήσεις</div></div>
+      <div class="stat"><div class="n">{{ res.skipped }}</div><div class="l">υπήρχαν ήδη</div></div>
+      <div class="stat"><div class="n">{{ res.questions }}</div><div class="l">ερωτήσεις</div></div>
+    </div>
+    <p class="muted">{% if res.created_survey %}Δημιουργήθηκε νέο ερωτηματολόγιο (ανενεργό — δεν δέχεται δημόσιες απαντήσεις).{% else %}Προστέθηκαν σε υπάρχον ερωτηματολόγιο.{% endif %} Σύνολο γραμμών: {{ res.total }}.</p>
+    <div style="margin-top:16px; display:flex; gap:10px;">
+      <a class="btn" href="/dashboard/survey/{{ res.survey_id }}/results?embed=1"><i class="ti ti-chart-bar"></i> Αποτελέσματα</a>
+      <a class="btn ghost" href="/dashboard/imports?embed=1"><i class="ti ti-database-import"></i> Κέντρο Εισαγωγής</a>
+    </div>
+  </div>
+{% else %}
   <div class="ok"><i class="ti ti-circle-check"></i> Το αρχείο <b>{{ up.filename }}</b> εισήχθη στις Βλάβες.</div>
   <div class="card">
     <div class="stat-row">
@@ -41,6 +57,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; backg
       <a class="btn ghost" href="/dashboard/imports?embed=1"><i class="ti ti-database-import"></i> Κέντρο Εισαγωγής</a>
     </div>
   </div>
+{% endif %}
+
 </div>
 </body>
 </html>
