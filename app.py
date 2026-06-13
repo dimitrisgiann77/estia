@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.13)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.14)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -26,6 +26,8 @@ Modules:
              εκτός login/register)· Χρήστες: πλήρες edit (username+γλώσσα) + reveal νέου κωδικού
   - v12.13 — Χρήστες: χρωματικά badges για όλους τους ρόλους (masteradmin/admin/manager/staff/viewer)·
              η διαχείριση χρήστη σε pop-up modal (αντί για ανάπτυξη)· delete μέσα στο modal
+  - v12.14 — Module Βλαβοληψία Φάση 1 (faults.py): δέντρο κατηγοριών (240), 9 καταστάσεις/state machine,
+             αυτόματη/χειροκίνητη ανάθεση, σχόλια 2 καναλιών, audit log, SLA seed, μαζική «Ολοκλήρωση»
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
@@ -269,7 +271,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.13'
+APP_VERSION = '12.14'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -1823,30 +1825,7 @@ def pools_coverage():
         grid.append({'pool': p, 'cells': cells})
     return render_template('coverage.html', grid=grid, days=days)
 
-# ── Αναφορά βλάβης ──
-@app.route('/fault', methods=['GET', 'POST'])
-def fault_report():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = current_user()
-    hids = {h.id for h in allowed_hotels(user)}
-    pools = [p for p in Pool.query.filter_by(is_active=True).all() if p.hotel_id in hids]
-    if request.method == 'POST':
-        area = request.form.get('area', 'other')
-        msg = request.form.get('message', '').strip()
-        pid = request.form.get('pool_id', '')
-        pool = Pool.query.get(int(pid)) if pid.isdigit() else None
-        if msg:
-            fr = FaultReport(user_id=user.id, area=area, message=msg,
-                             pool_id=pool.id if pool else None,
-                             hotel_id=pool.hotel_id if pool else None, status='open')
-            db.session.add(fr); db.session.commit()
-            log_activity('fault_report', area)
-            where = (' / ' + pool.name) if pool else ''
-            notify_admins('Νέα αναφορά βλάβης: ' + AREA_LABELS.get(area, area) + where, '/dashboard/faults')
-            threading.Thread(target=_bg_send_fault, args=(fr.id,), daemon=True).start()
-            return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=True)
-    return render_template('fault.html', areas=AREA_LABELS, pools=pools, done=False)
+# ── Αναφορά βλάβης: μεταφέρθηκε στο faults.py (Module Βλαβοληψία v12.14) ──
 
 # ── In-app ειδοποιήσεις ──
 @app.route('/notifications')
@@ -1864,47 +1843,7 @@ def notifications_read():
     db.session.commit()
     return redirect(url_for('notifications'))
 
-# ── Admin inbox βλαβών ──
-@app.route('/dashboard/faults')
-def faults_inbox():
-    if not is_admin():
-        return redirect(url_for('login'))
-    open_faults = FaultReport.query.filter_by(status='open').order_by(FaultReport.id.desc()).all()
-    done_faults = FaultReport.query.filter_by(status='resolved').order_by(FaultReport.id.desc()).limit(50).all()
-    return render_template('faults_inbox.html', open_faults=open_faults, done_faults=done_faults, areas=AREA_LABELS)
-
-@app.route('/dashboard/fault/<int:fid>/answer', methods=['POST'])
-def fault_answer(fid):
-    if not is_admin():
-        return redirect(url_for('login'))
-    fr = FaultReport.query.get(fid)
-    if fr:
-        fr.answer = request.form.get('answer', '').strip()
-        fr.answered_by = session.get('user_id')
-        db.session.commit()
-        notify(fr.user_id, 'Απάντηση στην αναφορά σου: ' + (fr.answer or '')[:80], '/notifications')
-        log_activity('fault_answer', str(fid))
-    return redirect(url_for('faults_inbox'))
-
-@app.route('/dashboard/fault/<int:fid>/resolve', methods=['POST'])
-def fault_resolve(fid):
-    if not is_admin():
-        return redirect(url_for('login'))
-    fr = FaultReport.query.get(fid)
-    if fr:
-        fr.status = 'resolved'; fr.resolved_at = datetime.utcnow(); db.session.commit()
-        notify(fr.user_id, 'Η αναφορά βλάβης σου επιλύθηκε.', '/notifications')
-        log_activity('fault_resolve', str(fid))
-    return redirect(url_for('faults_inbox'))
-
-@app.route('/dashboard/fault/<int:fid>/reopen', methods=['POST'])
-def fault_reopen(fid):
-    if not is_admin():
-        return redirect(url_for('login'))
-    fr = FaultReport.query.get(fid)
-    if fr:
-        fr.status = 'open'; fr.resolved_at = None; db.session.commit()
-    return redirect(url_for('faults_inbox'))
+# ── Inbox/διαχείριση βλαβών: μεταφέρθηκε στο faults.py (Module Βλαβοληψία v12.14) ──
 
 # ── Email admin (Graph/SMTP, test, manual, log) ──
 @app.route('/dashboard/email')
@@ -2613,8 +2552,10 @@ def seed_team():
             db.session.rollback(); print('seed_team skipped:', e)
 
 
+import faults          # v12.14 — Module Βλαβοληψία (μοντέλα + routes)· ΠΡΙΝ το create_all
 init_db()
 seed_team()
+faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
 start_scheduler()
 
 if __name__ == '__main__':
