@@ -1,5 +1,5 @@
 """
-Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.21)
+Εστία (Estia) — CONDIAN HOTELS · Κεντρική πλατφόρμα προσωπικού (v12.22)
 Backend: Flask + PostgreSQL + SMTP + AI Assistant
 
 Modules:
@@ -275,7 +275,7 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.21'
+APP_VERSION = '12.22'
 APP_BUILD   = '2026-06-13'
 
 @app.context_processor
@@ -375,9 +375,12 @@ def can_access_water_system(u, ws):
         return True   # χωρίς ανάθεση = όλα
     return ws.hotel_id in assigned
 
-def log_activity(action, detail=''):
+def log_activity(action, detail='', hotel_id=None):
     try:
-        db.session.add(ActivityLog(user_id=session.get('user_id'),
+        if hotel_id is None:
+            try: hotel_id = active_hotel_id()
+            except Exception: hotel_id = None
+        db.session.add(ActivityLog(user_id=session.get('user_id'), hotel_id=hotel_id,
                                    action=(action or '')[:60], detail=(detail or '')[:300]))
         db.session.commit()
     except Exception:
@@ -394,10 +397,12 @@ user_hotels = db.Table('user_hotels',
 class ActivityLog(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=True)   # v12.22
     action     = db.Column(db.String(60))
     detail     = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     user       = db.relationship('User')
+    hotel      = db.relationship('Hotel')
 
 class User(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -1362,7 +1367,7 @@ def submit():
         db.session.add(record)
     db.session.commit()
     place = (ws.hotel.name + ' · ' + ws.name) if ws.hotel else ws.name
-    log_activity('water_submit', f'{place} ({period})')
+    log_activity('water_submit', f'{place} ({period})', hotel_id=(ws.hotel_id if ws else None))
     _wa = compute_water_actions(record)
     if _wa:
         notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _wa) else '')
@@ -1481,7 +1486,7 @@ def submit_pool():
         apply_pool_record(record, data, period)
         db.session.add(record)
     db.session.commit()
-    log_activity('pool_submit', f'{pool.name} ({period})')
+    log_activity('pool_submit', f'{pool.name} ({period})', hotel_id=pool.hotel_id)
     _a = compute_pool_actions(record)
     if _a:
         notify_admins((('ΕΠΕΙΓΟΝ — ' if any(x['urgent'] for x in _a) else '') + 'Μέτρηση εκτός ορίων: ' + pool.name), '/pools/dashboard')
@@ -2078,7 +2083,7 @@ def areas_submit():
                       record_date=date.today(), period=period, values=json.dumps(vals), notes=data.get('notes', ''))
         db.session.add(rec)
     db.session.commit()
-    log_activity('area_submit', area.name)
+    log_activity('area_submit', area.name, hotel_id=area.hotel_id)
     acts = area_actions(rec)
     if acts:
         notify_admins('Εκτός ορίων: ' + area.name + ' (' + str(len(acts)) + ')', '/areas/dashboard')
@@ -2164,6 +2169,19 @@ ACTION_LABELS = {
 def _act_label(a):
     return ACTION_LABELS.get(a, a or '—')
 
+ACTION_ICON = {
+    'login': 'login', 'logout': 'logout', 'profile_update': 'user-edit',
+    'water_submit': 'droplet', 'pool_submit': 'pool', 'pool_edit': 'edit', 'area_submit': 'checklist',
+    'user_add': 'user-plus', 'user_delete': 'user-x', 'user_approve': 'user-check',
+    'user_edit': 'user-edit', 'user_reset_password': 'key', 'user_toggle': 'toggle-right',
+    'email_test': 'mail', 'email_reminder_manual': 'mail-forward', 'theme_update': 'palette', 'ai_config': 'plug',
+    'area_add': 'map-pin-plus', 'template_new': 'template', 'template_edit': 'template', 'seed_demo': 'database',
+    'water_system_add': 'plus', 'water_system_edit': 'edit', 'water_system_delete': 'trash',
+    'fault_report': 'tool', 'faults_bulk': 'checks',
+}
+def _act_icon(a):
+    return ACTION_ICON.get(a, 'point')
+
 @app.route('/dashboard/activity')
 def activity_log():
     if not is_admin():
@@ -2175,7 +2193,11 @@ def activity_log():
     chip     = request.args.get('chip')          # today | 7d | 30d | logins
     now = datetime.utcnow()
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    q = ActivityLog.query
+    aid = active_hotel_id()                       # v12.22 — scope ανά ξενοδοχείο
+    def hscope(query):
+        return query.filter(ActivityLog.hotel_id == aid) if aid else query
+    base = hscope(ActivityLog.query)
+    q = hscope(ActivityLog.query)
     if chip == 'today':  q = q.filter(ActivityLog.created_at >= midnight)
     elif chip == '7d':   q = q.filter(ActivityLog.created_at >= now - timedelta(days=7))
     elif chip == '30d':  q = q.filter(ActivityLog.created_at >= now - timedelta(days=30))
@@ -2189,26 +2211,39 @@ def activity_log():
     users = User.query.filter_by(is_active=True).order_by(User.full_name).all()
     actions = sorted({a[0] for a in db.session.query(ActivityLog.action).distinct().all() if a[0]})
     kpi = {
-        'today':        ActivityLog.query.filter(ActivityLog.created_at >= midnight).count(),
-        'active_today': db.session.query(ActivityLog.user_id).filter(ActivityLog.created_at >= midnight).distinct().count(),
-        'logins_today': ActivityLog.query.filter(ActivityLog.created_at >= midnight, ActivityLog.action == 'login').count(),
-        'week':         ActivityLog.query.filter(ActivityLog.created_at >= now - timedelta(days=7)).count(),
+        'today':        hscope(ActivityLog.query).filter(ActivityLog.created_at >= midnight).count(),
+        'active_today': hscope(db.session.query(ActivityLog.user_id)).filter(ActivityLog.created_at >= midnight).distinct().count(),
+        'logins_today': hscope(ActivityLog.query).filter(ActivityLog.created_at >= midnight, ActivityLog.action == 'login').count(),
+        'week':         hscope(ActivityLog.query).filter(ActivityLog.created_at >= now - timedelta(days=7)).count(),
     }
+    # v12.22 — 7ήμερο mini γράφημα (scoped)
+    spark = []
+    for i in range(6, -1, -1):
+        d0 = (midnight - timedelta(days=i))
+        d1 = d0 + timedelta(days=1)
+        cnt = hscope(ActivityLog.query).filter(ActivityLog.created_at >= d0, ActivityLog.created_at < d1).count()
+        spark.append({'label': d0.strftime('%d/%m'), 'dow': ['Δε','Τρ','Τε','Πε','Πα','Σα','Κυ'][d0.weekday()], 'count': cnt})
+    spark_max = max([x['count'] for x in spark] or [1]) or 1
     week_start = now - timedelta(days=7)
     per_user = []
     for u in users:
-        last = ActivityLog.query.filter_by(user_id=u.id).order_by(ActivityLog.created_at.desc()).first()
+        last = hscope(ActivityLog.query).filter(ActivityLog.user_id == u.id).order_by(ActivityLog.created_at.desc()).first()
+        cw = hscope(ActivityLog.query).filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= week_start).count()
+        if aid and not last and cw == 0:
+            continue                              # σε scope ξενοδοχείου, κρύψε άσχετους χρήστες
         per_user.append({
             'u': u,
-            'today': ActivityLog.query.filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= midnight).count(),
-            'week':  ActivityLog.query.filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= week_start).count(),
+            'today': hscope(ActivityLog.query).filter(ActivityLog.user_id == u.id, ActivityLog.created_at >= midnight).count(),
+            'week':  cw,
             'last':  last,
         })
     per_user.sort(key=lambda x: (x['last'].created_at if x['last'] else datetime.min), reverse=True)
+    active_hotel = Hotel.query.get(aid) if aid else None
     return render_template('activity_log.html', logs=logs, users=users, actions=actions,
-                           act_label=_act_label, ACTION_LABELS=ACTION_LABELS,
+                           act_label=_act_label, act_icon=_act_icon, ACTION_LABELS=ACTION_LABELS,
                            f_user=f_user, f_action=f_action, search=search, chip=chip,
-                           kpi=kpi, per_user=per_user, user=user,
+                           kpi=kpi, per_user=per_user, user=user, spark=spark, spark_max=spark_max,
+                           active_hotel=active_hotel,
                            qs=request.query_string.decode('utf-8'))
 
 # admin: areas management
@@ -2496,6 +2531,7 @@ def ensure_columns():
         _add_col('user', 'approved', f'approved BOOLEAN DEFAULT {truth}')
         _add_col('user', 'avatar', 'avatar TEXT')
         _add_col('water_record', 'water_system_id', 'water_system_id INTEGER')  # v12.3
+        _add_col('activity_log', 'hotel_id', 'hotel_id INTEGER')  # v12.22
     except Exception as e:
         db.session.rollback()
         print(f'ensure_columns skipped: {e}')

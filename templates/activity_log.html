@@ -16,10 +16,17 @@
 .ucard .ustat b{display:block;font-size:18px;color:#193847;}
 .ucard .ustat span{font-size:10px;color:#8aa0aa;}
 .ucard .ulast{font-size:11px;color:#9aa7ad;margin-top:9px;}
+.spark{display:flex;align-items:flex-end;gap:10px;height:120px;padding:6px 4px 0;}
+.spark .bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end;}
+.spark .bar .fill{width:100%;max-width:40px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--mp-brand),#3b6e86);min-height:3px;}
+.spark .bar .v{font-size:12px;font-weight:700;color:#193847;}
+.spark .bar .d{font-size:10px;color:#8aa0aa;text-align:center;line-height:1.2;}
+.actc{display:inline-flex;align-items:center;gap:6px;}
+.actc i{color:#8aa0aa;font-size:15px;}
 </style>
 </head>
 <body>
-{{ mp.topbar('history', 'ΕΣΤΙΑ — Καταγραφή χρηστών', logs|length ~ ' πρόσφατες ενέργειες') }}
+{{ mp.topbar('history', 'ΕΣΤΙΑ — Καταγραφή χρηστών', (logs|length ~ ' πρόσφατες ενέργειες') ~ (' · ' ~ active_hotel.name if active_hotel else '')) }}
 <div class="container">
 
   {% set kcards = [
@@ -29,6 +36,19 @@
     {'n': kpi.week,          'label': 'Ενέργειες (7 ημ.)',  'color': '#b45309', 'href': '/dashboard/activity?chip=7d&embed=1',     'active': chip=='7d'},
   ] %}
   {{ mp.kpis(kcards) }}
+
+  <div class="card">
+    <div style="font-size:12px;font-weight:700;color:#193847;margin-bottom:6px;"><i class="ti ti-chart-bar"></i> Δραστηριότητα τελευταίων 7 ημερών{{ ' · ' ~ active_hotel.name if active_hotel else '' }}</div>
+    <div class="spark">
+      {% for d in spark %}
+      <div class="bar" title="{{ d.label }}: {{ d.count }}">
+        <div class="v">{{ d.count }}</div>
+        <div class="fill" style="height:{{ (d.count / spark_max * 100) if spark_max else 0 }}%;"></div>
+        <div class="d">{{ d.dow }}<br>{{ d.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
 
   <div class="card">
     {{ mp.chips([
@@ -47,14 +67,14 @@
       <span style="flex:1"></span>
       {{ mp.view_toggle('Ροή', 'Ανά χρήστη') }}
     </form>
-    <div class="muted" style="font-size:11px;margin-top:8px;"><i class="ti ti-info-circle"></i> Η καταγραφή αφορά όλο τον οργανισμό (δεν φιλτράρεται ανά ξενοδοχείο).</div>
+    <div class="muted" style="font-size:11px;margin-top:8px;"><i class="ti ti-info-circle"></i> Με επιλεγμένο ξενοδοχείο φιλτράρονται οι ενέργειες που έχουν ξενοδοχείο. Καθολικές ενέργειες (π.χ. σύνδεση/ρυθμίσεις) φαίνονται στο «Όλα τα ξενοδοχεία».</div>
   </div>
 
   <!-- ΡΟΗ (feed) -->
   <div class="card" id="mp-view-table">
     <div style="overflow-x:auto;">
     <table>
-      <thead><tr><th>Ώρα</th><th>Χρήστης</th><th>Ρόλος</th><th>Ενέργεια</th><th>Λεπτομέρεια</th></tr></thead>
+      <thead><tr><th>Ώρα</th><th>Χρήστης</th><th>Ρόλος</th><th>Ξενοδοχείο</th><th>Ενέργεια</th><th>Λεπτομέρεια</th></tr></thead>
       <tbody>
       {% for l in logs %}
         {% set act = l.action or '' %}
@@ -67,11 +87,12 @@
           <td class="muted" style="white-space:nowrap;">{{ l.created_at.strftime('%d/%m/%y %H:%M') if l.created_at else '—' }}</td>
           <td>{{ l.user.full_name if l.user else '—' }}</td>
           <td class="muted">{{ l.user.role if l.user else '' }}</td>
-          <td>{{ mp.badge(act_label(act), bg, fg) }}</td>
-          <td class="muted" style="max-width:340px;">{{ l.detail or '' }}</td>
+          <td class="muted">{{ l.hotel.name if l.hotel else '—' }}</td>
+          <td><span class="actc"><i class="ti ti-{{ act_icon(act) }}"></i>{{ mp.badge(act_label(act), bg, fg) }}</span></td>
+          <td class="muted" style="max-width:320px;">{{ l.detail or '' }}</td>
         </tr>
       {% endfor %}
-      {% if not logs %}<tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px;">Καμία ενέργεια</td></tr>{% endif %}
+      {% if not logs %}<tr><td colspan="6" style="text-align:center;color:#aaa;padding:24px;">Καμία ενέργεια</td></tr>{% endif %}
       </tbody>
     </table>
     </div>

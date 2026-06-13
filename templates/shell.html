@@ -148,9 +148,9 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
     {% endif %}
     <div class="sp"></div>
     <div class="apps">
-      <button class="hbtn active" onclick="estiaSoon('Operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>
+      <button class="hbtn active" data-ws="operations" onclick="setWorkspace('operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>
       <button class="hbtn" onclick="estiaSoon('Staff HUB')" title="Staff HUB — σύντομα"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
-      <button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>
+      {% if is_admin %}<button class="hbtn" data-ws="admin" onclick="setWorkspace('admin')" title="Admin"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% else %}<button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% endif %}
       <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
     </div>
     <div class="ic" onclick="go('/messages?embed=1',null)" title="Μηνύματα"><i class="ti ti-mail"></i>{% if msg_unread %}<span class="badge">{{ msg_unread }}</span>{% endif %}</div>
@@ -192,36 +192,36 @@ html[data-theme="dark"] .eai-panel{background:#141d2a;border-color:#243140;}
   <div class="body">
     <div class="scrim" onclick="document.getElementById('app').classList.remove('open')"></div>
     <nav class="side" id="side">
-      {% if is_admin %}<div class="item" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Σύνοψη</div>{% endif %}
+      {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Σύνοψη</div>{% endif %}
       {% if can_log %}
-      <div class="grp">Καταγραφές</div>
-      <div class="item" data-url="/pools?embed=1"><i class="ti ti-pool"></i> Πισίνες</div>
-      <div class="item" data-url="/app?embed=1"><i class="ti ti-droplet"></i> Νερά Χρήσης</div>
+      <div class="grp" data-ws="operations">Καταγραφές</div>
+      <div class="item" data-ws="operations" data-url="/pools?embed=1"><i class="ti ti-pool"></i> Πισίνες</div>
+      <div class="item" data-ws="operations" data-url="/app?embed=1"><i class="ti ti-droplet"></i> Νερά Χρήσης</div>
       {% endif %}
-      <div class="grp">Παρακολούθηση</div>
-      <div class="item" data-url="/pools/dashboard?embed=1"><i class="ti ti-layout-dashboard"></i> Πίνακας Πισινών</div>
-      {% if is_admin %}<div class="item" data-url="/dashboard?embed=1"><i class="ti ti-droplet-filled"></i> Πίνακας Νερών</div>{% endif %}
-      <div class="item" data-url="/records?embed=1"><i class="ti ti-list-details"></i> Records</div>
-      <div class="item" data-url="/pools/coverage?embed=1"><i class="ti ti-calendar-stats"></i> Εβδομαδιαία κάλυψη</div>
-      <div class="item" data-url="/dashboard/faults?embed=1"><i class="ti ti-alert-triangle"></i> Πίνακας Βλαβών</div>
-      <div class="grp">Συντήρηση</div>
-      <div class="item" data-url="/fault?embed=1"><i class="ti ti-tool"></i> Δήλωση βλάβης</div>
-      {% if can_log %}<div class="item" data-url="/areas?embed=1"><i class="ti ti-checklist"></i> Καταγραφή τομέων</div>{% endif %}
-      <div class="item" data-url="/areas/dashboard?embed=1"><i class="ti ti-clipboard-list"></i> Πίνακας τομέων</div>
-      <div class="grp">Γενικά</div>
-      <div class="item" data-url="/profile?embed=1"><i class="ti ti-user"></i> Το προφίλ μου</div>
+      <div class="grp" data-ws="operations">Παρακολούθηση</div>
+      <div class="item" data-ws="operations" data-url="/pools/dashboard?embed=1"><i class="ti ti-layout-dashboard"></i> Πίνακας Πισινών</div>
+      {% if is_admin %}<div class="item" data-ws="operations" data-url="/dashboard?embed=1"><i class="ti ti-droplet-filled"></i> Πίνακας Νερών</div>{% endif %}
+      <div class="item" data-ws="operations" data-url="/records?embed=1"><i class="ti ti-list-details"></i> Records</div>
+      <div class="item" data-ws="operations" data-url="/pools/coverage?embed=1"><i class="ti ti-calendar-stats"></i> Εβδομαδιαία κάλυψη</div>
+      <div class="item" data-ws="operations" data-url="/dashboard/faults?embed=1"><i class="ti ti-alert-triangle"></i> Πίνακας Βλαβών</div>
+      <div class="grp" data-ws="operations">Συντήρηση</div>
+      <div class="item" data-ws="operations" data-url="/fault?embed=1"><i class="ti ti-tool"></i> Δήλωση βλάβης</div>
+      {% if can_log %}<div class="item" data-ws="operations" data-url="/areas?embed=1"><i class="ti ti-checklist"></i> Καταγραφή τομέων</div>{% endif %}
+      <div class="item" data-ws="operations" data-url="/areas/dashboard?embed=1"><i class="ti ti-clipboard-list"></i> Πίνακας τομέων</div>
+      <div class="grp" data-ws="operations admin">Γενικά</div>
+      <div class="item" data-ws="operations admin" data-url="/profile?embed=1"><i class="ti ti-user"></i> Το προφίλ μου</div>
       {% if is_admin %}
-      <div class="grp">Διαχείριση</div>
-      <div class="item" data-url="/dashboard/users?embed=1"><i class="ti ti-users"></i> Χρήστες</div>
-      <div class="item" data-url="/dashboard/activity?embed=1"><i class="ti ti-history"></i> Καταγραφή χρηστών</div>
-      <div class="item" data-url="/dashboard/hotels?embed=1"><i class="ti ti-building"></i> Ξενοδοχεία & Πισίνες</div>
-      <div class="item" data-url="/dashboard/areas?embed=1"><i class="ti ti-map-pin"></i> Διαχείριση τομέων</div>
-      <div class="item" data-url="/dashboard/templates?embed=1"><i class="ti ti-template"></i> Templates</div>
-      <div class="item" data-url="/dashboard/faults/settings?embed=1"><i class="ti ti-settings-cog"></i> Βλάβες · Ρυθμίσεις</div>
-      <div class="item" data-url="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
-      <div class="item" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
-      <div class="item" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
-      {% if is_master %}<div class="item" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
+      <div class="grp" data-ws="admin">Διαχείριση</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/users?embed=1"><i class="ti ti-users"></i> Χρήστες</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/activity?embed=1"><i class="ti ti-history"></i> Καταγραφή χρηστών</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/hotels?embed=1"><i class="ti ti-building"></i> Ξενοδοχεία & Πισίνες</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/areas?embed=1"><i class="ti ti-map-pin"></i> Διαχείριση τομέων</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/templates?embed=1"><i class="ti ti-template"></i> Templates</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/faults/settings?embed=1"><i class="ti ti-settings-cog"></i> Βλάβες · Ρυθμίσεις</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
+      {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
       {% endif %}
     </nav>
     <div class="content"><iframe id="frame" name="frame"></iframe></div>
@@ -330,16 +330,29 @@ if(window.matchMedia){ try{ matchMedia('(prefers-color-scheme:dark)').addEventLi
 var frame=document.getElementById('frame');
 function go(url,el){
   frame.src=url;
-  function setHotel(v){fetch('/set-hotel/'+encodeURIComponent(v)).then(function(){var f=document.getElementById('frame');if(f&&f.src)f.src=f.src;}).catch(function(){});}
-document.querySelectorAll('.item').forEach(function(i){i.classList.remove('active');});
+  document.querySelectorAll('.item').forEach(function(i){i.classList.remove('active');});
   if(el) el.classList.add('active');
   document.getElementById('app').classList.remove('open');
 }
+function setHotel(v){ fetch('/set-hotel/'+encodeURIComponent(v)).then(function(){ if(frame&&frame.src) frame.src=frame.src; }).catch(function(){}); }
+function applyWs(ws){
+  document.querySelectorAll('#side [data-ws]').forEach(function(el){ el.style.display = el.matches('[data-ws~="'+ws+'"]') ? '' : 'none'; });
+  document.querySelectorAll('.apps .hbtn[data-ws]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-ws')===ws); });
+}
+function setWorkspace(ws){
+  applyWs(ws);
+  try{ localStorage.setItem('estia_ws', ws); }catch(e){}
+  var f=document.querySelector('#side .item[data-ws~="'+ws+'"]');
+  if(f) go(f.getAttribute('data-url'), f);
+}
 document.querySelectorAll('.item').forEach(function(i){ i.addEventListener('click',function(){ go(i.getAttribute('data-url'), i); }); });
-// default section
-var first = {{ 'true' if is_admin else 'false' }} ? document.querySelector('.item[data-url^="/overview"]') : ({{ 'true' if can_log else 'false' }} ? document.querySelector('.item[data-url^="/pools?"]') : document.querySelector('.item[data-url^="/pools/dashboard"]'));
-if(!first) first=document.querySelector('.item');
-go(first.getAttribute('data-url'), first);
+// init workspace + default section
+var _ws='operations'; try{ _ws=localStorage.getItem('estia_ws')||'operations'; }catch(e){}
+if(_ws!=='operations' && !document.querySelector('.apps .hbtn[data-ws="'+_ws+'"]')) _ws='operations';
+applyWs(_ws);
+var first=document.querySelector('#side .item[data-ws~="'+_ws+'"]');
+if(!first) first=document.querySelector('#side .item');
+if(first) go(first.getAttribute('data-url'), first);
 </script>
 </body>
 </html>
