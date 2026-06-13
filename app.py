@@ -314,8 +314,8 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.31'
-APP_BUILD   = '311'
+APP_VERSION = '12.32'
+APP_BUILD   = '312'
 
 @app.context_processor
 def inject_version():
