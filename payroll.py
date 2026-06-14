@@ -17,7 +17,8 @@ import os, re, json, unicodedata
 from datetime import datetime, date
 from flask import request, redirect, url_for, render_template, session
 from app import (app, db, current_user, is_admin, log_activity,
-                 Hotel, User, Setting, role_rank, ROLE_RANK)
+                 Hotel, User, Setting, role_rank, ROLE_RANK,
+                 notify, notify_admins)
 
 try:
     from schedule import EmploymentProfile, monthly_settlement  # L1/L2 source (S-13)
@@ -142,6 +143,9 @@ def ensure_payroll_columns():
             _add_col('payroll_line', 'extra_legal_net', 'extra_legal_net FLOAT')
             _add_col('payroll_line', 'extra_employer_cost', 'extra_employer_cost FLOAT')
             _add_col('payroll_line', 'extras_json', 'extras_json TEXT')
+            _add_col('payroll_line', 'paid', 'paid FLOAT')
+            _add_col('payroll_run', 'approved_by', 'approved_by INTEGER')
+            _add_col('payroll_run', 'approved_at', 'approved_at DATETIME')
         except Exception as e:
             print('ensure_payroll_columns skipped:', e)
 
@@ -367,7 +371,7 @@ _EPSILON_MONTH.update({_norm(k): v for k, v in {
 }.items()})
 
 RUN_STATUS = ('draft', 'calculated', 'verified', 'locked', 'paid')
-RUN_LABELS = {'draft':'Πρόχειρο','calculated':'Υπολογίστηκε','verified':'Επιβεβαιωμένο',
+RUN_LABELS = {'draft':'Πρόχειρο','calculated':'Υπολογίστηκε','verified':'Εγκρίθηκε (ΓΔ)',
               'locked':'Κλειδωμένο','paid':'Πληρωμένο'}
 
 
@@ -382,6 +386,8 @@ class PayrollRun(db.Model):
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
     locked_at     = db.Column(db.DateTime)
+    approved_by   = db.Column(db.Integer, db.ForeignKey('user.id'))
+    approved_at   = db.Column(db.DateTime)
     __table_args__ = (db.UniqueConstraint('company_id', 'year', 'month', name='uq_payrollrun'),)
 
 
@@ -417,6 +423,7 @@ class PayrollLine(db.Model):
     extra_legal_net = db.Column(db.Float, default=0.0)      # δώρα/άδεια καθαρά (Epsilon)
     extra_employer_cost = db.Column(db.Float, default=0.0)  # κόστος εργοδ. δώρων/άδειας
     extras_json   = db.Column(db.Text)                      # JSON [{kind,net,cost}]
+    paid          = db.Column(db.Float, default=0.0)        # πληρωμένο (παρακολούθηση)
     note          = db.Column(db.String(200))
 
 
@@ -590,11 +597,15 @@ def build_run(company_id, year, month, created_by=None):
     if monthly_settlement is None:
         return {'error': 'schedule module μη διαθέσιμο'}
     run = PayrollRun.query.filter_by(company_id=company_id, year=year, month=month).first()
+    if run and run.status in ('verified', 'locked', 'paid'):
+        return {'run_id': run.id, 'lines': PayrollLine.query.filter_by(run_id=run.id).count(),
+                'locked': True}   # εγκεκριμένη — δεν ξαναϋπολογίζεται
     if not run:
         run = PayrollRun(company_id=company_id, year=year, month=month, created_by=created_by)
         db.session.add(run); db.session.flush()
     rates = PayrollRates.query.filter_by(year=year).first()
     run.rates_version = rates.id if rates else None
+    prev_paid = {l.user_id: (l.paid or 0.0) for l in PayrollLine.query.filter_by(run_id=run.id).all()}
     PayrollLine.query.filter_by(run_id=run.id).delete()
     hotel_ids = _hotels_of_company(company_id)
     seen = set()
@@ -664,6 +675,7 @@ def build_run(company_id, year, month, created_by=None):
                 net_legal=net_legal,
                 employer_cost_legal=(li.employer_cost_legal if li else None),
                 net_diff=(round((net_legal - net_calc), 2) if net_legal is not None else None))
+            line.paid = prev_paid.get(u.id, 0.0)
             db.session.add(line); n += 1
     run.status = 'calculated'
     db.session.commit()
@@ -745,4 +757,166 @@ def payroll_import():
     return render_template('payroll_import.html', companies=companies, result=result,
         n_legal=n_legal, is_admin=is_admin())
 
-print('payroll module loaded (Φ2)')
+# ══════════════════════════════════════════════════════════════════════════════
+# ΦΑΣΗ 2.2 — Σελίδα «Έλεγχος & Έγκριση» (πίνακας Γενικού Διευθυντή)
+# ══════════════════════════════════════════════════════════════════════════════
+try:
+    from schedule import Department as _Dept
+except Exception:
+    _Dept = None
+
+def _control_rows(year, month, company_id=None, hotel_id=None, dept_id=None):
+    runs_q = PayrollRun.query.filter_by(year=year, month=month)
+    if company_id:
+        runs_q = runs_q.filter_by(company_id=company_id)
+    runs = runs_q.all()
+    comp_by_id = {c.id: c for c in Company.query.all()}
+    umap = {u.id: u for u in User.query.all()}
+    dmap = {d.id: d.name for d in _Dept.query.all()} if _Dept else {}
+    rows = []
+    tot = {'work_days':0,'repo':0,'extra_hours':0.0,'mgmt':0.0,'legal':0.0,
+           'ektos':0.0,'payable':0.0,'paid':0.0,'remaining':0.0}
+    for run in runs:
+        comp = comp_by_id.get(run.company_id)
+        for l in PayrollLine.query.filter_by(run_id=run.id).all():
+            u = umap.get(l.user_id)
+            if not u:
+                continue
+            hid = getattr(u, 'home_hotel_id', None)
+            if hotel_id and hid != hotel_id:
+                continue
+            did = getattr(u, 'department_id', None)
+            if dept_id and did != dept_id:
+                continue
+            hotel = Hotel.query.get(hid) if hid else None
+            mgmt = round((l.in_hand or 0) + (l.extra_legal_net or 0), 2)         # στο χέρι σύνολο
+            legal = (round((l.net_legal or 0), 2) if l.net_legal is not None else None)
+            ektos = round(mgmt - (l.net_legal or 0), 2)                          # εκτός λογιστηρίου
+            paid = round(l.paid or 0.0, 2)
+            remaining = round(mgmt - paid, 2)
+            diff = (round((l.net_legal or 0) - (l.net_calc or 0), 2) if l.net_legal is not None else None)
+            flags = []
+            if not (l.gross_agreement or 0): flags.append('χωρίς συμφωνία')
+            if (l.repo or 0) == 0 and (l.work_days or 0) > 0: flags.append('0 ρεπό')
+            if (l.extra_hours or 0) > 40: flags.append('πολλές έξτρα')
+            if legal is None and (l.work_days or 0) > 0: flags.append('χωρίς Epsilon')
+            rows.append({'user': u, 'company': comp, 'run': run,
+                'hotel': hotel.name if hotel else '', 'dept': dmap.get(did, ''),
+                'work_days': l.work_days or 0, 'repo': l.repo or 0,
+                'extra_hours': l.extra_hours or 0, 'mgmt': mgmt, 'legal': legal,
+                'diff': diff, 'ektos': ektos, 'payable': mgmt, 'paid': paid,
+                'remaining': remaining, 'flags': flags})
+            tot['work_days'] += l.work_days or 0; tot['repo'] += l.repo or 0
+            tot['extra_hours'] += l.extra_hours or 0; tot['mgmt'] += mgmt
+            tot['legal'] += (l.net_legal or 0); tot['ektos'] += ektos
+            tot['payable'] += mgmt; tot['paid'] += paid; tot['remaining'] += remaining
+    for k in tot:
+        if isinstance(tot[k], float): tot[k] = round(tot[k], 2)
+    rows.sort(key=lambda r: (r['company'].legal_name if r['company'] else '', r['hotel'], r['user'].full_name or ''))
+    return rows, runs, tot
+
+
+@app.route('/dashboard/payroll/control', methods=['GET', 'POST'])
+def payroll_control():
+    if not _padmin():
+        return redirect(url_for('login'))
+    year = request.values.get('year', type=int) or 2026
+    month = request.values.get('month', type=int) or 5
+    if request.method == 'POST' and request.form.get('action') == 'calc':
+        # υπολόγισε όλες τις εταιρείες για τον μήνα
+        for c in Company.query.filter_by(active=True).all():
+            build_run(c.id, year, month, created_by=(current_user().id if current_user() else None))
+        log_activity('payroll_calc_month', '%s/%s' % (year, month))
+        return redirect(url_for('payroll_control', year=year, month=month))
+    company_id = request.values.get('company_id', type=int)
+    hotel_id = request.values.get('hotel_id', type=int)
+    dept_id = request.values.get('dept_id', type=int)
+    rows, runs, tot = _control_rows(year, month, company_id, hotel_id, dept_id)
+    companies = Company.query.filter_by(active=True).order_by(Company.legal_name).all()
+    hotels = Hotel.query.order_by(Hotel.name).all()
+    depts = _Dept.query.order_by(_Dept.name).all() if _Dept else []
+    # per-company run status (για κουμπιά έγκρισης)
+    run_map = {r.company_id: r for r in runs}
+    return render_template('payroll_control.html', rows=rows, tot=tot, runs=runs, run_map=run_map,
+        companies=companies, hotels=hotels, depts=depts, months=MONTHS_EL2,
+        year=year, month=month, company_id=company_id, hotel_id=hotel_id, dept_id=dept_id,
+        run_labels=RUN_LABELS, is_admin=is_admin())
+
+
+@app.route('/dashboard/payroll/approve', methods=['POST'])
+def payroll_approve():
+    if not _padmin():
+        return ('', 403)
+    rid = request.form.get('run_id', type=int)
+    run = PayrollRun.query.get(rid) if rid else None
+    if run and run.status not in ('verified', 'locked', 'paid'):
+        cu = current_user()
+        run.status = 'verified'
+        run.approved_by = cu.id if cu else None
+        run.approved_at = datetime.utcnow()
+        run.locked_at = datetime.utcnow()
+        db.session.commit()
+        comp = Company.query.get(run.company_id)
+        period = '%s %s' % (MONTHS_EL2[run.month], run.year)
+        link = '/dashboard/payroll/run/%d?embed=1' % run.id
+        msg = 'Εγκρίθηκε μισθοδοσία: %s — %s (προς πληρωμή/λογιστήριο)' % (comp.legal_name if comp else '', period)
+        # ειδοποίηση λογιστηρίου + admins στην πλατφόρμα
+        for u in User.query.filter(User.role.in_(['accountant', 'admin', 'masteradmin'])).all():
+            notify(u.id, msg, link)
+        # email
+        try:
+            from app import send_email
+            send_email('Εστία — Έγκριση μισθοδοσίας: %s %s' % (comp.legal_name if comp else '', period),
+                       '<p>%s</p><p>Πίνακας ανά ξενοδοχείο: εξαγωγή από τη σελίδα εκτέλεσης.</p>' % msg)
+        except Exception as e:
+            print('approve email skipped:', e)
+        log_activity('payroll_approve', msg)
+    return redirect(request.referrer or url_for('payroll_control'))
+
+
+@app.route('/dashboard/payroll/run/<int:rid>/markpaid', methods=['POST'])
+def payroll_markpaid(rid):
+    if not _padmin():
+        return ('', 403)
+    run = PayrollRun.query.get_or_404(rid)
+    for l in PayrollLine.query.filter_by(run_id=rid).all():
+        l.paid = round((l.in_hand or 0) + (l.extra_legal_net or 0), 2)
+    run.status = 'paid'
+    db.session.commit()
+    log_activity('payroll_markpaid', str(rid))
+    return redirect(request.referrer or url_for('payroll_run_view', rid=rid))
+
+
+@app.route('/dashboard/payroll/run/<int:rid>/export.xlsx')
+def payroll_run_export(rid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    if openpyxl is None:
+        return ('openpyxl μη διαθέσιμο', 500)
+    run = PayrollRun.query.get_or_404(rid)
+    comp = Company.query.get(run.company_id)
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active; ws.title = 'Μισθοδοσία'
+    umap = {u.id: u for u in User.query.all()}
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    hdr = ['Ξενοδοχείο', 'Εργαζόμενος', 'Εργάσιμες', 'Ρεπό', 'Έξτρα ώρες',
+           'Management (στο χέρι)', 'Λογιστήριο (καθαρά)', 'Δώρα/άδεια',
+           'Εκτός λογιστηρίου', 'Πληρωτέο', 'Πληρωμένο', 'Υπόλοιπο']
+    ws.append(hdr)
+    lines = PayrollLine.query.filter_by(run_id=rid).all()
+    def hof(u): return hmap.get(getattr(u, 'home_hotel_id', None), '')
+    lines.sort(key=lambda l: (hof(umap.get(l.user_id)), (umap.get(l.user_id).full_name if umap.get(l.user_id) else '')))
+    for l in lines:
+        u = umap.get(l.user_id)
+        mgmt = round((l.in_hand or 0) + (l.extra_legal_net or 0), 2)
+        ws.append([hof(u), (u.full_name if u else l.user_id), l.work_days or 0, l.repo or 0,
+                   round(l.extra_hours or 0, 2), mgmt, (l.net_legal if l.net_legal is not None else ''),
+                   round(l.extra_legal_net or 0, 2), round(mgmt - (l.net_legal or 0), 2),
+                   mgmt, round(l.paid or 0, 2), round(mgmt - (l.paid or 0), 2)])
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    from flask import send_file
+    fn = 'misthodosia_%s_%s_%s.xlsx' % ((comp.code if comp else 'X'), run.year, run.month)
+    return send_file(bio, as_attachment=True, download_name=fn,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+print('payroll module loaded (Φ2.2)')

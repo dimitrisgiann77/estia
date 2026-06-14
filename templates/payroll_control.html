@@ -1,0 +1,98 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μισθοδοσία — Έλεγχος & Έγκριση', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+ select,input{padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:13px;}
+ .b.green{background:#0e9f6e;} .b.grey{background:#64748b;}
+ table{width:100%;border-collapse:collapse;font-size:12px;}
+ td,th{padding:5px 7px;border-bottom:1px solid #eef2f6;text-align:right;white-space:nowrap;}
+ td.l,th.l{text-align:left;}
+ th{font-size:10.5px;text-transform:uppercase;color:#64748b;position:sticky;top:0;background:var(--card,#fff);}
+ tr:hover td{background:rgba(24,95,165,.04);}
+ .wrap{overflow:auto;max-height:60vh;border:1px solid #eef2f6;border-radius:8px;}
+ .flag{display:inline-block;background:#fef3c7;color:#92400e;border-radius:8px;padding:1px 6px;font-size:10px;margin-left:3px;}
+ .muted{color:#94a3b8;} .neg{color:#b91c1c;} tfoot td{font-weight:700;border-top:2px solid #cbd5e1;background:#f8fafc;}
+ .appr{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;margin:8px 0;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+ .pend{background:#fff7ed;color:#9a3412;}
+</style></head><body>
+{{ mp.topbar('clipboard-check', 'ΕΣΤΙΑ — Μισθοδοσία · Έλεγχος & Έγκριση') }}
+<div class="container">
+
+  <form method="GET" class="bar">
+    <b>Περίοδος:</b>
+    <select name="month">{% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==month }}>{{ months[m] }}</option>{% endfor %}</select>
+    <input type="number" name="year" value="{{ year }}" style="width:80px;">
+    <select name="company_id"><option value="">— όλες οι εταιρείες —</option>{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if company_id==c.id }}>{{ c.legal_name }}</option>{% endfor %}</select>
+    <select name="hotel_id"><option value="">— όλα τα ξενοδοχεία —</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}</select>
+    <select name="dept_id"><option value="">— όλα τα τμήματα —</option>{% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if dept_id==d.id }}>{{ d.name }}</option>{% endfor %}</select>
+    <button class="b" type="submit">Εμφάνιση</button>
+  </form>
+
+  <form method="POST" style="margin-bottom:10px;"><input type="hidden" name="action" value="calc">
+    <input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+    <button class="b grey" type="submit"><i class="ti ti-refresh"></i> Υπολόγισε/ανανέωσε όλον τον μήνα</button>
+    <span class="muted" style="font-size:12px;">(δεν ξαναϋπολογίζει εγκεκριμένες)</span>
+  </form>
+
+  {# Καταστάσεις/έγκριση ανά εταιρεία #}
+  {% for c in companies %}{% set r = run_map.get(c.id) %}{% if r %}
+    <div class="appr {{ 'pend' if r.status not in ['verified','locked','paid'] }}">
+      <b>{{ c.legal_name }}</b> · {{ months[month] }} {{ year }} · {{ run_labels.get(r.status, r.status) }}
+      {% if r.approved_at %}<span class="muted">(εγκρίθηκε {{ r.approved_at.strftime('%d/%m %H:%M') }})</span>{% endif %}
+      <a class="b" href="/dashboard/payroll/run/{{ r.id }}?embed=1">Άνοιγμα</a>
+      <a class="b grey" href="/dashboard/payroll/run/{{ r.id }}/export.xlsx">Excel ανά ξεν.</a>
+      {% if r.status not in ['verified','locked','paid'] %}
+        <form method="POST" action="/dashboard/payroll/approve" style="margin:0;" onsubmit="return confirm('Έγκριση μισθοδοσίας {{ c.legal_name }} — {{ months[month] }} {{ year }}; Θα κλειδώσει & θα ειδοποιηθεί το λογιστήριο.');">
+          <input type="hidden" name="run_id" value="{{ r.id }}">
+          <button class="b green" type="submit"><i class="ti ti-check"></i> Έγκριση → λογιστήριο</button>
+        </form>
+      {% else %}
+        <form method="POST" action="/dashboard/payroll/run/{{ r.id }}/markpaid" style="margin:0;" onsubmit="return confirm('Σήμανση ως πληρωμένη;');">
+          <button class="b grey" type="submit">Σήμανση πληρωμής</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}{% endfor %}
+
+  <div class="card"><h3>Εργαζόμενοι — {{ months[month] }} {{ year }} ({{ rows|length }})</h3>
+  <div class="wrap"><table>
+    <thead><tr>
+      <th class="l">Εργαζόμενος</th><th class="l">Ξεν./Τμήμα</th>
+      <th>Εργάσ.</th><th>Ρεπό</th><th>Έξτρα ώρ.</th>
+      <th>Management<br>(στο χέρι)</th><th>Λογιστήριο<br>(καθαρά)</th><th>Διαφορά</th>
+      <th>Εκτός<br>λογιστ.</th><th>Πληρωτέο</th><th>Πληρωμ.</th><th>Υπόλοιπο</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="l">{{ r.user.full_name or r.user.username }}{% for f in r.flags %}<span class="flag">{{ f }}</span>{% endfor %}</td>
+        <td class="l muted">{{ r.hotel }}{% if r.dept %} · {{ r.dept }}{% endif %}</td>
+        <td>{{ r.work_days }}</td><td>{{ r.repo }}</td><td>{{ '%.1f'|format(r.extra_hours) }}</td>
+        <td><b>{{ '%.2f'|format(r.mgmt) }}</b></td>
+        <td>{% if r.legal is not none %}{{ '%.2f'|format(r.legal) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if r.diff is not none %}<span class="{{ 'neg' if r.diff<0 }}">{{ '%.2f'|format(r.diff) }}</span>{% else %}—{% endif %}</td>
+        <td>{{ '%.2f'|format(r.ektos) }}</td>
+        <td><b>{{ '%.2f'|format(r.payable) }}</b></td>
+        <td>{{ '%.2f'|format(r.paid) }}</td>
+        <td class="{{ 'neg' if r.remaining>0 }}"><b>{{ '%.2f'|format(r.remaining) }}</b></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="12" class="muted l">Καμία εγγραφή. Πάτησε «Υπολόγισε/ανανέωσε όλον τον μήνα».</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr>
+      <td class="l">ΣΥΝΟΛΑ</td><td></td>
+      <td>{{ tot.work_days }}</td><td>{{ tot.repo }}</td><td>{{ '%.1f'|format(tot.extra_hours) }}</td>
+      <td>{{ '%.0f'|format(tot.mgmt) }}</td><td>{{ '%.0f'|format(tot.legal) }}</td><td></td>
+      <td>{{ '%.0f'|format(tot.ektos) }}</td><td>{{ '%.0f'|format(tot.payable) }}</td>
+      <td>{{ '%.0f'|format(tot.paid) }}</td><td>{{ '%.0f'|format(tot.remaining) }}</td>
+    </tr></tfoot>
+  </table></div>
+  <p class="muted" style="font-size:12px;margin-top:8px;">
+    <b>Management (στο χέρι)</b>=τι δικαιούται ο εργαζόμενος (τράπεζα+φάκελος+δώρα). <b>Λογιστήριο</b>=νόμιμα καθαρά (Epsilon, κατάθεση τράπεζας).
+    <b>Εκτός λογιστηρίου</b>=φάκελος+bonus+δώρα που δίνει η εταιρεία. <b>Υπόλοιπο</b>=Πληρωτέο−Πληρωμένο. 🚩=έλεγχος κανόνων.
+  </p>
+  </div>
+</div></body></html>
