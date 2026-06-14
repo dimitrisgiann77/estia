@@ -30,6 +30,14 @@
       {% else %}<div class="ok">✓ Μητρώο: νέοι {{ result.reg_new }}, ενημερώθηκαν {{ result.reg_upd }} · Συμφωνίες: {{ result.agr_upd }} · παραλείφθηκαν {{ result.skipped }}.</div>{% endif %}
     {% endif %}
   </div>
+  <div class="card" style="border:1px solid #fecaca;">
+    <h3 style="color:#b91c1c;">⚠ Πλήρης καθαρισμός προσωπικού</h3>
+    <p class="muted">Διαγράφει <b>ΟΛΟ</b> το εισαγμένο προσωπικό (και τα κλειδωμένα από Epsilon) + βάρδιες/συμφωνίες/μισθοδοσία. Κρατά μόνο πραγματικούς λογαριασμούς (managers/admin). Δεν αναιρείται.</p>
+    <form method="POST" action="/dashboard/payroll/reset" onsubmit="return confirm('ΟΡΙΣΤΙΚΗ διαγραφή όλου του προσωπικού;');">
+      <input name="confirm" placeholder="Γράψε: ΔΙΑΓΡΑΦΗ" style="padding:7px 9px;border:1px solid #dbe3ea;border-radius:8px;">
+      <button class="b" type="submit" style="background:#dc2626;">Καθαρισμός όλων</button>
+    </form>
+  </div>
 </div>
 <script>(function(){var dz=document.getElementById('dz'),inp=document.getElementById('dzin'),lst=document.getElementById('dzlist');if(!dz)return;
 dz.addEventListener('click',function(e){if(e.target!==inp)inp.click();});

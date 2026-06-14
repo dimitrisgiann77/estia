@@ -19,7 +19,9 @@
     {'n': n_emp, 'label':'Εργαζόμενοι (όλοι)', 'color':'#0e9f6e', 'href':'/dashboard/payroll?embed=1', 'active': not flt},
     {'n': n_agree, 'label':'Με συμφωνία', 'color':'#d97706', 'href':'/dashboard/payroll?filter=agree&embed=1', 'active': flt=='agree'},
     {'n': n_pii, 'label':'Με ΑΦΜ/PII', 'color':'#7e22ce', 'href':'/dashboard/payroll?filter=pii&embed=1', 'active': flt=='pii'},
+    {'n': n_nokey, 'label':'⚠ Χωρίς κλειδί', 'color':'#dc2626', 'href':'/dashboard/payroll?filter=nokey&embed=1', 'active': flt=='nokey'},
   ]) }}
+  {% if n_nokey and not flt %}<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:10px;padding:10px 14px;margin:6px 0;font-size:13px;">⚠ <b>{{ n_nokey }} εργαζόμενοι χωρίς κλειδί</b> (λείπει ΑΦΜ ή Κωδ. Εργαζομένου). <a href="/dashboard/payroll?filter=nokey&embed=1" style="color:#b91c1c;font-weight:600;">Δες τους →</a></div>{% endif %}
 
   <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;">
     <input type="hidden" name="embed" value="1">
@@ -39,6 +41,7 @@
       <option value="noagree" {{ 'selected' if flt=='noagree' }}>χωρίς συμφωνία</option>
       <option value="pii" {{ 'selected' if flt=='pii' }}>με ΑΦΜ</option>
       <option value="nopii" {{ 'selected' if flt=='nopii' }}>χωρίς ΑΦΜ</option>
+      <option value="nokey" {{ 'selected' if flt=='nokey' }}>χωρίς κλειδί (ΑΦΜ/Κωδ.)</option>
     </select>
     <a href="/dashboard/payroll?embed=1" style="font-size:13px;color:#64748b;">καθαρισμός</a>
     <span style="font-size:13px;color:#94a3b8;margin-left:auto;">{{ total_shown }} εγγραφές</span>
@@ -48,24 +51,25 @@
     <h3>Μητρώο εργαζομένων ανά εταιρεία</h3>
     {% set ns = namespace(cur='') %}
     <table>
-      <tr><th>Ονοματεπώνυμο</th><th>Τμήμα</th><th>Ξενοδοχείο (νομικό)</th><th>Μονάδα</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
+      <tr><th>Επώνυμο</th><th>Όνομα</th><th>Τμήμα</th><th>Ξενοδοχείο (νομικό)</th><th>Μονάδα</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
       {% for r in rows %}
         {% set cname = r.company.legal_name if r.company else 'Χωρίς εταιρεία' %}
         {% if cname != ns.cur %}
-          <tr><td colspan="7" class="grp">{{ cname }}</td></tr>
+          <tr><td colspan="8" class="grp">{{ cname }}</td></tr>
           {% set ns.cur = cname %}
         {% endif %}
         <tr>
-          <td>{{ r.user.full_name or r.user.username }}</td>
+          <td>{{ (r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username)) }}</td>
+          <td>{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
           <td>{{ r.profile.position if r.profile and r.profile.position else (r.pii.ergani_specialty if r.pii else '') }}</td>
           <td class="muted">{{ r.hotel_name }}</td>
           <td>{% if r.cost_center %}<span class="pill" style="background:#e0e7ff;color:#3730a3;">{{ r.cost_center }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.profile and r.profile.agreement_amount %}<b>{{ '%.0f'|format(r.profile.agreement_amount) }}€</b> <span class="muted">{{ r.profile.agreement_type }}</span>{% else %}<span class="pill no">—</span>{% endif %}</td>
-          <td>{% if r.pii and r.pii.afm %}<span class="pill ok">✓{% if r.pii.locked %} 🔒{% endif %}</span>{% else %}<span class="pill no">λείπει</span>{% endif %}</td>
+          <td>{% if r.pii and r.pii.afm %}<span class="pill ok">✓{% if r.pii.locked %} 🔒{% endif %}</span>{% else %}<span class="pill no">⚠ ΑΦΜ</span>{% endif %}{% if not (r.pii and r.pii.emp_code) %} <span class="pill no">⚠ Κωδ.</span>{% endif %}</td>
           <td><a class="b" href="/dashboard/payroll/employee/{{ r.user.id }}?embed=1">Καρτέλα</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="7" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
+        <tr><td colspan="8" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
       {% endfor %}
     </table>
     <div class="note">

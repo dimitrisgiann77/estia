@@ -109,6 +109,8 @@ class EmployeePII(db.Model):
     afm              = db.Column(db.String(12))
     amka             = db.Column(db.String(12))
     ika_am           = db.Column(db.String(15))
+    last_name        = db.Column(db.String(80))
+    first_name       = db.Column(db.String(80))
     father_name      = db.Column(db.String(80))
     ergani_specialty = db.Column(db.String(120))
     contract_type    = db.Column(db.String(40))
@@ -166,6 +168,8 @@ def ensure_payroll_columns():
             _add_col('employee_pii', 'locked', 'locked BOOLEAN')
             _add_col('employee_pii', 'cost_center', "cost_center VARCHAR(8)")
             _add_col('employee_pii', 'emp_code', "emp_code VARCHAR(12)")
+            _add_col('employee_pii', 'last_name', "last_name VARCHAR(80)")
+            _add_col('employee_pii', 'first_name', "first_name VARCHAR(80)")
         except Exception as e:
             print('ensure_payroll_columns skipped:', e)
 
@@ -258,6 +262,11 @@ def payroll_home():
     n_emp = len(allrows)
     n_agree = sum(1 for r in allrows if r['profile'] and r['profile'].agreement_amount)
     n_pii = sum(1 for r in allrows if r['pii'] and r['pii'].afm)
+    # Χωρίς κλειδί: λείπει ΑΦΜ Ή Κωδ. Εργαζομένου (#1 — να φαίνονται για διόρθωση)
+    def _nokey(r):
+        pii = r['pii']
+        return (not (pii and pii.afm)) or (not (pii and pii.emp_code))
+    n_nokey = sum(1 for r in allrows if _nokey(r))
     # φίλτρα
     company_id = request.args.get('company_id', type=int)
     hotel_id = request.args.get('hotel_id', type=int)
@@ -271,13 +280,14 @@ def payroll_home():
     elif flt == 'noagree': rows = [r for r in rows if not (r['profile'] and r['profile'].agreement_amount)]
     elif flt == 'pii':   rows = [r for r in rows if r['pii'] and r['pii'].afm]
     elif flt == 'nopii': rows = [r for r in rows if not (r['pii'] and r['pii'].afm)]
+    elif flt == 'nokey':  rows = [r for r in rows if _nokey(r)]
     hotels = Hotel.query.order_by(Hotel.name).all()
     rates = PayrollRates.query.filter_by(year=2026).first()
     log_activity('payroll_view', 'μητρώο')
     return render_template('payroll_home.html',
         rows=rows, companies=companies, hotels=hotels, n_emp=n_emp, n_agree=n_agree, n_pii=n_pii,
         company_id=company_id, hotel_id=hotel_id, cc=cc, cost_centers=COST_CENTERS,
-        flt=flt, total_shown=len(rows), rates=rates, is_admin=is_admin())
+        flt=flt, total_shown=len(rows), n_nokey=n_nokey, rates=rates, is_admin=is_admin())
 
 
 @app.route('/dashboard/payroll/companies', methods=['GET', 'POST'])
@@ -527,7 +537,7 @@ def parse_epsilon(wb):
     c_epon=col('Επώνυμο'); c_onoma=col('Όνομα'); c_afm=col('ΑΦΜ')
     c_amka=col('ΑΜΚΑ'); c_ika=col('Α.Μ. ΙΚΑ','ΑΜ ΙΚΑ'); c_pat=col('Όνομα Πατρός')
     c_spec=col('Ειδικότητα'); c_kind=col('Είδος Εργάζ','Είδος Εργαζ'); c_contract=col('Διάρκεια Σύμβασης')
-    c_sub=col('Περιγραφή Υποκαταστήματος'); c_dept=col('Περιγραφή Τμήματος')
+    c_sub=col('Περιγραφή Υποκαταστήματος'); c_dept=col('Περιγραφή Τμήματος'); c_comp=col('Εταιρεία')
     c_subcode=col('Κωδικός Υποκαταστήματος')
     c_bank=col('Τράπεζα'); c_period=col('Περίοδος'); c_year=col('Έτος')
     c_gross=col('Συν.Αποδ.','Συν.Αποδ'); c_emain=col('Εισφ. Εργάζ. Κύριου Ταμείου')
@@ -561,6 +571,7 @@ def parse_epsilon(wb):
             'subunit_desc': (ws.cell(r,c_sub).value if c_sub else None),
             'dept_desc': (ws.cell(r,c_dept).value if c_dept else None),
             'subunit_code': _ypok4(ws.cell(r,c_subcode).value if c_subcode else None),
+            'company_name': (ws.cell(r,c_comp).value if c_comp else None),
             'bank': (ws.cell(r,c_bank).value if c_bank else None),
             'year': yr, 'month': month, 'period_raw': period_raw,
             'gross': num(c_gross), 'efka_employee': round(emain+eaux,2),
@@ -647,11 +658,28 @@ def _apply_epsilon_identity(u, row, comp=None, cost_center=None):
                      ('bank_name',row['bank'])]:
         if val and not getattr(pii, fld, None):
             setattr(pii, fld, str(val)[:120]); filled = True
+    # όνομα/επώνυμο χωριστά
+    if row.get('epon') and not pii.last_name: pii.last_name = str(row['epon']).strip()[:80]
+    if row.get('onoma') and not pii.first_name: pii.first_name = str(row['onoma']).strip()[:80]
     pii.locked = True
+    # managerial κέντρο κόστους: file-level αν δόθηκε, αλλιώς default = νομικό ξενοδοχείο
     if cost_center:
         pii.cost_center = cost_center
+    elif hotel and not pii.cost_center:
+        pii.cost_center = hotel_code(hotel)
     db.session.flush()
     return filled
+
+def _company_from_name(name):
+    """Ταιριάζει το «Εταιρεία» (C1) του Epsilon σε Company (normalized)."""
+    n = _norm(name)
+    if not n:
+        return None
+    for c in Company.query.all():
+        cn = _norm(c.legal_name)
+        if cn and (cn in n or n in cn or cn[:18] == n[:18]):
+            return c
+    return None
 
 def import_epsilon_bytes(raw, filename='', company_id=None):
     """Εισάγει Epsilon workbook -> LegalNetImport (κανονικός + δώρα/άδεια). Idempotent."""
@@ -662,6 +690,8 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
     wb = _safe_load_xlsx(raw)
     rows = parse_epsilon(wb); wb.close()
     comp = Company.query.get(company_id) if company_id else None
+    if not comp and rows:
+        comp = _company_from_name(rows[0].get('company_name'))   # από περιεχόμενο (C1)
     if not comp and filename:
         pref = re.split(r'[ _]', filename)[0].upper()
         cc = COMPANY_CODE.get(pref)
@@ -684,12 +714,24 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
             if kind != 'monthly': extras += 1
         if not yr or not mo: continue
         period.add((yr, mo))
-        u = _match_user_by_afm_or_name(row['afm'], row['epon'], row['onoma'])
-        if u is None and kind == 'monthly':
-            u = _create_locked_employee(row); created += 1
+        # ΑΦΜ-first αυστηρά (μην ενώνεις λάθος με όνομα)
+        afm0 = row['afm']
+        if afm0:
+            pp0 = EmployeePII.query.filter_by(afm=afm0).first()
+            u = User.query.get(pp0.user_id) if pp0 else None
+        else:
+            u = _match_user_by_afm_or_name(None, row['epon'], row['onoma'])
+        if u is None and (afm0 or row['epon']):   # δημιούργησε από ΟΠΟΙΑΔΗΠΟΤΕ γραμμή (& δώρου)
+            u = _create_locked_employee(row)
+            if afm0:
+                pp0 = EmployeePII.query.filter_by(user_id=u.id).first()
+                if not pp0:
+                    pp0 = EmployeePII(user_id=u.id); db.session.add(pp0)
+                pp0.afm = afm0; db.session.flush()
+            created += 1
         if u is not None:
             matched += 1
-            if _apply_epsilon_identity(u, row, comp, cost_center):
+            if _apply_epsilon_identity(u, row, comp, cost_center):  # cost_center None -> default=νομικό ξεν.
                 pii_filled += 1
         key = '%s|%s|%s|%s|%s' % (comp.id if comp else 'x', yr, mo, kind, row['afm'] or (row['epon']+row['onoma']))
         h = hashlib.sha1(key.encode('utf-8')).hexdigest()[:40]
@@ -1156,6 +1198,8 @@ def sync_master_workbook(wb):
             sset('afm','afm'); sset('amka','amka'); sset('ika_am','ika'); sset('father_name','father')
             sset('ergani_specialty','spec'); sset('employment_kind','kind'); sset('contract_type','contract')
             sset('bank_name','bank'); sset('bank_iban','iban')
+            if row['epon']: pii.last_name = row['epon'][:80]
+            if row['onoma']: pii.first_name = row['onoma'][:80]
             cc = g(r,'cc')
             if cc: pii.cost_center = str(cc).strip()[:8]
             code = g(r,'code')
@@ -1288,5 +1332,44 @@ def start_master_sync_scheduler():
     if os.environ.get('SP_MASTER_FILE'):
         threading.Thread(target=_master_sync_loop, daemon=True).start()
         print('[master-sync] scheduler started')
+
+@app.route('/dashboard/payroll/reset', methods=['POST'])
+def payroll_reset():
+    """Πλήρης καθαρισμός ΟΛΟΥ του εισαγμένου προσωπικού (locked + unlocked) + σχετικών."""
+    cu = current_user()
+    if not (cu and cu.role == 'masteradmin'):
+        return ('', 403)
+    if (request.form.get('confirm') or '').strip() != 'ΔΙΑΓΡΑΦΗ':
+        return redirect(request.referrer or url_for('payroll_sync'))
+    # χρήστες-προσωπικό = login-off (κρατάμε πραγματικούς λογαριασμούς)
+    uids = [u.id for u in User.query.filter(User.login_enabled == False).all()]
+    n = len(uids)
+    try:
+        PayrollLine.query.delete(synchronize_session=False)
+        PayrollRun.query.delete(synchronize_session=False)
+        LegalNetImport.query.delete(synchronize_session=False)
+        if uids:
+            Agreement.query.filter(Agreement.user_id.in_(uids)).delete(synchronize_session=False)
+            EmployeePII.query.filter(EmployeePII.user_id.in_(uids)).delete(synchronize_session=False)
+            try:
+                from schedule import EmploymentProfile as _EP, ShiftAssignment as _SA
+                _SA.query.filter(_SA.user_id.in_(uids)).delete(synchronize_session=False)
+                _EP.query.filter(_EP.user_id.in_(uids)).delete(synchronize_session=False)
+            except Exception:
+                pass
+            try:
+                import faults as _flt
+                _flt.UserSpecialty.query.filter(_flt.UserSpecialty.user_id.in_(uids)).delete(synchronize_session=False)
+            except Exception:
+                pass
+            for u in User.query.filter(User.id.in_(uids)).all():
+                db.session.delete(u)
+        db.session.commit()
+        log_activity('payroll_reset', '%d εργαζόμενοι διαγράφηκαν' % n)
+    except Exception as e:
+        db.session.rollback()
+        log_activity('payroll_reset_error', str(e))
+    return redirect(url_for('payroll_sync'))
+
 
 print('payroll module loaded (Φ2.3 sync)')
