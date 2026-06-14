@@ -40,7 +40,7 @@
   {% for c in companies %}{% set r = run_map.get(c.id) %}{% if r %}
     <div class="appr {{ 'pend' if r.status not in ['verified','locked','paid'] }}">
       <b>{{ c.legal_name }}</b> · {{ months[month] }} {{ year }} · {{ run_labels.get(r.status, r.status) }}
-      {% if r.approved_at %}<span class="muted">(εγκρίθηκε {{ r.approved_at.strftime('%d/%m %H:%M') }})</span>{% endif %}
+      {% if r.approved_at %}<span class="muted">(εγκρίθηκε {{ r.approved_at|gr }})</span>{% endif %}
       <a class="b" href="/dashboard/payroll/run/{{ r.id }}?embed=1">Άνοιγμα</a>
       <a class="b grey" href="/dashboard/payroll/run/{{ r.id }}/export.xlsx">Excel ανά ξεν.</a>
       {% if r.status not in ['verified','locked','paid'] %}

@@ -29,6 +29,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .item:hover{background:#f3f7f9;}
 .item.active{background:#eef5f8;border-left-color:var(--accent);color:var(--brand);font-weight:600;}
 .item i{font-size:19px;width:20px;text-align:center;}
+.adm{border:none;margin:0;}
+.adm>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 18px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748b;}
+.adm>summary::-webkit-details-marker{display:none;}
+.adm>summary::after{content:'\25B8';margin-left:auto;font-size:11px;opacity:.55;}
+.adm[open]>summary::after{content:'\25BE';}
+.adm>summary:hover{background:#f3f7f9;}
+.adm .item{padding-left:32px;font-size:13.5px;}
+html[data-theme="dark"] .adm>summary{color:#9fb0c0;}
+html[data-theme="dark"] .adm>summary:hover{background:#1b2735;}
 .content{flex:1;min-width:0;background:#eff5f8;}
 .content iframe{width:100%;height:100%;border:0;display:block;}
 .scrim{display:none;}
@@ -313,26 +322,38 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
 
       {% if is_admin %}
       <div class="grp" data-ws="admin">Διαχείριση</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/users?embed=1"><i class="ti ti-users"></i> Χρήστες</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/menu-roles?embed=1"><i class="ti ti-adjustments-cog"></i> Μενού ανά ρόλο</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/feedback?embed=1"><i class="ti ti-messages"></i> Feedback χρηστών</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/activity?embed=1"><i class="ti ti-history"></i> Καταγραφή χρηστών</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/hotels?embed=1"><i class="ti ti-building"></i> Ξενοδοχεία & Πισίνες</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/areas?embed=1"><i class="ti ti-map-pin"></i> Διαχείριση τομέων</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/templates?embed=1"><i class="ti ti-template"></i> Templates</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/faults/settings?embed=1"><i class="ti ti-settings-cog"></i> Βλάβες · Ρυθμίσεις</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/imports?embed=1"><i class="ti ti-database-import"></i> Κέντρο Εισαγωγής</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/schedule/settings?embed=1"><i class="ti ti-calendar-cog"></i> Πρόγραμμα · Ρυθμίσεις</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Πρόγραμμα · Προσωπικό</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/schedule/import?embed=1"><i class="ti ti-calendar-up"></i> Πρόγραμμα · Εισαγωγή</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/payroll/companies?embed=1"><i class="ti ti-building-bank"></i> Μισθοδοσία · Εταιρείες</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/payroll/rates?embed=1"><i class="ti ti-percentage"></i> Μισθοδοσία · Συντελεστές</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/payroll/import?embed=1"><i class="ti ti-file-spreadsheet"></i> Μισθοδοσία · Εισαγωγή Epsilon</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/backup?embed=1"><i class="ti ti-database-export"></i> Αντίγραφα ασφαλείας</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
-      <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
-      {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-users"></i> Χρήστες & Πρόσβαση</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/users?embed=1"><i class="ti ti-users"></i> Χρήστες</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/menu-roles?embed=1"><i class="ti ti-adjustments-cog"></i> Μενού ανά ρόλο</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/activity?embed=1"><i class="ti ti-history"></i> Καταγραφή χρηστών</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/feedback?embed=1"><i class="ti ti-messages"></i> Feedback χρηστών</div>
+      </details>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-building"></i> Ξενοδοχεία & Τομείς</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/hotels?embed=1"><i class="ti ti-building"></i> Ξενοδοχεία & Πισίνες</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/areas?embed=1"><i class="ti ti-map-pin"></i> Διαχείριση τομέων</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/templates?embed=1"><i class="ti ti-template"></i> Templates</div>
+      </details>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-tool"></i> Συντήρηση</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/faults/settings?embed=1"><i class="ti ti-settings-cog"></i> Βλάβες · Ρυθμίσεις</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
+      </details>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-calendar-cog"></i> Προσωπικό & Πρόγραμμα</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/schedule/settings?embed=1"><i class="ti ti-calendar-cog"></i> Πρόγραμμα · Ρυθμίσεις</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Πρόγραμμα · Προσωπικό</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/schedule/import?embed=1"><i class="ti ti-calendar-up"></i> Πρόγραμμα · Εισαγωγή</div>
+      </details>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-cash"></i> Μισθοδοσία</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/payroll/companies?embed=1"><i class="ti ti-building-bank"></i> Εταιρείες</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/payroll/rates?embed=1"><i class="ti ti-percentage"></i> Συντελεστές</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/payroll/import?embed=1"><i class="ti ti-file-spreadsheet"></i> Εισαγωγή Epsilon</div>
+      </details>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-database-cog"></i> Δεδομένα & Σύστημα</summary>
+        <div class="item" data-ws="admin" data-url="/dashboard/imports?embed=1"><i class="ti ti-database-import"></i> Κέντρο Εισαγωγής</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/backup?embed=1"><i class="ti ti-database-export"></i> Αντίγραφα ασφαλείας</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
+        {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
+      </details>
       {% endif %}
     </nav>
     <div class="content"><iframe id="frame" name="frame"></iframe></div>
@@ -442,7 +463,7 @@ if(window.matchMedia){ try{ matchMedia('(prefers-color-scheme:dark)').addEventLi
   var MON=['Ιαν','Φεβ','Μαρ','Απρ','Μαΐ','Ιουν','Ιουλ','Αυγ','Σεπ','Οκτ','Νοε','Δεκ'];
   function p(n){ return (n<10?'0':'')+n; }
   function tick(){
-    var d=new Date();
+    var d=new Date(new Date().toLocaleString('en-US',{timeZone:'Europe/Athens'}));
     var c=document.getElementById('hclock'); if(c) c.textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
     var dd=document.getElementById('hdate'); if(dd) dd.textContent=DAYS[d.getDay()]+' '+p(d.getDate())+' '+MON[d.getMonth()]+' '+d.getFullYear();
   }

@@ -313,12 +313,30 @@ def inject_nav():
 def inject_theme():
     return {'theme': get_theme()}
 
+@app.template_filter('gr')
+def _gr_time(dt, fmt='%d/%m %H:%M'):
+    """Εμφάνιση UTC datetime σε ώρα Ελλάδας (Europe/Athens)."""
+    if not dt:
+        return ''
+    try:
+        from zoneinfo import ZoneInfo
+        return dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Athens')).strftime(fmt)
+    except Exception:
+        try:
+            return dt.strftime(fmt)
+        except Exception:
+            return str(dt)
+
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.53'
-APP_BUILD   = '333'
+APP_VERSION = '12.54'
+APP_BUILD   = '334'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.54', 'b': '334', 'date': '14/06/2026', 'time': '19:10', 'title': 'UX: μενού Διαχείρισης σε κατηγορίες · ώρα Ελλάδας · drag & drop',
+     'items': ['Το μενού «Διαχείριση» οργανώθηκε σε αναπτυσσόμενες υποκατηγορίες (Χρήστες & Πρόσβαση, Ξενοδοχεία & Τομείς, Συντήρηση, Προσωπικό & Πρόγραμμα, Μισθοδοσία, Δεδομένα & Σύστημα).',
+               'Το ρολόι δείχνει πλέον ώρα Ελλάδας (Europe/Athens) ανεξάρτητα από τον server.',
+               'Στις εισαγωγές αρχείων: drag & drop — σύρε τα αρχεία πάνω στη σελίδα αντί να τα επιλέγεις.']},
     {'v': '12.53', 'b': '333', 'date': '14/06/2026', 'time': '18:40', 'title': 'Έγκριση μισθοδοσίας — ειδοποίηση μόνο σε masteradmin',
      'items': ['Η ειδοποίηση/email έγκρισης μισθοδοσίας πηγαίνει προς το παρόν μόνο στους masteradmin.']},
     {'v': '12.52', 'b': '332', 'date': '14/06/2026', 'time': '18:20', 'title': 'Διόρθωση: Palm Island Suites (PLM)',

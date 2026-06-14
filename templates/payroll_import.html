@@ -8,7 +8,15 @@
  .ok{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:8px;padding:10px 12px;font-size:13px;}
  .err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;padding:10px 12px;font-size:13px;}
  .muted{color:#475569;font-size:12px;}
-</style></head><body>
+</style><style>
+.dropzone{border:2px dashed #b8c6d3;border-radius:12px;padding:22px;text-align:center;cursor:pointer;color:#64748b;background:#f8fafc;transition:.15s;font-size:14px;}
+.dropzone:hover,.dropzone.over{border-color:var(--accent,#185FA5);background:#eef5fb;color:var(--accent,#185FA5);}
+.dropzone i{font-size:30px;display:block;margin-bottom:6px;}
+.dzlist{margin-top:10px;font-size:13px;text-align:left;display:inline-block;}
+.dzlist div{padding:2px 0;}
+html[data-theme="dark"] .dropzone{background:#16202c;border-color:#33475b;color:#9fb0c0;}
+</style>
+</head><body>
 {{ mp.topbar('file-spreadsheet', 'ΕΣΤΙΑ — Μισθοδοσία · Εισαγωγή Epsilon (νόμιμα καθαρά)') }}
 <div class="container">
   <div class="card"><h3>Ανέβασμα αρχείου Epsilon (.xlsx)</h3>
@@ -16,7 +24,7 @@
       <div class="row">Εταιρεία (προαιρετικό — αλλιώς από το όνομα αρχείου):
         <select name="company_id"><option value="">— αυτόματα —</option>{% for c in companies %}<option value="{{ c.id }}">{{ c.legal_name }}</option>{% endfor %}</select>
       </div>
-      <div class="row"><input type="file" name="file" accept=".xlsx,.xls"></div>
+      <div id="dz" class="dropzone"><i class="ti ti-cloud-upload"></i>Σύρε εδώ το αρχείο Epsilon (.xlsx) ή κάνε κλικ<input type="file" name="file" accept=".xlsx,.xls" id="dzin" style="display:none;"><div id="dzlist" class="dzlist"></div></div>
       <button class="b" type="submit"><i class="ti ti-upload"></i> Εισαγωγή</button>
     </form>
     <p class="muted">Διαβάζει τις 44 στήλες Epsilon → νόμιμα καθαρά/εισφορές/ΦΜΥ/κόστος εργοδότη ανά εργαζόμενο/μήνα, και <b>συμπληρώνει αυτόματα ΑΦΜ/ΑΜΚΑ/ειδικότητα/τράπεζα (PII)</b>. Ταίριασμα με ΑΦΜ → όνομα. Idempotent (ίδιο αρχείο = χωρίς διπλά). Φορτωμένες γραμμές: <b>{{ n_legal }}</b>.</p>
@@ -25,4 +33,12 @@
       {% else %}<div class="ok">✓ {{ result.company or 'Άγνωστη εταιρεία' }} · περίοδοι {{ result.periods }} · γραμμές {{ result.rows }} (νέες {{ result.added }}, ενημερώθηκαν {{ result.updated }}, εκ των οποίων δώρα/άδεια {{ result.extras }}) · ταιριάστηκαν {{ result.matched }} εργαζόμενοι · PII συμπληρώθηκε σε {{ result.pii_filled }}.</div>{% endif %}
     {% endif %}
   </div>
-</div></body></html>
+</div><script>(function(){var dz=document.getElementById('dz'),inp=document.getElementById('dzin'),lst=document.getElementById('dzlist');if(!dz)return;
+dz.addEventListener('click',function(e){if(e.target!==inp)inp.click();});
+['dragenter','dragover'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();dz.classList.add('over');});});
+['dragleave','dragend','drop'].forEach(function(ev){dz.addEventListener(ev,function(e){e.preventDefault();e.stopPropagation();dz.classList.remove('over');});});
+dz.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){inp.files=e.dataTransfer.files;show();}});
+inp.addEventListener('change',show);
+function show(){if(!lst)return;lst.innerHTML='';for(var i=0;i<inp.files.length;i++){var d=document.createElement('div');d.textContent='\uD83D\uDCC4 '+inp.files[i].name;lst.appendChild(d);}}
+})();</script>
+</body></html>
