@@ -1,0 +1,204 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>
+{{ mp.head('Πρόγραμμα Εργασίας', theme.primary) }}
+<style>
+  .sched-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .sched-toolbar select,.sched-toolbar input{padding:7px 9px;border:1px solid var(--bd,#dbe3ea);border-radius:9px;background:var(--card,#fff);color:inherit;}
+  .wk-nav{display:flex;align-items:center;gap:6px;}
+  .wk-nav a,.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:9px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;cursor:pointer;font-size:13px;}
+  .btn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
+  .btn.ok{background:#16a34a;color:#fff;border-color:transparent;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .banner{padding:9px 12px;border-radius:10px;margin-bottom:10px;font-size:13px;display:flex;gap:8px;align-items:center;}
+  .banner.lock{background:#fef3c7;color:#92400e;}
+  .banner.open{background:#dcfce7;color:#166534;}
+  .banner.err{background:#fee2e2;color:#b91c1c;}
+  table.grid{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.grid th,table.grid td{border:1px solid var(--bd,#e2e8f0);padding:4px 6px;text-align:center;}
+  table.grid th.name,table.grid td.name{text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);min-width:160px;}
+  table.grid th{background:var(--soft,#f1f5f9);font-weight:600;}
+  table.grid th.sun,table.grid td.sun{background:#fff4f4;}
+  .cell{min-width:78px;height:34px;cursor:pointer;border-radius:6px;font-size:11px;line-height:1.2;}
+  .cell.empty{color:#cbd5e1;}
+  .cell .hh{font-size:9px;opacity:.7;display:block;}
+  .cell .x{font-size:8px;color:#e11d48;font-weight:700;}
+  .tot{font-weight:700;}
+  .editor{position:fixed;z-index:90;background:var(--card,#fff);border:1px solid var(--bd,#cbd5e1);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:10px;width:240px;display:none;}
+  .editor h5{margin:0 0 6px;font-size:12px;color:#64748b;}
+  .codes{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+  .codes button{border:none;border-radius:7px;padding:5px 8px;color:#fff;cursor:pointer;font-size:11px;}
+  .times{display:flex;gap:5px;align-items:center;margin-bottom:8px;}
+  .times input{width:70px;padding:5px;border:1px solid var(--bd,#cbd5e1);border-radius:7px;}
+  .ed-actions{display:flex;justify-content:space-between;}
+  .issues{margin-top:12px;}
+  .issues .it{font-size:12.5px;padding:5px 8px;border-radius:7px;background:#fef2f2;color:#b91c1c;margin-bottom:4px;}
+  .issues .it.warn{background:#fffbeb;color:#92400e;}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;margin:6px 0;}
+  .legend span{display:inline-flex;align-items:center;gap:4px;}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
+</style>
+</head><body>
+{{ mp.topbar('calendar-week', 'ΕΣΤΙΑ — Πρόγραμμα Εργασίας',
+   (cur_hotel.name if cur_hotel else '') ~ (' · ' ~ cur_dept.name if cur_dept else '')) }}
+<div class="container">
+
+  <form class="sched-toolbar" method="GET" action="/dashboard/schedule">
+    <input type="hidden" name="embed" value="1">
+    <select name="hotel_id" onchange="this.form.submit()">
+      {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}
+    </select>
+    <select name="department_id" onchange="this.form.submit()">
+      {% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==dept_id }}>{{ d.name }}</option>{% endfor %}
+    </select>
+    <span class="wk-nav">
+      <a href="/dashboard/schedule?hotel_id={{ hotel_id }}&department_id={{ dept_id }}&week={{ prev_week }}&embed=1"><i class="ti ti-chevron-left"></i></a>
+      <input type="date" name="week" value="{{ week_start }}" onchange="this.form.submit()">
+      <a href="/dashboard/schedule?hotel_id={{ hotel_id }}&department_id={{ dept_id }}&week={{ next_week }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+    </span>
+  </form>
+
+  {% set qs = request.args %}
+  {% if qs.get('ok')=='submitted' %}<div class="banner open"><i class="ti ti-check"></i> Το πρόγραμμα υποβλήθηκε στο λογιστήριο.</div>{% endif %}
+  {% if qs.get('ok')=='copied' %}<div class="banner open"><i class="ti ti-copy"></i> Αντιγράφηκε η προηγούμενη εβδομάδα.</div>{% endif %}
+  {% if qs.get('err')=='rules' %}<div class="banner err"><i class="ti ti-alert-triangle"></i> Η υποβολή μπλοκαρίστηκε — δες τους κανόνες πιο κάτω.</div>{% endif %}
+  {% if qs.get('err')=='locked' %}<div class="banner lock"><i class="ti ti-lock"></i> Η εβδομάδα είναι κλειδωμένη (πέρασε η προθεσμία).</div>{% endif %}
+
+  {% if editable %}
+    <div class="banner open"><i class="ti ti-pencil"></i> Επεξεργάσιμο — προθεσμία οριστικοποίησης: <b>{{ deadline.strftime('%a %d/%m %H:%M') }}</b></div>
+  {% else %}
+    <div class="banner lock"><i class="ti ti-lock"></i> Κλειδωμένο (read-only). Προθεσμία ήταν: {{ deadline.strftime('%d/%m %H:%M') }}{% if is_admin %} — ως admin μπορείς να ξεκλειδώσεις από τις Ρυθμίσεις.{% endif %}</div>
+  {% endif %}
+
+  <div class="card">
+    <div style="overflow-x:auto;">
+    <table class="grid">
+      <thead><tr>
+        <th class="name">Εργαζόμενος</th>
+        {% for d in days %}<th class="{{ 'sun' if d.weekday()==6 }}">{{ weekdays[d.weekday()][:3] }}<br><small>{{ d.strftime('%d/%m') }}</small></th>{% endfor %}
+        <th>Ώρες</th><th>Ρεπό</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="name">{{ r.user.full_name }}{% if r.user.login_enabled is sameas false %} <i class="ti ti-lock" title="χωρίς login" style="font-size:11px;opacity:.5"></i>{% endif %}</td>
+          {% for c in r.cells %}
+            {% set st = shift_lookup.get(c.code) %}
+            <td class="{{ 'sun' if loop.index0==6 }}">
+              <div class="cell {{ 'empty' if not c.code }}"
+                   data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}"
+                   data-segs='{{ c.segs|tojson }}'
+                   style="{{ ('background:'+st.color+'22;border:1px solid '+st.color+'66;') if st else '' }}"
+                   onclick="openEditor(this)">
+                {% if c.elsewhere %}<span class="x">⇄</span>{% endif %}
+                {{ c.label or '+' }}
+                {% if c.code=='ΕΡΓ' and c.hours %}<span class="hh">{{ c.hours }}h</span>{% endif %}
+              </div>
+            </td>
+          {% endfor %}
+          <td class="tot">{{ r.wk_hours }}</td>
+          <td class="tot {{ 'x' if r.repo<1 }}">{{ r.repo }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" style="padding:18px;color:#94a3b8;">Κανένας εργαζόμενος σε αυτό το τμήμα/ξενοδοχείο. Κάνε εισαγωγή ή όρισε τμήμα/ξενοδοχείο στους χρήστες.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <div class="legend">
+      {% for st in shift_types %}<span><span class="dot" style="background:{{ st.color }}"></span>{{ st.code }} — {{ st.label }}</span>{% endfor %}
+      <span><span class="x">⇄</span> άλλο ξενοδοχείο</span>
+    </div>
+
+    {% if editable %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <form method="POST" action="/dashboard/schedule/copyprev">
+        <input type="hidden" name="hotel_id" value="{{ hotel_id }}"><input type="hidden" name="department_id" value="{{ dept_id }}"><input type="hidden" name="week" value="{{ week_start }}">
+        <button class="btn" type="submit"><i class="ti ti-copy"></i> Αντιγραφή προηγούμενης εβδομάδας</button>
+      </form>
+      <form method="POST" action="/dashboard/schedule/submit" onsubmit="return confirm('Υποβολή ΟΛΟΥ του ξενοδοχείου για αυτή την εβδομάδα στο λογιστήριο;');">
+        <input type="hidden" name="hotel_id" value="{{ hotel_id }}"><input type="hidden" name="week" value="{{ week_start }}">
+        <button class="btn pri" type="submit"><i class="ti ti-send"></i> Αποστολή στο λογιστήριο (όλο το ξενοδοχείο)</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if issues %}
+    <div class="issues">
+      <h4 style="margin:8px 0 6px;font-size:14px;"><i class="ti ti-alert-triangle"></i> Έλεγχοι κανόνων ({{ cur_hotel.name if cur_hotel }} — όλη η εβδομάδα)</h4>
+      {% for i in issues %}<div class="it {{ 'warn' if i.severity=='warn' }}">{{ '⛔' if i.severity=='block' else '⚠' }} {{ i.msg }}</div>{% endfor %}
+    </div>
+    {% else %}
+      <div class="issues"><div class="it" style="background:#dcfce7;color:#166534;">✓ Όλοι οι κανόνες περνούν για αυτή την εβδομάδα.</div></div>
+    {% endif %}
+
+    {% if sub %}<p style="font-size:12px;color:#64748b;margin-top:8px;">Τελευταία υποβολή ξενοδοχείου: v{{ sub.version }} — {{ sub.submitted_at.strftime('%d/%m/%Y %H:%M') }}</p>{% endif %}
+  </div>
+</div>
+
+<!-- Cell editor -->
+<div class="editor" id="editor">
+  <h5 id="ed-title">Βάρδια</h5>
+  <div class="codes" id="ed-codes"></div>
+  <div class="times" id="ed-times" style="display:none;">
+    <input type="time" id="ed-start" value="07:00"> – <input type="time" id="ed-end" value="15:30">
+  </div>
+  <div class="ed-actions">
+    <button class="btn" onclick="clearCell()"><i class="ti ti-trash"></i> Καθάρισε</button>
+    <button class="btn pri" onclick="saveCell()">Αποθήκευση</button>
+  </div>
+</div>
+
+<script>
+var SHIFTS = {{ shift_types_json|safe }};
+var EDIT = {{ 'true' if editable else 'false' }};
+var cur = null;
+function openEditor(el){
+  if(!EDIT){ return; }
+  cur = el;
+  var ed = document.getElementById('editor');
+  var codes = document.getElementById('ed-codes'); codes.innerHTML='';
+  var chosen = el.getAttribute('data-code')||'';
+  SHIFTS.forEach(function(s){
+    var b=document.createElement('button'); b.textContent=s.code; b.style.background=s.color;
+    b.onclick=function(){ pick(s.code); };
+    codes.appendChild(b);
+  });
+  pick(chosen||'ΕΡΓ', true);
+  var segs=[]; try{segs=JSON.parse(el.getAttribute('data-segs')||'[]');}catch(e){}
+  if(segs.length){ document.getElementById('ed-start').value=segs[0].start; document.getElementById('ed-end').value=segs[0].end; }
+  var rc = el.getBoundingClientRect();
+  ed.style.display='block';
+  ed.style.left=Math.min(rc.left, window.innerWidth-260)+'px';
+  ed.style.top=(rc.bottom+6)+'px';
+}
+var pickedCode='ΕΡΓ';
+function pick(code, silent){
+  pickedCode=code;
+  document.getElementById('ed-title').textContent='Κωδικός: '+code;
+  document.getElementById('ed-times').style.display=(code==='ΕΡΓ')?'flex':'none';
+  if(!silent && code!=='ΕΡΓ'){ saveCell(); }
+}
+function payload(){
+  var segs=[];
+  if(pickedCode==='ΕΡΓ'){ segs=[{start:document.getElementById('ed-start').value, end:document.getElementById('ed-end').value}]; }
+  return {user_id:cur.getAttribute('data-uid'), date:cur.getAttribute('data-date'), code:pickedCode, segments:segs};
+}
+function post(body){
+  return fetch('/dashboard/schedule/cell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){ if(r.status===423){ alert('Κλειδωμένη εβδομάδα.'); return null;} return r.json(); });
+}
+function saveCell(){
+  if(!cur) return;
+  post(payload()).then(function(j){ if(j){ location.reload(); } });
+}
+function clearCell(){
+  if(!cur) return;
+  post({user_id:cur.getAttribute('data-uid'),date:cur.getAttribute('data-date'),code:''}).then(function(){ location.reload(); });
+}
+document.addEventListener('click',function(e){
+  var ed=document.getElementById('editor');
+  if(ed.style.display==='block' && !ed.contains(e.target) && !e.target.closest('.cell')){ ed.style.display='none'; }
+});
+</script>
+</body></html>

@@ -1,0 +1,27 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Υποβολές προγράμματος', theme.primary) }}</head><body>
+{{ mp.topbar('send', 'ΕΣΤΙΑ — Υποβολές προγράμματος (Λογιστήριο)', subs|length ~ ' υποβολές') }}
+<div class="container"><div class="card">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+    <a class="btn" style="padding:7px 11px;border:1px solid #dbe3ea;border-radius:9px;text-decoration:none;color:inherit;"
+       href="/dashboard/schedule/export.xlsx?embed=1"><i class="ti ti-file-spreadsheet"></i> Export μήνα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ»</a>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:var(--soft,#f1f5f9);">
+      <th style="padding:8px;text-align:left;">Ξενοδοχείο</th><th style="padding:8px;">Εβδομάδα</th>
+      <th style="padding:8px;">Έκδοση</th><th style="padding:8px;">Υποβλήθηκε</th><th></th>
+    </tr></thead><tbody>
+    {% for s in subs %}
+      <tr style="border-bottom:1px solid #eef2f6;">
+        <td style="padding:8px;">{{ hotels.get(s.hotel_id,'—') }}</td>
+        <td style="padding:8px;text-align:center;">{{ s.week_start.strftime('%d/%m/%Y') }}</td>
+        <td style="padding:8px;text-align:center;">{% if s.version>1 %}<span style="background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;">ΤΡΟΠΟΠΟΙΗΣΗ v{{ s.version }}</span>{% else %}v1{% endif %}</td>
+        <td style="padding:8px;text-align:center;">{{ s.submitted_at.strftime('%d/%m %H:%M') }}</td>
+        <td style="padding:8px;text-align:right;"><a href="/dashboard/schedule/submission/{{ s.id }}?embed=1">Προβολή →</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" style="padding:18px;color:#94a3b8;">Καμία υποβολή ακόμη.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></body></html>

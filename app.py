@@ -314,11 +314,17 @@ def inject_theme():
     return {'theme': get_theme()}
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.39'
-APP_BUILD   = '319'
+APP_VERSION = '12.40'
+APP_BUILD   = '320'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.40', 'b': '320', 'date': '14/06/2026', 'title': 'Module Πρόγραμμα Εργασίας (Βάρδιες) — Φάση 1',
+     'items': ['Νέα ομάδα μενού «Προσωπικό»: Πρόγραμμα Εργασίας + Υποβολές (Λογιστήριο).',
+               'Κάθε εργαζόμενος = χρήστης σε τμήμα (οργανόγραμμα)· import workbooks (χρήστες/τμήματα/βάρδιες).',
+               'Φόρμα εβδομάδας Δ–Κ με κωδικούς βαρδιών, αυτόματες ώρες/ρεπό.',
+               'Κανόνες (≥1 ρεπό/εβδ.), κλειδώματα προθεσμίας (Πέμπτη), ενοποιημένη αποστολή στο λογιστήριο.',
+               'Τροποποίηση με νέα έκδοση + σήμανση αλλαγών· export ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ.']},
     {'v': '12.39', 'b': '319', 'date': '14/06/2026', 'title': 'Dashboard: πλαϊνό κουμπί widgets + διόρθωση drag & drop',
      'items': ['Η μπάρα widgets ανοίγει από κομψό πλαϊνό κουμπί στη δεξιά άκρη της οθόνης.',
                'Διορθώθηκε το drag & drop — σύρε ένα widget από τη μπάρα στο πλέγμα.',
@@ -574,6 +580,13 @@ class User(db.Model):
     approved   = db.Column(db.Boolean, default=True)
     avatar     = db.Column(db.Text)                       # data URL (base64) εικόνας προφίλ
     dashboard  = db.Column(db.Text)                       # v12.34 — προσωπική διάταξη tiles (JSON)
+    # v12.40 — Module Πρόγραμμα Εργασίας (οργανόγραμμα + βάρδιες)
+    department_id     = db.Column(db.Integer)
+    employer          = db.Column(db.String(120))
+    subunit           = db.Column(db.String(20))
+    home_hotel_id     = db.Column(db.Integer)
+    login_enabled     = db.Column(db.Boolean)
+    employment_active = db.Column(db.Boolean)
     is_active  = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     hotels     = db.relationship('Hotel', secondary=user_hotels, backref='members')
@@ -1361,7 +1374,7 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username, is_active=True).first()
-        if user and user.approved and check_password_hash(user.password, password):
+        if user and user.approved and getattr(user, 'login_enabled', True) is not False and check_password_hash(user.password, password):
             _login_reset(_k)
             session['user_id']   = user.id
             session['user_name'] = user.full_name
@@ -2946,6 +2959,13 @@ def ensure_columns():
     _add_col('activity_log', 'hotel_id', 'hotel_id INTEGER')  # v12.22
     _add_col('survey_response', 'import_hash', 'import_hash VARCHAR(40)')  # v12.30
     _add_col('user', 'dashboard', 'dashboard TEXT')  # v12.34 — προσωπική διάταξη tiles (JSON)
+    # v12.40 — Module Πρόγραμμα Εργασίας (User columns ΠΡΙΝ το init_db seed)
+    _add_col('user', 'department_id', 'department_id INTEGER')
+    _add_col('user', 'employer', 'employer VARCHAR(120)')
+    _add_col('user', 'subunit', 'subunit VARCHAR(20)')
+    _add_col('user', 'home_hotel_id', 'home_hotel_id INTEGER')
+    _add_col('user', 'login_enabled', 'login_enabled BOOLEAN')
+    _add_col('user', 'employment_active', 'employment_active BOOLEAN')
 
 def init_db():
     with app.app_context():
@@ -3122,11 +3142,14 @@ import faults          # v12.14 — Module Βλαβοληψία (μοντέλα 
 import surveys         # v12.23 — Module Ερωτηματολόγια (μοντέλα + routes)· ΠΡΙΝ το create_all
 import imports         # v12.29 — Κέντρο Εισαγωγής Δεδομένων (μοντέλο ImportUpload + routes)· ΠΡΙΝ το create_all
 import backup          # v12.31 — Module Αντιγράφων Ασφαλείας (BackupLog + routes)· ΠΡΙΝ το create_all
+import schedule        # v12.40 — Module Πρόγραμμα Εργασίας (μοντέλα + routes)· ΠΡΙΝ το create_all
 init_db()
 backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
 seed_team()
 faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
 surveys.seed_surveys() # seed δείγμα ερωτηματολογίου (idempotent)
+schedule.ensure_schedule_columns()  # v12.40
+schedule.seed_schedule()            # v12.40 (idempotent)
 start_scheduler()
 backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
 

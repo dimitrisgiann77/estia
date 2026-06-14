@@ -1,0 +1,52 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Πρόγραμμα · Ρυθμίσεις', theme.primary) }}
+<style>.card h3{margin:0 0 10px;font-size:15px;}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
+ input,select{padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;}
+ table{width:100%;border-collapse:collapse;font-size:13px;}td,th{padding:6px;border-bottom:1px solid #eef2f6;text-align:left;}
+ .pill{padding:2px 8px;border-radius:10px;font-size:11px;}</style></head><body>
+{{ mp.topbar('calendar-cog', 'ΕΣΤΙΑ — Πρόγραμμα · Ρυθμίσεις') }}
+<div class="container">
+
+  <div class="card"><h3>Πολιτική κλειδώματος</h3>
+  <form method="POST"><input type="hidden" name="action" value="policy">
+    <div class="row">Ορίζοντας σχεδιασμού (εβδομάδες): <input type="number" name="planning_horizon_weeks" value="{{ policy.planning_horizon_weeks }}" style="width:80px;"></div>
+    <div class="row">Ημέρα προθεσμίας:
+      <select name="cutoff_dow">{% for i in range(7) %}<option value="{{ i }}" {{ 'selected' if policy.cutoff_dow|int==i }}>{{ dow_el[i] }}</option>{% endfor %}</select>
+      Ώρα: <input type="time" name="cutoff_time" value="{{ policy.cutoff_time }}">
+      Lead (μέρες πριν τη Δευτέρα): <input type="number" name="lead_days" value="{{ policy.lead_days }}" style="width:70px;">
+    </div>
+    <div class="row">Admin override: <select name="allow_admin_override"><option value="1" {{ 'selected' if policy.allow_admin_override|int==1 }}>Ναι</option><option value="0" {{ 'selected' if policy.allow_admin_override|int==0 }}>Όχι</option></select></div>
+    <button class="b" type="submit">Αποθήκευση πολιτικής</button>
+  </form></div>
+
+  <div class="card"><h3>Κανόνες υποβολής</h3><table>
+    <tr><th>Κωδικός</th><th>Περιγραφή</th><th>Σοβαρότητα</th><th>Ενεργός</th><th></th></tr>
+    {% for r in rules %}<tr><td>{{ r.code }}</td><td>{{ r.description }}</td>
+      <td><span class="pill" style="background:{{ '#fee2e2;color:#b91c1c' if r.severity=='block' else '#fef3c7;color:#92400e' }}">{{ r.severity }}</span></td>
+      <td>{{ '✓' if r.active else '—' }}</td>
+      <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="rule_toggle"><input type="hidden" name="id" value="{{ r.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργοποίηση' if r.active else 'Ενεργοποίηση' }}</button></form></td></tr>{% endfor %}
+  </table></div>
+
+  <div class="card"><h3>Κωδικοί βαρδιών</h3><table>
+    <tr><th>Κωδικός</th><th>Σημασία</th><th>Χρώμα</th><th>Εργάσιμη;</th><th>Ενεργός</th><th></th></tr>
+    {% for s in shift_types %}<tr><td><b>{{ s.code }}</b></td><td>{{ s.label }}</td>
+      <td><span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }}">{{ s.color }}</span></td>
+      <td>{{ '✓' if s.counts_as_work else '—' }}</td><td>{{ '✓' if s.active else '—' }}</td>
+      <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="shift_toggle"><input type="hidden" name="id" value="{{ s.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργ.' if s.active else 'Ενεργ.' }}</button></form></td></tr>{% endfor %}
+  </table></div>
+
+  <div class="card"><h3>Τμήματα (οργανισμού-wide)</h3>
+    <div class="row">{% for d in depts %}<span class="pill" style="background:{{ d.color }}22;border:1px solid {{ d.color }}66;">{{ d.name }}</span>{% endfor %}</div>
+  </div>
+
+  <div class="card"><h3>Αργίες</h3>
+    <form method="POST" class="row"><input type="hidden" name="action" value="holiday">
+      <input type="date" name="hol_date" required><input type="text" name="description" placeholder="Περιγραφή"><button class="b" type="submit">+ Προσθήκη</button>
+    </form>
+    <table>{% for h in holidays %}<tr><td>{{ h.hol_date.strftime('%d/%m/%Y') }}</td><td>{{ h.description }}</td>
+      <td style="text-align:right;"><form method="POST" style="margin:0;"><input type="hidden" name="action" value="holiday_del"><input type="hidden" name="id" value="{{ h.id }}"><button class="b" style="background:#dc2626;">✕</button></form></td></tr>
+      {% else %}<tr><td colspan="3" style="color:#94a3b8;">Καμία αργία.</td></tr>{% endfor %}</table>
+  </div>
+
+</div></body></html>

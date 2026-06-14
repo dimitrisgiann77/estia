@@ -1,0 +1,39 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Υποβολή', theme.primary) }}
+<style>
+ table.snap{width:100%;border-collapse:collapse;font-size:12px;}
+ table.snap th,table.snap td{border:1px solid #e2e8f0;padding:4px 6px;text-align:center;}
+ table.snap th.name,table.snap td.name{text-align:left;white-space:nowrap;}
+ td.chg{background:#fef3c7;font-weight:700;outline:2px solid #f59e0b;}
+ .chgbox{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px;margin-bottom:12px;}
+</style></head><body>
+{{ mp.topbar('send', 'ΕΣΤΙΑ — Υποβολή προγράμματος',
+   (hotel.name if hotel else '') ~ ' · εβδ. ' ~ sub.week_start.strftime('%d/%m/%Y') ~ ' · v' ~ sub.version) }}
+<div class="container">
+  {% if changes %}
+  <div class="chgbox">
+    <b><i class="ti ti-pencil"></i> Τροποποίηση (v{{ sub.version }}) — τι άλλαξε από v{{ sub.parent_version }}:</b>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px;">
+      <tr style="text-align:left;"><th>Εργαζόμενος</th><th>Ημ/νία</th><th>Πριν</th><th>Μετά</th></tr>
+      {% for c in changes %}<tr><td>{{ c.name }}</td><td>{{ c.date }}</td><td>{{ c.old }}</td><td><b>{{ c.new }}</b></td></tr>{% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  <div class="card"><div style="overflow-x:auto;">
+    <table class="snap">
+      <thead><tr><th class="name">Εργαζόμενος</th>
+        {% for d in days %}<th>{{ weekdays[d.weekday()][:3] }}<br><small>{{ d.strftime('%d/%m') }}</small></th>{% endfor %}
+      </tr></thead><tbody>
+      {% for uid, rec in snap.items() %}
+        <tr><td class="name">{{ rec.name }}</td>
+          {% for d in days %}
+            {% set cell = rec.days.get(d.isoformat()) %}
+            <td class="{{ 'chg' if (uid, d.isoformat()) in changed }}">{{ cell.code if cell else '' }}</td>
+          {% endfor %}
+        </tr>
+      {% else %}<tr><td colspan="8" style="padding:16px;color:#94a3b8;">Κενό snapshot.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <p style="margin-top:8px;"><a href="/dashboard/schedule/submissions?embed=1">← Πίσω στις υποβολές</a></p>
+</div></body></html>
