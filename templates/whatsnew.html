@@ -45,7 +45,7 @@ html[data-theme="dark"] .entry::before{box-shadow:0 0 0 3px #0f1722;background:#
           <span class="ver">v{{ e.v }}</span>
           {% if e.b and e.b != '—' %}<span class="bld">build {{ e.b }}</span>{% endif %}
           {% if e.v == cur_version %}<span class="nowtag">Νέο</span>{% endif %}
-          <span class="date">{{ e.date }}</span>
+          <span class="date">{{ e.date }}{% if e.time %} · {{ e.time }}{% endif %}</span>
         </div>
         <div class="title">{{ e.title }}</div>
         <ul class="chg">

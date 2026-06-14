@@ -933,7 +933,8 @@ def schedule_import():
                 log_activity('schedule_import', str(res))
             except Exception as e:
                 res = {'error': str(e)}
-    return render_template('schedule_import.html', res=res, year=date.today().year)
+    purge_count = imported_staff_query().count()
+    return render_template('schedule_import.html', res=res, year=date.today().year, purge_count=purge_count)
 
 
 # ── ADMIN settings (κωδικοί / τμήματα / αργίες / πολιτική / κανόνες) ───────────
@@ -1160,3 +1161,29 @@ def schedule_staff_merge():
         n = merge_users(keep_id, drop_ids)
         log_activity('staff_merge', f'keep={keep_id} drop={drop_ids} moved={n}')
     return redirect('/dashboard/schedule/staff?embed=1&ok=merged')
+
+
+# ── Καθαρισμός εισαγμένου προσωπικού (login ανενεργό) ─────────────────────────
+def imported_staff_query():
+    return User.query.filter(User.login_enabled == False)
+
+@app.route('/dashboard/schedule/staff/purge', methods=['POST'])
+def schedule_staff_purge():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    staff = imported_staff_query().all()
+    ids = [u.id for u in staff]
+    n = len(ids)
+    if ids:
+        ShiftAssignment.query.filter(ShiftAssignment.user_id.in_(ids)).delete(synchronize_session=False)
+        EmploymentProfile.query.filter(EmploymentProfile.user_id.in_(ids)).delete(synchronize_session=False)
+        try:
+            import faults as _flt
+            _flt.UserSpecialty.query.filter(_flt.UserSpecialty.user_id.in_(ids)).delete(synchronize_session=False)
+        except Exception:
+            pass
+        for u in staff:
+            db.session.delete(u)
+        db.session.commit()
+    log_activity('schedule_staff_purge', f'{n} εργαζόμενοι')
+    return redirect('/dashboard/schedule/import?embed=1&purged=' + str(n))

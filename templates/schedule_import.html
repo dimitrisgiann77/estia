@@ -20,4 +20,16 @@
       </div>
     {% endif %}
   {% endif %}
-</div></div></body></html>
+
+  {% if request.args.get('purged') %}<div style="margin-top:12px;background:#dcfce7;color:#166534;padding:10px;border-radius:10px;">✓ Διαγράφηκαν {{ request.args.get('purged') }} εισαγμένοι εργαζόμενοι.</div>{% endif %}
+</div>
+
+<div class="card" style="border:1px solid #fecaca;background:#fef2f2;">
+  <h3 style="margin:0 0 6px;font-size:15px;color:#b91c1c;"><i class="ti ti-trash"></i> Καθαρισμός εισαγμένου προσωπικού</h3>
+  <p style="font-size:13px;color:#7f1d1d;margin:0 0 10px;">Διαγράφει <b>όλους τους εισαγμένους εργαζόμενους (χωρίς σύνδεση)</b> μαζί με τις βάρδιές τους. Χρήσιμο για να καθαρίσεις τα «σκουπίδια» και να ξανακάνεις εισαγωγή από καθαρή πηγή. <b>Δεν αγγίζει</b> τους πραγματικούς λογαριασμούς (managers/admin). Τώρα στη βάση: <b>{{ purge_count }}</b> εισαγμένοι.</p>
+  {% if purge_count %}
+  <form method="POST" action="/dashboard/schedule/staff/purge" onsubmit="return confirm('Διαγραφή {{ purge_count }} εισαγμένων εργαζομένων + των βαρδιών τους; Δεν αναιρείται.');">
+    <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;"><i class="ti ti-trash"></i> Καθαρισμός {{ purge_count }} εγγραφών</button>
+  </form>
+  {% endif %}
+</div></body></html>
