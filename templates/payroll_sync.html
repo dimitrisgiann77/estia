@@ -12,18 +12,14 @@
  .muted{color:#475569;font-size:12px;}
  html[data-theme="dark"] .dropzone{background:#16202c;border-color:#33475b;color:#9fb0c0;}
 </style></head><body>
-{{ mp.topbar('refresh', 'ΕΣΤΙΑ — Μισθοδοσία · Συγχρονισμός Master File') }}
+{{ mp.topbar('refresh', 'ΕΣΤΙΑ — Μισθοδοσία · Εισαγωγή Master File') }}
 <div class="container">
-  <div class="card"><h3>Συγχρονισμός Excel → Βάση</h3>
-    <p class="muted">Διαβάζει τα φύλλα <b>Μητρώο</b> + <b>Συμφωνίες</b> και ενημερώνει τη βάση (κλειδί ΑΦΜ → Κωδ.). Idempotent — δεν δημιουργεί διπλά. Τελευταίος συγχρονισμός: <b>{{ last_sync or '—' }}</b> (UTC).</p>
+  <div class="card"><h3>Εισαγωγή Master File (Excel → Βάση)</h3>
+    <p class="muted">Διαβάζει τα φύλλα <b>Μητρώο</b> + <b>Συμφωνίες</b> και ενημερώνει τη βάση (κλειδί ΑΦΜ → Κωδ.). Idempotent — δεν δημιουργεί διπλά. Τελευταία εισαγωγή: <b>{{ last_sync or '—' }}</b> (UTC).</p>
     <form method="POST" enctype="multipart/form-data">
       <div id="dz" class="dropzone"><i class="ti ti-cloud-upload"></i>Σύρε εδώ το master .xlsx ή κάνε κλικ
         <input type="file" name="file" accept=".xlsx" id="dzin" style="display:none;"><div id="dzlist" class="dzlist"></div></div>
-      <div style="margin-top:10px;"><button class="b" type="submit"><i class="ti ti-upload"></i> Συγχρονισμός τώρα (από αρχείο)</button></div>
-    </form>
-    <form method="POST" style="margin-top:10px;"><input type="hidden" name="action" value="sharepoint">
-      <button class="b grey" type="submit" {{ '' if sp_ready else 'disabled' }}><i class="ti ti-brand-sharepoint"></i> Συγχρονισμός από SharePoint</button>
-      <span class="muted">{{ 'Ρυθμισμένο (env SP_MASTER_FILE) + νυχτερινό auto.' if sp_ready else 'Όχι ακόμα ρυθμισμένο (env SP_MASTER_FILE).' }}</span>
+      <div style="margin-top:10px;"><button class="b" type="submit"><i class="ti ti-upload"></i> Εισαγωγή τώρα</button></div>
     </form>
     {% if result %}
       {% if result.error %}<div class="err">Σφάλμα: {{ result.error }}</div>
