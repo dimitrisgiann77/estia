@@ -328,11 +328,32 @@ def payroll_employee(uid):
 # ══════════════════════════════════════════════════════════════════════════════
 # ΦΑΣΗ 2 — Μηχανή υπολογισμού + δύο όψεις + Epsilon import (Λογιστήριο = αλήθεια)
 # ══════════════════════════════════════════════════════════════════════════════
-import hashlib, io
+import hashlib, io, zipfile
 try:
     import openpyxl
 except Exception:
     openpyxl = None
+
+def _safe_load_xlsx(raw):
+    """Ανθεκτικό άνοιγμα .xlsx — διορθώνει Epsilon exports με cellStyle χωρίς όνομα
+    (openpyxl TypeError: name should be str but value is None)."""
+    try:
+        return openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+    except TypeError:
+        zin = zipfile.ZipFile(io.BytesIO(raw)); buf = io.BytesIO()
+        zout = zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED)
+        for it in zin.namelist():
+            data = zin.read(it)
+            if it == 'xl/styles.xml':
+                txt = data.decode('utf-8', 'replace')
+                def _fix(m):
+                    tag = m.group(0)
+                    return tag if 'name=' in tag else tag[:-2] + ' name="Normal_x"/>'
+                txt = re.sub(r'<cellStyle [^>]*/>', _fix, txt)
+                data = txt.encode('utf-8')
+            zout.writestr(it, data)
+        zout.close(); buf.seek(0)
+        return openpyxl.load_workbook(buf, data_only=True)
 
 MONTHS_EL2 = ['', 'Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος',
               'Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
@@ -501,7 +522,9 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
     """Εισάγει Epsilon workbook -> LegalNetImport (κανονικός + δώρα/άδεια). Idempotent."""
     if openpyxl is None:
         return {'error': 'openpyxl μη διαθέσιμο'}
-    wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+    if filename and filename.lower().endswith('.xls'):
+        return {'error': 'Παλιό format .xls — άνοιξέ το και αποθήκευσέ το ως .xlsx και ξαναδοκίμασε.'}
+    wb = _safe_load_xlsx(raw)
     rows = parse_epsilon(wb); wb.close()
     comp = Company.query.get(company_id) if company_id else None
     if not comp and filename:
