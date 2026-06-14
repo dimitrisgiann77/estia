@@ -328,11 +328,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.59'
-APP_BUILD   = '339'
+APP_VERSION = '12.60'
+APP_BUILD   = '340'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.60', 'b': '340', 'date': '14/06/2026', 'time': '22:30', 'title': 'Συγχρονισμός Master File (Excel → Βάση)',
+     'items': ['Νέα σελίδα «Συγχρονισμός Master»: ανεβάζεις το master Excel και ενημερώνει τη βάση (Μητρώο + Συμφωνίες, κλειδί ΑΦΜ).',
+               'On-demand κουμπί + νυχτερινός αυτόματος συγχρονισμός από SharePoint (όταν ρυθμιστεί). Idempotent, χωρίς διπλά.',
+               'Νέα στήλη «Κωδ. Εργαζομένου» (σταθερό εσωτερικό κλειδί) στα ευαίσθητα στοιχεία.']},
     {'v': '12.59', 'b': '339', 'date': '14/06/2026', 'time': '21:45', 'title': 'Μισθοδοσία: managerial μονάδα / κέντρο κόστους (CND)',
      'items': ['Κάθε εργαζόμενος έχει τώρα ΚΑΙ «Μονάδα / Κέντρο Κόστους» (managerial: AST/CNT/IRO/SRG/PSV/CND) — μπορεί να διαφέρει από το νομικό ξενοδοχείο ασφάλισης.',
                'Π.χ. ασφαλισμένος στο Iro αλλά ανήκει στα Κεντρικά Γραφεία (CND) — όταν φιλτράρεις CND εμφανίζεται.',
@@ -3352,6 +3356,7 @@ payroll.ensure_payroll_columns()    # v12.47 — Hotel.company_id
 payroll.seed_payroll()              # v12.47 (idempotent)
 start_scheduler()
 backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
+payroll.start_master_sync_scheduler()  # v12.60 — νυχτερινό sync master file (αν SP_MASTER_FILE)
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

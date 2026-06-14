@@ -119,6 +119,7 @@ class EmployeePII(db.Model):
     left_at          = db.Column(db.Date)
     locked           = db.Column(db.Boolean, default=False)   # v12.56: κλειδωμένο μητρώο (πηγή=Epsilon)
     cost_center      = db.Column(db.String(8))   # v12.59: managerial μονάδα (AST/CNT/IRO/SRG/PSV/CND)
+    emp_code         = db.Column(db.String(12), index=True)  # v12.60: Κωδ. Εργαζομένου (master Excel)
     updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by       = db.Column(db.Integer, db.ForeignKey('user.id'))
 
@@ -164,6 +165,7 @@ def ensure_payroll_columns():
             _add_col('payroll_run', 'approved_at', 'approved_at DATETIME')
             _add_col('employee_pii', 'locked', 'locked BOOLEAN')
             _add_col('employee_pii', 'cost_center', "cost_center VARCHAR(8)")
+            _add_col('employee_pii', 'emp_code', "emp_code VARCHAR(12)")
         except Exception as e:
             print('ensure_payroll_columns skipped:', e)
 
@@ -1052,4 +1054,239 @@ def payroll_run_export(rid):
     return send_file(bio, as_attachment=True, download_name=fn,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-print('payroll module loaded (Φ2.2)')
+# ══════════════════════════════════════════════════════════════════════════════
+# v12.60 — SYNC MASTER FILE (Excel -> Βάση) · on-demand + νυχτερινό SharePoint
+# ══════════════════════════════════════════════════════════════════════════════
+import threading, urllib.parse, urllib.request
+
+def _hmap(ws):
+    """normalized header -> column index (γραμμή 1)."""
+    h = {}
+    for c in range(1, ws.max_column + 1):
+        h[_norm(ws.cell(1, c).value)] = c
+    return h
+
+def _col(hmap, *keys, exact=None):
+    if exact:
+        for e in exact:
+            if _norm(e) in hmap: return hmap[_norm(e)]
+    for k in keys:
+        kk = _norm(k)
+        for hn, ci in hmap.items():
+            if kk in hn: return ci
+    return None
+
+def _pdate(v):
+    if not v: return None
+    if isinstance(v, datetime): return v.date()
+    if isinstance(v, date): return v
+    sv = str(v).strip()
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y'):
+        try: return datetime.strptime(sv, fmt).date()
+        except Exception: pass
+    return None
+
+def _hotel_by_code(code):
+    if not code: return None
+    code = str(code).strip().upper()
+    for h in Hotel.query.all():
+        if hotel_code(h) == code: return h
+    return None
+
+def sync_master_workbook(wb):
+    """Διαβάζει φύλλα «Μητρώο» + «Συμφωνίες» -> upsert στη βάση (κλειδί ΑΦΜ/Κωδ.)."""
+    res = {'reg_new': 0, 'reg_upd': 0, 'agr_upd': 0, 'skipped': 0}
+    comp_by_code = {c.code: c for c in Company.query.all()}
+    # --- Μητρώο ---
+    if 'Μητρώο' in wb.sheetnames:
+        ws = wb['Μητρώο']; H = _hmap(ws)
+        c = {
+            'afm': _col(H, exact=['ΑΦΜ'], ), 'code': _col(H, 'κωδ'),
+            'epon': _col(H, exact=['Επώνυμο']), 'onoma': _col(H, exact=['Όνομα']),
+            'father': _col(H, 'πατρ'), 'ika': _col(H, exact=['Α.Μ. ΙΚΑ'], ) or _col(H, 'μικα'),
+            'amka': _col(H, exact=['ΑΜΚΑ']), 'company': _col(H, 'εταιρει'),
+            'hotel': _col(H, 'νομικοξεν') or _col(H, 'νομικο'), 'cc': _col(H, 'κεντροκοστ') or _col(H, 'κεντρο'),
+            'spec': _col(H, 'ειδικοτητα'), 'kind': _col(H, 'ειδος'), 'contract': _col(H, 'συμβαση'),
+            'bank': _col(H, 'τραπεζα'), 'iban': _col(H, 'iban'),
+            'hired': _col(H, 'προσληψ'), 'left': _col(H, 'αποχωρ'),
+        }
+        def g(r, key):
+            ci = c.get(key); v = ws.cell(r, ci).value if ci else None
+            return v
+        for r in range(2, ws.max_row + 1):
+            afm = g(r, 'afm'); afm = str(afm).strip() if afm not in (None, '') else None
+            epon = g(r, 'epon')
+            if not afm and not epon:
+                continue
+            row = {'afm': afm, 'epon': str(epon).strip() if epon else '',
+                   'onoma': str(g(r,'onoma')).strip() if g(r,'onoma') else ''}
+            # ΑΦΜ-first αυστηρά (idempotent): αν υπάρχει ΑΦΜ, ΜΟΝΟ με ΑΦΜ
+            u = None
+            if afm:
+                pp = EmployeePII.query.filter_by(afm=afm).first()
+                u = User.query.get(pp.user_id) if pp else None
+            else:
+                u = _match_user_by_afm_or_name(None, row['epon'], row['onoma'])
+            if not u:
+                if not (row['epon'] or afm):
+                    res['skipped'] += 1; continue
+                u = _create_locked_employee(row)
+                if afm:   # κλείδωσε το ΑΦΜ ΑΜΕΣΩΣ ώστε το re-run να ταιριάζει
+                    pp = EmployeePII.query.filter_by(user_id=u.id).first()
+                    if not pp:
+                        pp = EmployeePII(user_id=u.id); db.session.add(pp)
+                    pp.afm = afm; db.session.flush()
+                res['reg_new'] += 1
+            else:
+                res['reg_upd'] += 1
+            # User full name + hotel + company
+            full = (row['epon'] + ' ' + row['onoma']).strip()
+            if full: u.full_name = full[:100]
+            h = _hotel_by_code(g(r, 'hotel'))
+            if h:
+                u.home_hotel_id = h.id
+            # PII
+            pii = EmployeePII.query.filter_by(user_id=u.id).first()
+            if not pii:
+                pii = EmployeePII(user_id=u.id); db.session.add(pii)
+            def sset(field, key):
+                v = g(r, key)
+                if v not in (None, ''):
+                    setattr(pii, field, str(v).strip()[:120])
+            sset('afm','afm'); sset('amka','amka'); sset('ika_am','ika'); sset('father_name','father')
+            sset('ergani_specialty','spec'); sset('employment_kind','kind'); sset('contract_type','contract')
+            sset('bank_name','bank'); sset('bank_iban','iban')
+            cc = g(r,'cc')
+            if cc: pii.cost_center = str(cc).strip()[:8]
+            code = g(r,'code')
+            if code: pii.emp_code = str(code).strip()[:12]
+            hv = _pdate(g(r,'hired'));  lv = _pdate(g(r,'left'))
+            if hv: pii.hired_at = hv
+            if lv: pii.left_at = lv
+            pii.locked = True
+            db.session.flush()
+    # --- Συμφωνίες ---
+    if 'Συμφωνίες' in wb.sheetnames:
+        ws = wb['Συμφωνίες']; H = _hmap(ws)
+        c = {'afm': _col(H, exact=['ΑΦΜ']), 'type': _col(H, 'τυπος'),
+             'amount': _col(H, 'συμφωνημ'), 'bank': _col(H, 'στοχοςτραπ') or _col(H, 'στοχος'),
+             'folder': _col(H, 'φακελο'), 'hour': _col(H, 'ωρομισθ')}
+        for r in range(2, ws.max_row + 1):
+            afm = ws.cell(r, c['afm']).value if c['afm'] else None
+            if not afm: continue
+            amt = ws.cell(r, c['amount']).value if c['amount'] else None
+            if not isinstance(amt, (int, float)) or amt <= 0:
+                continue
+            pii = EmployeePII.query.filter_by(afm=str(afm).strip()).first()
+            if not pii: continue
+            prof = EmploymentProfile.query.filter_by(user_id=pii.user_id).first() if EmploymentProfile else None
+            if EmploymentProfile is None: break
+            if not prof:
+                prof = EmploymentProfile(user_id=pii.user_id); db.session.add(prof)
+            prof.agreement_amount = round(float(amt), 2)
+            tv = ws.cell(r, c['type']).value if c['type'] else None
+            if tv: prof.agreement_type = str(tv).strip()
+            hw = ws.cell(r, c['hour']).value if c['hour'] else None
+            res['agr_upd'] += 1
+            db.session.flush()
+    db.session.commit()
+    return res
+
+def sync_master_bytes(raw):
+    if openpyxl is None:
+        return {'error': 'openpyxl μη διαθέσιμο'}
+    wb = _safe_load_xlsx(raw)
+    out = sync_master_workbook(wb); wb.close()
+    Setting.query.filter_by(key='master_last_sync')  # touch
+    st = Setting.query.get('master_last_sync') if hasattr(Setting, 'query') else None
+    try:
+        row = Setting.query.get('master_last_sync')
+        if not row:
+            row = Setting(key='master_last_sync'); db.session.add(row)
+        row.value = datetime.utcnow().isoformat(timespec='minutes')
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return out
+
+def sp_download_master():
+    """Κατεβάζει το master xlsx από SharePoint (env SP_MASTER_FILE = πλήρης διαδρομή)."""
+    path = os.environ.get('SP_MASTER_FILE', '')
+    try:
+        import backup as _B
+        if not (path and _B.GRAPH_CLIENT_ID and _B.SP_HOST and _B.SP_SITE_PATH):
+            return None
+        from app import _graph_token
+        token = _graph_token(); sid = _B._site_id(token)
+        url = ('https://graph.microsoft.com/v1.0/sites/%s/drive/root:/%s:/content'
+               % (sid, urllib.parse.quote(path)))
+        req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + token})
+        return urllib.request.urlopen(req, timeout=60).read()
+    except Exception as e:
+        print('sp_download_master:', e); return None
+
+
+@app.route('/dashboard/payroll/sync', methods=['GET', 'POST'])
+def payroll_sync():
+    if not _padmin():
+        return redirect(url_for('login'))
+    result = None
+    if request.method == 'POST':
+        act = request.form.get('action')
+        if act == 'sharepoint':
+            raw = sp_download_master()
+            result = sync_master_bytes(raw) if raw else {'error': 'Δεν βρέθηκε αρχείο στο SharePoint (env SP_MASTER_FILE).'}
+        else:
+            f = request.files.get('file')
+            if f and f.filename:
+                try:
+                    result = sync_master_bytes(f.read())
+                except Exception as e:
+                    result = {'error': str(e)}
+        log_activity('payroll_master_sync', str(result))
+    last = Setting.query.get('master_last_sync')
+    return render_template('payroll_sync.html', result=result,
+        last_sync=(last.value if last else None),
+        sp_ready=bool(os.environ.get('SP_MASTER_FILE')), is_admin=is_admin())
+
+
+# ── Νυχτερινό auto-sync από SharePoint ────────────────────────────────────────
+def _master_sync_tick():
+    with app.app_context():
+        try:
+            hour = int(os.environ.get('MASTER_SYNC_HOUR', '4'))
+        except Exception:
+            hour = 4
+        now = datetime.utcnow()
+        if now.hour != hour:
+            return
+        slot = now.strftime('%Y-%m-%d')
+        row = Setting.query.get('master_sync_slot')
+        if row and row.value == slot:
+            return
+        raw = sp_download_master()
+        if raw:
+            try:
+                sync_master_bytes(raw)
+                print('[master-sync] νυχτερινός συγχρονισμός OK')
+            except Exception as e:
+                print('[master-sync] σφάλμα:', e)
+        if not row:
+            row = Setting(key='master_sync_slot'); db.session.add(row)
+        row.value = slot; db.session.commit()
+
+def _master_sync_loop():
+    import time as _t
+    while True:
+        try:
+            _master_sync_tick()
+        except Exception as e:
+            print('[master-sync] loop:', e)
+        _t.sleep(900)  # 15'
+
+def start_master_sync_scheduler():
+    if os.environ.get('SP_MASTER_FILE'):
+        threading.Thread(target=_master_sync_loop, daemon=True).start()
+        print('[master-sync] scheduler started')
+
+print('payroll module loaded (Φ2.3 sync)')
