@@ -23,7 +23,9 @@
       <span class="kpi">Μικτά (Mgmt) <b>{{ '%.0f'|format(totals.gross_total) }}€</b></span>
       <span class="kpi">Έξτρα <b>{{ '%.0f'|format(totals.extra_pay) }}€</b></span>
       <span class="kpi">Καθαρά Epsilon <b>{{ '%.0f'|format(totals.net_legal) }}€</b> <span class="muted">({{ totals.n_legal }})</span></span>
-      <span class="kpi">Κόστος εργοδ. <b>{{ '%.0f'|format(totals.employer_cost) }}€</b></span>
+      <span class="kpi">Δώρα/άδεια <b>{{ '%.0f'|format(totals.extra_legal) }}€</b> <span class="muted">({{ totals.n_extras }})</span></span>
+      <span class="kpi">Στο χέρι (σύνολο) <b>{{ '%.0f'|format(totals.in_hand_total) }}€</b></span>
+      <span class="kpi">Κόστος εργοδ. (σύνολο) <b>{{ '%.0f'|format(totals.employer_cost_total) }}€</b></span>
     </div>
     <div class="tabs">
       <a class="tab {{ 'on' if view=='management' }}" href="?view=management&embed=1">Management (τι πληρώνεται)</a>
@@ -33,7 +35,7 @@
     <div class="wrap">
     {% if view == 'legal' %}
     <table>
-      <tr><th class="l">Εργαζόμενος</th><th>Μέρες</th><th>Μικτά</th><th>ΕΦΚΑ εργαζ.</th><th>ΦΜΥ</th><th>Καθαρά (Epsilon)</th><th>Εκτίμηση</th><th>Διαφορά</th><th>Κόστος εργοδ.</th></tr>
+      <tr><th class="l">Εργαζόμενος</th><th>Μέρες</th><th>Μικτά</th><th>ΕΦΚΑ εργαζ.</th><th>ΦΜΥ</th><th>Καθαρά (Epsilon)</th><th>Δώρα/άδεια</th><th>Σύνολο καθαρά</th><th>Κόστος εργοδ.</th></tr>
       {% for l in lines %}
       <tr>
         <td class="l">{{ umap[l.user_id].full_name if umap.get(l.user_id) else l.user_id }}</td>
@@ -42,15 +44,15 @@
         <td>{{ '%.2f'|format(l.efka_employee) }}</td>
         <td>{{ '%.2f'|format(l.fmy) }}</td>
         <td>{% if l.net_legal is not none %}<b>{{ '%.2f'|format(l.net_legal) }}</b>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td class="muted">{{ '%.2f'|format(l.net_calc) }}</td>
-        <td>{% if l.net_diff is not none %}<span class="{{ 'neg' if l.net_diff<0 else 'pos' }}">{{ '%.2f'|format(l.net_diff) }}</span>{% else %}—{% endif %}</td>
-        <td>{{ '%.2f'|format(l.employer_cost_legal or l.employer_cost) }}</td>
+        <td title="{% if l.extras_json %}{{ l.extras_json }}{% endif %}">{% if l.extra_legal_net %}{{ '%.2f'|format(l.extra_legal_net) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td><b>{{ '%.2f'|format((l.net_legal or l.net_calc or 0) + (l.extra_legal_net or 0)) }}</b></td>
+        <td>{{ '%.2f'|format((l.employer_cost_legal or l.employer_cost or 0) + (l.extra_employer_cost or 0)) }}</td>
       </tr>
       {% endfor %}
     </table>
     {% else %}
     <table>
-      <tr><th class="l">Εργαζόμενος</th><th>Εργάσιμες</th><th>Κυρ.</th><th>Έξτρα ώρ.</th><th>Ρεπό</th><th>Μικτά συμφ.</th><th>Έξτρα €</th><th>Μικτά σύνολο</th><th>Bonus</th><th>Τράπεζα</th><th>Φάκελος</th><th>Στο χέρι</th></tr>
+      <tr><th class="l">Εργαζόμενος</th><th>Εργάσιμες</th><th>Κυρ.</th><th>Έξτρα ώρ.</th><th>Ρεπό</th><th>Μικτά συμφ.</th><th>Έξτρα €</th><th>Μικτά σύνολο</th><th>Bonus</th><th>Τράπεζα</th><th>Φάκελος</th><th>Στο χέρι</th><th>Δώρα/άδεια</th><th>Σύνολο</th></tr>
       {% for l in lines %}
       <tr>
         <td class="l">{{ umap[l.user_id].full_name if umap.get(l.user_id) else l.user_id }}</td>
@@ -62,6 +64,8 @@
         <td>{{ '%.2f'|format(l.bank_total) }}</td>
         <td>{{ '%.2f'|format(l.folder_total) }}</td>
         <td><b>{{ '%.2f'|format(l.in_hand) }}</b></td>
+        <td>{% if l.extra_legal_net %}{{ '%.2f'|format(l.extra_legal_net) }}{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td><b>{{ '%.2f'|format((l.in_hand or 0) + (l.extra_legal_net or 0)) }}</b></td>
       </tr>
       {% endfor %}
     </table>

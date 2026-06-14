@@ -22,7 +22,7 @@
     <p class="muted">Διαβάζει τις 44 στήλες Epsilon → νόμιμα καθαρά/εισφορές/ΦΜΥ/κόστος εργοδότη ανά εργαζόμενο/μήνα, και <b>συμπληρώνει αυτόματα ΑΦΜ/ΑΜΚΑ/ειδικότητα/τράπεζα (PII)</b>. Ταίριασμα με ΑΦΜ → όνομα. Idempotent (ίδιο αρχείο = χωρίς διπλά). Φορτωμένες γραμμές: <b>{{ n_legal }}</b>.</p>
     {% if result %}
       {% if result.error %}<div class="err">Σφάλμα: {{ result.error }}</div>
-      {% else %}<div class="ok">✓ {{ result.company or 'Άγνωστη εταιρεία' }} · περίοδοι {{ result.periods }} · γραμμές {{ result.rows }} (νέες {{ result.added }}, ενημερώθηκαν {{ result.updated }}) · ταιριάστηκαν {{ result.matched }} εργαζόμενοι · PII συμπληρώθηκε σε {{ result.pii_filled }}.</div>{% endif %}
+      {% else %}<div class="ok">✓ {{ result.company or 'Άγνωστη εταιρεία' }} · περίοδοι {{ result.periods }} · γραμμές {{ result.rows }} (νέες {{ result.added }}, ενημερώθηκαν {{ result.updated }}, εκ των οποίων δώρα/άδεια {{ result.extras }}) · ταιριάστηκαν {{ result.matched }} εργαζόμενοι · PII συμπληρώθηκε σε {{ result.pii_filled }}.</div>{% endif %}
     {% endif %}
   </div>
 </div></body></html>

@@ -138,6 +138,10 @@ def ensure_payroll_columns():
         try:
             from app import _add_col
             _add_col('hotel', 'company_id', 'company_id INTEGER')
+            _add_col('legal_net_import', 'period_kind', "period_kind VARCHAR(24)")
+            _add_col('payroll_line', 'extra_legal_net', 'extra_legal_net FLOAT')
+            _add_col('payroll_line', 'extra_employer_cost', 'extra_employer_cost FLOAT')
+            _add_col('payroll_line', 'extras_json', 'extras_json TEXT')
         except Exception as e:
             print('ensure_payroll_columns skipped:', e)
 
@@ -389,6 +393,9 @@ class PayrollLine(db.Model):
     net_legal     = db.Column(db.Float)        # από Epsilon
     employer_cost_legal = db.Column(db.Float)
     net_diff      = db.Column(db.Float)
+    extra_legal_net = db.Column(db.Float, default=0.0)      # δώρα/άδεια καθαρά (Epsilon)
+    extra_employer_cost = db.Column(db.Float, default=0.0)  # κόστος εργοδ. δώρων/άδειας
+    extras_json   = db.Column(db.Text)                      # JSON [{kind,net,cost}]
     note          = db.Column(db.String(200))
 
 
@@ -406,6 +413,7 @@ class LegalNetImport(db.Model):
     fmy_legal     = db.Column(db.Float)
     net_legal     = db.Column(db.Float)
     employer_cost_legal = db.Column(db.Float)
+    period_kind   = db.Column(db.String(24), default='monthly')  # monthly/Δώρο Πάσχα/Επίδομα Αδείας...
     import_hash   = db.Column(db.String(40), unique=True, index=True)
     source_file   = db.Column(db.String(160))
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
@@ -443,6 +451,7 @@ def parse_epsilon(wb):
         per = ws.cell(r, c_period).value if c_period else None
         yr  = ws.cell(r, c_year).value if c_year else None
         month = _EPSILON_MONTH.get(_norm(per)) if per else None
+        period_raw = str(per).strip() if per else ''
         try: yr = int(yr) if yr else None
         except Exception: yr = None
         def num(c):
@@ -460,7 +469,7 @@ def parse_epsilon(wb):
             'kind': (ws.cell(r,c_kind).value if c_kind else None),
             'contract': (ws.cell(r,c_contract).value if c_contract else None),
             'bank': (ws.cell(r,c_bank).value if c_bank else None),
-            'year': yr, 'month': month,
+            'year': yr, 'month': month, 'period_raw': period_raw,
             'gross': num(c_gross), 'efka_employee': round(emain+eaux,2),
             'fmy': num(c_fmy), 'net': num(c_net), 'employer_cost': num(c_cost),
         })
@@ -478,27 +487,45 @@ def _match_user_by_afm_or_name(afm, epon, onoma):
     cand = [u for u in User.query.all() if _norm(u.full_name).startswith(_norm(epon))]
     return cand[0] if len(cand) == 1 else None
 
+_KIND_MAP = {
+    'δωροπασχα':'Δώρο Πάσχα', 'δωροχριστουγεννων':'Δώρο Χριστουγέννων',
+    'επιδομααδειας':'Επίδομα Αδείας', 'αποζημιωσηαδειας':'Αποζημίωση Αδείας',
+    'αποδοχεςαδειας':'Αποδοχές Αδείας',
+}
+def _period_kind(period_raw):
+    n = _norm(period_raw)
+    if n in _EPSILON_MONTH: return 'monthly'
+    return _KIND_MAP.get(n, period_raw or 'extra')
+
 def import_epsilon_bytes(raw, filename='', company_id=None):
-    """Εισάγει Epsilon workbook -> LegalNetImport (+ backfill EmployeePII). Idempotent."""
+    """Εισάγει Epsilon workbook -> LegalNetImport (κανονικός + δώρα/άδεια). Idempotent."""
     if openpyxl is None:
         return {'error': 'openpyxl μη διαθέσιμο'}
     wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
     rows = parse_epsilon(wb); wb.close()
-    # company resolve: param -> filename prefix -> καμία
     comp = Company.query.get(company_id) if company_id else None
     if not comp and filename:
         pref = re.split(r'[ _]', filename)[0].upper()
         cc = COMPANY_CODE.get(pref)
         if cc: comp = Company.query.filter_by(code=cc).first()
-    added = updated = matched = pii_filled = 0
+    # κυρίαρχος μήνας αρχείου (από τις γραμμές που ΕΧΟΥΝ μήνα)
+    from collections import Counter
+    mc = Counter((r['year'], r['month']) for r in rows if r['year'] and r['month'])
+    dom = mc.most_common(1)[0][0] if mc else (None, None)
+    added = updated = matched = pii_filled = extras = 0
     period = set()
     for row in rows:
-        yr = row['year']; mo = row['month']
+        kind = _period_kind(row['period_raw'])
+        if kind == 'monthly' and row['year'] and row['month']:
+            yr, mo = row['year'], row['month']
+        else:
+            yr, mo = dom            # δώρα/άδεια -> κυρίαρχος μήνας αρχείου
+            if kind != 'monthly': extras += 1
         if not yr or not mo: continue
         period.add((yr, mo))
         u = _match_user_by_afm_or_name(row['afm'], row['epon'], row['onoma'])
         if u: matched += 1
-        key = '%s|%s|%s|%s' % (comp.id if comp else 'x', yr, mo, row['afm'] or (row['epon']+row['onoma']))
+        key = '%s|%s|%s|%s|%s' % (comp.id if comp else 'x', yr, mo, kind, row['afm'] or (row['epon']+row['onoma']))
         h = hashlib.sha1(key.encode('utf-8')).hexdigest()[:40]
         rec = LegalNetImport.query.filter_by(import_hash=h).first()
         if not rec:
@@ -507,13 +534,13 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
             updated += 1
         rec.company_id = comp.id if comp else None
         rec.user_id = u.id if u else None
-        rec.year = yr; rec.month = mo; rec.afm = row['afm']
+        rec.year = yr; rec.month = mo; rec.afm = row['afm']; rec.period_kind = kind
         rec.emp_name = (row['epon'] + ' ' + (row['onoma'] or '')).strip()
         rec.gross_legal = row['gross']; rec.efka_employee_legal = row['efka_employee']
         rec.fmy_legal = row['fmy']; rec.net_legal = row['net']; rec.employer_cost_legal = row['employer_cost']
         rec.source_file = filename[:160]
-        # backfill PII
-        if u:
+        # backfill PII (μόνο από κανονικές γραμμές)
+        if u and kind == 'monthly':
             pii = EmployeePII.query.filter_by(user_id=u.id).first()
             if not pii:
                 pii = EmployeePII(user_id=u.id); db.session.add(pii)
@@ -527,7 +554,7 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
             if changed: pii_filled += 1
     db.session.commit()
     return {'added': added, 'updated': updated, 'matched': matched, 'rows': len(rows),
-            'pii_filled': pii_filled, 'company': comp.legal_name if comp else None,
+            'pii_filled': pii_filled, 'extras': extras, 'company': comp.legal_name if comp else None,
             'periods': sorted(period)}
 
 
@@ -548,9 +575,13 @@ def build_run(company_id, year, month, created_by=None):
     PayrollLine.query.filter_by(run_id=run.id).delete()
     hotel_ids = _hotels_of_company(company_id)
     seen = set()
-    legal_by_user = {}
+    legal_by_user = {}; extras_by_user = {}
     for li in LegalNetImport.query.filter_by(company_id=company_id, year=year, month=month).all():
-        if li.user_id: legal_by_user[li.user_id] = li
+        if not li.user_id: continue
+        if (li.period_kind or 'monthly') == 'monthly':
+            legal_by_user[li.user_id] = li
+        else:
+            extras_by_user.setdefault(li.user_id, []).append(li)
     n = 0
     for hid in hotel_ids:
         for row in monthly_settlement(year, month, hid):
@@ -592,7 +623,14 @@ def build_run(company_id, year, month, created_by=None):
             folder_fixed = (ag.folder_fixed if ag else 0.0) or 0.0
             folder_total = round(folder_fixed + extra_pay, 2)
             in_hand = round(bank_total + folder_total, 2)
+            ex_list = extras_by_user.get(u.id, [])
+            extra_legal_net = round(sum((e.net_legal or 0) for e in ex_list), 2)
+            extra_emp_cost = round(sum((e.employer_cost_legal or 0) for e in ex_list), 2)
+            extras_json = json.dumps([{'kind': e.period_kind, 'net': round(e.net_legal or 0, 2),
+                                       'cost': round(e.employer_cost_legal or 0, 2)} for e in ex_list],
+                                     ensure_ascii=False) if ex_list else None
             line = PayrollLine(run_id=run.id, user_id=u.id,
+                extra_legal_net=extra_legal_net, extra_employer_cost=extra_emp_cost, extras_json=extras_json,
                 work_days=agg['work_days'], sundays=agg['sundays'],
                 holidays_worked=agg['holidays_worked'], extra_hours=agg['extra_hours'],
                 repo=agg['repo'], total_days=agg['total_days'], elsewhere_days=agg['elsewhere_days'],
@@ -611,12 +649,19 @@ def build_run(company_id, year, month, created_by=None):
 def run_totals(run_id):
     lines = PayrollLine.query.filter_by(run_id=run_id).all()
     t = {'gross_total':0.0,'extra_pay':0.0,'bank_total':0.0,'folder_total':0.0,'in_hand':0.0,
-         'bonus':0.0,'net_legal':0.0,'employer_cost':0.0,'n':len(lines),'n_legal':0}
+         'bonus':0.0,'net_legal':0.0,'employer_cost':0.0,'extra_legal':0.0,
+         'in_hand_total':0.0,'employer_cost_total':0.0,'n':len(lines),'n_legal':0,'n_extras':0}
     for l in lines:
         t['gross_total']+=l.gross_total or 0; t['extra_pay']+=l.extra_pay or 0
         t['bank_total']+=l.bank_total or 0; t['folder_total']+=l.folder_total or 0
         t['in_hand']+=l.in_hand or 0; t['bonus']+=l.bonus or 0
-        t['employer_cost']+= (l.employer_cost_legal or l.employer_cost or 0)
+        ec = (l.employer_cost_legal or l.employer_cost or 0)
+        t['employer_cost']+= ec
+        eln = l.extra_legal_net or 0; eec = l.extra_employer_cost or 0
+        t['extra_legal']+= eln
+        t['in_hand_total']+= (l.in_hand or 0) + eln
+        t['employer_cost_total']+= ec + eec
+        if eln: t['n_extras']+=1
         if l.net_legal is not None: t['net_legal']+=l.net_legal; t['n_legal']+=1
     for k in t:
         if isinstance(t[k], float): t[k]=round(t[k],2)
