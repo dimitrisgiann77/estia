@@ -410,7 +410,7 @@ def seed_schedule():
 # ── IMPORT (workbook προγράμματος -> χρήστες/τμήματα/αναθέσεις) ────────────────
 CODE_HOTELNAME = {
     'AST': 'Asterias', 'CNT': 'Central', 'SRG': 'Sergios',
-    'PSV': 'Piskopiano', 'IRO': 'Iro', 'PLM': 'Iro',  # PLM≈Iro (επιβεβαίωση Giannis)
+    'PSV': 'Piskopiano', 'IRO': 'Iro',  # PLM: σκόπιμα ΧΩΡΙΣ αντιστοίχιση (Giannis)
 }
 _LABELS = {'τμημα': 'dept', 'ειδικοτητα': 'spec', 'εταιρεια': 'comp', 'υποκ': 'upok',
            'επωνυμο': 'epon', 'ονομα': 'onoma'}
@@ -579,13 +579,13 @@ def week_grid(hotel_id, dept_id, week_start):
     rows = []
     for u in users:
         cells = []
-        wk_hours = 0.0; repo = 0
+        wk_hours = 0.0; repo = 0; work_days = 0
         for d in days:
             a = amap.get((u.id, d.isoformat()))
             if a:
                 hrs = assignment_hours(a)
                 if is_work_code(a.shift_code):
-                    wk_hours += hrs
+                    wk_hours += hrs; work_days += 1
                 elif a.shift_code == 'ΑΝ':
                     repo += 1
                 try:
@@ -602,7 +602,7 @@ def week_grid(hotel_id, dept_id, week_start):
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
                               'elsewhere': False, 'note': ''})
-        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'repo': repo})
+        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'repo': repo, 'work_days': work_days})
     return days, rows
 
 def validate_hotel_week(hotel_id, week_start):
@@ -626,7 +626,22 @@ def validate_hotel_week(hotel_id, week_start):
     return issues
 
 
-# ── ROUTE: Board (επιλογή ξενοδοχείου/τμήματος/εβδομάδας + grid) ───────────────
+# ── ROUTE: Board (multi-week: επιλογή ξενοδοχείου/τμήματος + Ν εβδομάδες) ──────
+def _build_block(hotel_id, dept_id, week_start, user):
+    days, rows = week_grid(hotel_id, dept_id, week_start)
+    sub = None
+    if hotel_id:
+        sub = (ScheduleSubmission.query.filter_by(hotel_id=hotel_id, week_start=week_start)
+               .order_by(ScheduleSubmission.version.desc()).first())
+    return {
+        'week_start': week_start, 'days': days, 'rows': rows,
+        'editable': week_editable(week_start, user) and can_edit_schedule(),
+        'issues': validate_hotel_week(hotel_id, week_start) if hotel_id else [],
+        'deadline': week_deadline(week_start), 'sub': sub,
+        'iso': week_start.isoformat(),
+        'label': f"{week_start.strftime('%d/%m')} – {(week_start + timedelta(days=6)).strftime('%d/%m/%Y')}",
+    }
+
 @app.route('/dashboard/schedule')
 def schedule_board():
     if not _auth():
@@ -637,28 +652,22 @@ def schedule_board():
     depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     dept_id = request.args.get('department_id', type=int) or (depts[0].id if depts else None)
     week_start = _week_arg()
-    days, rows = week_grid(hotel_id, dept_id, week_start)
+    pol = get_policy()
+    horizon = max(1, int(pol.get('planning_horizon_weeks', 8)))
+    weeks = request.args.get('weeks', type=int) or 1
+    weeks = max(1, min(weeks, horizon))
+    blocks = [_build_block(hotel_id, dept_id, week_start + timedelta(days=7 * i), user) for i in range(weeks)]
     shift_types = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
-    editable = week_editable(week_start, user) and can_edit_schedule()
-    issues = validate_hotel_week(hotel_id, week_start) if hotel_id else []
-    wp = None
-    if hotel_id and dept_id:
-        wp = WeekPlan.query.filter_by(hotel_id=hotel_id, department_id=dept_id, week_start=week_start).first()
-    sub = None
-    if hotel_id:
-        sub = (ScheduleSubmission.query.filter_by(hotel_id=hotel_id, week_start=week_start)
-               .order_by(ScheduleSubmission.version.desc()).first())
-    cur_dept = Department.query.get(dept_id) if dept_id else None
-    cur_hotel = Hotel.query.get(hotel_id) if hotel_id else None
     shift_lookup = {st.code: st for st in shift_types}
     shift_types_json = json.dumps([{'code': st.code, 'color': st.color} for st in shift_types], ensure_ascii=False)
+    cur_dept = Department.query.get(dept_id) if dept_id else None
+    cur_hotel = Hotel.query.get(hotel_id) if hotel_id else None
     return render_template('schedule_board.html',
         shift_lookup=shift_lookup, shift_types_json=shift_types_json,
         hotels=hotels, depts=depts, hotel_id=hotel_id, dept_id=dept_id,
-        cur_dept=cur_dept, cur_hotel=cur_hotel,
-        week_start=week_start, days=days, rows=rows, weekdays=WEEKDAYS_EL,
-        shift_types=shift_types, editable=editable, issues=issues, wp=wp, sub=sub,
-        wp_labels=WP_LABELS, deadline=week_deadline(week_start),
+        cur_dept=cur_dept, cur_hotel=cur_hotel, weekdays=WEEKDAYS_EL,
+        shift_types=shift_types, blocks=blocks, weeks=weeks, horizon=horizon,
+        week_start=week_start, week_start_iso=week_start.isoformat(),
         prev_week=(week_start - timedelta(days=7)).isoformat(),
         next_week=(week_start + timedelta(days=7)).isoformat(),
         month_el=MONTHS_EL, is_admin=is_admin())
@@ -953,3 +962,58 @@ def schedule_settings():
         depts=Department.query.order_by(Department.sort).all(),
         holidays=Holiday.query.order_by(Holiday.hol_date).all(),
         rules=ScheduleRule.query.all(), dow_el=DOW_EL)
+
+
+# ── ROUTE: Διαχείριση Προσωπικού (οργανόγραμμα: τμήμα/ξενοδοχείο/login) ────────
+@app.route('/dashboard/schedule/staff', methods=['GET', 'POST'])
+def schedule_staff():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        act = request.form.get('action')
+        if act == 'add':
+            full = (request.form.get('full_name') or '').strip()
+            if full:
+                base = re.sub(r'[^a-z0-9.]', '', _acc(full).lower().replace(' ', '.')) or 'emp'
+                uname = base
+                i = 1
+                while User.query.filter_by(username=uname).first():
+                    i += 1; uname = f'{base}.{i}'
+                u = User(username=uname[:50], password=generate_password_hash(os.urandom(8).hex()),
+                         full_name=full[:100], role='staff', approved=True, is_active=True,
+                         department_id=request.form.get('department_id', type=int) or None,
+                         home_hotel_id=request.form.get('home_hotel_id', type=int) or None,
+                         employer=(request.form.get('employer') or '')[:120] or None,
+                         login_enabled=bool(request.form.get('login_enabled')),
+                         employment_active=True)
+                db.session.add(u); db.session.commit()
+                log_activity('staff_add', full)
+        elif act == 'edit':
+            u = User.query.get(request.form.get('user_id', type=int))
+            if u:
+                u.department_id = request.form.get('department_id', type=int) or None
+                u.home_hotel_id = request.form.get('home_hotel_id', type=int) or None
+                u.employer = (request.form.get('employer') or '')[:120] or None
+                u.login_enabled = bool(request.form.get('login_enabled'))
+                db.session.commit()
+        elif act == 'toggle_active':
+            u = User.query.get(request.form.get('user_id', type=int))
+            if u:
+                u.employment_active = not bool(getattr(u, 'employment_active', True))
+                db.session.commit()
+        qs = f"?embed=1&hotel_id={request.form.get('f_hotel','')}&department_id={request.form.get('f_dept','')}"
+        return redirect('/dashboard/schedule/staff' + qs)
+    f_hotel = request.args.get('hotel_id', type=int)
+    f_dept = request.args.get('department_id', type=int)
+    q = User.query.filter(User.is_active == True)
+    if f_hotel:
+        q = q.filter(User.home_hotel_id == f_hotel)
+    if f_dept:
+        q = q.filter(User.department_id == f_dept)
+    users = q.order_by(User.full_name).limit(800).all()
+    return render_template('schedule_staff.html',
+        users=users, depts=Department.query.order_by(Department.sort).all(),
+        hotels=Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all(),
+        f_hotel=f_hotel, f_dept=f_dept,
+        dept_map={d.id: d.name for d in Department.query.all()},
+        hotel_map={h.id: h.name for h in Hotel.query.all()})
