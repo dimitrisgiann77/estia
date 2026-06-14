@@ -1,0 +1,57 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Βοήθεια', theme.primary) }}
+<style>
+ .tabs{display:flex;gap:8px;margin-bottom:14px;}
+ .tab{padding:8px 16px;border-radius:9px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);cursor:pointer;font-size:13px;}
+ .tab.on{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
+ .cat{font-size:12px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px;}
+ .qa{border:1px solid #eef2f6;border-radius:10px;margin-bottom:8px;overflow:hidden;}
+ .q{padding:11px 14px;cursor:pointer;font-weight:600;font-size:13.5px;display:flex;justify-content:space-between;gap:10px;align-items:center;}
+ .q:hover{background:var(--soft,#f8fafc);}
+ .a{padding:0 14px;max-height:0;overflow:hidden;transition:max-height .2s,padding .2s;font-size:13px;color:#475569;}
+ .qa.open .a{max-height:400px;padding:0 14px 12px;}
+ .qa.open .q .chev{transform:rotate(180deg);}
+ .chev{transition:transform .2s;opacity:.6;}
+ .prob{border-left:3px solid #f59e0b;}
+ .admtag{font-size:10px;background:#ede9fe;color:#6d28d9;padding:1px 7px;border-radius:9px;}
+ .hide{display:none;}
+</style></head><body>
+{{ mp.topbar('help-circle', 'ΕΣΤΙΑ — Βοήθεια', 'Συχνές ερωτήσεις & επίλυση προβλημάτων') }}
+<div class="container"><div class="card">
+  <div class="tabs">
+    <div class="tab on" id="t-faq" onclick="showTab('faq')"><i class="ti ti-help"></i> Συχνές ερωτήσεις</div>
+    <div class="tab" id="t-tr" onclick="showTab('tr')"><i class="ti ti-tools"></i> Επίλυση προβλημάτων</div>
+  </div>
+
+  <div id="sec-faq">
+    {% for c in cats %}
+    <div class="cat">{{ c }}</div>
+    {% for f in faqs if f.c==c %}
+    <div class="qa" onclick="this.classList.toggle('open')">
+      <div class="q"><span>{{ f.q }}{% if f.admin %} <span class="admtag">Διαχ/ση</span>{% endif %}</span><i class="ti ti-chevron-down chev"></i></div>
+      <div class="a">{{ f.a }}</div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+
+  <div id="sec-tr" class="hide">
+    {% for t in trbl %}
+    <div class="qa prob" onclick="this.classList.toggle('open')">
+      <div class="q"><span>⚠ {{ t.p }}{% if t.admin %} <span class="admtag">Διαχ/ση</span>{% endif %}</span><i class="ti ti-chevron-down chev"></i></div>
+      <div class="a">{{ t.s }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p style="font-size:12.5px;color:#64748b;margin-top:16px;">Δεν βρήκες αυτό που ψάχνεις; Στείλε μας <a href="/feedback?embed=1">feedback</a>.</p>
+</div></div>
+<script>
+function showTab(w){
+  document.getElementById('sec-faq').classList.toggle('hide', w!=='faq');
+  document.getElementById('sec-tr').classList.toggle('hide', w!=='tr');
+  document.getElementById('t-faq').classList.toggle('on', w==='faq');
+  document.getElementById('t-tr').classList.toggle('on', w==='tr');
+}
+</script>
+</body></html>
