@@ -27,23 +27,36 @@ except Exception:
     monthly_settlement = None
 
 
-# ── Χάρτης εταιρειών (SPEC §3) ────────────────────────────────────────────────
-COMPANY_MAP = {
-    'AST': ('Γ. ΓΙΑΝΝΟΥΛΑΚΗΣ – Α. ΓΙΑΝΝΟΥΛΑΚΗ Α.Ε.', '0002'),
-    'CNT': ('Γ. ΓΙΑΝΝΟΥΛΑΚΗΣ – Α. ΓΙΑΝΝΟΥΛΑΚΗ Α.Ε.', None),
-    'IRO': ('Γ. ΓΙΑΝΝΟΥΛΑΚΗΣ – Α. ΓΙΑΝΝΟΥΛΑΚΗ Α.Ε.', None),
-    'SRG': ('ΑΦΟΙ ΣΕΡΓΙΟΥ Α.Ε.',                       None),
-    'PSV': ('ΠΙΣΚΟΠΙΑΝΟ Α.Ε.',                         None),
-    'PLM': ('ΦΥΤΩΡΙΑ ΚΡΗΤΗΣ Α.Ε.',                     None),
-    'CND': ('CONDIAN HOTELS (HQ / Όμιλος)',            None),
+# ── Αυθεντικός χάρτης νομικών οντοτήτων (Giannis 14/06) ───────────────────────
+# Εταιρεία (ΑΦΜ) -> ξενοδοχεία, με Κωδικό Υποκαταστήματος (ΥΠΟΚ) ανά ξενοδοχείο.
+COMPANY_INFO = {   # company_code -> (legal_name, ΑΦΜ)
+    'GIAN': ('Γ. ΓΙΑΝΝΟΥΛΑΚΗΣ - Α. ΓΙΑΝΝΟΥΛΑΚΗ Α.Ε.', '094082480'),
+    'SERG': ('ΑΦΟΙ ΣΕΡΓΙΟΥ Α.Ε.',                      '094084694'),
+    'PISK': ('ΠΙΣΚΟΠΙΑΝΟ Α.Ε.',                        '094121123'),
 }
-COMPANY_CODE = {
-    'AST': 'GIAN', 'CNT': 'GIAN', 'IRO': 'GIAN',
-    'SRG': 'SERG', 'PSV': 'PISK', 'PLM': 'FYTO', 'CND': 'CND',
+HOTEL_INFO = {   # hotel_code -> (name, company_code, ypok_code, ypok_desc)
+    'AST': ('Asterias Village Resort',   'GIAN', '0002', 'ΥΠΟΚ/ΜΑ 2 ΑΣΤΕΡΙΑΣ'),
+    'CNT': ('Central Hersonissos Hotel', 'GIAN', '0001', 'ΥΠΟΚ/ΜΑ 1 CENTRAL'),
+    'IRO': ('Iro Hotel',                 'GIAN', '0000', 'Κεντρικό'),
+    'SRG': ('Sergios Hotel',             'SERG', '0000', 'Κεντρικό'),
+    'PSV': ('Piskopiano Village Resort', 'PISK', '0000', 'Κεντρικό'),
 }
-HOTEL_NAME_CODE = {
+COMPANY_CODE = {   # filename/hotel prefix -> εταιρεία (CND/HQ ασφαλίζεται στη Γιαννουλάκη)
+    'AST': 'GIAN', 'CNT': 'GIAN', 'IRO': 'GIAN', 'CND': 'GIAN',
+    'SRG': 'SERG', 'PSV': 'PISK',
+}
+HOTEL_NAME_CODE = {   # όνομα ξενοδοχείου -> hotel code
     'asterias': 'AST', 'central': 'CNT', 'iro': 'IRO', 'ηρω': 'IRO',
-    'sergios': 'SRG', 'piskopiano': 'PSV', 'palm': 'PLM', 'condian': 'CND',
+    'sergios': 'SRG', 'piskopiano': 'PSV',
+}
+HOTEL_YPOK = {hc: info[2] for hc, info in HOTEL_INFO.items()}
+YPOK_TO_HOTEL = {(info[1], info[2]): hc for hc, info in HOTEL_INFO.items()}  # (company,ypok)->hotel
+
+# Managerial «κέντρο κόστους / μονάδα» (εσωτερικό· μπορεί να διαφέρει από το νομικό ξεν.)
+# π.χ. κάποιος ασφαλισμένος στο Iro αλλά ανήκει στα Κεντρικά Γραφεία (CND).
+COST_CENTERS = {
+    'AST': 'Asterias', 'CNT': 'Central Hersonissos', 'IRO': 'Iro',
+    'SRG': 'Sergios', 'PSV': 'Piskopiano', 'CND': 'Κεντρικά Γραφεία (CONDIAN)',
 }
 
 
@@ -105,6 +118,7 @@ class EmployeePII(db.Model):
     hired_at         = db.Column(db.Date)
     left_at          = db.Column(db.Date)
     locked           = db.Column(db.Boolean, default=False)   # v12.56: κλειδωμένο μητρώο (πηγή=Epsilon)
+    cost_center      = db.Column(db.String(8))   # v12.59: managerial μονάδα (AST/CNT/IRO/SRG/PSV/CND)
     updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by       = db.Column(db.Integer, db.ForeignKey('user.id'))
 
@@ -140,6 +154,7 @@ def ensure_payroll_columns():
         try:
             from app import _add_col
             _add_col('hotel', 'company_id', 'company_id INTEGER')
+            _add_col('hotel', 'ypok_code', "ypok_code VARCHAR(8)")
             _add_col('legal_net_import', 'period_kind', "period_kind VARCHAR(24)")
             _add_col('payroll_line', 'extra_legal_net', 'extra_legal_net FLOAT')
             _add_col('payroll_line', 'extra_employer_cost', 'extra_employer_cost FLOAT')
@@ -148,6 +163,7 @@ def ensure_payroll_columns():
             _add_col('payroll_run', 'approved_by', 'approved_by INTEGER')
             _add_col('payroll_run', 'approved_at', 'approved_at DATETIME')
             _add_col('employee_pii', 'locked', 'locked BOOLEAN')
+            _add_col('employee_pii', 'cost_center', "cost_center VARCHAR(8)")
         except Exception as e:
             print('ensure_payroll_columns skipped:', e)
 
@@ -156,24 +172,35 @@ def ensure_payroll_columns():
 def seed_payroll():
     with app.app_context():
         try:
-            seen = {}
-            for hcode, ccode in COMPANY_CODE.items():
-                if ccode in seen:
-                    continue
-                legal, sub = COMPANY_MAP[hcode]
-                if not Company.query.filter_by(code=ccode).first():
-                    db.session.add(Company(code=ccode, legal_name=legal, subunit_code=sub))
-                seen[ccode] = True
+            # 1) Εταιρείες (αυθεντικός χάρτης + ΑΦΜ)
+            for ccode, (legal, vat) in COMPANY_INFO.items():
+                c = Company.query.filter_by(code=ccode).first()
+                if not c:
+                    c = Company(code=ccode, legal_name=legal, vat=vat); db.session.add(c)
+                else:
+                    c.legal_name = legal
+                    if not c.vat:
+                        c.vat = vat
+            db.session.commit()
+            # καταργημένες εταιρείες (PLM/ΦΥΤΩΡΙΑ, CND) -> ανενεργές
+            for old_code in ('FYTO', 'CND'):
+                oc = Company.query.filter_by(code=old_code).first()
+                if oc:
+                    oc.active = False
             db.session.commit()
 
+            # 2) Ξενοδοχεία -> εταιρεία + Κωδικός ΥΠΟΚ (αυθεντικά)
             comp_by_code = {c.code: c for c in Company.query.all()}
             for h in Hotel.query.all():
-                if getattr(h, 'company_id', None):
-                    continue
                 hc = hotel_code(h)
-                cc = COMPANY_CODE.get(hc)
-                if cc and cc in comp_by_code:
+                info = HOTEL_INFO.get(hc) if hc else None
+                if not info:
+                    continue
+                cc = info[1]
+                if cc in comp_by_code:
                     h.company_id = comp_by_code[cc].id
+                if hasattr(h, 'ypok_code'):
+                    h.ypok_code = info[2]
             db.session.commit()
 
             if not PayrollRates.query.filter_by(year=2026).first():
@@ -209,9 +236,11 @@ def _employees():
         hid = getattr(u, 'home_hotel_id', None)
         comp = _company_for_hotel(hid)
         hotel = Hotel.query.get(hid) if hid else None
+        cc = pii.cost_center if (pii and pii.cost_center) else None
         out.append({'user': u, 'profile': prof, 'pii': pii, 'company': comp,
                     'hotel_name': (hotel.name if hotel else ''), 'hotel_id': hid,
-                    'dept_id': getattr(u, 'department_id', None)})
+                    'dept_id': getattr(u, 'department_id', None),
+                    'cost_center': cc, 'cost_center_label': (COST_CENTERS.get(cc, cc) if cc else '')})
     out.sort(key=lambda r: (r['company'].legal_name if r['company'] else 'ω', r['user'].full_name or ''))
     return out
 
@@ -230,10 +259,12 @@ def payroll_home():
     # φίλτρα
     company_id = request.args.get('company_id', type=int)
     hotel_id = request.args.get('hotel_id', type=int)
+    cc = request.args.get('cc')
     flt = request.args.get('filter')
     rows = allrows
     if company_id: rows = [r for r in rows if r['company'] and r['company'].id == company_id]
     if hotel_id: rows = [r for r in rows if r.get('hotel_id') == hotel_id]
+    if cc: rows = [r for r in rows if r.get('cost_center') == cc]
     if flt == 'agree':   rows = [r for r in rows if r['profile'] and r['profile'].agreement_amount]
     elif flt == 'noagree': rows = [r for r in rows if not (r['profile'] and r['profile'].agreement_amount)]
     elif flt == 'pii':   rows = [r for r in rows if r['pii'] and r['pii'].afm]
@@ -243,8 +274,8 @@ def payroll_home():
     log_activity('payroll_view', 'μητρώο')
     return render_template('payroll_home.html',
         rows=rows, companies=companies, hotels=hotels, n_emp=n_emp, n_agree=n_agree, n_pii=n_pii,
-        company_id=company_id, hotel_id=hotel_id, flt=flt, total_shown=len(rows),
-        rates=rates, is_admin=is_admin())
+        company_id=company_id, hotel_id=hotel_id, cc=cc, cost_centers=COST_CENTERS,
+        flt=flt, total_shown=len(rows), rates=rates, is_admin=is_admin())
 
 
 @app.route('/dashboard/payroll/companies', methods=['GET', 'POST'])
@@ -472,6 +503,16 @@ def _epsilon_headers(ws):
         h[_norm(ws.cell(1, c).value)] = c
     return h
 
+def _ypok4(v):
+    """Κωδικός ΥΠΟΚ -> 4ψήφιο string (π.χ. 2 -> '0002')."""
+    if v in (None, ''):
+        return None
+    sv = str(v).strip()
+    try:
+        return '%04d' % int(float(sv))
+    except Exception:
+        return sv
+
 def parse_epsilon(wb):
     """Επιστρέφει λίστα dict ανά εργαζόμενο από workbook Epsilon (44 στήλες)."""
     ws = wb.worksheets[0]
@@ -485,6 +526,7 @@ def parse_epsilon(wb):
     c_amka=col('ΑΜΚΑ'); c_ika=col('Α.Μ. ΙΚΑ','ΑΜ ΙΚΑ'); c_pat=col('Όνομα Πατρός')
     c_spec=col('Ειδικότητα'); c_kind=col('Είδος Εργάζ','Είδος Εργαζ'); c_contract=col('Διάρκεια Σύμβασης')
     c_sub=col('Περιγραφή Υποκαταστήματος'); c_dept=col('Περιγραφή Τμήματος')
+    c_subcode=col('Κωδικός Υποκαταστήματος')
     c_bank=col('Τράπεζα'); c_period=col('Περίοδος'); c_year=col('Έτος')
     c_gross=col('Συν.Αποδ.','Συν.Αποδ'); c_emain=col('Εισφ. Εργάζ. Κύριου Ταμείου')
     c_eaux=col('Εισφ. Εργάζ. Επικ. Ταμείου'); c_fmy=col('Φ.Μ.Υ','ΦΜΥ')
@@ -516,6 +558,7 @@ def parse_epsilon(wb):
             'contract': (ws.cell(r,c_contract).value if c_contract else None),
             'subunit_desc': (ws.cell(r,c_sub).value if c_sub else None),
             'dept_desc': (ws.cell(r,c_dept).value if c_dept else None),
+            'subunit_code': _ypok4(ws.cell(r,c_subcode).value if c_subcode else None),
             'bank': (ws.cell(r,c_bank).value if c_bank else None),
             'year': yr, 'month': month, 'period_raw': period_raw,
             'gross': num(c_gross), 'efka_employee': round(emain+eaux,2),
@@ -551,25 +594,24 @@ _HOTEL_KW = {
     'PSV': ['piskopiano', 'πισκοπιανο'], 'PLM': ['palm', 'παλμ'], 'CND': ['condian', 'κονντιαν'],
 }
 def _hotel_from_epsilon(row, comp=None):
-    """Ξενοδοχείο: ΕΤΑΙΡΕΙΑ-ΠΡΩΤΑ. Μονοξενοδοχειακή εταιρεία -> το ξεν. της.
-    Πολυξενοδοχειακή (Γιαννουλάκης: AST/CNT/IRO) -> disambiguate από ΥΠΟΚ.
-    («Κεντρικό» = έδρα/λογιστικό υποκατάστημα, ΟΧΙ ξενοδοχείο)."""
-    blob = _norm(str(row.get('subunit_desc') or '') + ' ' + str(row.get('dept_desc') or ''))
+    """Ξενοδοχείο ΝΤΕΤΕΡΜΙΝΙΣΤΙΚΑ από Κωδικό ΥΠΟΚ + εταιρεία (αυθεντικός χάρτης).
+    π.χ. Γιαννουλάκης: 0002->AST, 0001->CNT, 0000->IRO. Μονοξενοδοχειακή -> το ξεν. της."""
     if comp:
+        ypok = row.get('subunit_code')
+        hc = YPOK_TO_HOTEL.get((comp.code, ypok)) if ypok else None
+        if hc:
+            for h in Hotel.query.filter_by(company_id=comp.id).all():
+                if hotel_code(h) == hc:
+                    return h
         hs = Hotel.query.filter_by(company_id=comp.id).all()
         if len(hs) == 1:
             return hs[0]
-        for h in hs:                       # πολλά ξεν. -> διάλεξε με βάση το ΥΠΟΚ
-            code = hotel_code(h)
-            if any(_norm(k) in blob for k in _HOTEL_KW.get(code, [])):
+        # εφεδρεία: περιγραφή ΥΠΟΚ
+        blob = _norm(str(row.get('subunit_desc') or '') + ' ' + str(row.get('dept_desc') or ''))
+        for h in hs:
+            if any(_norm(k) in blob for k in _HOTEL_KW.get(hotel_code(h), [])):
                 return h
-        return None                        # έδρα/«Κεντρικό» -> χωρίς ξεν.
-    # χωρίς εταιρεία: καθαρό keyword
-    for code, kws in _HOTEL_KW.items():
-        if any(_norm(k) in blob for k in kws):
-            for h in Hotel.query.all():
-                if hotel_code(h) == code:
-                    return h
+        return None
     return None
 
 def _create_locked_employee(row):
@@ -588,7 +630,7 @@ def _create_locked_employee(row):
     db.session.add(u); db.session.flush()
     return u
 
-def _apply_epsilon_identity(u, row, comp=None):
+def _apply_epsilon_identity(u, row, comp=None, cost_center=None):
     """Ταυτότητα από Epsilon (αλήθεια): ξενοδοχείο + PII + κλείδωμα."""
     hotel = _hotel_from_epsilon(row, comp)
     if hotel:
@@ -604,6 +646,8 @@ def _apply_epsilon_identity(u, row, comp=None):
         if val and not getattr(pii, fld, None):
             setattr(pii, fld, str(val)[:120]); filled = True
     pii.locked = True
+    if cost_center:
+        pii.cost_center = cost_center
     db.session.flush()
     return filled
 
@@ -624,6 +668,9 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
     from collections import Counter
     mc = Counter((r['year'], r['month']) for r in rows if r['year'] and r['month'])
     dom = mc.most_common(1)[0][0] if mc else (None, None)
+    # managerial κέντρο κόστους από το ΟΝΟΜΑ αρχείου (AST/CNT/IRO/SRG/PSV/CND)
+    _ccpref = (re.split(r'[ _]', filename)[0].upper() if filename else None)
+    cost_center = _ccpref if _ccpref in COST_CENTERS else None
     added = updated = matched = pii_filled = extras = created = 0
     period = set()
     for row in rows:
@@ -640,7 +687,7 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
             u = _create_locked_employee(row); created += 1
         if u is not None:
             matched += 1
-            if _apply_epsilon_identity(u, row, comp):
+            if _apply_epsilon_identity(u, row, comp, cost_center):
                 pii_filled += 1
         key = '%s|%s|%s|%s|%s' % (comp.id if comp else 'x', yr, mo, kind, row['afm'] or (row['epon']+row['onoma']))
         h = hashlib.sha1(key.encode('utf-8')).hexdigest()[:40]
@@ -843,7 +890,7 @@ try:
 except Exception:
     _Dept = None
 
-def _control_rows(year, month, company_id=None, hotel_id=None, dept_id=None):
+def _control_rows(year, month, company_id=None, hotel_id=None, dept_id=None, cc=None):
     runs_q = PayrollRun.query.filter_by(year=year, month=month)
     if company_id:
         runs_q = runs_q.filter_by(company_id=company_id)
@@ -866,6 +913,10 @@ def _control_rows(year, month, company_id=None, hotel_id=None, dept_id=None):
             did = getattr(u, 'department_id', None)
             if dept_id and did != dept_id:
                 continue
+            pii_u = EmployeePII.query.filter_by(user_id=u.id).first()
+            ccu = pii_u.cost_center if (pii_u and pii_u.cost_center) else None
+            if cc and ccu != cc:
+                continue
             hotel = Hotel.query.get(hid) if hid else None
             mgmt = round((l.in_hand or 0) + (l.extra_legal_net or 0), 2)         # στο χέρι σύνολο
             legal = (round((l.net_legal or 0), 2) if l.net_legal is not None else None)
@@ -879,7 +930,7 @@ def _control_rows(year, month, company_id=None, hotel_id=None, dept_id=None):
             if (l.extra_hours or 0) > 40: flags.append('πολλές έξτρα')
             if legal is None and (l.work_days or 0) > 0: flags.append('χωρίς Epsilon')
             rows.append({'user': u, 'company': comp, 'run': run,
-                'hotel': hotel.name if hotel else '', 'dept': dmap.get(did, ''),
+                'hotel': hotel.name if hotel else '', 'dept': dmap.get(did, ''), 'cc': ccu or '',
                 'work_days': l.work_days or 0, 'repo': l.repo or 0,
                 'extra_hours': l.extra_hours or 0, 'mgmt': mgmt, 'legal': legal,
                 'diff': diff, 'ektos': ektos, 'payable': mgmt, 'paid': paid,
@@ -909,7 +960,8 @@ def payroll_control():
     company_id = request.values.get('company_id', type=int)
     hotel_id = request.values.get('hotel_id', type=int)
     dept_id = request.values.get('dept_id', type=int)
-    rows, runs, tot = _control_rows(year, month, company_id, hotel_id, dept_id)
+    cc = request.values.get('cc')
+    rows, runs, tot = _control_rows(year, month, company_id, hotel_id, dept_id, cc)
     companies = Company.query.filter_by(active=True).order_by(Company.legal_name).all()
     hotels = Hotel.query.order_by(Hotel.name).all()
     depts = _Dept.query.order_by(_Dept.name).all() if _Dept else []
@@ -918,7 +970,7 @@ def payroll_control():
     return render_template('payroll_control.html', rows=rows, tot=tot, runs=runs, run_map=run_map,
         companies=companies, hotels=hotels, depts=depts, months=MONTHS_EL2,
         year=year, month=month, company_id=company_id, hotel_id=hotel_id, dept_id=dept_id,
-        run_labels=RUN_LABELS, is_admin=is_admin())
+        cc=cc, cost_centers=COST_CENTERS, run_labels=RUN_LABELS, is_admin=is_admin())
 
 
 @app.route('/dashboard/payroll/approve', methods=['POST'])

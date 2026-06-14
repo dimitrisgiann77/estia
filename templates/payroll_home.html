@@ -27,8 +27,11 @@
     <select name="company_id" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;">
       <option value="">— εταιρεία —</option>{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if company_id==c.id }}>{{ c.legal_name }}</option>{% endfor %}
     </select>
-    <select name="hotel_id" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;">
-      <option value="">— ξενοδοχείο —</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}
+    <select name="hotel_id" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;" title="Νομικό ξενοδοχείο (ασφάλιση)">
+      <option value="">— ξενοδοχείο (νομικό) —</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}
+    </select>
+    <select name="cc" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;" title="Managerial μονάδα / κέντρο κόστους">
+      <option value="">— μονάδα (managerial) —</option>{% for code,label in cost_centers.items() %}<option value="{{ code }}" {{ 'selected' if cc==code }}>{{ label }}</option>{% endfor %}
     </select>
     <select name="filter" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;">
       <option value="">— όλοι —</option>
@@ -45,23 +48,24 @@
     <h3>Μητρώο εργαζομένων ανά εταιρεία</h3>
     {% set ns = namespace(cur='') %}
     <table>
-      <tr><th>Ονοματεπώνυμο</th><th>Τμήμα</th><th>Ξενοδοχείο</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
+      <tr><th>Ονοματεπώνυμο</th><th>Τμήμα</th><th>Ξενοδοχείο (νομικό)</th><th>Μονάδα</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
       {% for r in rows %}
         {% set cname = r.company.legal_name if r.company else 'Χωρίς εταιρεία' %}
         {% if cname != ns.cur %}
-          <tr><td colspan="6" class="grp">{{ cname }}</td></tr>
+          <tr><td colspan="7" class="grp">{{ cname }}</td></tr>
           {% set ns.cur = cname %}
         {% endif %}
         <tr>
           <td>{{ r.user.full_name or r.user.username }}</td>
           <td>{{ r.profile.position if r.profile and r.profile.position else (r.pii.ergani_specialty if r.pii else '') }}</td>
           <td class="muted">{{ r.hotel_name }}</td>
+          <td>{% if r.cost_center %}<span class="pill" style="background:#e0e7ff;color:#3730a3;">{{ r.cost_center }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td>{% if r.profile and r.profile.agreement_amount %}<b>{{ '%.0f'|format(r.profile.agreement_amount) }}€</b> <span class="muted">{{ r.profile.agreement_type }}</span>{% else %}<span class="pill no">—</span>{% endif %}</td>
           <td>{% if r.pii and r.pii.afm %}<span class="pill ok">✓{% if r.pii.locked %} 🔒{% endif %}</span>{% else %}<span class="pill no">λείπει</span>{% endif %}</td>
           <td><a class="b" href="/dashboard/payroll/employee/{{ r.user.id }}?embed=1">Καρτέλα</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="6" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
+        <tr><td colspan="7" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
       {% endfor %}
     </table>
     <div class="note">

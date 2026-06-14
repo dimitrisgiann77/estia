@@ -328,11 +328,19 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.57'
-APP_BUILD   = '337'
+APP_VERSION = '12.59'
+APP_BUILD   = '339'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.59', 'b': '339', 'date': '14/06/2026', 'time': '21:45', 'title': 'Μισθοδοσία: managerial μονάδα / κέντρο κόστους (CND)',
+     'items': ['Κάθε εργαζόμενος έχει τώρα ΚΑΙ «Μονάδα / Κέντρο Κόστους» (managerial: AST/CNT/IRO/SRG/PSV/CND) — μπορεί να διαφέρει από το νομικό ξενοδοχείο ασφάλισης.',
+               'Π.χ. ασφαλισμένος στο Iro αλλά ανήκει στα Κεντρικά Γραφεία (CND) — όταν φιλτράρεις CND εμφανίζεται.',
+               'Νέα φίλτρα & στήλη «Μονάδα» σε Μητρώο και Έλεγχο & Έγκριση.']},
+    {'v': '12.58', 'b': '338', 'date': '14/06/2026', 'time': '21:15', 'title': 'Αυθεντικός χάρτης εταιρειών/ΥΠΟΚ · κατάργηση Palm',
+     'items': ['Καταχωρήθηκαν οι 3 νομικές οντότητες με ΑΦΜ (Γιαννουλάκης 094082480, Σεργίου 094084694, Πισκοπιανό 094121123) και ο Κωδικός Υποκαταστήματος ανά ξενοδοχείο.',
+               'Το ξενοδοχείο βγαίνει ΝΤΕΤΕΡΜΙΝΙΣΤΙΚΑ από τον κωδικό ΥΠΟΚ (Γιαννουλάκης: 0002=Asterias, 0001=Central, 0000=Iro).',
+               'Καταργήθηκε το Palm Island Suites (PLM/ΦΥΤΩΡΙΑ) από τις ρυθμίσεις.']},
     {'v': '12.57', 'b': '337', 'date': '14/06/2026', 'time': '20:45', 'title': 'Διορθώσεις Epsilon: σωστό ξενοδοχείο + πολλαπλά αρχεία',
      'items': ['Διόρθωση: το «Κεντρικό» (έδρα/λογιστικό υποκατάστημα) ΔΕΝ μπερδεύεται πια με το Central Hersonissos — το ξενοδοχείο βγαίνει από την εταιρεία.',
                'Η Εισαγωγή Epsilon δέχεται πλέον ΠΟΛΛΑ αρχεία μαζί (drag & drop) και δείχνει αποτέλεσμα για το καθένα.']},
@@ -707,6 +715,7 @@ class Hotel(db.Model):
     name       = db.Column(db.String(120), unique=True, nullable=False)
     is_active  = db.Column(db.Boolean, default=True)
     company_id = db.Column(db.Integer)   # v12.47 — Μισθοδοσία: νομικός εργοδότης (payroll.Company)
+    ypok_code  = db.Column(db.String(8))  # v12.58 — Κωδικός Υποκαταστήματος (ΑΠΔ/Epsilon)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     pools = db.relationship('Pool', backref='hotel', order_by='Pool.name')
 
