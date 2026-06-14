@@ -1,0 +1,72 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μισθοδοσία — Εκτέλεση', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ table{width:100%;border-collapse:collapse;font-size:12.5px;}
+ td,th{padding:6px 8px;border-bottom:1px solid #eef2f6;text-align:right;white-space:nowrap;}
+ td.l,th.l{text-align:left;}
+ th{font-size:11px;text-transform:uppercase;color:#64748b;position:sticky;top:0;background:var(--card,#fff);}
+ .tabs{display:flex;gap:8px;margin-bottom:10px;}
+ .tab{padding:7px 14px;border-radius:8px;border:1px solid #dbe3ea;text-decoration:none;color:#475569;font-size:13px;}
+ .tab.on{background:var(--accent,#185FA5);color:#fff;border-color:var(--accent,#185FA5);}
+ .kpi{display:inline-block;margin-right:18px;}.kpi b{font-size:18px;color:var(--accent,#185FA5);}
+ .muted{color:#94a3b8;} .neg{color:#b91c1c;} .pos{color:#166534;}
+ .wrap{overflow:auto;max-height:62vh;}
+</style></head><body>
+{{ mp.topbar('calculator', 'ΕΣΤΙΑ — Μισθοδοσία · ' ~ comp.legal_name ~ ' · ' ~ months[run.month] ~ ' ' ~ run.year) }}
+<div class="container">
+  <a href="/dashboard/payroll/runs?embed=1" style="font-size:13px;">← Εκτελέσεις</a>
+
+  <div class="card">
+    <div style="margin-bottom:10px;">
+      <span class="kpi">Εργαζόμενοι <b>{{ totals.n }}</b></span>
+      <span class="kpi">Μικτά (Mgmt) <b>{{ '%.0f'|format(totals.gross_total) }}€</b></span>
+      <span class="kpi">Έξτρα <b>{{ '%.0f'|format(totals.extra_pay) }}€</b></span>
+      <span class="kpi">Καθαρά Epsilon <b>{{ '%.0f'|format(totals.net_legal) }}€</b> <span class="muted">({{ totals.n_legal }})</span></span>
+      <span class="kpi">Κόστος εργοδ. <b>{{ '%.0f'|format(totals.employer_cost) }}€</b></span>
+    </div>
+    <div class="tabs">
+      <a class="tab {{ 'on' if view=='management' }}" href="?view=management&embed=1">Management (τι πληρώνεται)</a>
+      <a class="tab {{ 'on' if view=='legal' }}" href="?view=legal&embed=1">Λογιστήριο (Epsilon)</a>
+    </div>
+
+    <div class="wrap">
+    {% if view == 'legal' %}
+    <table>
+      <tr><th class="l">Εργαζόμενος</th><th>Μέρες</th><th>Μικτά</th><th>ΕΦΚΑ εργαζ.</th><th>ΦΜΥ</th><th>Καθαρά (Epsilon)</th><th>Εκτίμηση</th><th>Διαφορά</th><th>Κόστος εργοδ.</th></tr>
+      {% for l in lines %}
+      <tr>
+        <td class="l">{{ umap[l.user_id].full_name if umap.get(l.user_id) else l.user_id }}</td>
+        <td>{{ l.total_days }}</td>
+        <td>{{ '%.2f'|format(l.gross_total) }}</td>
+        <td>{{ '%.2f'|format(l.efka_employee) }}</td>
+        <td>{{ '%.2f'|format(l.fmy) }}</td>
+        <td>{% if l.net_legal is not none %}<b>{{ '%.2f'|format(l.net_legal) }}</b>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td class="muted">{{ '%.2f'|format(l.net_calc) }}</td>
+        <td>{% if l.net_diff is not none %}<span class="{{ 'neg' if l.net_diff<0 else 'pos' }}">{{ '%.2f'|format(l.net_diff) }}</span>{% else %}—{% endif %}</td>
+        <td>{{ '%.2f'|format(l.employer_cost_legal or l.employer_cost) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <table>
+      <tr><th class="l">Εργαζόμενος</th><th>Εργάσιμες</th><th>Κυρ.</th><th>Έξτρα ώρ.</th><th>Ρεπό</th><th>Μικτά συμφ.</th><th>Έξτρα €</th><th>Μικτά σύνολο</th><th>Bonus</th><th>Τράπεζα</th><th>Φάκελος</th><th>Στο χέρι</th></tr>
+      {% for l in lines %}
+      <tr>
+        <td class="l">{{ umap[l.user_id].full_name if umap.get(l.user_id) else l.user_id }}</td>
+        <td>{{ l.work_days }}</td><td>{{ l.sundays }}</td><td>{{ '%.1f'|format(l.extra_hours) }}</td><td>{{ l.repo }}</td>
+        <td>{{ '%.2f'|format(l.gross_agreement) }}</td>
+        <td>{{ '%.2f'|format(l.extra_pay) }}</td>
+        <td><b>{{ '%.2f'|format(l.gross_total) }}</b></td>
+        <td>{{ '%.2f'|format(l.bonus) }}</td>
+        <td>{{ '%.2f'|format(l.bank_total) }}</td>
+        <td>{{ '%.2f'|format(l.folder_total) }}</td>
+        <td><b>{{ '%.2f'|format(l.in_hand) }}</b></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:8px;">«Management» = τι θα πληρωθεί ο εργαζόμενος (μικτά συμφωνίας + έξτρα). «Λογιστήριο» = η εικόνα Epsilon (νόμιμα καθαρά/εισφορές/κόστος). Η «Εκτίμηση» είναι μόνο όπου δεν έχει φορτωθεί Epsilon.</p>
+  </div>
+</div></body></html>

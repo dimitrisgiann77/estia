@@ -321,4 +321,360 @@ def payroll_employee(uid):
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, is_admin=is_admin())
 
 
-print('payroll module loaded (Φ1)')
+# ══════════════════════════════════════════════════════════════════════════════
+# ΦΑΣΗ 2 — Μηχανή υπολογισμού + δύο όψεις + Epsilon import (Λογιστήριο = αλήθεια)
+# ══════════════════════════════════════════════════════════════════════════════
+import hashlib, io
+try:
+    import openpyxl
+except Exception:
+    openpyxl = None
+
+MONTHS_EL2 = ['', 'Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος',
+              'Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος']
+_EPSILON_MONTH = {}
+for _i, _n in enumerate(MONTHS_EL2):
+    if _i: _EPSILON_MONTH[_norm(_n)] = _i
+_EPSILON_MONTH.update({_norm(k): v for k, v in {
+    'ΙΑΝ':1,'ΦΕΒ':2,'ΜΑΡ':3,'ΑΠΡ':4,'ΜΑΙ':5,'ΜΑΪΟΣ':5,'ΙΟΥΝ':6,'ΙΟΥΛ':7,'ΑΥΓ':8,
+    'ΣΕΠ':9,'ΟΚΤ':10,'ΝΟΕ':11,'ΔΕΚ':12,'JANUARY':1,'FEBRUARY':2,'MARCH':3,'APRIL':4,
+    'MAY':5,'JUNE':6,'JULY':7,'AUGUST':8,'SEPTEMBER':9,'OCTOBER':10,'NOVEMBER':11,'DECEMBER':12,
+}.items()})
+
+RUN_STATUS = ('draft', 'calculated', 'verified', 'locked', 'paid')
+RUN_LABELS = {'draft':'Πρόχειρο','calculated':'Υπολογίστηκε','verified':'Επιβεβαιωμένο',
+              'locked':'Κλειδωμένο','paid':'Πληρωμένο'}
+
+
+class PayrollRun(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    company_id    = db.Column(db.Integer, db.ForeignKey('company.id'), index=True, nullable=False)
+    year          = db.Column(db.Integer, nullable=False)
+    month         = db.Column(db.Integer, nullable=False)
+    status        = db.Column(db.String(12), default='draft')
+    rates_version = db.Column(db.Integer)
+    note          = db.Column(db.String(200))
+    created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    locked_at     = db.Column(db.DateTime)
+    __table_args__ = (db.UniqueConstraint('company_id', 'year', 'month', name='uq_payrollrun'),)
+
+
+class PayrollLine(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    run_id        = db.Column(db.Integer, db.ForeignKey('payroll_run.id'), index=True, nullable=False)
+    user_id       = db.Column(db.Integer, db.ForeignKey('user.id'), index=True, nullable=False)
+    # ώρες/ημέρες (από monthly_settlement)
+    work_days     = db.Column(db.Integer, default=0)
+    sundays       = db.Column(db.Integer, default=0)
+    holidays_worked = db.Column(db.Integer, default=0)
+    extra_hours   = db.Column(db.Float, default=0.0)
+    repo          = db.Column(db.Integer, default=0)
+    total_days    = db.Column(db.Integer, default=0)
+    elsewhere_days= db.Column(db.Integer, default=0)
+    # Management όψη
+    gross_agreement = db.Column(db.Float, default=0.0)
+    extra_pay     = db.Column(db.Float, default=0.0)
+    gross_total   = db.Column(db.Float, default=0.0)
+    bank_target   = db.Column(db.Float)
+    bonus         = db.Column(db.Float, default=0.0)
+    bank_total    = db.Column(db.Float, default=0.0)
+    folder_total  = db.Column(db.Float, default=0.0)
+    in_hand       = db.Column(db.Float, default=0.0)
+    # Λογιστήριο όψη (εκτίμηση) + αλήθεια Epsilon
+    efka_employee = db.Column(db.Float, default=0.0)
+    fmy           = db.Column(db.Float, default=0.0)
+    net_calc      = db.Column(db.Float, default=0.0)
+    employer_cost = db.Column(db.Float, default=0.0)
+    net_legal     = db.Column(db.Float)        # από Epsilon
+    employer_cost_legal = db.Column(db.Float)
+    net_diff      = db.Column(db.Float)
+    note          = db.Column(db.String(200))
+
+
+class LegalNetImport(db.Model):
+    """Νόμιμα καθαρά από Epsilon (η αλήθεια του Λογιστηρίου). Idempotent ανά εταιρεία/μήνα/ΑΦΜ."""
+    id            = db.Column(db.Integer, primary_key=True)
+    company_id    = db.Column(db.Integer, db.ForeignKey('company.id'), index=True)
+    user_id       = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
+    year          = db.Column(db.Integer, index=True)
+    month         = db.Column(db.Integer, index=True)
+    afm           = db.Column(db.String(12), index=True)
+    emp_name      = db.Column(db.String(120))
+    gross_legal   = db.Column(db.Float)
+    efka_employee_legal = db.Column(db.Float)
+    fmy_legal     = db.Column(db.Float)
+    net_legal     = db.Column(db.Float)
+    employer_cost_legal = db.Column(db.Float)
+    import_hash   = db.Column(db.String(40), unique=True, index=True)
+    source_file   = db.Column(db.String(160))
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ── EPSILON PARSER ────────────────────────────────────────────────────────────
+def _epsilon_headers(ws):
+    """Χάρτης normalized-header -> column index από την 1η γραμμή."""
+    h = {}
+    for c in range(1, ws.max_column + 1):
+        h[_norm(ws.cell(1, c).value)] = c
+    return h
+
+def parse_epsilon(wb):
+    """Επιστρέφει λίστα dict ανά εργαζόμενο από workbook Epsilon (44 στήλες)."""
+    ws = wb.worksheets[0]
+    H = _epsilon_headers(ws)
+    def col(*names, default=None):
+        for n in names:
+            c = H.get(_norm(n))
+            if c: return c
+        return default
+    c_epon=col('Επώνυμο'); c_onoma=col('Όνομα'); c_afm=col('ΑΦΜ')
+    c_amka=col('ΑΜΚΑ'); c_ika=col('Α.Μ. ΙΚΑ','ΑΜ ΙΚΑ'); c_pat=col('Όνομα Πατρός')
+    c_spec=col('Ειδικότητα'); c_kind=col('Είδος Εργάζ','Είδος Εργαζ'); c_contract=col('Διάρκεια Σύμβασης')
+    c_bank=col('Τράπεζα'); c_period=col('Περίοδος'); c_year=col('Έτος')
+    c_gross=col('Συν.Αποδ.','Συν.Αποδ'); c_emain=col('Εισφ. Εργάζ. Κύριου Ταμείου')
+    c_eaux=col('Εισφ. Εργάζ. Επικ. Ταμείου'); c_fmy=col('Φ.Μ.Υ','ΦΜΥ')
+    c_net=col('Καθαρές Αποδοχές'); c_cost=col('Συνολικό Κόστος')
+    rows=[]
+    for r in range(2, ws.max_row + 1):
+        epon = ws.cell(r, c_epon).value if c_epon else None
+        if not epon: continue
+        onoma = ws.cell(r, c_onoma).value if c_onoma else ''
+        per = ws.cell(r, c_period).value if c_period else None
+        yr  = ws.cell(r, c_year).value if c_year else None
+        month = _EPSILON_MONTH.get(_norm(per)) if per else None
+        try: yr = int(yr) if yr else None
+        except Exception: yr = None
+        def num(c):
+            v = ws.cell(r, c).value if c else None
+            try: return float(v) if v not in (None,'') else 0.0
+            except Exception: return 0.0
+        emain=num(c_emain); eaux=num(c_eaux)
+        rows.append({
+            'epon': str(epon).strip(), 'onoma': str(onoma).strip() if onoma else '',
+            'afm': str(ws.cell(r,c_afm).value).strip() if c_afm and ws.cell(r,c_afm).value else None,
+            'amka': str(ws.cell(r,c_amka).value).strip() if c_amka and ws.cell(r,c_amka).value else None,
+            'ika': str(ws.cell(r,c_ika).value).strip() if c_ika and ws.cell(r,c_ika).value else None,
+            'father': (ws.cell(r,c_pat).value if c_pat else None),
+            'specialty': (ws.cell(r,c_spec).value if c_spec else None),
+            'kind': (ws.cell(r,c_kind).value if c_kind else None),
+            'contract': (ws.cell(r,c_contract).value if c_contract else None),
+            'bank': (ws.cell(r,c_bank).value if c_bank else None),
+            'year': yr, 'month': month,
+            'gross': num(c_gross), 'efka_employee': round(emain+eaux,2),
+            'fmy': num(c_fmy), 'net': num(c_net), 'employer_cost': num(c_cost),
+        })
+    return rows
+
+def _match_user_by_afm_or_name(afm, epon, onoma):
+    if afm:
+        pii = EmployeePII.query.filter_by(afm=str(afm)).first()
+        if pii: return User.query.get(pii.user_id)
+    full = _norm((str(epon) + str(onoma or '')))
+    for u in User.query.all():
+        if _norm(u.full_name) == full:
+            return u
+    # χαλαρό: επώνυμο match μοναδικό
+    cand = [u for u in User.query.all() if _norm(u.full_name).startswith(_norm(epon))]
+    return cand[0] if len(cand) == 1 else None
+
+def import_epsilon_bytes(raw, filename='', company_id=None):
+    """Εισάγει Epsilon workbook -> LegalNetImport (+ backfill EmployeePII). Idempotent."""
+    if openpyxl is None:
+        return {'error': 'openpyxl μη διαθέσιμο'}
+    wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+    rows = parse_epsilon(wb); wb.close()
+    # company resolve: param -> filename prefix -> καμία
+    comp = Company.query.get(company_id) if company_id else None
+    if not comp and filename:
+        pref = re.split(r'[ _]', filename)[0].upper()
+        cc = COMPANY_CODE.get(pref)
+        if cc: comp = Company.query.filter_by(code=cc).first()
+    added = updated = matched = pii_filled = 0
+    period = set()
+    for row in rows:
+        yr = row['year']; mo = row['month']
+        if not yr or not mo: continue
+        period.add((yr, mo))
+        u = _match_user_by_afm_or_name(row['afm'], row['epon'], row['onoma'])
+        if u: matched += 1
+        key = '%s|%s|%s|%s' % (comp.id if comp else 'x', yr, mo, row['afm'] or (row['epon']+row['onoma']))
+        h = hashlib.sha1(key.encode('utf-8')).hexdigest()[:40]
+        rec = LegalNetImport.query.filter_by(import_hash=h).first()
+        if not rec:
+            rec = LegalNetImport(import_hash=h); db.session.add(rec); added += 1
+        else:
+            updated += 1
+        rec.company_id = comp.id if comp else None
+        rec.user_id = u.id if u else None
+        rec.year = yr; rec.month = mo; rec.afm = row['afm']
+        rec.emp_name = (row['epon'] + ' ' + (row['onoma'] or '')).strip()
+        rec.gross_legal = row['gross']; rec.efka_employee_legal = row['efka_employee']
+        rec.fmy_legal = row['fmy']; rec.net_legal = row['net']; rec.employer_cost_legal = row['employer_cost']
+        rec.source_file = filename[:160]
+        # backfill PII
+        if u:
+            pii = EmployeePII.query.filter_by(user_id=u.id).first()
+            if not pii:
+                pii = EmployeePII(user_id=u.id); db.session.add(pii)
+            changed = False
+            for fld, val in [('afm',row['afm']),('amka',row['amka']),('ika_am',row['ika']),
+                             ('father_name',row['father']),('ergani_specialty',row['specialty']),
+                             ('employment_kind',row['kind']),('contract_type',row['contract']),
+                             ('bank_name',row['bank'])]:
+                if val and not getattr(pii, fld, None):
+                    setattr(pii, fld, str(val)[:120]); changed = True
+            if changed: pii_filled += 1
+    db.session.commit()
+    return {'added': added, 'updated': updated, 'matched': matched, 'rows': len(rows),
+            'pii_filled': pii_filled, 'company': comp.legal_name if comp else None,
+            'periods': sorted(period)}
+
+
+# ── ΜΗΧΑΝΗ: build_run ─────────────────────────────────────────────────────────
+def _hotels_of_company(company_id):
+    return [h.id for h in Hotel.query.filter_by(company_id=company_id).all()]
+
+def build_run(company_id, year, month, created_by=None):
+    """Δημιουργεί/ξαναϋπολογίζει PayrollRun + PayrollLines για εταιρεία×μήνα."""
+    if monthly_settlement is None:
+        return {'error': 'schedule module μη διαθέσιμο'}
+    run = PayrollRun.query.filter_by(company_id=company_id, year=year, month=month).first()
+    if not run:
+        run = PayrollRun(company_id=company_id, year=year, month=month, created_by=created_by)
+        db.session.add(run); db.session.flush()
+    rates = PayrollRates.query.filter_by(year=year).first()
+    run.rates_version = rates.id if rates else None
+    PayrollLine.query.filter_by(run_id=run.id).delete()
+    hotel_ids = _hotels_of_company(company_id)
+    seen = set()
+    legal_by_user = {}
+    for li in LegalNetImport.query.filter_by(company_id=company_id, year=year, month=month).all():
+        if li.user_id: legal_by_user[li.user_id] = li
+    n = 0
+    for hid in hotel_ids:
+        for row in monthly_settlement(year, month, hid):
+            u = row['user']; agg = row['agg']; prof = row['profile']
+            if u.id in seen: continue
+            seen.add(u.id)
+            day_wage = prof.day_wage if prof else 0.0
+            hour_wage = (prof.hour_wage if prof else 0.0)
+            if prof and getattr(prof, 'agreement_type', '') == 'Management' and prof.agreement_amount:
+                gross_agreement = round(prof.agreement_amount, 2)
+            else:
+                gross_agreement = round(day_wage * agg['total_days'], 2)
+            extra_pay = round(hour_wage * agg['extra_hours'], 2)
+            gross_total = round(gross_agreement + extra_pay, 2)
+            # Λογιστήριο: αλήθεια Epsilon αν υπάρχει, αλλιώς εκτίμηση
+            li = legal_by_user.get(u.id)
+            if li and li.net_legal:
+                net_ref = li.net_legal; efka = li.efka_employee_legal or 0.0
+                fmy = li.fmy_legal or 0.0; emp_cost = li.employer_cost_legal or 0.0
+                net_legal = li.net_legal; net_calc = net_ref
+            else:
+                erate = ((rates.efka_employee_pct or 0) + (rates.efka_aux_employee_pct or 0)) / 100.0 if rates else 0.1387
+                efka = round(gross_total * erate, 2)
+                fmy = 0.0
+                net_calc = round(gross_total - efka - fmy, 2)
+                emp_rate = ((rates.efka_employer_pct or 0) + (rates.efka_aux_employer_pct or 0)) / 100.0 if rates else 0.2229
+                emp_cost = round(gross_total * (1 + emp_rate), 2)
+                net_ref = net_calc; net_legal = None
+            ag = Agreement.query.filter_by(user_id=u.id, effective_to=None).first()
+            # bank_target: στόχος τράπεζας από συμφωνία (Φ2: αν δηλωθεί στο channels_json)· αλλιώς None
+            bank_target = None
+            if ag and ag.channels_json:
+                try:
+                    bank_target = (json.loads(ag.channels_json) or {}).get('bank_target')
+                except Exception:
+                    bank_target = None
+            bonus = round(max(0.0, (bank_target - net_ref)), 2) if bank_target else 0.0
+            bank_total = round(net_ref + bonus, 2)
+            folder_fixed = (ag.folder_fixed if ag else 0.0) or 0.0
+            folder_total = round(folder_fixed + extra_pay, 2)
+            in_hand = round(bank_total + folder_total, 2)
+            line = PayrollLine(run_id=run.id, user_id=u.id,
+                work_days=agg['work_days'], sundays=agg['sundays'],
+                holidays_worked=agg['holidays_worked'], extra_hours=agg['extra_hours'],
+                repo=agg['repo'], total_days=agg['total_days'], elsewhere_days=agg['elsewhere_days'],
+                gross_agreement=gross_agreement, extra_pay=extra_pay, gross_total=gross_total,
+                bank_target=bank_target, bonus=bonus, bank_total=bank_total,
+                folder_total=folder_total, in_hand=in_hand,
+                efka_employee=efka, fmy=fmy, net_calc=net_calc, employer_cost=emp_cost,
+                net_legal=net_legal,
+                employer_cost_legal=(li.employer_cost_legal if li else None),
+                net_diff=(round((net_legal - net_calc), 2) if net_legal is not None else None))
+            db.session.add(line); n += 1
+    run.status = 'calculated'
+    db.session.commit()
+    return {'run_id': run.id, 'lines': n, 'legal_matched': len(legal_by_user)}
+
+def run_totals(run_id):
+    lines = PayrollLine.query.filter_by(run_id=run_id).all()
+    t = {'gross_total':0.0,'extra_pay':0.0,'bank_total':0.0,'folder_total':0.0,'in_hand':0.0,
+         'bonus':0.0,'net_legal':0.0,'employer_cost':0.0,'n':len(lines),'n_legal':0}
+    for l in lines:
+        t['gross_total']+=l.gross_total or 0; t['extra_pay']+=l.extra_pay or 0
+        t['bank_total']+=l.bank_total or 0; t['folder_total']+=l.folder_total or 0
+        t['in_hand']+=l.in_hand or 0; t['bonus']+=l.bonus or 0
+        t['employer_cost']+= (l.employer_cost_legal or l.employer_cost or 0)
+        if l.net_legal is not None: t['net_legal']+=l.net_legal; t['n_legal']+=1
+    for k in t:
+        if isinstance(t[k], float): t[k]=round(t[k],2)
+    return t
+
+
+# ── ROUTES Φ2 ─────────────────────────────────────────────────────────────────
+@app.route('/dashboard/payroll/runs', methods=['GET', 'POST'])
+def payroll_runs():
+    if not _padmin():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        cid = request.form.get('company_id', type=int)
+        yr = request.form.get('year', type=int); mo = request.form.get('month', type=int)
+        if cid and yr and mo:
+            res = build_run(cid, yr, mo, created_by=(current_user().id if current_user() else None))
+            log_activity('payroll_run_build', '%s/%s/%s -> %s' % (cid, yr, mo, res))
+            run = PayrollRun.query.filter_by(company_id=cid, year=yr, month=mo).first()
+            if run: return redirect(url_for('payroll_run_view', rid=run.id))
+        return redirect(url_for('payroll_runs'))
+    runs = PayrollRun.query.order_by(PayrollRun.year.desc(), PayrollRun.month.desc()).all()
+    companies = Company.query.filter_by(active=True).order_by(Company.legal_name).all()
+    comp_by_id = {c.id: c for c in Company.query.all()}
+    tot_by_run = {r.id: run_totals(r.id) for r in runs}
+    return render_template('payroll_runs.html', runs=runs, companies=companies,
+        comp_by_id=comp_by_id, tot_by_run=tot_by_run, months=MONTHS_EL2,
+        run_labels=RUN_LABELS, is_admin=is_admin())
+
+@app.route('/dashboard/payroll/run/<int:rid>')
+def payroll_run_view(rid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    run = PayrollRun.query.get_or_404(rid)
+    comp = Company.query.get(run.company_id)
+    lines = PayrollLine.query.filter_by(run_id=rid).all()
+    umap = {u.id: u for u in User.query.all()}
+    lines.sort(key=lambda l: (umap.get(l.user_id).full_name if umap.get(l.user_id) else ''))
+    view = request.args.get('view', 'management')
+    return render_template('payroll_run.html', run=run, comp=comp, lines=lines, umap=umap,
+        totals=run_totals(rid), months=MONTHS_EL2, run_labels=RUN_LABELS, view=view, is_admin=is_admin())
+
+@app.route('/dashboard/payroll/import', methods=['GET', 'POST'])
+def payroll_import():
+    if not _padmin():
+        return redirect(url_for('login'))
+    result = None
+    if request.method == 'POST':
+        f = request.files.get('file')
+        cid = request.form.get('company_id', type=int)
+        if f and f.filename:
+            try:
+                result = import_epsilon_bytes(f.read(), filename=f.filename, company_id=cid)
+                log_activity('payroll_epsilon_import', '%s -> %s' % (f.filename, result))
+            except Exception as e:
+                result = {'error': str(e)}
+    companies = Company.query.filter_by(active=True).order_by(Company.legal_name).all()
+    n_legal = LegalNetImport.query.count()
+    return render_template('payroll_import.html', companies=companies, result=result,
+        n_legal=n_legal, is_admin=is_admin())
+
+print('payroll module loaded (Φ2)')

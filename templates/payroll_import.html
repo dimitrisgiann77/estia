@@ -1,0 +1,28 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μισθοδοσία — Εισαγωγή Epsilon', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+ select,input{padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;}
+ .ok{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:8px;padding:10px 12px;font-size:13px;}
+ .err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;padding:10px 12px;font-size:13px;}
+ .muted{color:#475569;font-size:12px;}
+</style></head><body>
+{{ mp.topbar('file-spreadsheet', 'ΕΣΤΙΑ — Μισθοδοσία · Εισαγωγή Epsilon (νόμιμα καθαρά)') }}
+<div class="container">
+  <div class="card"><h3>Ανέβασμα αρχείου Epsilon (.xlsx)</h3>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="row">Εταιρεία (προαιρετικό — αλλιώς από το όνομα αρχείου):
+        <select name="company_id"><option value="">— αυτόματα —</option>{% for c in companies %}<option value="{{ c.id }}">{{ c.legal_name }}</option>{% endfor %}</select>
+      </div>
+      <div class="row"><input type="file" name="file" accept=".xlsx,.xls"></div>
+      <button class="b" type="submit"><i class="ti ti-upload"></i> Εισαγωγή</button>
+    </form>
+    <p class="muted">Διαβάζει τις 44 στήλες Epsilon → νόμιμα καθαρά/εισφορές/ΦΜΥ/κόστος εργοδότη ανά εργαζόμενο/μήνα, και <b>συμπληρώνει αυτόματα ΑΦΜ/ΑΜΚΑ/ειδικότητα/τράπεζα (PII)</b>. Ταίριασμα με ΑΦΜ → όνομα. Idempotent (ίδιο αρχείο = χωρίς διπλά). Φορτωμένες γραμμές: <b>{{ n_legal }}</b>.</p>
+    {% if result %}
+      {% if result.error %}<div class="err">Σφάλμα: {{ result.error }}</div>
+      {% else %}<div class="ok">✓ {{ result.company or 'Άγνωστη εταιρεία' }} · περίοδοι {{ result.periods }} · γραμμές {{ result.rows }} (νέες {{ result.added }}, ενημερώθηκαν {{ result.updated }}) · ταιριάστηκαν {{ result.matched }} εργαζόμενοι · PII συμπληρώθηκε σε {{ result.pii_filled }}.</div>{% endif %}
+    {% endif %}
+  </div>
+</div></body></html>

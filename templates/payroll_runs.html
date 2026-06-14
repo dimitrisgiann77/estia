@@ -1,0 +1,43 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μισθοδοσία — Εκτελέσεις', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+ select,input{padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:13px;}
+ table{width:100%;border-collapse:collapse;font-size:13px;}td,th{padding:7px 8px;border-bottom:1px solid #eef2f6;text-align:left;}
+ th{font-size:11px;text-transform:uppercase;color:#64748b;}
+ .pill{padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;background:#dbeafe;color:#185FA5;}
+ .muted{color:#94a3b8;}
+</style></head><body>
+{{ mp.topbar('calculator', 'ΕΣΤΙΑ — Μισθοδοσία · Εκτελέσεις') }}
+<div class="container">
+  <div class="card"><h3>Νέα εκτέλεση (εταιρεία × μήνα)</h3>
+    <form method="POST" class="row">
+      <select name="company_id">{% for c in companies %}<option value="{{ c.id }}">{{ c.legal_name }}</option>{% endfor %}</select>
+      <select name="month">{% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==5 }}>{{ months[m] }}</option>{% endfor %}</select>
+      <input type="number" name="year" value="2026" style="width:90px;">
+      <button class="b" type="submit"><i class="ti ti-player-play"></i> Υπολόγισε</button>
+    </form>
+    <p class="muted" style="font-size:12px;">Διαβάζει ώρες/ημέρες από το Πρόγραμμα Εργασίας· τα νόμιμα καθαρά από το import Epsilon (όπου υπάρχει).</p>
+  </div>
+
+  <div class="card"><h3>Εκτελέσεις</h3>
+  <table>
+    <tr><th>Εταιρεία</th><th>Περίοδος</th><th>Γραμμές</th><th>Μικτά (Mgmt)</th><th>Καθαρά (Epsilon)</th><th>Κόστος εργοδ.</th><th>Κατάσταση</th><th></th></tr>
+    {% for r in runs %}
+    {% set t = tot_by_run[r.id] %}
+    <tr>
+      <td>{{ comp_by_id[r.company_id].legal_name if comp_by_id.get(r.company_id) else '—' }}</td>
+      <td>{{ months[r.month] }} {{ r.year }}</td>
+      <td>{{ t.n }}{% if t.n_legal %} <span class="muted">({{ t.n_legal }} Epsilon)</span>{% endif %}</td>
+      <td>{{ '%.0f'|format(t.gross_total) }}€</td>
+      <td>{{ '%.0f'|format(t.net_legal) }}€</td>
+      <td>{{ '%.0f'|format(t.employer_cost) }}€</td>
+      <td><span class="pill">{{ run_labels.get(r.status, r.status) }}</span></td>
+      <td><a class="b" href="/dashboard/payroll/run/{{ r.id }}?embed=1">Άνοιγμα</a></td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="muted">Καμία εκτέλεση ακόμη.</td></tr>{% endfor %}
+  </table>
+  </div>
+</div></body></html>

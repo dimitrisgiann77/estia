@@ -298,8 +298,9 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       <div class="item" data-ws="operations admin" data-url="/dashboard/schedule?embed=1"><i class="ti ti-calendar-week"></i> Πρόγραμμα Εργασίας</div>
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/dashboard/schedule/submissions?embed=1"><i class="ti ti-send"></i> Υποβολές (Λογιστήριο)</div>{% endif %}
       {% if is_admin %}
-      <div class="grp" data-ws="operations admin">Οικονομικά</div>
-      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll?embed=1"><i class="ti ti-cash"></i> Μισθοδοσία</div>
+      <div class="grp" data-ws="operations admin">Μισθοδοσία</div>
+      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll?embed=1"><i class="ti ti-cash"></i> Μητρώο</div>
+      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll/runs?embed=1"><i class="ti ti-calculator"></i> Εκτελέσεις</div>
       {% endif %}
       {% endif %}
 
@@ -326,6 +327,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       <div class="item" data-ws="admin" data-url="/dashboard/schedule/import?embed=1"><i class="ti ti-calendar-up"></i> Πρόγραμμα · Εισαγωγή</div>
       <div class="item" data-ws="admin" data-url="/dashboard/payroll/companies?embed=1"><i class="ti ti-building-bank"></i> Μισθοδοσία · Εταιρείες</div>
       <div class="item" data-ws="admin" data-url="/dashboard/payroll/rates?embed=1"><i class="ti ti-percentage"></i> Μισθοδοσία · Συντελεστές</div>
+      <div class="item" data-ws="admin" data-url="/dashboard/payroll/import?embed=1"><i class="ti ti-file-spreadsheet"></i> Μισθοδοσία · Εισαγωγή Epsilon</div>
       <div class="item" data-ws="admin" data-url="/dashboard/backup?embed=1"><i class="ti ti-database-export"></i> Αντίγραφα ασφαλείας</div>
       <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
       <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
