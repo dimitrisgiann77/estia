@@ -860,14 +860,17 @@ def payroll_approve():
         period = '%s %s' % (MONTHS_EL2[run.month], run.year)
         link = '/dashboard/payroll/run/%d?embed=1' % run.id
         msg = 'Εγκρίθηκε μισθοδοσία: %s — %s (προς πληρωμή/λογιστήριο)' % (comp.legal_name if comp else '', period)
-        # ειδοποίηση λογιστηρίου + admins στην πλατφόρμα
-        for u in User.query.filter(User.role.in_(['accountant', 'admin', 'masteradmin'])).all():
+        # ειδοποίηση: προς το παρόν ΜΟΝΟ masteradmin (πλατφόρμα + email) — απόφαση Giannis
+        masters = User.query.filter_by(role='masteradmin').all()
+        for u in masters:
             notify(u.id, msg, link)
-        # email
+        emails = [u.email for u in masters if u.email]
         try:
             from app import send_email
-            send_email('Εστία — Έγκριση μισθοδοσίας: %s %s' % (comp.legal_name if comp else '', period),
-                       '<p>%s</p><p>Πίνακας ανά ξενοδοχείο: εξαγωγή από τη σελίδα εκτέλεσης.</p>' % msg)
+            if emails:
+                send_email('Εστία — Έγκριση μισθοδοσίας: %s %s' % (comp.legal_name if comp else '', period),
+                           '<p>%s</p><p>Πίνακας ανά ξενοδοχείο: εξαγωγή από τη σελίδα εκτέλεσης.</p>' % msg,
+                           emails)
         except Exception as e:
             print('approve email skipped:', e)
         log_activity('payroll_approve', msg)
