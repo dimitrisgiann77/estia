@@ -602,11 +602,19 @@ _KIND_MAP = {
     'δωροπασχα':'Δώρο Πάσχα', 'δωροχριστουγεννων':'Δώρο Χριστουγέννων',
     'επιδομααδειας':'Επίδομα Αδείας', 'αποζημιωσηαδειας':'Αποζημίωση Αδείας',
     'αποδοχεςαδειας':'Αποδοχές Αδείας',
+    'επιδομααδειαςπροηγουμενουετους':'Επίδ.Αδείας π.έ.',
+    'αποζημιωσηαδειαςπροηγουμενουετους':'Αποζ.Αδείας π.έ.',
+    'αποδοχεςαδειαςπροηγουμενουετους':'Αποδ.Αδείας π.έ.',
+    'δωροπασχαπροηγουμενουετους':'Δώρο Πάσχα π.έ.',
+    'δωροχριστουγεννωνπροηγουμενουετους':'Δώρο Χριστ. π.έ.',
 }
 def _period_kind(period_raw):
     n = _norm(period_raw)
     if n in _EPSILON_MONTH: return 'monthly'
-    return _KIND_MAP.get(n, period_raw or 'extra')
+    lbl = _KIND_MAP.get(n)
+    if lbl: return lbl
+    # άγνωστη ταμπέλα: κράτα ≤24 χαρ. (όριο στήλης)
+    return (str(period_raw).strip() or 'extra')[:24]
 
 _HOTEL_KW = {
     'AST': ['asterias', 'αστεριας'], 'CNT': ['central', 'χερσονησ', 'hersoniss'],  # ΟΧΙ 'κεντρικο' (=έδρα)
@@ -754,7 +762,7 @@ def import_epsilon_bytes(raw, filename='', company_id=None):
             updated += 1
         rec.company_id = comp.id if comp else None
         rec.user_id = u.id if u else None
-        rec.year = yr; rec.month = mo; rec.afm = row['afm']; rec.period_kind = kind
+        rec.year = yr; rec.month = mo; rec.afm = row['afm']; rec.period_kind = (kind or 'monthly')[:24]
         rec.emp_name = (row['epon'] + ' ' + (row['onoma'] or '')).strip()
         rec.gross_legal = row['gross']; rec.efka_employee_legal = row['efka_employee']
         rec.fmy_legal = row['fmy']; rec.net_legal = row['net']; rec.employer_cost_legal = row['employer_cost']
