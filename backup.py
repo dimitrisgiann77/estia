@@ -159,13 +159,20 @@ def dump_bytes():
            'dialect': (db.engine.dialect.name if db.engine is not None else ''),
            'tables': []}
     total_rows = 0
+    skipped = []
     for t in tables:
-        cols = [c.name for c in t.columns]
-        rows = []
-        for r in db.session.execute(t.select()).mappings():
-            rows.append([_enc(r[c]) for c in cols])
-        total_rows += len(rows)
-        out['tables'].append({'name': t.name, 'columns': cols, 'rows': rows})
+        try:
+            cols = [c.name for c in t.columns]
+            rows = []
+            for r in db.session.execute(t.select()).mappings():
+                rows.append([_enc(r[c]) for c in cols])
+            total_rows += len(rows)
+            out['tables'].append({'name': t.name, 'columns': cols, 'rows': rows})
+        except Exception as e:
+            db.session.rollback()
+            skipped.append('%s:%s' % (t.name, str(e)[:100]))
+            print('[backup] skip table %s: %s' % (t.name, e))
+    out['skipped'] = skipped
     raw = json.dumps(out, ensure_ascii=False).encode('utf-8')
     gz = gzip.compress(raw, compresslevel=6)
     return gz, len(tables), total_rows
@@ -201,9 +208,26 @@ def sp_upload(filename, content):
     token = _graph_token()
     sid = _site_id(token)
     path = urllib.parse.quote('%s/%s' % (SP_FOLDER.strip('/'), filename))
-    url = 'https://graph.microsoft.com/v1.0/sites/%s/drive/root:/%s:/content' % (sid, path)
-    st, j = _graph('PUT', url, data=content, token=token, ctype='application/octet-stream')
-    return j.get('id'), j.get('webUrl')
+    if len(content) <= 4 * 1024 * 1024:
+        url = 'https://graph.microsoft.com/v1.0/sites/%s/drive/root:/%s:/content' % (sid, path)
+        st, j = _graph('PUT', url, data=content, token=token, ctype='application/octet-stream')
+        return j.get('id'), j.get('webUrl')
+    # Μεγάλο αρχείο -> upload session (chunks πολλαπλάσια 320KiB)
+    sess_url = 'https://graph.microsoft.com/v1.0/sites/%s/drive/root:/%s:/createUploadSession' % (sid, path)
+    _, sj = _graph('POST', sess_url, token=token,
+                   data=json.dumps({'item': {'@microsoft.graph.conflictBehavior': 'replace'}}).encode('utf-8'))
+    upload_url = sj['uploadUrl']
+    total = len(content); chunk = 5 * 327680; start = 0; last = {}
+    while start < total:
+        end = min(start + chunk, total) - 1
+        part = content[start:end + 1]
+        req = urllib.request.Request(upload_url, data=part, method='PUT',
+            headers={'Content-Length': str(len(part)),
+                     'Content-Range': 'bytes %d-%d/%d' % (start, end, total)})
+        with urllib.request.urlopen(req, timeout=180) as r:
+            body = r.read(); last = json.loads(body.decode()) if body else {}
+        start = end + 1
+    return last.get('id'), last.get('webUrl')
 
 def sp_list(token=None):
     token = token or _graph_token()
@@ -249,6 +273,7 @@ def run_backup(by_user_id=None):
     try:
         gz, n_tables, n_rows = dump_bytes()
         rec.n_tables = n_tables; rec.n_rows = n_rows; rec.size_bytes = len(gz)
+        db.session.commit()   # v12.64 — σώσε stats ΠΡΙΝ το upload (να μη χάνονται σε αποτυχία)
         item_id, web_url = sp_upload(fname, gz)
         rec.sp_item_id = item_id; rec.sp_url = web_url
         rec.status = 'done'
