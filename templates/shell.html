@@ -303,14 +303,14 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       {% endif %}
 
       {% if menu_show('schedule') %}
-      <div class="grp" data-ws="operations admin">Προσωπικό</div>
+      <div class="grp" data-ws="operations admin">HR — Ανθρώπινο Δυναμικό</div>
+      {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/dashboard/payroll?embed=1"><i class="ti ti-cash"></i> Μητρώο εργαζομένων</div>{% endif %}
       <div class="item" data-ws="operations admin" data-url="/dashboard/schedule?embed=1"><i class="ti ti-calendar-week"></i> Πρόγραμμα Εργασίας</div>
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/dashboard/schedule/submissions?embed=1"><i class="ti ti-send"></i> Υποβολές (Λογιστήριο)</div>{% endif %}
       {% if is_admin %}
-      <div class="grp" data-ws="operations admin">Μισθοδοσία</div>
-      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll?embed=1"><i class="ti ti-cash"></i> Μητρώο</div>
-      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll/runs?embed=1"><i class="ti ti-calculator"></i> Εκτελέσεις</div>
+      <div class="item" data-ws="operations admin" data-url="/dashboard/payroll/runs?embed=1"><i class="ti ti-calculator"></i> Μισθοδοσία · Εκτελέσεις</div>
       <div class="item" data-ws="operations admin" data-url="/dashboard/payroll/control?embed=1"><i class="ti ti-clipboard-check"></i> Έλεγχος & Έγκριση</div>
+      <div class="item" data-ws="operations admin" data-url="/dashboard/attention?embed=1"><i class="ti ti-alert-triangle"></i> Χρειάζονται προσοχή</div>
       {% endif %}
       {% endif %}
 
@@ -337,18 +337,15 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
         <div class="item" data-ws="admin" data-url="/dashboard/faults/settings?embed=1"><i class="ti ti-settings-cog"></i> Βλάβες · Ρυθμίσεις</div>
         <div class="item" data-ws="admin" data-url="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
       </details>
-      <details class="adm" data-ws="admin"><summary><i class="ti ti-calendar-cog"></i> Προσωπικό & Πρόγραμμα</summary>
-        <div class="item" data-ws="admin" data-url="/dashboard/schedule/settings?embed=1"><i class="ti ti-calendar-cog"></i> Πρόγραμμα · Ρυθμίσεις</div>
-        <div class="item" data-ws="admin" data-url="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Πρόγραμμα · Προσωπικό</div>
-        <div class="item" data-ws="admin" data-url="/dashboard/schedule/import?embed=1"><i class="ti ti-calendar-up"></i> Πρόγραμμα · Εισαγωγή</div>
-      </details>
-      <details class="adm" data-ws="admin"><summary><i class="ti ti-cash"></i> Μισθοδοσία</summary>
+      <details class="adm" data-ws="admin"><summary><i class="ti ti-users-group"></i> HR — Ανθρώπινο Δυναμικό</summary>
         <div class="item" data-ws="admin" data-url="/dashboard/payroll?embed=1"><i class="ti ti-cash"></i> Μητρώο εργαζομένων</div>
-        <div class="item" data-ws="admin" data-url="/dashboard/payroll/runs?embed=1"><i class="ti ti-calculator"></i> Εκτελέσεις</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/payroll/runs?embed=1"><i class="ti ti-calculator"></i> Μισθοδοσία · Εκτελέσεις</div>
         <div class="item" data-ws="admin" data-url="/dashboard/payroll/control?embed=1"><i class="ti ti-clipboard-check"></i> Έλεγχος & Έγκριση</div>
         <div class="item" data-ws="admin" data-url="/dashboard/attention?embed=1"><i class="ti ti-alert-triangle"></i> Χρειάζονται προσοχή</div>
         <div class="item" data-ws="admin" data-url="/dashboard/payroll/companies?embed=1"><i class="ti ti-building-bank"></i> Εταιρείες</div>
         <div class="item" data-ws="admin" data-url="/dashboard/payroll/rates?embed=1"><i class="ti ti-percentage"></i> Συντελεστές</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/schedule/settings?embed=1"><i class="ti ti-calendar-cog"></i> Πρόγραμμα · Ρυθμίσεις</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Πρόγραμμα · Προσωπικό</div>
         <div class="item" data-ws="admin" data-url="/dashboard/imports?embed=1" style="opacity:.85;"><i class="ti ti-database-import"></i> Εισαγωγές → Κέντρο Εισαγωγής</div>
       </details>
       <details class="adm" data-ws="admin"><summary><i class="ti ti-database-cog"></i> Δεδομένα & Σύστημα</summary>
