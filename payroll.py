@@ -1468,6 +1468,13 @@ def payroll_reset():
         PayrollLine.query.delete(synchronize_session=False)
         PayrollRun.query.delete(synchronize_session=False)
         LegalNetImport.query.delete(synchronize_session=False)
+        try:
+            MgmtAssignment.query.delete(synchronize_session=False)
+            import people as _PPL
+            _PPL.ProfileEvent.query.delete(synchronize_session=False)
+            _PPL.AttentionFlag.query.delete(synchronize_session=False)
+            _PPL.NotDuplicate.query.delete(synchronize_session=False)
+        except Exception: pass
         if uids:
             Agreement.query.filter(Agreement.user_id.in_(uids)).delete(synchronize_session=False)
             EmployeePII.query.filter(EmployeePII.user_id.in_(uids)).delete(synchronize_session=False)
@@ -1567,27 +1574,86 @@ def import_mitroo_central(raw, wipe=True):
                 comp_cache[code] = Company.query.filter_by(code=code).first()
             comp = comp_cache[code]
         ypok = gv(r, 'Κωδ.ΥΠΟΚ', 'ΥΠΟΚ'); ypok = _ypok4(ypok) if ypok not in (None, '') else None
-        row = {'epon': epon, 'onoma': gv(r, 'Όνομα'), 'afm': afm, 'amka': None,
+        ccv = gv(r, 'Κέντρο κόστους', 'Κ.κόστους'); ccv = str(ccv).strip() if ccv not in (None, '') else None
+        row = {'epon': epon, 'onoma': gv(r, 'Όνομα'), 'afm': afm, 'amka': gv(r, 'ΑΜΚΑ', 'Α.Μ.Κ.Α'),
                'ika': gv(r, 'Α.Μ.ΙΚΑ', 'ΑΜ ΙΚΑ'), 'father': gv(r, 'Πατρώνυμο'),
                'specialty': gv(r, 'Ειδικότητα'), 'kind': gv(r, 'Είδος'),
                'contract': gv(r, 'Σύμβαση', 'Τύπος Σύμβασης'), 'bank': gv(r, 'Τράπεζα'),
                'subunit_code': ypok, 'subunit_desc': None, 'dept_desc': gv(r, 'Τμήμα'),
                'company_name': compname}
         u = _create_locked_employee(row)
-        _apply_epsilon_identity(u, row, comp)
+        _apply_epsilon_identity(u, row, comp, cost_center=ccv)
         pii = EmployeePII.query.filter_by(user_id=u.id).first()
         ecode = gv(r, 'Κωδ.Εργ', 'Κωδ. Εργ', 'Κωδ Εργ')
         if pii and ecode not in (None, ''):
             pii.emp_code = str(ecode).strip()[:12]
+        if pii:
+            ib = gv(r, 'IBAN')
+            if ib not in (None, '') and not pii.bank_iban: pii.bank_iban = str(ib).strip()[:40]
+            from datetime import datetime as _dt2
+            for _fld, _nm in [('hired_at', 'Ημ.Πρόσληψης'), ('left_at', 'Ημ.Αποχώρησης')]:
+                _dv = gv(r, _nm)
+                if _dv not in (None, ''):
+                    try:
+                        setattr(pii, _fld, _dv.date() if hasattr(_dv, 'date') else _dt2.strptime(str(_dv)[:10], '%Y-%m-%d').date())
+                    except Exception: pass
         st = _norm(gv(r, 'Κατάσταση'))
         active = (st != _norm('Ανενεργός'))
         if hasattr(u, 'employment_active'):
             u.employment_active = active
         if active: active_n += 1
         created += 1
-    db.session.commit(); wb.close()
+    db.session.commit()
+    # v12.82 — ποσά από «Μισθοδοσία ανά μήνα» (αν υπάρχει) -> LegalNetImport (lossless round-trip)
+    net_loaded = 0
+    msheet = None
+    for s2 in wb.worksheets:
+        if _norm(s2.title).startswith(_norm('Μισθοδοσία αν')) or _norm(s2.title).startswith(_norm('Μισθοδοσια αν')):
+            msheet = s2; break
+    if msheet is not None:
+        mhr = None
+        for r in range(1, 6):
+            vals = [_norm(msheet.cell(r, c).value) for c in range(1, msheet.max_column + 1)]
+            if _norm('ΑΦΜ') in vals and _norm('Έτος') in vals:
+                mhr = r; break
+        if mhr:
+            MH = {_norm(msheet.cell(mhr, c).value): c for c in range(1, msheet.max_column + 1) if msheet.cell(mhr, c).value}
+            def mcol(*names):
+                for nm in names:
+                    c = MH.get(_norm(nm))
+                    if c: return c
+            def mgv(r, *names):
+                c = mcol(*names); return msheet.cell(r, c).value if c else None
+            import hashlib as _hl
+            pmap = {p.afm: p for p in EmployeePII.query.all() if p.afm}
+            def _ff(v):
+                try: return float(v) if v not in (None, '') else None
+                except Exception: return None
+            def _ii(v):
+                try: return int(float(v)) if v not in (None, '') else None
+                except Exception: return None
+            for r in range(mhr + 1, msheet.max_row + 1):
+                afm2 = mgv(r, 'ΑΦΜ'); afm2 = str(afm2).strip() if afm2 not in (None, '') else None
+                yr = _ii(mgv(r, 'Έτος'))
+                if not afm2 or not yr: continue
+                mo = _ii(mgv(r, 'Μήνας'))
+                kind = (str(mgv(r, 'Είδος', 'period_kind') or 'monthly').strip())[:24]
+                h = _hl.md5(('%s|%s|%s|%s' % (afm2, yr, mo, kind)).encode('utf-8')).hexdigest()[:40]
+                rec = LegalNetImport.query.filter_by(import_hash=h).first()
+                if not rec:
+                    rec = LegalNetImport(import_hash=h); db.session.add(rec); net_loaded += 1
+                p = pmap.get(afm2)
+                rec.afm = afm2; rec.year = yr; rec.month = mo; rec.period_kind = kind
+                rec.user_id = (p.user_id if p else None)
+                rec.gross_legal = _ff(mgv(r, 'Μικτά', 'Συν.Αποδ.'))
+                rec.efka_employee_legal = _ff(mgv(r, 'ΕΦΚΑ εργαζ', 'Εισφ. Εργάζ.'))
+                rec.fmy_legal = _ff(mgv(r, 'ΦΜΥ', 'Φ.Μ.Υ'))
+                rec.net_legal = _ff(mgv(r, 'Καθαρά', 'Καθαρές Αποδοχές'))
+                rec.employer_cost_legal = _ff(mgv(r, 'Κόστος εργοδότη', 'Συνολικό Κόστος'))
+            db.session.commit()
+    wb.close()
     return {'ok': True, 'created': created, 'active': active_n,
-            'inactive': created - active_n, 'wiped': wiped}
+            'inactive': created - active_n, 'wiped': wiped, 'net_rows': net_loaded}
 
 @app.route('/dashboard/payroll/mitroo', methods=['GET', 'POST'])
 def payroll_mitroo():
@@ -2111,29 +2177,25 @@ def export_logistirio():
     HF = PatternFill('solid', fgColor='1F4E5F'); HFONT = Font(bold=True, color='FFFFFF', size=10)
     # Σύνοψη
     s = wb.active; s.title = 'ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)'
-    cols = ['Κωδ.Εργ', 'ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Πατρώνυμο', 'Α.Μ.ΙΚΑ', 'Ξενοδοχείο', 'Τράπεζα', 'IBAN', 'Κατάσταση', 'Καθ.2023', 'Καθ.2024', 'Καθ.2025', 'Καθ.2026', 'Σύν.Καθαρών', 'Μήνες', 'Μ.Ο./μήνα']
+    cols = ['Κωδ.Εργ','ΑΦΜ','Επώνυμο','Όνομα','Πατρώνυμο','Α.Μ.ΙΚΑ','ΑΜΚΑ','Ειδικότητα','Είδος','Σύμβαση','Τράπεζα','IBAN','Εταιρεία (τελ.)','Κωδ.ΥΠΟΚ','Ξενοδοχείο','Τμήμα','Κέντρο κόστους','Ημ.Πρόσληψης','Ημ.Αποχώρησης','Κατάσταση']
     s.append(cols)
-    net = _legal_net_map()
     for u in User.query.all():
         pii = EmployeePII.query.filter_by(user_id=u.id).first()
         if not pii: continue
         h = Hotel.query.get(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
-        nm = net.get(str(pii.afm), {}) if pii.afm else {}
-        regs = {y: nm.get(y, {}).get('reg', 0) for y in (2023, 2024, 2025, 2026)}
-        tot = sum(v.get('reg', 0) for v in nm.values()); mon = sum(v.get('months', 0) for v in nm.values())
-        s.append([pii.emp_code, pii.afm, pii.last_name, pii.first_name, pii.father_name, pii.ika_am,
-                  (h.name if h else ''), pii.bank_name, pii.bank_iban,
-                  ('Ενεργός' if u.employment_active is not False else 'Ανενεργός'),
-                  round(regs[2023], 2) or '', round(regs[2024], 2) or '', round(regs[2025], 2) or '', round(regs[2026], 2) or '',
-                  round(tot, 2) or '', mon or '', (round(tot / mon, 2) if mon else '')])
-    # Μισθοδοσία ανά μήνα
+        comp = _company_for_hotel(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
+        s.append([pii.emp_code, pii.afm, pii.last_name, pii.first_name, pii.father_name, pii.ika_am, pii.amka,
+                  pii.ergani_specialty, pii.employment_kind, pii.contract_type, pii.bank_name, pii.bank_iban,
+                  (comp.legal_name if comp else ''), (getattr(h, 'ypok_code', None) if h else ''),
+                  (h.name if h else ''), '', pii.cost_center, pii.hired_at, pii.left_at,
+                  ('Ενεργός' if u.employment_active is not False else 'Ανενεργός')])
     s2 = wb.create_sheet('Μισθοδοσία ανά μήνα')
-    s2.append(['ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Έτος', 'Μήνας', 'Είδος', 'Καθαρά', 'Εταιρεία'])
+    s2.append(['ΑΦΜ','Επώνυμο','Όνομα','Έτος','Μήνας','Είδος','Μικτά','ΕΦΚΑ εργαζ','ΦΜΥ','Καθαρά','Κόστος εργοδότη','Εταιρεία'])
     for li in LegalNetImport.query.order_by(LegalNetImport.afm, LegalNetImport.year, LegalNetImport.month).all():
-        u = User.query.get(li.user_id) if li.user_id else None
         pii = EmployeePII.query.filter_by(user_id=li.user_id).first() if li.user_id else None
         s2.append([li.afm, (pii.last_name if pii else (li.emp_name or '')), (pii.first_name if pii else ''),
-                   li.year, li.month, li.period_kind, li.net_legal, ''])
+                   li.year, li.month, li.period_kind, li.gross_legal, li.efka_employee_legal, li.fmy_legal,
+                   li.net_legal, li.employer_cost_legal, ''])
     for ws in (s, s2):
         for c in range(1, ws.max_column + 1):
             ws.cell(1, c).fill = HF; ws.cell(1, c).font = HFONT
@@ -2148,14 +2210,15 @@ def export_management():
     from openpyxl.styles import Font, PatternFill
     wb = openpyxl.Workbook()
     HF = PatternFill('solid', fgColor='1F4E5F'); HFONT = Font(bold=True, color='FFFFFF', size=10)
-    # Σύνοψη ανά άτομο
+    # Σύνοψη ανά άτομο (readable)
     s = wb.active; s.title = 'Εργαζόμενοι (σύνοψη)'
     s.append(['Κωδ.Εργ', 'ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Κατάσταση', 'Πλήθος αναθέσεων', 'Μονάδες', 'Τρέχον Τμήμα', 'Τρέχουσα Θέση', 'Συμφωνία €', 'Τηλέφωνο', 'Email'])
-    # Αναθέσεις (αναλυτικά)
-    s2 = wb.create_sheet('Αναθέσεις (αναλυτικά)')
-    s2.append(['ΑΦΜ', 'Κωδ.Εργ', 'Επώνυμο', 'Όνομα', 'Μονάδα', 'Τμήμα', 'Θέση', 'Συμφωνία €', 'Ημέρες/μήνα', 'Ώρες/μέρα', 'Ημ. Πρόσληψης', 'Ημ. Αποχώρησης', 'Διαμονή', 'Τηλέφωνο', 'Email'])
+    # Μητρώο Management (importable, 1 γραμμή/ανάθεση)
+    s2 = wb.create_sheet('Μητρώο Management')
+    s2.append(['Α/Α','Κωδ.Εργαζομένου','ΑΦΜ','Κατάσταση ταύτισης','Μονάδα','Ενεργός','Τμήμα','Θέση','Επώνυμο','Όνομα','Συμφωνία €','Ημέρες/μήνα','Ώρες/μέρα','Ημερομίσθιο','Ωρομίσθιο','Ημ. Πρόσληψης','Ημ. Αποχώρησης','Διαμονή','Τηλέφωνο','Email','Σχόλια'])
+    aa = 0
     for u in User.query.all():
-        asg = MgmtAssignment.query.filter_by(user_id=u.id).all()
+        asg = MgmtAssignment.query.filter_by(user_id=u.id).order_by(MgmtAssignment.id).all()
         if not asg: continue
         pii = EmployeePII.query.filter_by(user_id=u.id).first()
         cur = current_assignment(u.id)
@@ -2166,11 +2229,12 @@ def export_management():
                   (cur.department if cur else ''), (cur.position if cur else ''),
                   (cur.agreement_amount if cur else ''), u.phone, u.email])
         for a in asg:
-            s2.append([(pii.afm if pii else ''), (pii.emp_code if pii else ''),
-                       (pii.last_name if pii else u.full_name), (pii.first_name if pii else ''),
-                       a.unit, a.department, a.position, a.agreement_amount, a.days_per_month, a.hours_per_day,
-                       (a.valid_from.isoformat() if a.valid_from else ''), (a.valid_to.isoformat() if a.valid_to else ''),
-                       a.accommodation, a.phone, a.email])
+            aa += 1
+            s2.append([aa, (pii.emp_code if pii else ''), (pii.afm if pii else ''), '',
+                       a.unit, ('ΝΑΙ' if u.employment_active is not False else 'ΟΧΙ'),
+                       a.department, a.position, (pii.last_name if pii else u.full_name), (pii.first_name if pii else ''),
+                       a.agreement_amount, a.days_per_month, a.hours_per_day, a.day_wage, a.hour_wage,
+                       a.valid_from, a.valid_to, a.accommodation, a.phone, a.email, a.notes])
     for ws in (s, s2):
         for c in range(1, ws.max_column + 1):
             ws.cell(1, c).fill = HF; ws.cell(1, c).font = HFONT
