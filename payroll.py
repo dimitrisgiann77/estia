@@ -1396,4 +1396,126 @@ def payroll_reset():
     return redirect(url_for('payroll_sync'))
 
 
-print('payroll module loaded (Φ2.3 sync)')
+# ── Φόρτωση ΜΗΤΡΩΟΥ από το κεντρικό Excel (νέα πηγή αλήθειας) ─────────────────
+_COMP_SHORT = {'γιαννουλακης': 'GIAN', 'σεργιου': 'SERG', 'πισκοπιανο': 'PISK'}
+
+def _wipe_personnel():
+    """Καθαρισμός ΟΛΟΥ του εισαγμένου προσωπικού (login-off) + σχετικών. Επιστρέφει πλήθος."""
+    uids = [u.id for u in User.query.filter(User.login_enabled == False).all()]
+    n = len(uids)
+    PayrollLine.query.delete(synchronize_session=False)
+    PayrollRun.query.delete(synchronize_session=False)
+    LegalNetImport.query.delete(synchronize_session=False)
+    if uids:
+        Agreement.query.filter(Agreement.user_id.in_(uids)).delete(synchronize_session=False)
+        EmployeePII.query.filter(EmployeePII.user_id.in_(uids)).delete(synchronize_session=False)
+        try:
+            from schedule import EmploymentProfile as _EP, ShiftAssignment as _SA
+            _SA.query.filter(_SA.user_id.in_(uids)).delete(synchronize_session=False)
+            _EP.query.filter(_EP.user_id.in_(uids)).delete(synchronize_session=False)
+        except Exception:
+            pass
+        try:
+            import faults as _flt
+            _flt.UserSpecialty.query.filter(_flt.UserSpecialty.user_id.in_(uids)).delete(synchronize_session=False)
+        except Exception:
+            pass
+        for u in User.query.filter(User.id.in_(uids)).all():
+            db.session.delete(u)
+    db.session.flush()
+    return n
+
+def import_mitroo_central(raw, wipe=True):
+    """Φορτώνει το ΜΗΤΡΩΟ εργαζομένων από το φύλλο «ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)» του κεντρικού Excel.
+    Δημιουργεί κλειδωμένες ταυτότητες (πηγή=Λογιστήριο). Δεν φορτώνει μηνιαία μισθοδοσία."""
+    if openpyxl is None:
+        return {'error': 'openpyxl μη διαθέσιμο'}
+    wb = _safe_load_xlsx(raw)
+    ws = None
+    for s in wb.worksheets:
+        if _norm(s.title).startswith(_norm('ΛΟΓΙΣΤΗΡΙΟ')):
+            ws = s; break
+    if ws is None:
+        wb.close(); return {'error': 'Δεν βρέθηκε φύλλο «ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)».'}
+    hdr_r = None
+    for r in range(1, 7):
+        vals = [_norm(ws.cell(r, c).value) for c in range(1, ws.max_column + 1)]
+        if _norm('ΑΦΜ') in vals and _norm('Επώνυμο') in vals:
+            hdr_r = r; break
+    if not hdr_r:
+        wb.close(); return {'error': 'Δεν βρέθηκαν επικεφαλίδες (ΑΦΜ/Επώνυμο) στο φύλλο.'}
+    H = {_norm(ws.cell(hdr_r, c).value): c for c in range(1, ws.max_column + 1) if ws.cell(hdr_r, c).value}
+    def col(*names):
+        for nm in names:
+            c = H.get(_norm(nm))
+            if c: return c
+        return None
+    def gv(r, *names):
+        c = col(*names)
+        return ws.cell(r, c).value if c else None
+    wiped = _wipe_personnel() if wipe else 0
+    created = 0; active_n = 0; comp_cache = {}; seen_afm = set()
+    for r in range(hdr_r + 1, ws.max_row + 1):
+        epon = gv(r, 'Επώνυμο')
+        if not epon or not str(epon).strip():
+            continue
+        afm = gv(r, 'ΑΦΜ'); afm = str(afm).strip() if afm not in (None, '') else None
+        if afm and afm in seen_afm:
+            continue
+        if afm: seen_afm.add(afm)
+        compname = str(gv(r, 'Εταιρεία (τελ.)', 'Εταιρεία') or '')
+        code = _COMP_SHORT.get(_norm(compname))
+        comp = None
+        if code:
+            if code not in comp_cache:
+                comp_cache[code] = Company.query.filter_by(code=code).first()
+            comp = comp_cache[code]
+        ypok = gv(r, 'Κωδ.ΥΠΟΚ', 'ΥΠΟΚ'); ypok = _ypok4(ypok) if ypok not in (None, '') else None
+        row = {'epon': epon, 'onoma': gv(r, 'Όνομα'), 'afm': afm, 'amka': None,
+               'ika': gv(r, 'Α.Μ.ΙΚΑ', 'ΑΜ ΙΚΑ'), 'father': gv(r, 'Πατρώνυμο'),
+               'specialty': gv(r, 'Ειδικότητα'), 'kind': gv(r, 'Είδος'),
+               'contract': gv(r, 'Σύμβαση', 'Τύπος Σύμβασης'), 'bank': gv(r, 'Τράπεζα'),
+               'subunit_code': ypok, 'subunit_desc': None, 'dept_desc': gv(r, 'Τμήμα'),
+               'company_name': compname}
+        u = _create_locked_employee(row)
+        _apply_epsilon_identity(u, row, comp)
+        pii = EmployeePII.query.filter_by(user_id=u.id).first()
+        ecode = gv(r, 'Κωδ.Εργ', 'Κωδ. Εργ', 'Κωδ Εργ')
+        if pii and ecode not in (None, ''):
+            pii.emp_code = str(ecode).strip()[:12]
+        st = _norm(gv(r, 'Κατάσταση'))
+        active = (st != _norm('Ανενεργός'))
+        if hasattr(u, 'employment_active'):
+            u.employment_active = active
+        if active: active_n += 1
+        created += 1
+    db.session.commit(); wb.close()
+    return {'ok': True, 'created': created, 'active': active_n,
+            'inactive': created - active_n, 'wiped': wiped}
+
+@app.route('/dashboard/payroll/mitroo', methods=['GET', 'POST'])
+def payroll_mitroo():
+    if not _padmin():
+        return redirect(url_for('login'))
+    cu = current_user(); result = None
+    if request.method == 'POST':
+        if not (cu and cu.role == 'masteradmin'):
+            result = {'error': 'Μόνο ο masteradmin μπορεί να φορτώσει/καθαρίσει το μητρώο.'}
+        elif (request.form.get('confirm') or '').strip() != 'ΦΟΡΤΩΣΗ':
+            result = {'error': 'Για επιβεβαίωση γράψε ΦΟΡΤΩΣΗ (καθαρίζει & ξαναφορτώνει το προσωπικό).'}
+        else:
+            f = request.files.get('file')
+            if f and f.filename:
+                try:
+                    result = import_mitroo_central(f.read(), wipe=True)
+                except Exception as e:
+                    db.session.rollback(); result = {'error': str(e)}
+            else:
+                result = {'error': 'Δεν δόθηκε αρχείο .xlsx.'}
+        log_activity('payroll_mitroo_import', str(result))
+    cnt = EmployeePII.query.count()
+    locked = EmployeePII.query.filter_by(locked=True).count()
+    return render_template('payroll_mitroo.html', result=result, count=cnt, locked=locked, is_admin=is_admin())
+
+
+print('payroll module loaded (Φ2.4 μητρώο)')

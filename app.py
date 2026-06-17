@@ -328,11 +328,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.67'
-APP_BUILD   = '347'
+APP_VERSION = '12.68'
+APP_BUILD   = '348'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.68', 'b': '348', 'date': '17/06/2026', 'time': '06:30', 'title': 'Φόρτωση Μητρώου από κεντρικό Excel (νέα πηγή αλήθειας)',
+     'items': ['Νέα σελίδα «Φόρτωση Μητρώου»: διαβάζει το φύλλο «ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)» του κεντρικού Excel και χτίζει το μητρώο εργαζομένων (298 κλειδωμένες ταυτότητες, πηγή=Λογιστήριο).',
+               'Καθαρισμός & φόρτωση από την αρχή (masteradmin), με επιβεβαίωση ΦΟΡΤΩΣΗ.',
+               'Σημείωση δεδομένων: τα αρχεία 2023–2025 δεν έχουν Κωδ.ΥΠΟΚ — άρα το νομικό ξενοδοχείο προκύπτει μόνο για τους ενεργούς (2026). Το κέντρο κόστους θα έρθει από το Management.']},
     {'v': '12.67', 'b': '347', 'date': '15/06/2026', 'time': '18:30', 'title': 'Διόρθωση εισαγωγής ιστορικών (μεγάλες ταμπέλες περιόδου)',
      'items': ['Διορθώθηκε σφάλμα στην εισαγωγή Epsilon ιστορικών ετών: ταμπέλες όπως «Επίδομα αδείας προηγούμενου έτους» ξεπερνούσαν το όριο και έσκαγαν. Τώρα συντομεύονται σωστά.']},
     {'v': '12.66', 'b': '346', 'date': '15/06/2026', 'time': '02:00', 'title': 'Μητρώο: ιστορικό + Ενεργός/Ανενεργός',
@@ -3367,19 +3371,4 @@ import imports         # v12.29 — Κέντρο Εισαγωγής Δεδομέ
 import backup          # v12.31 — Module Αντιγράφων Ασφαλείας (BackupLog + routes)· ΠΡΙΝ το create_all
 import schedule        # v12.40 — Module Πρόγραμμα Εργασίας (μοντέλα + routes)· ΠΡΙΝ το create_all
 import extras          # v12.43 — per-role μενού + Feedback· ΠΡΙΝ το create_all
-import payroll         # v12.47 — Module Μισθοδοσία Φ1 (μοντέλα + routes)· ΠΡΙΝ το create_all
-init_db()
-backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
-seed_team()
-faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
-surveys.seed_surveys() # seed δείγμα ερωτηματολογίου (idempotent)
-schedule.ensure_schedule_columns()  # v12.40
-schedule.seed_schedule()            # v12.40 (idempotent)
-payroll.ensure_payroll_columns()    # v12.47 — Hotel.company_id
-payroll.seed_payroll()              # v12.47 (idempotent)
-start_scheduler()
-backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
-payroll.start_master_sync_scheduler()  # v12.60 — νυχτερινό sync master file (αν SP_MASTER_FILE)
-
-if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+import payroll         # v12.47 — Module Μισθο

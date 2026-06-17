@@ -1,0 +1,56 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μισθοδοσία — Φόρτωση Μητρώου', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ .dropzone{border:2px dashed #b8c6d3;border-radius:12px;padding:22px;text-align:center;cursor:pointer;color:#64748b;background:#f8fafc;}
+ .dropzone:hover,.dropzone.over{border-color:var(--accent,#185FA5);background:#eef5fb;color:var(--accent,#185FA5);}
+ .dropzone i{font-size:30px;display:block;margin-bottom:6px;}.dzlist{margin-top:8px;font-size:13px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;}
+ .b.grey{background:#64748b;}
+ .ok{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px;}
+ .err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px;}
+ .muted{color:#475569;font-size:12px;}
+ .warn{background:#fef9c3;border:1px solid #fde047;color:#854d0e;border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0;}
+ .cf{margin-top:10px;}.cf input{border:1px solid #cbd5e1;border-radius:8px;padding:7px 10px;font-size:13px;width:160px;}
+ .stat{display:inline-block;background:#f1f5f9;border-radius:8px;padding:6px 12px;margin:2px;font-size:13px;}
+ .stat b{color:var(--accent,#185FA5);font-size:15px;}
+ html[data-theme="dark"] .dropzone{background:#16202c;border-color:#33475b;color:#9fb0c0;}
+ html[data-theme="dark"] .stat{background:#16202c;}
+</style></head><body>
+{{ mp.topbar('users', 'ΕΣΤΙΑ — Μισθοδοσία · Φόρτωση Μητρώου') }}
+<div class="container">
+  <div class="card"><h3>Φόρτωση Μητρώου Εργαζομένων (από κεντρικό Excel)</h3>
+    <p class="muted">Διαβάζει το φύλλο <b>«ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)»</b> από το <b>ESTIA_ΚΕΝΤΡΙΚΟ_ΕΛΕΓΧΟΥ.xlsx</b> και δημιουργεί το μητρώο εργαζομένων — ταυτότητα από το Λογιστήριο (ΑΦΜ, ονοματεπώνυμο, πατρώνυμο, Α.Μ.ΙΚΑ, εταιρεία, ΥΠΟΚ, ξενοδοχείο, ειδικότητα, είδος, σύμβαση, τράπεζα), <b>κλειδωμένο</b>. Δεν φορτώνει μηνιαία μισθοδοσία.</p>
+    <div class="warn"><b>Προσοχή:</b> καθαρίζει πρώτα ΟΛΟ το εισαγμένο προσωπικό (locked + unlocked) και ξαναφορτώνει από την αρχή. Οι πραγματικοί λογαριασμοί χρηστών (login) δεν θίγονται.</div>
+    <p><span class="stat">Τρέχον μητρώο: <b>{{ count }}</b></span> <span class="stat">Κλειδωμένα: <b>{{ locked }}</b></span></p>
+    <form method="POST" enctype="multipart/form-data">
+      <div id="dz" class="dropzone"><i class="ti ti-cloud-upload"></i>Σύρε εδώ το <b>ESTIA_ΚΕΝΤΡΙΚΟ_ΕΛΕΓΧΟΥ.xlsx</b> ή κάνε κλικ
+        <input type="file" name="file" accept=".xlsx" id="dzin" style="display:none;"><div id="dzlist" class="dzlist"></div></div>
+      <div class="cf">Γράψε <b>ΦΟΡΤΩΣΗ</b> για επιβεβαίωση: <input type="text" name="confirm" placeholder="ΦΟΡΤΩΣΗ" autocomplete="off"></div>
+      <div style="margin-top:10px;"><button class="b" type="submit"><i class="ti ti-database-import"></i> Καθαρισμός & Φόρτωση μητρώου</button></div>
+    </form>
+    {% if result %}
+      {% if result.error %}<div class="err">Σφάλμα: {{ result.error }}</div>
+      {% else %}<div class="ok">✓ Φορτώθηκε το μητρώο.
+        <div style="margin-top:6px;">
+          <span class="stat">Δημιουργήθηκαν: <b>{{ result.created }}</b></span>
+          <span class="stat">Ενεργοί: <b>{{ result.active }}</b></span>
+          <span class="stat">Ανενεργοί: <b>{{ result.inactive }}</b></span>
+          <span class="stat">Διαγράφηκαν πριν: <b>{{ result.wiped }}</b></span>
+        </div></div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+<script>
+(function(){
+  var dz=document.getElementById('dz'),inp=document.getElementById('dzin'),lst=document.getElementById('dzlist');
+  if(!dz)return;
+  dz.addEventListener('click',function(){inp.click();});
+  inp.addEventListener('change',function(){lst.textContent=inp.files.length?('Επιλέχθηκε: '+inp.files[0].name):'';});
+  ['dragover','dragenter'].forEach(function(e){dz.addEventListener(e,function(ev){ev.preventDefault();dz.classList.add('over');});});
+  ['dragleave','drop'].forEach(function(e){dz.addEventListener(e,function(ev){ev.preventDefault();dz.classList.remove('over');});});
+  dz.addEventListener('drop',function(ev){if(ev.dataTransfer.files.length){inp.files=ev.dataTransfer.files;lst.textContent='Επιλέχθηκε: '+ev.dataTransfer.files[0].name;}});
+})();
+</script>
+</body></html>
