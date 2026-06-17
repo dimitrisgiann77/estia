@@ -1,0 +1,45 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Χρειάζονται προσοχή', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ table{width:100%;border-collapse:collapse;font-size:13px;}
+ td,th{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;}
+ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;}
+ .pill{padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;}
+ .warn{background:#fff3cd;color:#92400e;} .high{background:#fee2e2;color:#b91c1c;} .info{background:#e0f2fe;color:#075985;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:6px 11px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:12px;}
+ .gh{background:#eef5f8;color:#185FA5;border:none;padding:5px 10px;border-radius:8px;cursor:pointer;font-size:12px;}
+ .muted{color:#94a3b8;}
+</style></head><body>
+{{ mp.topbar('alert-triangle', 'ΕΣΤΙΑ — Χρειάζονται προσοχή') }}
+<div class="container">
+
+  {% set kp = [] %}
+  {{ mp.kpis([
+    {'n': total, 'label':'Ανοιχτά (σύνολο)', 'color':'#dc2626', 'href':'/dashboard/attention?embed=1', 'active': not ftype},
+    {'n': counts.get('orphan',0), 'label':'Ορφανά', 'color':'#b45309', 'href':'/dashboard/attention?flag=orphan&embed=1', 'active': ftype=='orphan'},
+    {'n': counts.get('no_key',0)+counts.get('no_afm',0)+counts.get('no_code',0), 'label':'Χωρίς κλειδί/ΑΦΜ', 'color':'#d97706', 'href':'/dashboard/attention?flag=no_key&embed=1', 'active': ftype=='no_key'},
+    {'n': counts.get('possible_dup',0), 'label':'Πιθανά διπλά', 'color':'#7e22ce', 'href':'/dashboard/attention?flag=possible_dup&embed=1', 'active': ftype=='possible_dup'},
+    {'n': counts.get('assignment_no_date',0), 'label':'Αναθέσεις χωρίς ημ/νία', 'color':'#0e7490', 'href':'/dashboard/attention?flag=assignment_no_date&embed=1', 'active': ftype=='assignment_no_date'},
+  ]) }}
+
+  <div class="card">
+    <h3>Εκκρεμότητες προσωπικού {% if ftype %}· {{ labels.get(ftype, ftype) }} <a href="/dashboard/attention?embed=1" class="muted" style="font-size:12px;">(καθαρισμός)</a>{% endif %}</h3>
+    <table>
+      <tr><th>Όνομα</th><th>Θέμα</th><th>Λεπτομέρεια</th><th></th></tr>
+      {% for it in items %}
+      <tr>
+        <td>{% if it.link %}<a href="{{ it.link }}" style="color:var(--accent,#185FA5);font-weight:600;">{{ it.name }}</a>{% else %}{{ it.name }}{% endif %}</td>
+        <td><span class="pill {{ it.f.severity }}">{{ it.label }}</span></td>
+        <td class="muted">{{ it.f.detail }}</td>
+        <td style="text-align:right;">
+          {% if it.link %}<a class="b" href="{{ it.link }}">Καρτέλα</a>{% endif %}
+          <form method="POST" action="/dashboard/attention/resolve/{{ it.f.id }}?embed=1" style="display:inline;" onsubmit="return confirm('Σήμανση ως τακτοποιημένο;');"><button class="gh" type="submit">✓ Τακτοποιήθηκε</button></form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">Καμία εκκρεμότητα — όλα τακτοποιημένα. ✓</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div></body></html>

@@ -276,9 +276,12 @@ def _employees(status='active'):
         comp = _company_for_hotel(hid)
         hotel = Hotel.query.get(hid) if hid else None
         cc = pii.cost_center if (pii and pii.cost_center) else None
+        ma = current_assignment(u.id)
         out.append({'user': u, 'profile': prof, 'pii': pii, 'company': comp,
                     'hotel_name': (hotel.name if hotel else ''), 'hotel_id': hid,
-                    'dept_id': getattr(u, 'department_id', None),
+                    'dept_id': getattr(u, 'department_id', None), 'mgmt': ma,
+                    'mgmt_dept': (ma.department if ma else None), 'mgmt_pos': (ma.position if ma else None),
+                    'mgmt_unit': (ma.unit if ma else None),
                     'cost_center': cc, 'cost_center_label': (COST_CENTERS.get(cc, cc) if cc else '')})
     out.sort(key=lambda r: (r['company'].legal_name if r['company'] else 'ω', r['user'].full_name or ''))
     return out
@@ -457,9 +460,23 @@ def payroll_employee(uid):
                         'extra': d['extra'], 'tot': d['tot'], 'avg': avg})
     fin_tot = {'reg': sum(f['reg'] for f in fin), 'extra': sum(f['extra'] for f in fin),
                'tot': sum(f['tot'] for f in fin), 'months': sum(f['months'] for f in fin)}
+    import people as PPL
+    assignments = assignments_for(uid)
+    events = PPL.events_for(uid)
+    flags = PPL.open_flags_for(uid)
+    ev_labels = PPL.EVENT_LABELS; flag_labels = PPL.FLAG_LABELS
+    merge_cands = []
+    if pii and pii.last_name:
+        for p2 in EmployeePII.query.filter(EmployeePII.last_name == pii.last_name).all():
+            if p2.user_id == uid: continue
+            u2 = User.query.get(p2.user_id)
+            if u2 and (u2.employment_active is not False):
+                merge_cands.append(u2)
     return render_template('payroll_employee.html',
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements,
-        fin=fin, fin_tot=fin_tot, is_admin=is_admin())
+        fin=fin, fin_tot=fin_tot, assignments=assignments, events=events, flags=flags,
+        ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
+        is_admin=is_admin())
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1589,4 +1606,276 @@ def payroll_mitroo():
     return render_template('payroll_mitroo.html', result=result, count=cnt, locked=locked, is_admin=is_admin())
 
 
-print('payroll module loaded (Φ2.4 μητρώο)')
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v12.71 — MANAGEMENT LAYER: αναθέσεις (ιστορικό) + import Management + merge
+# ══════════════════════════════════════════════════════════════════════════════
+class MgmtAssignment(db.Model):
+    """Ανάθεση Management ανά εργαζόμενο — ιστορικό τμήματος/θέσης/συμφωνίας.
+    valid_to NULL = τρέχουσα. Πολλές αναθέσεις/εργαζόμενο (αλλαγή ρόλου ή cross-hotel)."""
+    id            = db.Column(db.Integer, primary_key=True)
+    user_id       = db.Column(db.Integer, db.ForeignKey('user.id'), index=True)
+    unit          = db.Column(db.String(40))
+    department    = db.Column(db.String(60))
+    position      = db.Column(db.String(80))
+    agreement_amount = db.Column(db.Float)
+    days_per_month   = db.Column(db.Float)
+    hours_per_day    = db.Column(db.Float)
+    day_wage      = db.Column(db.Float)
+    hour_wage     = db.Column(db.Float)
+    accommodation = db.Column(db.String(10))
+    phone         = db.Column(db.String(40))
+    email         = db.Column(db.String(120))
+    notes         = db.Column(db.Text)
+    valid_from    = db.Column(db.Date)
+    valid_to      = db.Column(db.Date)
+    needs_date    = db.Column(db.Boolean, default=False)
+    source        = db.Column(db.String(40), default='mgmt2026')
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+def _hotel_by_unit(unit):
+    if not unit: return None
+    u = _norm(unit)
+    for h in Hotel.query.all():
+        if u and u in _norm(h.name):
+            return h
+    return None
+
+
+def assignments_for(uid):
+    return (MgmtAssignment.query.filter_by(user_id=uid)
+            .order_by(MgmtAssignment.valid_to.is_(None).desc(),
+                      MgmtAssignment.valid_from.is_(None).desc(),
+                      MgmtAssignment.id.desc()).all())
+
+
+def current_assignment(uid):
+    a = (MgmtAssignment.query.filter_by(user_id=uid, valid_to=None)
+         .order_by(MgmtAssignment.id.desc()).first())
+    if a: return a
+    return (MgmtAssignment.query.filter_by(user_id=uid)
+            .order_by(MgmtAssignment.id.desc()).first())
+
+
+import re as _re2
+def _hidx(row, *names):
+    norm = [_norm(c) for c in row]
+    for n in names:
+        t = _norm(n)
+        for i, h in enumerate(norm):
+            if h == t: return i
+    return None
+
+def _asdate(v):
+    if isinstance(v, datetime): return v.date()
+    if isinstance(v, date): return v
+    return None
+
+def import_management(raw):
+    import people as PPL
+    if openpyxl is None:
+        return {'error': 'openpyxl μη διαθέσιμο'}
+    wb = openpyxl.load_workbook(io.BytesIO(raw), data_only=True)
+    if 'Μητρώο Management' not in wb.sheetnames:
+        return {'error': 'Λείπει το φύλλο «Μητρώο Management».'}
+    M = list(wb['Μητρώο Management'].iter_rows(values_only=True))
+    mh = M[0]
+    c_code=_hidx(mh,'Κωδ.Εργαζομένου'); c_unit=_hidx(mh,'Μονάδα'); c_act=_hidx(mh,'Ενεργός')
+    c_dept=_hidx(mh,'Τμήμα'); c_pos=_hidx(mh,'Θέση'); c_last=_hidx(mh,'Επώνυμο'); c_first=_hidx(mh,'Όνομα')
+    c_agr=_hidx(mh,'Συμφωνία €','Συμφωνία'); c_dpm=_hidx(mh,'Ημέρες/μήνα'); c_hpd=_hidx(mh,'Ώρες/μέρα')
+    c_day=_hidx(mh,'Ημερομίσθιο'); c_hour=_hidx(mh,'Ωρομίσθιο')
+    c_hire=_hidx(mh,'Ημ. Πρόσληψης'); c_left=_hidx(mh,'Ημ. Αποχώρησης')
+    c_stay=_hidx(mh,'Διαμονή'); c_tel=_hidx(mh,'Τηλέφωνο'); c_em=_hidx(mh,'Email'); c_note=_hidx(mh,'Σχόλια')
+    kmap = {}
+    if 'ΠΡΟΣ ΑΝΤΙΣΤΟΙΧΙΣΗ' in wb.sheetnames:
+        T = list(wb['ΠΡΟΣ ΑΝΤΙΣΤΟΙΧΙΣΗ'].iter_rows(values_only=True))
+        th = T[0]
+        t_unit=_hidx(th,'Μονάδα'); t_last=_hidx(th,'Επώνυμο'); t_first=_hidx(th,'Όνομα')
+        t_kl=[i for i,h in enumerate(th) if h and 'Σημείωση' in str(h)]
+        t_k = t_kl[0] if t_kl else None
+        for r in T[1:]:
+            if not r or t_last is None or not r[t_last]: continue
+            kv = str(r[t_k]).strip() if (t_k is not None and r[t_k]) else ''
+            kmap[(_norm(r[t_unit]), _norm(r[t_last]), _norm(r[t_first]))] = kv
+    stats = {'rows':0,'assignments':0,'matched':0,'orphan':0,'created_users':0,
+             'multi':0,'dup_rows':0,'errors':[]}
+    seen = {}; by_user = {}
+    code_re = _re2.compile(r'(E0?\d{2,})', _re2.I)
+    for r in M[1:]:
+        if not r or c_last is None or not r[c_last]: continue
+        stats['rows'] += 1
+        unit=r[c_unit]; last=r[c_last]; first=r[c_first]
+        code = str(r[c_code]).strip() if (c_code is not None and r[c_code]) else ''
+        if not code:
+            kv = kmap.get((_norm(unit),_norm(last),_norm(first)), '')
+            m = code_re.search(kv or '')
+            code = m.group(1).upper() if m else ''
+        user = None
+        if code:
+            pii = EmployeePII.query.filter_by(emp_code=code).first()
+            if pii: user = User.query.get(pii.user_id)
+        if user is None:
+            full = ('%s %s' % (str(last).strip(), str(first or '').strip())).strip()
+            u = None
+            for cand in User.query.filter_by(login_enabled=False).all():
+                if _norm(cand.full_name) == _norm(full):
+                    u = cand; break
+            if u is None:
+                u = User(username=('mgmt_%s' % _norm(full).replace(' ','_'))[:60] or 'mgmt_x',
+                         password='!', full_name=full, role='staff',
+                         login_enabled=False, employment_active=True)
+                h = _hotel_by_unit(unit)
+                if h and hasattr(u,'home_hotel_id'): u.home_hotel_id = h.id
+                db.session.add(u); db.session.flush()
+                pii2 = EmployeePII(user_id=u.id)
+                if hasattr(pii2,'last_name'): pii2.last_name = str(last).strip()
+                if hasattr(pii2,'first_name'): pii2.first_name = str(first or '').strip()
+                db.session.add(pii2)
+                PPL.log_event(u.id,'created','Ορφανό προφίλ από Management (χωρίς κλειδί Λογιστηρίου)')
+                stats['created_users'] += 1
+            user = u
+            PPL.add_flag(user.id,'orphan','warn','Εκτός αρχείων Λογιστηρίου')
+            PPL.add_flag(user.id,'no_afm','warn','Χωρίς ΑΦΜ (ορφανό)')
+            PPL.add_flag(user.id,'no_code','warn','Χωρίς Κωδ. Εργαζομένου')
+            stats['orphan'] += 1
+        else:
+            stats['matched'] += 1
+        k=(user.id, _norm(unit), _norm(r[c_dept]))
+        a = seen.get(k)
+        num=lambda c: (float(r[c]) if (c is not None and isinstance(r[c],(int,float))) else None)
+        if a is None:
+            a = (MgmtAssignment.query
+                 .filter_by(user_id=user.id, unit=str(unit or ''), department=str(r[c_dept] or ''), source='mgmt2026')
+                 .first())
+            if a is None:
+                a = MgmtAssignment(user_id=user.id, source='mgmt2026'); db.session.add(a)
+                stats['assignments'] += 1
+            seen[k]=a
+        else:
+            stats['dup_rows'] += 1
+            PPL.add_flag(user.id,'possible_dup','info',
+                         'Η πηγή Management είχε 2 ίδιες γραμμές (%s/%s)' % (unit, r[c_dept]))
+        a.unit=str(unit or ''); a.department=str(r[c_dept] or ''); a.position=str(r[c_pos] or '') or None
+        a.agreement_amount=num(c_agr); a.days_per_month=num(c_dpm); a.hours_per_day=num(c_hpd)
+        a.day_wage=num(c_day); a.hour_wage=num(c_hour)
+        a.accommodation=str(r[c_stay]).strip() if (c_stay is not None and r[c_stay]) else None
+        a.phone=str(r[c_tel]).strip() if (c_tel is not None and r[c_tel]) else None
+        a.email=str(r[c_em]).strip() if (c_em is not None and r[c_em]) else None
+        a.notes=str(r[c_note]).strip() if (c_note is not None and r[c_note]) else None
+        if a.valid_from is None and c_hire is not None:
+            a.valid_from=_asdate(r[c_hire])
+        if a.valid_to is None and c_left is not None:
+            a.valid_to=_asdate(r[c_left])
+        by_user.setdefault(user.id, []).append(a)
+        PPL.log_event(user.id,'import','Management: %s / %s%s' %
+                      (unit, r[c_dept], (' - ' + str(r[c_pos]) if (c_pos is not None and r[c_pos]) else '')))
+        if code:
+            PPL.clear_flags(user.id,'no_code'); PPL.clear_flags(user.id,'orphan')
+    db.session.flush()
+    for uid, lst in by_user.items():
+        if len(lst) > 1:
+            stats['multi'] += 1
+            need = [a for a in lst if a.valid_from is None and a.valid_to is None]
+            if len(need) >= 2:
+                for a in need: a.needs_date = True
+                PPL.add_flag(uid,'assignment_no_date','warn',
+                             '%d αναθέσεις χωρίς ημερομηνία - όρισε περιόδους' % len(need))
+    db.session.commit()
+    return stats
+
+
+@app.route('/dashboard/payroll/mgmt-import', methods=['GET','POST'])
+def payroll_mgmt_import():
+    if not _padmin():
+        return redirect(url_for('login'))
+    result = None
+    if request.method == 'POST':
+        f = request.files.get('file')
+        if f and f.filename:
+            try:
+                result = import_management(f.read())
+            except Exception as e:
+                db.session.rollback(); result = {'error': str(e)}
+        else:
+            result = {'error': 'Δεν δόθηκε αρχείο .xlsx.'}
+        log_activity('payroll_mgmt_import', str(result))
+    n_assign = MgmtAssignment.query.count()
+    return render_template('payroll_mgmt_import.html', result=result, n_assign=n_assign, is_admin=is_admin())
+
+
+@app.route('/dashboard/payroll/employee/<int:uid>/assign', methods=['POST'])
+def payroll_assign(uid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    import people as PPL
+    from datetime import timedelta
+    u = User.query.get_or_404(uid)
+    act = request.form.get('action')
+    def _d(name):
+        v=request.form.get(name)
+        try: return datetime.strptime(v,'%Y-%m-%d').date() if v else None
+        except Exception: return None
+    def _f(name):
+        v=request.form.get(name)
+        try: return float(v) if v not in (None,'') else None
+        except Exception: return None
+    if act == 'assign_new':
+        vf = _d('valid_from')
+        if vf:
+            for a in MgmtAssignment.query.filter_by(user_id=uid, valid_to=None).all():
+                a.valid_to = vf - timedelta(days=1); a.needs_date=False
+        a = MgmtAssignment(user_id=uid, source='manual',
+                           unit=(request.form.get('unit') or '').strip() or None,
+                           department=(request.form.get('department') or '').strip() or None,
+                           position=(request.form.get('position') or '').strip() or None,
+                           agreement_amount=_f('agreement_amount'), valid_from=vf)
+        db.session.add(a)
+        PPL.log_event(uid,'assignment','Νέα ανάθεση: %s / %s (από %s)' % (a.unit, a.department, vf or '-'))
+        PPL.clear_flags(uid,'assignment_no_date')
+    elif act == 'assign_edit':
+        a = MgmtAssignment.query.get(request.form.get('aid', type=int))
+        if a and a.user_id == uid:
+            a.valid_from=_d('valid_from'); a.valid_to=_d('valid_to')
+            if request.form.get('department'): a.department=request.form.get('department').strip()
+            if request.form.get('position') is not None: a.position=(request.form.get('position') or '').strip() or None
+            if _f('agreement_amount') is not None: a.agreement_amount=_f('agreement_amount')
+            if a.valid_from: a.needs_date=False
+            PPL.log_event(uid,'assignment','Επεξεργασία ανάθεσης %s/%s' % (a.unit,a.department))
+            if not MgmtAssignment.query.filter_by(user_id=uid, needs_date=True).count():
+                PPL.clear_flags(uid,'assignment_no_date')
+    db.session.commit()
+    return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
+
+
+@app.route('/dashboard/payroll/employee/<int:uid>/merge', methods=['POST'])
+def payroll_merge(uid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    import people as PPL
+    keep = User.query.get_or_404(uid)
+    other_id = request.form.get('other_id', type=int)
+    other = User.query.get(other_id) if other_id else None
+    if not other or other.id == keep.id:
+        return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
+    for a in MgmtAssignment.query.filter_by(user_id=other.id).all():
+        a.user_id = keep.id
+    for li in LegalNetImport.query.filter_by(user_id=other.id).all():
+        li.user_id = keep.id
+    pk = EmployeePII.query.filter_by(user_id=keep.id).first()
+    po = EmployeePII.query.filter_by(user_id=other.id).first()
+    if pk and po:
+        for fld in ('afm','amka','ika_am','father_name','bank_name','bank_iban','emp_code'):
+            if not getattr(pk, fld, None) and getattr(po, fld, None):
+                setattr(pk, fld, getattr(po, fld))
+    other.employment_active = False; other.login_enabled = False
+    PPL.clear_flags(other.id)
+    PPL.clear_flags(keep.id, 'possible_dup')
+    PPL.log_event(keep.id,'merge','Συγχώνευση: «%s» (#%d) -> σε αυτό το προφίλ' % (other.full_name or other.username, other.id))
+    PPL.log_event(other.id,'merge','Συγχωνεύτηκε στο «%s» (#%d) - αρχειοθετήθηκε' % (keep.full_name or keep.username, keep.id))
+    db.session.commit()
+    log_activity('payroll_merge', '%s -> %s' % (other.id, keep.id))
+    return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
+
+
+print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management layer)')

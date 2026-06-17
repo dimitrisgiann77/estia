@@ -76,7 +76,7 @@
         <tr>
           <td>{{ (r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username)) }}</td>
           <td>{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
-          <td>{{ r.profile.position if r.profile and r.profile.position else (r.pii.ergani_specialty if r.pii else '') }}</td>
+          <td>{% if r.mgmt_dept %}{{ r.mgmt_dept }}{% if r.mgmt_pos %}<br><span class="muted" style="font-size:11px;">{{ r.mgmt_pos }}</span>{% endif %}{% else %}{{ r.profile.position if r.profile and r.profile.position else (r.pii.ergani_specialty if r.pii else '') }}{% endif %}</td>
           <td class="muted">{{ r.hotel_name }}</td>
           <td>{% if r.cost_center %}<span class="pill" style="background:#e0e7ff;color:#3730a3;">{{ r.cost_center }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
           <td class="num">{% if r.net_reg %}{{ '%.0f'|format(r.net_reg) }}€{% else %}<span class="muted">—</span>{% endif %}</td>
