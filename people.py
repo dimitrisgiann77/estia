@@ -162,4 +162,25 @@ def attention_resolve(fid):
     return redirect(url_for('attention_center', entity=f.entity_type) + '&embed=1')
 
 
+
+class NotDuplicate(db.Model):
+    """Ζεύγη προφίλ που ο χρήστης δήλωσε ΟΤΙ ΔΕΝ είναι διπλά (π.χ. αδέρφια ίδιο επώνυμο)."""
+    id    = db.Column(db.Integer, primary_key=True)
+    a_id  = db.Column(db.Integer, index=True)
+    b_id  = db.Column(db.Integer, index=True)
+    entity_type = db.Column(db.String(20), default='employee')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+def _pair(a, b):
+    return (min(a, b), max(a, b))
+
+def dismiss_pair(a, b, entity_type='employee'):
+    lo, hi = _pair(a, b)
+    if not NotDuplicate.query.filter_by(a_id=lo, b_id=hi, entity_type=entity_type).first():
+        db.session.add(NotDuplicate(a_id=lo, b_id=hi, entity_type=entity_type))
+
+def is_dismissed(a, b, entity_type='employee'):
+    lo, hi = _pair(a, b)
+    return NotDuplicate.query.filter_by(a_id=lo, b_id=hi, entity_type=entity_type).first() is not None
+
 print('people core module loaded (ProfileEvent/AttentionFlag/attention)')

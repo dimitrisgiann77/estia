@@ -460,6 +460,12 @@ def payroll_employee(uid):
                         'extra': d['extra'], 'tot': d['tot'], 'avg': avg})
     fin_tot = {'reg': sum(f['reg'] for f in fin), 'extra': sum(f['extra'] for f in fin),
                'tot': sum(f['tot'] for f in fin), 'months': sum(f['months'] for f in fin)}
+    fin_months = {}
+    if afm:
+        for li in LegalNetImport.query.filter_by(afm=str(afm)).all():
+            if (li.period_kind or 'monthly') == 'monthly' and li.year and li.month:
+                fin_months.setdefault(int(li.year), {})
+                fin_months[int(li.year)][int(li.month)] = fin_months[int(li.year)].get(int(li.month), 0.0) + (li.net_legal or 0.0)
     import people as PPL
     assignments = assignments_for(uid)
     events = PPL.events_for(uid)
@@ -469,12 +475,14 @@ def payroll_employee(uid):
     if pii and pii.last_name:
         for p2 in EmployeePII.query.filter(EmployeePII.last_name == pii.last_name).all():
             if p2.user_id == uid: continue
+            if PPL.is_dismissed(uid, p2.user_id): continue
             u2 = User.query.get(p2.user_id)
             if u2 and (u2.employment_active is not False):
                 merge_cands.append(u2)
     return render_template('payroll_employee.html',
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements,
-        fin=fin, fin_tot=fin_tot, assignments=assignments, events=events, flags=flags,
+        fin=fin, fin_tot=fin_tot, fin_months=fin_months, month_gr=_MONTH_GR,
+        assignments=assignments, events=events, flags=flags,
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
         is_admin=is_admin())
 
@@ -1947,4 +1955,76 @@ def payroll_scan():
     return redirect(url_for('attention_center', entity='employee') + '&embed=1')
 
 
-print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan)')
+
+# ── v12.77 — Πιθανές διπλοεγγραφές (κεντρικά) + dismiss + μήνες ───────────────
+_MONTH_GR = ['', 'Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μάι', 'Ιουν', 'Ιουλ', 'Αυγ', 'Σεπ', 'Οκτ', 'Νοε', 'Δεκ']
+
+def _dup_pairs():
+    """Ζεύγη πιθανών διπλών: ίδιο επώνυμο (ή ίδιο ΑΦΜ), ενεργά, μη-απορριφθέντα."""
+    import people as PPL
+    from collections import defaultdict
+    by_last = defaultdict(list); by_afm = defaultdict(list)
+    for pii in EmployeePII.query.all():
+        u = User.query.get(pii.user_id)
+        if not u or u.employment_active is False:
+            continue
+        if pii.last_name:
+            by_last[_norm(pii.last_name)].append((u, pii))
+        if pii.afm:
+            by_afm[str(pii.afm)].append((u, pii))
+    pairs = []
+    seen = set()
+    def add(a, pa, b, pb, reason):
+        k = (min(a.id, b.id), max(a.id, b.id))
+        if k in seen: return
+        if PPL.is_dismissed(a.id, b.id): return
+        seen.add(k); pairs.append((a, pa, b, pb, reason))
+    for afm, lst in by_afm.items():
+        for i in range(len(lst)):
+            for j in range(i+1, len(lst)):
+                add(lst[i][0], lst[i][1], lst[j][0], lst[j][1], 'Ίδιο ΑΦΜ')
+    for last, lst in by_last.items():
+        if len(lst) < 2: continue
+        for i in range(len(lst)):
+            for j in range(i+1, len(lst)):
+                add(lst[i][0], lst[i][1], lst[j][0], lst[j][1], 'Ίδιο επώνυμο')
+    return pairs
+
+def _net_summary(uid):
+    afm = None
+    pii = EmployeePII.query.filter_by(user_id=uid).first()
+    if pii and pii.afm: afm = str(pii.afm)
+    nm = _legal_net_map().get(afm, {}) if afm else {}
+    yrs = ', '.join('%s:%.0f' % (y, nm[y]['tot']) for y in sorted(nm)) if nm else '—'
+    na = MgmtAssignment.query.filter_by(user_id=uid).count()
+    return {'afm': (afm or '—'), 'code': (pii.emp_code if pii else None) or '—',
+            'years': yrs, 'assignments': na}
+
+@app.route('/dashboard/payroll/duplicates')
+def payroll_duplicates():
+    if not _padmin():
+        return redirect(url_for('login'))
+    rows = []
+    for a, pa, b, pb, reason in _dup_pairs():
+        rows.append({'a': a, 'b': b, 'reason': reason,
+                     'a_sum': _net_summary(a.id), 'b_sum': _net_summary(b.id)})
+    log_activity('payroll_duplicates', '%d ζεύγη' % len(rows))
+    return render_template('payroll_duplicates.html', rows=rows, total=len(rows), is_admin=is_admin())
+
+@app.route('/dashboard/payroll/dup/dismiss', methods=['POST'])
+def payroll_dup_dismiss():
+    if not _padmin():
+        return redirect(url_for('login'))
+    import people as PPL
+    a = request.form.get('a_id', type=int); b = request.form.get('b_id', type=int)
+    if a and b:
+        PPL.dismiss_pair(a, b)
+        PPL.clear_flags(a, 'possible_dup'); PPL.clear_flags(b, 'possible_dup')
+        PPL.log_event(a, 'merge', 'Δηλώθηκε ΟΤΙ ΔΕΝ είναι διπλό με #%d' % b)
+        PPL.log_event(b, 'merge', 'Δηλώθηκε ΟΤΙ ΔΕΝ είναι διπλό με #%d' % a)
+        db.session.commit()
+        log_activity('payroll_dup_dismiss', '%s / %s' % (a, b))
+    back = request.form.get('back') or url_for('payroll_duplicates')
+    return redirect(back + ('?embed=1' if '?' not in back else '&embed=1'))
+
+print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups)')

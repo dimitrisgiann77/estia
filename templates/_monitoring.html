@@ -18,7 +18,24 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 {{ styles(brand) }}
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
-<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}
+.copy-tbl-btn{font-size:11px;padding:3px 9px;margin:0 0 6px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#475569;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.copy-tbl-btn:hover{background:#f1f5f9;}</style>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+  function tsv(t){var out=[];for(var i=0;i<t.rows.length;i++){var c=t.rows[i].cells,l=[];for(var j=0;j<c.length;j++){l.push((c[j].innerText||"").replace(/\t/g," ").replace(/\r?\n/g," ").trim());}out.push(l.join("\t"));}return out.join("\n");}
+  document.querySelectorAll("table").forEach(function(t){
+    if(t.dataset.nocopy!==undefined) return;
+    if(!t.rows || t.rows.length<2) return;
+    var b=document.createElement("button"); b.type="button"; b.className="copy-tbl-btn";
+    b.innerHTML="<i class='ti ti-copy'></i> Αντιγραφή";
+    b.onclick=function(){var text=tsv(t); var done=function(){var o=b.innerHTML;b.innerHTML="<i class='ti ti-check'></i> Αντιγράφηκε";setTimeout(function(){b.innerHTML=o;},1500);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done).catch(function(){fb();});}else{fb();}
+      function fb(){var ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(ta);done();}};
+    t.parentNode.insertBefore(b,t);
+  });
+});
+</script>
 {% endmacro %}
 
 {# ── styles(): όλο το CSS μιας monitoring σελίδας ── #}

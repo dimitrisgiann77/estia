@@ -123,13 +123,22 @@
   </div>
 
   {% if merge_cands %}
-  <div class="card"><h3>Συγχώνευση διπλού (merge)</h3>
-    <p class="meta" style="font-size:12px;">Άλλα προφίλ με ίδιο επώνυμο. Η συγχώνευση μεταφέρει αναθέσεις/καθαρά εδώ, συμπληρώνει κενά στοιχεία και αρχειοθετεί το διπλό (καταγράφεται στην ιστορικότητα).</p>
-    <form method="POST" action="/dashboard/payroll/employee/{{ u.id }}/merge?embed=1" onsubmit="return confirm('Συγχώνευση; Το άλλο προφίλ θα αρχειοθετηθεί.');">
-      <div class="row"><label>Διπλό προφίλ</label>
-        <select name="other_id">{% for c in merge_cands %}<option value="{{ c.id }}">{{ c.full_name or c.username }} (#{{ c.id }})</option>{% endfor %}</select></div>
-      <button class="b" type="submit" style="background:#b45309;">Συγχώνευση → σε αυτό</button>
-    </form>
+  <div class="card"><h3>Πιθανές διπλοεγγραφές</h3>
+    <p class="meta" style="font-size:12px;">Άλλα προφίλ με <b>ίδιο επώνυμο</b> — μπορεί να είναι το ίδιο άτομο (διπλό) ή απλώς συγγενής/συνωνυμία. Επιβεβαίωσε πριν ενώσεις.</p>
+    {% for c in merge_cands %}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #f1f5f9;padding:7px 0;">
+      <span style="flex:1;min-width:160px;">{{ c.full_name or c.username }} <span class="muted">(#{{ c.id }})</span></span>
+      <form method="POST" action="/dashboard/payroll/employee/{{ u.id }}/merge?embed=1" style="display:inline;" onsubmit="return confirm('Είναι το ΙΔΙΟ άτομο; Θα ενωθεί το «{{ c.full_name }}» σε ΑΥΤΟ το προφίλ και θα αρχειοθετηθεί.');">
+        <input type="hidden" name="other_id" value="{{ c.id }}">
+        <button class="b" type="submit" style="background:#b45309;">Είναι διπλό → ένωσε εδώ</button>
+      </form>
+      <form method="POST" action="/dashboard/payroll/dup/dismiss?embed=1" style="display:inline;">
+        <input type="hidden" name="a_id" value="{{ u.id }}"><input type="hidden" name="b_id" value="{{ c.id }}">
+        <input type="hidden" name="back" value="/dashboard/payroll/employee/{{ u.id }}">
+        <button type="submit" style="background:#eef5f8;color:#185FA5;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;">Δεν είναι διπλό</button>
+      </form>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
@@ -160,7 +169,7 @@
       </tr>
       {% for f in fin %}
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;"><b>{{ f.year }}</b></td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;"><details><summary style="cursor:pointer;list-style:none;"><b>{{ f.year }}</b> <span class="muted" style="font-size:11px;">▸ μήνες</span></summary><div style="font-size:12px;color:#475569;margin:4px 0 2px;line-height:1.6;">{% if fin_months.get(f.year) %}{% for m in range(1,13) %}{% if fin_months[f.year].get(m) %}<span style="display:inline-block;min-width:92px;">{{ month_gr[m] }}: {{ '%.0f'|format(fin_months[f.year][m]) }}€</span>{% endif %}{% endfor %}{% else %}<span class="muted">—</span>{% endif %}</div></details></td>
         <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #f1f5f9;">{{ f.months }}</td>
         <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #f1f5f9;">{{ '%.2f'|format(f.reg) }}€</td>
         <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #f1f5f9;color:#92400e;">{% if f.extra %}{{ '%.2f'|format(f.extra) }}€{% else %}—{% endif %}</td>

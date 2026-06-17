@@ -1,0 +1,52 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Πιθανές διπλοεγγραφές', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ table{width:100%;border-collapse:collapse;font-size:13px;}
+ td,th{padding:8px;border-bottom:1px solid #eef2f6;text-align:left;vertical-align:top;}
+ th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;}
+ .b{background:#b45309;color:#fff;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;}
+ .gh{background:#eef5f8;color:#185FA5;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;}
+ .muted{color:#94a3b8;font-size:12px;} .reason{background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+ .prof{font-size:12px;color:#475569;line-height:1.6;}
+ a.nm{color:var(--accent,#185FA5);font-weight:600;text-decoration:none;}
+</style></head><body>
+{{ mp.topbar('users', 'ΕΣΤΙΑ — Πιθανές διπλοεγγραφές') }}
+<div class="container">
+  <div class="card">
+    <h3>Πιθανές διπλοεγγραφές <span class="muted">({{ total }})</span></h3>
+    <p class="muted">Ζεύγη προφίλ με ίδιο επώνυμο (ή ΑΦΜ). Μπορεί να είναι το ίδιο άτομο (→ <b>Ένωσε</b>) ή διαφορετικά άτομα/συγγενείς (→ <b>Δεν είναι διπλό</b>, φεύγει οριστικά).</p>
+    <table>
+      <tr><th>Λόγος</th><th>Προφίλ Α</th><th>Προφίλ Β</th><th>Ενέργειες</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><span class="reason">{{ r.reason }}</span></td>
+        <td>
+          <a class="nm" href="/dashboard/payroll/employee/{{ r.a.id }}?embed=1">{{ r.a.full_name or r.a.username }}</a> <span class="muted">#{{ r.a.id }}</span>
+          <div class="prof">ΑΦΜ {{ r.a_sum.afm }} · Κωδ {{ r.a_sum.code }} · αναθ. {{ r.a_sum.assignments }}<br>Καθαρά: {{ r.a_sum.years }}</div>
+        </td>
+        <td>
+          <a class="nm" href="/dashboard/payroll/employee/{{ r.b.id }}?embed=1">{{ r.b.full_name or r.b.username }}</a> <span class="muted">#{{ r.b.id }}</span>
+          <div class="prof">ΑΦΜ {{ r.b_sum.afm }} · Κωδ {{ r.b_sum.code }} · αναθ. {{ r.b_sum.assignments }}<br>Καθαρά: {{ r.b_sum.years }}</div>
+        </td>
+        <td style="white-space:nowrap;">
+          <form method="POST" action="/dashboard/payroll/employee/{{ r.a.id }}/merge?embed=1" style="display:inline;" onsubmit="return confirm('Ένωση «{{ r.b.full_name }}» → στο «{{ r.a.full_name }}» (#{{ r.a.id }}); Το Β αρχειοθετείται.');">
+            <input type="hidden" name="other_id" value="{{ r.b.id }}">
+            <button class="b" type="submit" title="Ένωσε το Β μέσα στο Α">⟵ Ένωσε στο Α</button>
+          </form>
+          <form method="POST" action="/dashboard/payroll/employee/{{ r.b.id }}/merge?embed=1" style="display:inline;" onsubmit="return confirm('Ένωση «{{ r.a.full_name }}» → στο «{{ r.b.full_name }}» (#{{ r.b.id }}); Το Α αρχειοθετείται.');">
+            <input type="hidden" name="other_id" value="{{ r.a.id }}">
+            <button class="b" type="submit" title="Ένωσε το Α μέσα στο Β">Ένωσε στο Β ⟶</button>
+          </form>
+          <form method="POST" action="/dashboard/payroll/dup/dismiss?embed=1" style="display:inline;">
+            <input type="hidden" name="a_id" value="{{ r.a.id }}"><input type="hidden" name="b_id" value="{{ r.b.id }}">
+            <button class="gh" type="submit">Δεν είναι διπλό</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">Καμία πιθανή διπλοεγγραφή. ✓</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</div></body></html>
