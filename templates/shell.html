@@ -533,4 +533,9 @@ document.querySelectorAll('.item').forEach(function(i){ i.addEventListener('clic
 var _ws='operations'; try{ _ws=localStorage.getItem('estia_ws')||'operations'; }catch(e){}
 if(_ws!=='operations' && !document.querySelector('.apps .hbtn[data-ws="'+_ws+'"]')) _ws='operations';
 applyWs(_ws);
-var first=document.querySelector('#side .item[d
+var first=document.querySelector('#side .item[data-ws~="'+_ws+'"]');
+if(!first) first=document.querySelector('#side .item');
+if(first) go(first.getAttribute('data-url'), first);
+</script>
+</body>
+</html>

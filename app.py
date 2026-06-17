@@ -3371,4 +3371,19 @@ import imports         # v12.29 — Κέντρο Εισαγωγής Δεδομέ
 import backup          # v12.31 — Module Αντιγράφων Ασφαλείας (BackupLog + routes)· ΠΡΙΝ το create_all
 import schedule        # v12.40 — Module Πρόγραμμα Εργασίας (μοντέλα + routes)· ΠΡΙΝ το create_all
 import extras          # v12.43 — per-role μενού + Feedback· ΠΡΙΝ το create_all
-import payroll         # v12.47 — Module Μισθο
+import payroll         # v12.47 — Module Μισθοδοσία Φ1 (μοντέλα + routes)· ΠΡΙΝ το create_all
+init_db()
+backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
+seed_team()
+faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
+surveys.seed_surveys() # seed δείγμα ερωτηματολογίου (idempotent)
+schedule.ensure_schedule_columns()  # v12.40
+schedule.seed_schedule()            # v12.40 (idempotent)
+payroll.ensure_payroll_columns()    # v12.47 — Hotel.company_id
+payroll.seed_payroll()              # v12.47 (idempotent)
+start_scheduler()
+backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
+payroll.start_master_sync_scheduler()  # v12.60 — νυχτερινό sync master file (αν SP_MASTER_FILE)
+
+if __name__ == '__main__':
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
