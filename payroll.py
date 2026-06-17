@@ -648,8 +648,13 @@ def _create_locked_employee(row):
     full = (str(row['epon']).strip() + ' ' + (str(row['onoma']).strip() if row['onoma'] else '')).strip()
     base = re.sub(r'[^a-z0-9.]', '', _acc(full).lower().replace(' ', '.')) or ('emp' + os.urandom(3).hex())
     uname = base[:40]
-    if User.query.filter_by(username=uname).first():
-        uname = (base[:32] + '.' + os.urandom(2).hex())[:46]
+    _guard = 0
+    while User.query.filter_by(username=uname).first():
+        _guard += 1
+        uname = (base[:34] + '.' + os.urandom(3).hex())[:46]
+        if _guard > 50:
+            uname = 'emp.' + os.urandom(6).hex()
+            break
     u = User(username=uname, password=generate_password_hash(os.urandom(8).hex()),
              full_name=full[:100], role='staff', approved=True, is_active=True)
     for attr, val in [('login_enabled', False), ('employment_active', True)]:
