@@ -328,11 +328,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.80'
-APP_BUILD   = '360'
+APP_VERSION = '12.81'
+APP_BUILD   = '361'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.81', 'b': '361', 'date': '17/06/2026', 'time': '21:30', 'title': 'Ανθεκτική φόρτωση modules (no total crash)',
+     'items': ['Τα plug-in modules φορτώνονται πλέον ανθεκτικά: αν ένα λείπει/σπάσει, καταγράφεται προειδοποίηση και η εφαρμογή συνεχίζει — δεν πέφτει ΟΛΗ (όπως έγινε με το ξεχασμένο menu.py).']},
     {'v': '12.80', 'b': '360', 'date': '17/06/2026', 'time': '20:00', 'title': 'Export μητρώων από τη βάση + Διαμόρφωση μενού (self-service)',
      'items': ['Εξαγωγή σε Excel ΑΠΟ ΤΗ ΖΩΝΤΑΝΗ ΒΑΣΗ για κάθε μητρώο (Λογιστηρίου & Management) — τα 2 master γίνονται πάντα καθρέφτης της βάσης.',
                'Νέα «Διαμόρφωση μενού» (admin, drag & drop): ομάδες/σειρά/μετονομασία/απόκρυψη του αριστερού μενού, αποθήκευση στη βάση. Ενεργό μόνο όταν αποθηκευτεί (αλλιώς προεπιλεγμένο)· ισχύει για admin.']},
@@ -3406,28 +3408,36 @@ def seed_team():
             db.session.rollback(); print('seed_team skipped:', e)
 
 
-import faults          # v12.14 — Module Βλαβοληψία (μοντέλα + routes)· ΠΡΙΝ το create_all
-import surveys         # v12.23 — Module Ερωτηματολόγια (μοντέλα + routes)· ΠΡΙΝ το create_all
-import imports         # v12.29 — Κέντρο Εισαγωγής Δεδομένων (μοντέλο ImportUpload + routes)· ΠΡΙΝ το create_all
-import backup          # v12.31 — Module Αντιγράφων Ασφαλείας (BackupLog + routes)· ΠΡΙΝ το create_all
-import schedule        # v12.40 — Module Πρόγραμμα Εργασίας (μοντέλα + routes)· ΠΡΙΝ το create_all
-import extras          # v12.43 — per-role μενού + Feedback· ΠΡΙΝ το create_all
-import payroll         # v12.47 — Module Μισθοδοσία Φ1 (μοντέλα + routes)· ΠΡΙΝ το create_all
-import people          # v12.71 — People core (ProfileEvent/AttentionFlag/attention)· ΠΡΙΝ το create_all
-import diag            # v12.74 — Διαγνωστικά/Logs + SQL console + Search· ΠΡΙΝ το create_all
-import menu            # v12.80 — Διαμόρφωση μενού (menu customizer)· ΠΡΙΝ το create_all
+# v12.81 — Ανθεκτική φόρτωση plug-ins: ένα ξεχασμένο/σπασμένο module ΔΕΝ ρίχνει όλη την εφαρμογή.
+def _try_import(_n):
+    try:
+        return __import__(_n)   # ΠΡΙΝ το create_all (μοντέλα + routes)
+    except Exception as _e:
+        import traceback as _tb; _tb.print_exc()
+        print('[plugin] ΠΡΟΣΟΧΗ: το module "%s" δεν φορτώθηκε — συνεχίζω χωρίς αυτό: %s' % (_n, _e))
+        return None
+faults   = _try_import('faults')
+surveys  = _try_import('surveys')
+imports  = _try_import('imports')
+backup   = _try_import('backup')
+schedule = _try_import('schedule')
+extras   = _try_import('extras')
+payroll  = _try_import('payroll')
+people   = _try_import('people')
+diag     = _try_import('diag')
+menu     = _try_import('menu')
 init_db()
-backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
+if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 seed_team()
-faults.seed_faults()   # seed κατηγορίες/ειδικότητες/SLA (idempotent)
-surveys.seed_surveys() # seed δείγμα ερωτηματολογίου (idempotent)
-schedule.ensure_schedule_columns()  # v12.40
-schedule.seed_schedule()            # v12.40 (idempotent)
-payroll.ensure_payroll_columns()    # v12.47 — Hotel.company_id
-payroll.seed_payroll()              # v12.47 (idempotent)
+if faults:   faults.seed_faults()
+if surveys:  surveys.seed_surveys()
+if schedule: schedule.ensure_schedule_columns()
+if schedule: schedule.seed_schedule()
+if payroll:  payroll.ensure_payroll_columns()
+if payroll:  payroll.seed_payroll()
 start_scheduler()
-backup.start_backup_scheduler()  # v12.31 — ημερήσιο backup -> SharePoint (αν BACKUP_ENABLED)
-payroll.start_master_sync_scheduler()  # v12.60 — νυχτερινό sync master file (αν SP_MASTER_FILE)
+if backup:   backup.start_backup_scheduler()
+if payroll:  payroll.start_master_sync_scheduler()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

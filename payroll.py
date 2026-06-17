@@ -2093,4 +2093,90 @@ def payroll_grid():
                            ids=','.join(str(r['user'].id) for r in rows), is_admin=is_admin())
 
 
-print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups + v12.79 grid)')
+
+# ── v12.80 — Export 2 μητρώων ΑΠΟ ΤΗ ΒΑΣΗ (καθρέφτης live) ────────────────────
+def _xlsx_response(wb, fname):
+    from flask import send_file
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    return send_file(bio, as_attachment=True, download_name=fname,
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/dashboard/payroll/export/logistirio')
+def export_logistirio():
+    if not _padmin(): return redirect(url_for('login'))
+    if openpyxl is None: return 'openpyxl μη διαθέσιμο', 500
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    wb = openpyxl.Workbook()
+    HF = PatternFill('solid', fgColor='1F4E5F'); HFONT = Font(bold=True, color='FFFFFF', size=10)
+    # Σύνοψη
+    s = wb.active; s.title = 'ΛΟΓΙΣΤΗΡΙΟ (σύνοψη)'
+    cols = ['Κωδ.Εργ', 'ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Πατρώνυμο', 'Α.Μ.ΙΚΑ', 'Ξενοδοχείο', 'Τράπεζα', 'IBAN', 'Κατάσταση', 'Καθ.2023', 'Καθ.2024', 'Καθ.2025', 'Καθ.2026', 'Σύν.Καθαρών', 'Μήνες', 'Μ.Ο./μήνα']
+    s.append(cols)
+    net = _legal_net_map()
+    for u in User.query.all():
+        pii = EmployeePII.query.filter_by(user_id=u.id).first()
+        if not pii: continue
+        h = Hotel.query.get(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
+        nm = net.get(str(pii.afm), {}) if pii.afm else {}
+        regs = {y: nm.get(y, {}).get('reg', 0) for y in (2023, 2024, 2025, 2026)}
+        tot = sum(v.get('reg', 0) for v in nm.values()); mon = sum(v.get('months', 0) for v in nm.values())
+        s.append([pii.emp_code, pii.afm, pii.last_name, pii.first_name, pii.father_name, pii.ika_am,
+                  (h.name if h else ''), pii.bank_name, pii.bank_iban,
+                  ('Ενεργός' if u.employment_active is not False else 'Ανενεργός'),
+                  round(regs[2023], 2) or '', round(regs[2024], 2) or '', round(regs[2025], 2) or '', round(regs[2026], 2) or '',
+                  round(tot, 2) or '', mon or '', (round(tot / mon, 2) if mon else '')])
+    # Μισθοδοσία ανά μήνα
+    s2 = wb.create_sheet('Μισθοδοσία ανά μήνα')
+    s2.append(['ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Έτος', 'Μήνας', 'Είδος', 'Καθαρά', 'Εταιρεία'])
+    for li in LegalNetImport.query.order_by(LegalNetImport.afm, LegalNetImport.year, LegalNetImport.month).all():
+        u = User.query.get(li.user_id) if li.user_id else None
+        pii = EmployeePII.query.filter_by(user_id=li.user_id).first() if li.user_id else None
+        s2.append([li.afm, (pii.last_name if pii else (li.emp_name or '')), (pii.first_name if pii else ''),
+                   li.year, li.month, li.period_kind, li.net_legal, ''])
+    for ws in (s, s2):
+        for c in range(1, ws.max_column + 1):
+            ws.cell(1, c).fill = HF; ws.cell(1, c).font = HFONT
+        ws.freeze_panes = 'A2'
+    log_activity('export_logistirio', '%d' % (s.max_row - 1))
+    return _xlsx_response(wb, 'ΜΗΤΡΩΟ ΜΙΣΘΟΔΟΣΙΑΣ ΛΟΓΙΣΤΗΡΙΟΥ (live).xlsx')
+
+@app.route('/dashboard/payroll/export/management')
+def export_management():
+    if not _padmin(): return redirect(url_for('login'))
+    if openpyxl is None: return 'openpyxl μη διαθέσιμο', 500
+    from openpyxl.styles import Font, PatternFill
+    wb = openpyxl.Workbook()
+    HF = PatternFill('solid', fgColor='1F4E5F'); HFONT = Font(bold=True, color='FFFFFF', size=10)
+    # Σύνοψη ανά άτομο
+    s = wb.active; s.title = 'Εργαζόμενοι (σύνοψη)'
+    s.append(['Κωδ.Εργ', 'ΑΦΜ', 'Επώνυμο', 'Όνομα', 'Κατάσταση', 'Πλήθος αναθέσεων', 'Μονάδες', 'Τρέχον Τμήμα', 'Τρέχουσα Θέση', 'Συμφωνία €', 'Τηλέφωνο', 'Email'])
+    # Αναθέσεις (αναλυτικά)
+    s2 = wb.create_sheet('Αναθέσεις (αναλυτικά)')
+    s2.append(['ΑΦΜ', 'Κωδ.Εργ', 'Επώνυμο', 'Όνομα', 'Μονάδα', 'Τμήμα', 'Θέση', 'Συμφωνία €', 'Ημέρες/μήνα', 'Ώρες/μέρα', 'Ημ. Πρόσληψης', 'Ημ. Αποχώρησης', 'Διαμονή', 'Τηλέφωνο', 'Email'])
+    for u in User.query.all():
+        asg = MgmtAssignment.query.filter_by(user_id=u.id).all()
+        if not asg: continue
+        pii = EmployeePII.query.filter_by(user_id=u.id).first()
+        cur = current_assignment(u.id)
+        s.append([(pii.emp_code if pii else ''), (pii.afm if pii else ''),
+                  (pii.last_name if pii else u.full_name), (pii.first_name if pii else ''),
+                  ('Ενεργός' if u.employment_active is not False else 'Ανενεργός'),
+                  len(asg), ' / '.join(sorted({a.unit or '' for a in asg})),
+                  (cur.department if cur else ''), (cur.position if cur else ''),
+                  (cur.agreement_amount if cur else ''), u.phone, u.email])
+        for a in asg:
+            s2.append([(pii.afm if pii else ''), (pii.emp_code if pii else ''),
+                       (pii.last_name if pii else u.full_name), (pii.first_name if pii else ''),
+                       a.unit, a.department, a.position, a.agreement_amount, a.days_per_month, a.hours_per_day,
+                       (a.valid_from.isoformat() if a.valid_from else ''), (a.valid_to.isoformat() if a.valid_to else ''),
+                       a.accommodation, a.phone, a.email])
+    for ws in (s, s2):
+        for c in range(1, ws.max_column + 1):
+            ws.cell(1, c).fill = HF; ws.cell(1, c).font = HFONT
+        ws.freeze_panes = 'A2'
+    log_activity('export_management', '%d' % (s.max_row - 1))
+    return _xlsx_response(wb, 'ΜΗΤΡΩΟ ΜΙΣΘΟΔΟΣΙΑΣ MANAGEMENT (live).xlsx')
+
+
+print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups + v12.79 grid + v12.80 export)')
