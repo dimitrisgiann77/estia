@@ -1890,7 +1890,7 @@ def scan_completeness():
     AF = PPL.AttentionFlag
     SCAN_TYPES = {'no_afm','no_code','missing_amka','missing_ika','missing_father',
                   'missing_iban','missing_bank','missing_hire','missing_specialty',
-                  'missing_phone','missing_email','missing_cc','missing_assignment','missing_agreement'}
+                  'missing_phone','missing_email','missing_cc','missing_assignment','missing_agreement','missing_position'}
     by = defaultdict(dict)
     for f in AF.query.filter_by(entity_type='employee', resolved=False).all():
         by[f.entity_id][f.flag_type] = f
@@ -1922,6 +1922,9 @@ def scan_completeness():
         if not (has(getattr(u,'email',None)) or (ma and has(ma.email))): miss.add('missing_email')
         if not (pii and has(pii.cost_center)): miss.add('missing_cc')
         if ma is None: miss.add('missing_assignment')
+        else:
+            _allpos = [a.position for a in MgmtAssignment.query.filter_by(user_id=uid).all()]
+            if not any((x or '').strip() for x in _allpos): miss.add('missing_position')
         if not ((ma and ma.agreement_amount) or (prof and prof.agreement_amount)): miss.add('missing_agreement')
         existing = {t for t in by.get(uid, {}) if t in SCAN_TYPES}
         for t in (miss - existing):
