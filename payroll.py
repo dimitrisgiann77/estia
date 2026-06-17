@@ -235,10 +235,36 @@ def _company_for_hotel(hotel_id):
         return Company.query.get(h.company_id)
     return None
 
-def _employees():
-    users = (User.query
-             .filter((User.employment_active == True) | (User.employment_active.is_(None)))
-             .all())
+def _years_available():
+    yrs = [r[0] for r in db.session.query(LegalNetImport.year).distinct().all() if r[0]]
+    return sorted(set(int(y) for y in yrs))
+
+def _legal_net_map():
+    """{afm: {year: {'reg','tot','months','extra'}}} από LegalNetImport (Epsilon).
+    reg = τακτικοί μήνες (period_kind=='monthly')· tot = + δώρα/άδεια· extra = δώρα/άδεια."""
+    out = {}
+    for li in LegalNetImport.query.all():
+        if not li.afm or not li.year:
+            continue
+        d = out.setdefault(str(li.afm), {}).setdefault(int(li.year),
+                {'reg': 0.0, 'tot': 0.0, 'months': 0, 'extra': 0.0})
+        net = li.net_legal or 0.0
+        d['tot'] += net
+        if (li.period_kind or 'monthly') == 'monthly':
+            d['reg'] += net; d['months'] += 1
+        else:
+            d['extra'] += net
+    return out
+
+def _employees(status='active'):
+    q = User.query
+    if status == 'inactive':
+        q = q.filter(User.employment_active == False)
+    elif status == 'all':
+        pass
+    else:
+        q = q.filter((User.employment_active == True) | (User.employment_active.is_(None)))
+    users = q.all()
     out = []
     for u in users:
         prof = EmploymentProfile.query.filter_by(user_id=u.id).first() if EmploymentProfile else None
@@ -263,17 +289,31 @@ def _employees():
 def payroll_home():
     if not _padmin():
         return redirect(url_for('login'))
-    allrows = _employees()
+    status = request.args.get('status') or 'active'
+    if status not in ('active', 'inactive', 'all'):
+        status = 'active'
+    allrows = _employees(status)
     companies = Company.query.filter_by(active=True).order_by(Company.legal_name).all()
-    # KPIs στο ΠΛΗΡΕΣ σύνολο
+    # πλήθη ανά κατάσταση (για τα κουμπιά)
+    n_active = len(_employees('active')); n_inactive = len(_employees('inactive'))
+    n_all = n_active + n_inactive
+    # KPIs στο σύνολο της τρέχουσας κατάστασης
     n_emp = len(allrows)
     n_agree = sum(1 for r in allrows if r['profile'] and r['profile'].agreement_amount)
     n_pii = sum(1 for r in allrows if r['pii'] and r['pii'].afm)
-    # Χωρίς κλειδί: λείπει ΑΦΜ Ή Κωδ. Εργαζομένου (#1 — να φαίνονται για διόρθωση)
+    # Χωρίς κλειδί: λείπει ΑΦΜ Ή Κωδ. Εργαζομένου (να φαίνονται για διόρθωση)
     def _nokey(r):
         pii = r['pii']
         return (not (pii and pii.afm)) or (not (pii and pii.emp_code))
     n_nokey = sum(1 for r in allrows if _nokey(r))
+    # έτος + ποσά (από Epsilon/LegalNetImport)
+    net_map = _legal_net_map()
+    years = _years_available()
+    year = request.args.get('year', type=int)
+    if year is None:
+        year = (years[-1] if years else 0)
+    if year != 0 and year not in years:
+        year = (years[-1] if years else 0)
     # φίλτρα
     company_id = request.args.get('company_id', type=int)
     hotel_id = request.args.get('hotel_id', type=int)
@@ -288,13 +328,26 @@ def payroll_home():
     elif flt == 'pii':   rows = [r for r in rows if r['pii'] and r['pii'].afm]
     elif flt == 'nopii': rows = [r for r in rows if not (r['pii'] and r['pii'].afm)]
     elif flt == 'nokey':  rows = [r for r in rows if _nokey(r)]
+    # ποσά ανά γραμμή για το επιλεγμένο έτος (0 = όλα τα έτη)
+    for r in rows:
+        afm = r['pii'].afm if (r['pii'] and r['pii'].afm) else None
+        info = net_map.get(str(afm), {}) if afm else {}
+        if year == 0:
+            reg = sum(v['reg'] for v in info.values()); tot = sum(v['tot'] for v in info.values())
+            mon = sum(v['months'] for v in info.values())
+        else:
+            d = info.get(year)
+            reg = d['reg'] if d else 0.0; tot = d['tot'] if d else 0.0; mon = d['months'] if d else 0
+        r['net_reg'] = reg; r['net_tot'] = tot; r['net_months'] = mon
     hotels = Hotel.query.order_by(Hotel.name).all()
     rates = PayrollRates.query.filter_by(year=2026).first()
     log_activity('payroll_view', 'μητρώο')
     return render_template('payroll_home.html',
         rows=rows, companies=companies, hotels=hotels, n_emp=n_emp, n_agree=n_agree, n_pii=n_pii,
         company_id=company_id, hotel_id=hotel_id, cc=cc, cost_centers=COST_CENTERS,
-        flt=flt, total_shown=len(rows), n_nokey=n_nokey, rates=rates, is_admin=is_admin())
+        flt=flt, total_shown=len(rows), n_nokey=n_nokey, rates=rates, is_admin=is_admin(),
+        status=status, n_active=n_active, n_inactive=n_inactive, n_all=n_all,
+        years=years, year=year)
 
 
 @app.route('/dashboard/payroll/companies', methods=['GET', 'POST'])
@@ -392,8 +445,21 @@ def payroll_employee(uid):
     hotel = Hotel.query.get(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
     agreements = (Agreement.query.filter_by(user_id=uid)
                   .order_by(Agreement.effective_from.desc()).all())
+    # Οικονομικά (Λογιστήριο = Epsilon): καθαρά ανά έτος, τακτικά vs δώρα/άδεια
+    fin = []
+    afm = pii.afm if (pii and pii.afm) else None
+    if afm:
+        nm = _legal_net_map().get(str(afm), {})
+        for y in sorted(nm.keys()):
+            d = nm[y]
+            avg = (d['reg'] / d['months']) if d['months'] else 0.0
+            fin.append({'year': y, 'months': d['months'], 'reg': d['reg'],
+                        'extra': d['extra'], 'tot': d['tot'], 'avg': avg})
+    fin_tot = {'reg': sum(f['reg'] for f in fin), 'extra': sum(f['extra'] for f in fin),
+               'tot': sum(f['tot'] for f in fin), 'months': sum(f['months'] for f in fin)}
     return render_template('payroll_employee.html',
-        u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, is_admin=is_admin())
+        u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements,
+        fin=fin, fin_tot=fin_tot, is_admin=is_admin())
 
 
 # ══════════════════════════════════════════════════════════════════════════════

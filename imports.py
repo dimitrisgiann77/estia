@@ -384,9 +384,16 @@ def imports_hub():
         surv_imported = S.SurveyResponse.query.filter_by(source='import').count()
     except Exception:
         surv_imported = 0
+    try:
+        import payroll as PR
+        pr_emp = PR.EmployeePII.query.count()
+        pr_net = PR.LegalNetImport.query.count()
+    except Exception:
+        pr_emp = pr_net = 0
     recent = ImportUpload.query.order_by(ImportUpload.id.desc()).limit(8).all()
     return render_template('imports_hub.html', ht_avail=ht_avail, ht_done=ht_done,
-                           upl_done=upl_done, surv_imported=surv_imported, recent=recent)
+                           upl_done=upl_done, surv_imported=surv_imported, recent=recent,
+                           pr_emp=pr_emp, pr_net=pr_net)
 
 
 @app.route('/dashboard/imports/upload', methods=['POST'])

@@ -10,6 +10,10 @@
  .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:6px 11px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:13px;}
  .muted{color:#94a3b8;} .grp{margin:18px 0 6px;font-weight:700;color:var(--accent,#185FA5);}
  .note{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:12px;color:#475569;margin-top:12px;}
+ .seg{padding:7px 14px;border:1px solid #dbe3ea;background:#fff;color:#475569;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;}
+ .seg.on{background:var(--accent,#185FA5);color:#fff;border-color:var(--accent,#185FA5);}
+ .segwrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 2px;}
+ .num{text-align:right;white-space:nowrap;} .ctr{text-align:center;}
 </style></head><body>
 {{ mp.topbar('cash', 'ΕΣΤΙΑ — Μισθοδοσία · Μητρώο') }}
 <div class="container">
@@ -25,6 +29,17 @@
 
   <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0;">
     <input type="hidden" name="embed" value="1">
+    <div class="segwrap" style="width:100%;">
+      <button class="seg {{ 'on' if status=='active' }}" name="status" value="active" type="submit">Ενεργοί ({{ n_active }})</button>
+      <button class="seg {{ 'on' if status=='inactive' }}" name="status" value="inactive" type="submit">Ανενεργοί ({{ n_inactive }})</button>
+      <button class="seg {{ 'on' if status=='all' }}" name="status" value="all" type="submit">Όλοι ({{ n_all }})</button>
+      <span style="margin-left:12px;font-size:13px;color:#475569;">Έτος εικόνας:</span>
+      <select name="year" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if year==y }}>{{ y }}</option>{% endfor %}
+        <option value="0" {{ 'selected' if year==0 }}>Όλα τα έτη</option>
+      </select>
+    </div>
+    {% if status!='active' %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
     <b style="font-size:13px;">Φίλτρα:</b>
     <select name="company_id" onchange="this.form.submit()" style="padding:6px 8px;border:1px solid #dbe3ea;border-radius:8px;">
       <option value="">— εταιρεία —</option>{% for c in companies %}<option value="{{ c.id }}" {{ 'selected' if company_id==c.id }}>{{ c.legal_name }}</option>{% endfor %}
@@ -51,11 +66,11 @@
     <h3>Μητρώο εργαζομένων ανά εταιρεία</h3>
     {% set ns = namespace(cur='') %}
     <table>
-      <tr><th>Επώνυμο</th><th>Όνομα</th><th>Τμήμα</th><th>Ξενοδοχείο (νομικό)</th><th>Μονάδα</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
+      <tr><th>Επώνυμο</th><th>Όνομα</th><th>Τμήμα</th><th>Ξενοδοχείο (νομικό)</th><th>Μονάδα</th><th class="num">Καθ. {% if year==0 %}(όλα){% else %}{{ year or '—' }}{% endif %}</th><th class="num">Σύνολο (+δώρα/άδεια)</th><th class="ctr">Μήνες</th><th>Συμφωνία</th><th>PII</th><th></th></tr>
       {% for r in rows %}
         {% set cname = r.company.legal_name if r.company else 'Χωρίς εταιρεία' %}
         {% if cname != ns.cur %}
-          <tr><td colspan="8" class="grp">{{ cname }}</td></tr>
+          <tr><td colspan="11" class="grp">{{ cname }}</td></tr>
           {% set ns.cur = cname %}
         {% endif %}
         <tr>
@@ -64,12 +79,15 @@
           <td>{{ r.profile.position if r.profile and r.profile.position else (r.pii.ergani_specialty if r.pii else '') }}</td>
           <td class="muted">{{ r.hotel_name }}</td>
           <td>{% if r.cost_center %}<span class="pill" style="background:#e0e7ff;color:#3730a3;">{{ r.cost_center }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="num">{% if r.net_reg %}{{ '%.0f'|format(r.net_reg) }}€{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="num">{% if r.net_tot %}<b>{{ '%.0f'|format(r.net_tot) }}€</b>{% if r.net_tot>r.net_reg %} <span class="pill" style="background:#fef3c7;color:#92400e;" title="δώρα/άδεια">+{{ '%.0f'|format(r.net_tot-r.net_reg) }}</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td class="ctr muted">{{ r.net_months or '' }}</td>
           <td>{% if r.profile and r.profile.agreement_amount %}<b>{{ '%.0f'|format(r.profile.agreement_amount) }}€</b> <span class="muted">{{ r.profile.agreement_type }}</span>{% else %}<span class="pill no">—</span>{% endif %}</td>
           <td>{% if r.pii and r.pii.afm %}<span class="pill ok">✓{% if r.pii.locked %} 🔒{% endif %}</span>{% else %}<span class="pill no">⚠ ΑΦΜ</span>{% endif %}{% if not (r.pii and r.pii.emp_code) %} <span class="pill no">⚠ Κωδ.</span>{% endif %}</td>
           <td><a class="b" href="/dashboard/payroll/employee/{{ r.user.id }}?embed=1">Καρτέλα</a></td>
         </tr>
       {% else %}
-        <tr><td colspan="8" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
+        <tr><td colspan="11" class="muted">Κανένας εργαζόμενος στο μητρώο ακόμη. Εισαγωγή από «Πρόγραμμα · Εισαγωγή».</td></tr>
       {% endfor %}
     </table>
     <div class="note">
