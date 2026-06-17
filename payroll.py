@@ -2027,4 +2027,70 @@ def payroll_dup_dismiss():
     back = request.form.get('back') or url_for('payroll_duplicates')
     return redirect(back + ('?embed=1' if '?' not in back else '&embed=1'))
 
-print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups)')
+
+# ── v12.79 — Διαγραφή ανάθεσης + Μαζική επεξεργασία (grid) ────────────────────
+@app.route('/dashboard/payroll/assignment/<int:aid>/delete', methods=['POST'])
+def payroll_assignment_delete(aid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    import people as PPL
+    a = MgmtAssignment.query.get_or_404(aid)
+    uid = a.user_id
+    PPL.log_event(uid, 'assignment', 'Διαγραφή ανάθεσης: %s / %s' % (a.unit, a.department))
+    db.session.delete(a); db.session.commit()
+    log_activity('payroll_assignment_delete', '%s' % aid)
+    return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
+
+
+@app.route('/dashboard/payroll/grid', methods=['GET', 'POST'])
+def payroll_grid():
+    if not _padmin():
+        return redirect(url_for('login'))
+    import people as PPL
+    if request.method == 'POST':
+        ids = [int(x) for x in (request.form.get('ids') or '').split(',') if x.strip().isdigit()]
+        changed = 0
+        def g(name, uid):
+            v = request.form.get('%s_%d' % (name, uid))
+            return v.strip() if v is not None else None
+        for uid in ids:
+            u = User.query.get(uid)
+            if not u: continue
+            pii = EmployeePII.query.filter_by(user_id=uid).first()
+            a = current_assignment(uid)
+            ch = False
+            ph = g('f_phone', uid); em = g('f_email', uid); cc = g('f_cc', uid)
+            act = g('f_active', uid)
+            if ph is not None and (u.phone or '') != ph: u.phone = ph or None; ch = True
+            if em is not None and (u.email or '') != em: u.email = em or None; ch = True
+            if cc is not None and pii and (pii.cost_center or '') != cc: pii.cost_center = cc or None; ch = True
+            if act in ('1', '0'):
+                want = (act == '1')
+                if u.employment_active != want: u.employment_active = want; ch = True
+            if a:
+                un = g('f_unit', uid); dp = g('f_dept', uid); ps = g('f_pos', uid); ag = g('f_agr', uid)
+                if un is not None and (a.unit or '') != un: a.unit = un or None; ch = True
+                if dp is not None and (a.department or '') != dp: a.department = dp or None; ch = True
+                if ps is not None and (a.position or '') != ps: a.position = ps or None; ch = True
+                if ag is not None:
+                    try: agv = float(ag) if ag != '' else None
+                    except Exception: agv = a.agreement_amount
+                    if a.agreement_amount != agv: a.agreement_amount = agv; ch = True
+            if ch:
+                changed += 1
+                PPL.log_event(uid, 'edit', 'Μαζική επεξεργασία (grid)')
+        db.session.commit()
+        log_activity('payroll_grid_save', '%d αλλαγές' % changed)
+        return redirect(url_for('payroll_grid') + '?embed=1&status=%s&saved=%d' % (request.form.get('status') or 'active', changed))
+    status = request.args.get('status') or 'active'
+    if status not in ('active', 'inactive', 'all'): status = 'active'
+    rows = _employees(status)
+    saved = request.args.get('saved', type=int)
+    n_active = len(_employees('active')); n_inactive = len(_employees('inactive'))
+    log_activity('payroll_grid_view', status)
+    return render_template('payroll_grid.html', rows=rows, status=status, saved=saved,
+                           n_active=n_active, n_inactive=n_inactive, n_all=n_active + n_inactive,
+                           ids=','.join(str(r['user'].id) for r in rows), is_admin=is_admin())
+
+
+print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups + v12.79 grid)')

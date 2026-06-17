@@ -99,6 +99,9 @@
               <div class="row"><label>Συμφωνία €</label><input name="agreement_amount" value="{{ a.agreement_amount or '' }}"></div>
               <button class="b" type="submit">Αποθήκευση</button>
             </form>
+            <form method="POST" action="/dashboard/payroll/assignment/{{ a.id }}/delete?embed=1" onsubmit="return confirm('Διαγραφή αυτής της ανάθεσης;');" style="margin-top:6px;">
+              <button type="submit" style="background:#fee2e2;color:#b91c1c;border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12px;">🗑 Διαγραφή ανάθεσης</button>
+            </form>
           </details>
         </td>
       </tr>
