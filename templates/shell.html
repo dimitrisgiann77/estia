@@ -273,6 +273,12 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
   <div class="body">
     <div class="scrim" onclick="document.getElementById('app').classList.remove('open')"></div>
     <nav class="side" id="side">
+      {% if menu_custom %}
+      {% for g in menu_groups %}
+      <div class="grp" data-ws="operations admin">{{ g['title'] }}</div>
+      {% for it in g['items'] %}<div class="item" data-ws="operations admin" data-url="{{ it.url }}?embed=1"><i class="ti {{ it.icon }}"></i> {{ it.label }}</div>{% endfor %}
+      {% endfor %}
+      {% else %}
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Dashboard</div>{% endif %}
 
       {% if menu_show('pools') or menu_show('water') %}
@@ -326,6 +332,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       <details class="adm" data-ws="admin"><summary><i class="ti ti-users"></i> Χρήστες & Πρόσβαση</summary>
         <div class="item" data-ws="admin" data-url="/dashboard/users?embed=1"><i class="ti ti-users"></i> Χρήστες</div>
         <div class="item" data-ws="admin" data-url="/dashboard/menu-roles?embed=1"><i class="ti ti-adjustments-cog"></i> Μενού ανά ρόλο</div>
+        <div class="item" data-ws="admin" data-url="/dashboard/menu-builder?embed=1"><i class="ti ti-layout-grid"></i> Διαμόρφωση μενού</div>
         <div class="item" data-ws="admin" data-url="/dashboard/activity?embed=1"><i class="ti ti-history"></i> Καταγραφή χρηστών</div>
         <div class="item" data-ws="admin" data-url="/dashboard/feedback?embed=1"><i class="ti ti-messages"></i> Feedback χρηστών</div>
       </details>
@@ -359,6 +366,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
         <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>
         {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/ai?embed=1"><i class="ti ti-plug"></i> AI σύνδεση</div>{% endif %}
       </details>
+      {% endif %}
       {% endif %}
     </nav>
     <div class="content"><iframe id="frame" name="frame"></iframe></div>

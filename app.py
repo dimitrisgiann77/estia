@@ -328,11 +328,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.79'
-APP_BUILD   = '359'
+APP_VERSION = '12.80'
+APP_BUILD   = '360'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.80', 'b': '360', 'date': '17/06/2026', 'time': '20:00', 'title': 'Export μητρώων από τη βάση + Διαμόρφωση μενού (self-service)',
+     'items': ['Εξαγωγή σε Excel ΑΠΟ ΤΗ ΖΩΝΤΑΝΗ ΒΑΣΗ για κάθε μητρώο (Λογιστηρίου & Management) — τα 2 master γίνονται πάντα καθρέφτης της βάσης.',
+               'Νέα «Διαμόρφωση μενού» (admin, drag & drop): ομάδες/σειρά/μετονομασία/απόκρυψη του αριστερού μενού, αποθήκευση στη βάση. Ενεργό μόνο όταν αποθηκευτεί (αλλιώς προεπιλεγμένο)· ισχύει για admin.']},
     {'v': '12.79', 'b': '359', 'date': '17/06/2026', 'time': '19:00', 'title': 'Μαζική επεξεργασία προσωπικού (grid) + διαγραφή ανάθεσης',
      'items': ['Νέα «Μαζική επεξεργασία προσωπικού» (HR): συγκεντρωτικός πίνακας όλου του προσωπικού με inline edit (μονάδα/τμήμα/θέση/συμφωνία/τηλ/email/κέντρο κόστους/κατάσταση) και αποθήκευση όλων μαζί — γρήγορες διορθώσεις live πάνω στη βάση.',
                'Κουμπί «Διαγραφή ανάθεσης» στην καρτέλα εργαζομένου (ολοκλήρωση live editing αναθέσεων).']},
@@ -3412,6 +3415,7 @@ import extras          # v12.43 — per-role μενού + Feedback· ΠΡΙΝ τ
 import payroll         # v12.47 — Module Μισθοδοσία Φ1 (μοντέλα + routes)· ΠΡΙΝ το create_all
 import people          # v12.71 — People core (ProfileEvent/AttentionFlag/attention)· ΠΡΙΝ το create_all
 import diag            # v12.74 — Διαγνωστικά/Logs + SQL console + Search· ΠΡΙΝ το create_all
+import menu            # v12.80 — Διαμόρφωση μενού (menu customizer)· ΠΡΙΝ το create_all
 init_db()
 backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
 seed_team()

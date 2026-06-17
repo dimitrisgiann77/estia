@@ -1,0 +1,77 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Διαμόρφωση μενού', theme.primary) }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;}
+ .gh2{background:#eef5f8;color:#185FA5;border:none;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:13px;}
+ .group{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:12px;}
+ .ghead{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+ .ghandle{cursor:grab;color:#94a3b8;}
+ .gtitle{font-weight:700;color:#185FA5;border:1px dashed transparent;border-radius:6px;padding:3px 6px;font-size:14px;flex:1;}
+ .gtitle:focus{border-color:#cbd5e1;outline:none;background:#f8fafc;}
+ .items{min-height:36px;display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
+ .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:grab;color:#334155;}
+ .chip i{color:#64748b;}
+ .pool .items{background:#fff7ed;}
+ .muted{color:#94a3b8;font-size:12px;} .ok{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;}
+ .xg{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;}
+</style></head><body>
+{{ mp.topbar('layout-grid', 'ΕΣΤΙΑ — Διαμόρφωση μενού') }}
+<div class="container">
+  {% if saved %}<div class="ok">✓ Αποθηκεύτηκε. Το αριστερό μενού ενημερώθηκε (κάνε refresh).</div>{% endif %}
+  <p class="muted">Σύρε τα στοιχεία μέσα/μεταξύ ομάδων, άλλαξε σειρά, μετονόμασε τίτλους (κλικ πάνω τους). Ό,τι μένει στα «Κρυμμένα» δεν εμφανίζεται. Ισχύει για admin· οι υπόλοιποι κρατούν το προεπιλεγμένο.</p>
+  <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
+    <button class="b" onclick="save()">💾 Αποθήκευση</button>
+    <button class="gh2" onclick="addGroup()">+ Νέα ομάδα</button>
+    <form method="POST" action="/dashboard/menu-builder/reset?embed=1" style="display:inline;" onsubmit="return confirm('Επαναφορά στο προεπιλεγμένο μενού;');"><button class="gh2" type="submit">↺ Επαναφορά προεπιλογής</button></form>
+  </div>
+
+  <div id="groups">
+    {% for g in layout %}
+    <div class="group">
+      <div class="ghead"><span class="ghandle">⠿</span><span class="gtitle" contenteditable="true">{{ g.title }}</span><button class="xg" onclick="delGroup(this)" title="Διάλυση ομάδας">✕</button></div>
+      <div class="items">
+        {% for iid in g['items'] %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}</div>{% endif %}{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="group pool">
+    <div class="ghead"><span style="font-weight:700;color:#b45309;">Κρυμμένα / Διαθέσιμα (δεν εμφανίζονται)</span></div>
+    <div class="items" id="pool">
+      {% for iid in unused %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}</div>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <form method="POST" action="/dashboard/menu-builder?embed=1" id="f"><input type="hidden" name="layout" id="layout"></form>
+</div>
+<script>
+function initSort(el){ new Sortable(el,{group:'mitems',animation:120,ghostClass:'muted'}); }
+function initAll(){
+  document.querySelectorAll('.items').forEach(initSort);
+  new Sortable(document.getElementById('groups'),{handle:'.ghandle',animation:120});
+}
+function addGroup(){
+  var d=document.createElement('div'); d.className='group';
+  d.innerHTML='<div class="ghead"><span class="ghandle">⠿</span><span class="gtitle" contenteditable="true">Νέα ομάδα</span><button class="xg" onclick="delGroup(this)">✕</button></div><div class="items"></div>';
+  document.getElementById('groups').appendChild(d); initSort(d.querySelector('.items'));
+}
+function delGroup(btn){
+  var g=btn.closest('.group'), pool=document.getElementById('pool');
+  g.querySelectorAll('.chip').forEach(function(c){pool.appendChild(c);});
+  g.remove();
+}
+function save(){
+  var out=[];
+  document.querySelectorAll('#groups .group').forEach(function(g){
+    var t=g.querySelector('.gtitle').innerText.trim();
+    var ids=[].map.call(g.querySelectorAll('.items .chip'),function(c){return c.dataset.id;});
+    if(t && ids.length) out.push({title:t,items:ids});
+  });
+  document.getElementById('layout').value=JSON.stringify(out);
+  document.getElementById('f').submit();
+}
+document.addEventListener('DOMContentLoaded',initAll);
+</script>
+</body></html>
