@@ -315,6 +315,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       {% endif %}
 
       <div class="grp" data-ws="operations admin">Ενημέρωση</div>
+      <div class="item" data-ws="operations admin" data-url="/dashboard/search?embed=1"><i class="ti ti-search"></i> Αναζήτηση</div>
       <div class="item" data-ws="operations admin" data-url="/dashboard/roadmap?embed=1"><i class="ti ti-map-2"></i> Roadmap</div>
       <div class="item" data-ws="operations admin" data-url="/dashboard/help?embed=1"><i class="ti ti-help-circle"></i> Βοήθεια (FAQ)</div>
       {% if menu_show('whatsnew') %}<div class="item" data-ws="operations admin" data-url="/dashboard/whatsnew?embed=1"><i class="ti ti-sparkles"></i> Τι νέο</div>{% endif %}
@@ -350,6 +351,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       </details>
       <details class="adm" data-ws="admin"><summary><i class="ti ti-database-cog"></i> Δεδομένα & Σύστημα</summary>
         <div class="item" data-ws="admin" data-url="/dashboard/imports?embed=1"><i class="ti ti-database-import"></i> Κέντρο Εισαγωγής</div>
+        {% if is_master %}<div class="item" data-ws="admin" data-url="/dashboard/diag?embed=1"><i class="ti ti-stethoscope"></i> Διαγνωστικά</div>{% endif %}
         <div class="item" data-ws="admin" data-url="/dashboard/backup?embed=1"><i class="ti ti-database-export"></i> Αντίγραφα ασφαλείας</div>
         <div class="item" data-ws="admin" data-url="/dashboard/email?embed=1"><i class="ti ti-mail"></i> Email</div>
         <div class="item" data-ws="admin" data-url="/dashboard/theme?embed=1"><i class="ti ti-palette"></i> Εμφάνιση</div>

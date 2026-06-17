@@ -1,0 +1,31 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Αναζήτηση', theme.primary) }}
+<style>
+ .card h3{margin:0 0 8px;font-size:14px;color:var(--accent,#185FA5);}
+ input{width:100%;padding:11px 14px;border:1px solid #dbe3ea;border-radius:10px;font-size:15px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:11px 18px;border-radius:10px;cursor:pointer;font-size:14px;}
+ .res a{display:block;padding:8px 10px;border-bottom:1px solid #eef2f6;color:#1e293b;text-decoration:none;font-size:13px;}
+ .res a:hover{background:#f8fafc;}
+ .muted{color:#94a3b8;}
+</style></head><body>
+{{ mp.topbar('search', 'ΕΣΤΙΑ — Αναζήτηση') }}
+<div class="container">
+  <form method="GET" action="/dashboard/search" style="display:flex;gap:8px;">
+    <input type="hidden" name="embed" value="1">
+    <input name="q" value="{{ q }}" placeholder="Ψάξε εργαζόμενο, ΑΦΜ, βλάβη, ξενοδοχείο, σελίδα…" autofocus>
+    <button class="b" type="submit">Αναζήτηση</button>
+  </form>
+  {% if res is not none %}
+    <p class="muted" style="margin:12px 0;">{{ total }} αποτελέσματα για «{{ q }}»</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    {% for cat, items in res.items() %}
+      {% if items %}
+      <div class="card"><h3>{{ cat }} ({{ items|length }})</h3>
+        <div class="res">{% for it in items %}<a href="{{ it.url }}">{{ it.label }}</a>{% endfor %}</div>
+      </div>
+      {% endif %}
+    {% endfor %}
+    </div>
+    {% if total==0 %}<p class="muted">Κανένα αποτέλεσμα.</p>{% endif %}
+  {% endif %}
+</div></body></html>

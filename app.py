@@ -328,11 +328,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.73'
-APP_BUILD   = '353'
+APP_VERSION = '12.74'
+APP_BUILD   = '354'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.74', 'b': '354', 'date': '17/06/2026', 'time': '15:30', 'title': 'Διαγνωστικά & Logs + SQL console + Έξυπνο Search',
+     'items': ['Νέα «Διαγνωστικά» (masteradmin): καταγραφή σφαλμάτων (log), εντολές (HEALTH/COUNTS/SCHEMA/EMP/FIND/FLAGS/ERRORS/TABLE) και read-only SQL console (μόνο SELECT) — για στοχευμένη υποστήριξη.',
+               'Νέα «Αναζήτηση» σε όλη την πλατφόρμα: εργαζόμενοι/ΑΦΜ, βλάβες, ερωτηματολόγια, ξενοδοχεία, σελίδες — με συνδέσμους.']},
     {'v': '12.73', 'b': '353', 'date': '17/06/2026', 'time': '14:00', 'title': 'Μενού: ενοποίηση σε «HR — Ανθρώπινο Δυναμικό»',
      'items': ['Η Μισθοδοσία και το «Πρόγραμμα & Προσωπικό» ενοποιήθηκαν σε μία ενότητα «HR — Ανθρώπινο Δυναμικό» (Μητρώο, Πρόγραμμα Εργασίας, Υποβολές, Εκτελέσεις, Έλεγχος, Χρειάζονται προσοχή, Εταιρείες, Συντελεστές, ρυθμίσεις προγράμματος).',
                'Οι εισαγωγές παραμένουν στο Κέντρο Εισαγωγής (με σύνδεσμο από το HR).']},
@@ -3393,6 +3396,7 @@ import schedule        # v12.40 — Module Πρόγραμμα Εργασίας (
 import extras          # v12.43 — per-role μενού + Feedback· ΠΡΙΝ το create_all
 import payroll         # v12.47 — Module Μισθοδοσία Φ1 (μοντέλα + routes)· ΠΡΙΝ το create_all
 import people          # v12.71 — People core (ProfileEvent/AttentionFlag/attention)· ΠΡΙΝ το create_all
+import diag            # v12.74 — Διαγνωστικά/Logs + SQL console + Search· ΠΡΙΝ το create_all
 init_db()
 backup.ensure_backup_columns()   # v12.33 — auto-migration στηλών backup_log + seed ρυθμίσεων
 seed_team()

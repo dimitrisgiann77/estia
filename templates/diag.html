@@ -1,0 +1,59 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Διαγνωστικά', theme.primary) }}
+<style>
+ .card h3{margin:0 0 10px;font-size:15px;}
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;}
+ input,textarea{width:100%;padding:8px 10px;border:1px solid #dbe3ea;border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;}
+ pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:8px;overflow:auto;font-size:12px;line-height:1.5;max-height:460px;}
+ table{width:100%;border-collapse:collapse;font-size:12px;} td,th{padding:5px 7px;border-bottom:1px solid #eef2f6;text-align:left;}
+ th{color:#64748b;font-size:11px;} .muted{color:#94a3b8;font-size:12px;} .kv{font-size:13px;color:#475569;}
+ .chip{display:inline-block;background:#eef5f8;color:#185FA5;border-radius:6px;padding:3px 8px;font-size:11px;margin:2px;cursor:pointer;font-family:monospace;}
+ .err{font-size:12px;color:#b91c1c;}
+</style></head><body>
+{{ mp.topbar('stethoscope', 'ΕΣΤΙΑ — Διαγνωστικά & Logs') }}
+<div class="container">
+  <div class="card">
+    <span class="kv">Έκδοση <b>v{{ info.version }}</b> (build {{ info.build }}) · DB <b>{{ info.dialect }}</b> · Πίνακες <b>{{ info.tables }}</b></span>
+  </div>
+
+  <div class="card"><h3>Εντολή διαγνωστικού</h3>
+    <form method="POST" style="display:flex;gap:8px;">
+      <input name="cmd" value="{{ cmd_val }}" placeholder="π.χ. HEALTH ή EMP 147562525 ή FIND κεπενος" autofocus>
+      <button class="b" type="submit">Εκτέλεση</button>
+    </form>
+    <div style="margin-top:8px;">
+      {% for c in ['HELP','HEALTH','COUNTS','SCHEMA','FLAGS','ERRORS'] %}<span class="chip" onclick="document.querySelector('[name=cmd]').value='{{c}}';">{{c}}</span>{% endfor %}
+      <span class="muted">+ EMP &lt;αφμ/κωδ/όνομα&gt; · FIND &lt;κείμενο&gt; · TABLE &lt;name&gt;</span>
+    </div>
+    {% if mode=='cmd' and output is not none %}<pre>{{ output }}</pre>{% endif %}
+  </div>
+
+  <div class="card"><h3>SQL console <span class="muted">(read-only — μόνο SELECT)</span></h3>
+    <form method="POST">
+      <textarea name="sql" rows="3" placeholder="SELECT * FROM employee_pii LIMIT 20">{{ sql_val }}</textarea>
+      <button class="b" type="submit" style="margin-top:8px;">Εκτέλεση SELECT</button>
+    </form>
+    {% if mode=='sql' %}
+      {% if sql_err %}<p class="err" style="margin-top:8px;">⚠ {{ sql_err }}</p>{% endif %}
+      {% if sql_cols %}
+      <div style="overflow:auto;margin-top:8px;"><table>
+        <tr>{% for c in sql_cols %}<th>{{ c }}</th>{% endfor %}</tr>
+        {% for row in sql_rows %}<tr>{% for v in row %}<td>{{ '' if v is none else v }}</td>{% endfor %}</tr>{% endfor %}
+      </table></div>
+      <p class="muted">{{ sql_rows|length }} γραμμές</p>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="card"><h3>Πρόσφατα σφάλματα (log)</h3>
+    {% if errors %}
+    <table>
+      <tr><th>Ώρα</th><th>Διαδρομή</th><th>Τύπος</th><th>Μήνυμα</th></tr>
+      {% for e in errors %}<tr>
+        <td class="muted">{{ e.created_at.strftime('%d/%m %H:%M') if e.created_at else '' }}</td>
+        <td>{{ e.method }} {{ e.path }}</td><td>{{ e.etype }}</td><td>{{ (e.message or '')[:120] }}</td>
+      </tr>{% endfor %}
+    </table>
+    {% else %}<p class="muted">Κανένα σφάλμα. ✓</p>{% endif %}
+  </div>
+</div></body></html>
