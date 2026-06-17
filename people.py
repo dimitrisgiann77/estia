@@ -49,6 +49,18 @@ FLAG_LABELS = {
     'orphan':            'Ορφανό (εκτός Λογιστηρίου)',
     'assignment_no_date':'Ανάθεση χωρίς ημερομηνία',
     'possible_dup':      'Πιθανή διπλοεγγραφή',
+    'missing_amka':      'Λείπει ΑΜΚΑ',
+    'missing_ika':       'Λείπει Α.Μ.ΙΚΑ',
+    'missing_father':    'Λείπει πατρώνυμο',
+    'missing_iban':      'Λείπει IBAN',
+    'missing_bank':      'Λείπει τράπεζα',
+    'missing_hire':      'Λείπει ημ. πρόσληψης',
+    'missing_specialty': 'Λείπει ειδικότητα',
+    'missing_phone':     'Λείπει τηλέφωνο',
+    'missing_email':     'Λείπει email',
+    'missing_cc':        'Λείπει κέντρο κόστους',
+    'missing_assignment':'Χωρίς ανάθεση Management',
+    'missing_agreement': 'Χωρίς συμφωνία/ποσό',
 }
 EVENT_LABELS = {
     'created':   'Δημιουργία προφίλ',
@@ -111,7 +123,7 @@ def attention_center():
     q = AttentionFlag.query.filter_by(resolved=False, entity_type=etype)
     if ftype:
         q = q.filter_by(flag_type=ftype)
-    flags = q.order_by(AttentionFlag.flag_type, AttentionFlag.id).all()
+    flags = q.order_by(AttentionFlag.flag_type, AttentionFlag.id).limit(800).all()
     # counts ανά τύπο (όλα τα ανοιχτά του entity)
     from collections import Counter
     counts = Counter(f.flag_type for f in

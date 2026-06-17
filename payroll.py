@@ -1782,6 +1782,10 @@ def import_management(raw):
                 PPL.add_flag(uid,'assignment_no_date','warn',
                              '%d αναθέσεις χωρίς ημερομηνία - όρισε περιόδους' % len(need))
     db.session.commit()
+    try:
+        scan_completeness()
+    except Exception:
+        pass
     return stats
 
 
@@ -1878,4 +1882,66 @@ def payroll_merge(uid):
     return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
 
 
-print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management layer)')
+
+# ── v12.72 — Σάρωμα πληρότητας προφίλ (flags για κάθε κενό) ───────────────────
+def scan_completeness():
+    import people as PPL
+    from collections import defaultdict
+    AF = PPL.AttentionFlag
+    SCAN_TYPES = {'no_afm','no_code','missing_amka','missing_ika','missing_father',
+                  'missing_iban','missing_bank','missing_hire','missing_specialty',
+                  'missing_phone','missing_email','missing_cc','missing_assignment','missing_agreement'}
+    by = defaultdict(dict)
+    for f in AF.query.filter_by(entity_type='employee', resolved=False).all():
+        by[f.entity_id][f.flag_type] = f
+    uids = set()
+    for (uid,) in db.session.query(EmployeePII.user_id).all(): uids.add(uid)
+    for (uid,) in db.session.query(MgmtAssignment.user_id).all(): uids.add(uid)
+    if EmploymentProfile:
+        for (uid,) in db.session.query(EmploymentProfile.user_id).all(): uids.add(uid)
+    uids.discard(None)
+    def has(v): return bool(v and str(v).strip())
+    n_scanned=n_added=n_cleared=0
+    for uid in uids:
+        u = User.query.get(uid)
+        if not u: continue
+        pii = EmployeePII.query.filter_by(user_id=uid).first()
+        prof = EmploymentProfile.query.filter_by(user_id=uid).first() if EmploymentProfile else None
+        ma = current_assignment(uid)
+        miss=set()
+        if not (pii and has(pii.afm)): miss.add('no_afm')
+        if not (pii and has(pii.emp_code)): miss.add('no_code')
+        if not (pii and has(pii.amka)): miss.add('missing_amka')
+        if not (pii and has(pii.ika_am)): miss.add('missing_ika')
+        if not (pii and has(pii.father_name)): miss.add('missing_father')
+        if not (pii and has(pii.bank_iban)): miss.add('missing_iban')
+        if not (pii and has(pii.bank_name)): miss.add('missing_bank')
+        if not (pii and pii.hired_at): miss.add('missing_hire')
+        if not (pii and has(pii.ergani_specialty)): miss.add('missing_specialty')
+        if not (has(getattr(u,'phone',None)) or (ma and has(ma.phone))): miss.add('missing_phone')
+        if not (has(getattr(u,'email',None)) or (ma and has(ma.email))): miss.add('missing_email')
+        if not (pii and has(pii.cost_center)): miss.add('missing_cc')
+        if ma is None: miss.add('missing_assignment')
+        if not ((ma and ma.agreement_amount) or (prof and prof.agreement_amount)): miss.add('missing_agreement')
+        existing = {t for t in by.get(uid, {}) if t in SCAN_TYPES}
+        for t in (miss - existing):
+            db.session.add(AF(entity_type='employee', entity_id=uid, flag_type=t,
+                              severity='high', detail=PPL.FLAG_LABELS.get(t, t))); n_added+=1
+        for t in (existing - miss):
+            f = by[uid][t]; f.resolved=True
+            from datetime import datetime as _dt; f.resolved_at=_dt.utcnow(); n_cleared+=1
+        n_scanned+=1
+    db.session.commit()
+    return {'scanned': n_scanned, 'added': n_added, 'cleared': n_cleared}
+
+
+@app.route('/dashboard/payroll/scan', methods=['POST'])
+def payroll_scan():
+    if not _padmin():
+        return redirect(url_for('login'))
+    res = scan_completeness()
+    log_activity('payroll_scan', str(res))
+    return redirect(url_for('attention_center', entity='employee') + '&embed=1')
+
+
+print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan)')
