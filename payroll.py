@@ -2066,6 +2066,25 @@ def _dup_pairs():
         for i in range(len(lst)):
             for j in range(i+1, len(lst)):
                 add(lst[i][0], lst[i][1], lst[j][0], lst[j][1], 'Ίδιο επώνυμο')
+    # v12.110 — και ονοματικα διπλα σε ΟΛΟΥΣ τους ενεργους (πιανει schedule-imported χωρις PII)
+    try:
+        import schedule as _S
+        by_sur = defaultdict(list)
+        for u in User.query.filter(User.is_active == True).all():
+            if getattr(u, 'employment_active', True) is False:
+                continue
+            sur, _f = _S._name_parts(u.full_name or '')
+            if sur:
+                by_sur[sur].append(u)
+        for sur, lst in by_sur.items():
+            if len(lst) < 2:
+                continue
+            for i in range(len(lst)):
+                for j in range(i+1, len(lst)):
+                    if _S._names_likely_same(lst[i].full_name or '', lst[j].full_name or ''):
+                        add(lst[i], None, lst[j], None, 'Παρόμοιο όνομα')
+    except Exception:
+        pass
     return pairs
 
 def _net_summary(uid):

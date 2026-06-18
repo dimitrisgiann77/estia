@@ -136,6 +136,36 @@ class ShiftAssignment(db.Model):
     import_hash   = db.Column(db.String(40), index=True)
     __table_args__ = (db.UniqueConstraint('user_id', 'work_date', name='uq_user_date'),)
 
+class NameLink(db.Model):
+    """Επιβεβαιωμενη συνδεση ονοματος προγραμματος -> master προφιλ.
+    Αγκυρωνεται στο master (που κουβαλα τον αριθμο E0xxx + ΑΦΜ). Το φτιαχνει ΜΟΝΟ ο χρηστης."""
+    id         = db.Column(db.Integer, primary_key=True)
+    norm_name  = db.Column(db.String(120), unique=True, index=True, nullable=False)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    raw_name   = db.Column(db.String(120))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+class PendingShift(db.Model):
+    """Προθαλαμος ταυτοποιησης: βαρδιες ονοματων ΧΩΡΙΣ επιβεβαιωμενη συνδεση.
+    ΔΕΝ φτιαχνεται User -> δεν μπαινουν πουθενα στην πλατφορμα μεχρι να τα ταυτοποιησεις."""
+    id            = db.Column(db.Integer, primary_key=True)
+    norm_name     = db.Column(db.String(120), index=True, nullable=False)
+    raw_name      = db.Column(db.String(120))
+    epon          = db.Column(db.String(80))
+    onoma         = db.Column(db.String(80))
+    hotel_tag     = db.Column(db.String(20))    # upok raw
+    dept_raw      = db.Column(db.String(120))
+    employer      = db.Column(db.String(120))
+    work_date     = db.Column(db.Date, index=True)
+    shift_code    = db.Column(db.String(12))
+    segments      = db.Column(db.Text)
+    work_hotel_id = db.Column(db.Integer, db.ForeignKey('hotel.id'))
+    import_hash   = db.Column(db.String(40), index=True)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
+    created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
+    __table_args__ = (db.UniqueConstraint('norm_name', 'work_date', name='uq_pending_name_date'),)
+
 class Holiday(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     hol_date    = db.Column(db.Date, unique=True, nullable=False)
@@ -428,35 +458,69 @@ def _resolve_hotel_by_code(code):
             return h
     return None
 
+def _route_name(full):
+    """Επιστρεφει master ΜΟΝΟ αν υπαρχει επιβεβαιωμενη συνδεση (NameLink, φτιαγμενη απο τον χρηστη).
+    Αλλιως None -> ο καλων στελνει τη βαρδια στον προθαλαμο (PendingShift)."""
+    nm = _norm(full)
+    if not nm:
+        return None
+    link = NameLink.query.filter_by(norm_name=nm).first()
+    if link:
+        u = User.query.get(link.user_id)
+        if u and u.is_active:
+            return u
+    return None
+
+def _suggest_masters(full, limit=6):
+    """Προτασεις (ΟΧΙ αυτοματη ενεργεια) πιθανων master για ενα ονομα — προτεραιοτητα locked Λογιστηριο.
+    Επιστρεφει [(user, score)] ταξινομημενο. score: 100 ακριβες / 90 ιδιες λεξεις / 70 fuzzy / 40 ιδιο επωνυμο."""
+    fn = _norm(full)
+    if not fn:
+        return []
+    locked = _locked_uids()
+    tgt = _tok_key(full)
+    sur_t, _f = _name_parts(full)
+    out = []
+    for u in User.query.filter(User.is_active == True).all():
+        un = u.full_name or ''
+        sc = 0
+        if _norm(un) == fn:
+            sc = 100
+        elif tgt and _tok_key(un) == tgt:
+            sc = 90
+        elif _names_likely_same(full, un):
+            sc = 70
+        else:
+            sur_u, _ = _name_parts(un)
+            if sur_t and sur_u == sur_t:
+                sc = 40
+        if sc:
+            if u.id in locked:
+                sc += 5
+            out.append((u, sc))
+    out.sort(key=lambda t: (-t[1], 0 if t[0].id in locked else 1, t[0].full_name or ''))
+    return out[:limit]
+
 def _find_or_create_user(epon, onoma, hotel, dept, employer, upok):
     full = (str(epon).strip() + ' ' + (str(onoma).strip() if onoma else '')).strip()
-    fn = _norm(full)
-    # ταίριασμα σε υπάρχοντα χρήστη (ονομαστικά)
-    for u in User.query.all():
-        if _norm(u.full_name) == fn:
-            user = u
-            break
-    else:
+    # ΠΡΩΤΑ ταιριασμα με υπαρχον προφιλ (προτεραιοτητα master Λογιστηριο)
+    user = _match_existing(full)
+    created = False
+    if user is None:
         base = _acc(full).lower().replace(' ', '.')
         uname = re.sub(r'[^a-z0-9.]', '', base) or ('emp' + str(ShiftAssignment.query.count() + 1))
         if User.query.filter_by(username=uname).first():
             uname = uname + '.' + str(User.query.count() + 1)
         user = User(username=uname[:50], password=generate_password_hash(os.urandom(8).hex()),
                     full_name=full[:100], role='staff', approved=True, is_active=True)
-        db.session.add(user)
-        db.session.flush()
-    # μετα-στοιχεία (συμπληρώνουμε όσα λείπουν)
-    if hotel and not getattr(user, 'home_hotel_id', None):
-        user.home_hotel_id = hotel.id
-    if dept and not getattr(user, 'department_id', None):
-        user.department_id = dept.id
-    if employer and not getattr(user, 'employer', None):
-        user.employer = str(employer)[:120]
-    if upok and not getattr(user, 'subunit', None):
-        user.subunit = str(upok)[:20]
-    if getattr(user, 'login_enabled', None) is None:
+        db.session.add(user); db.session.flush(); created = True
+    # μετα-στοιχεια ΜΟΝΟ σε νεο προφιλ - τα master κρατουν τα δικα τους assigned
+    if created:
+        if hotel: user.home_hotel_id = hotel.id
+        if dept: user.department_id = dept.id
+        if employer: user.employer = str(employer)[:120]
+        if upok: user.subunit = str(upok)[:20]
         user.login_enabled = False
-    if getattr(user, 'employment_active', None) is None:
         user.employment_active = True
     return user
 
@@ -468,7 +532,7 @@ def import_schedule_workbook(source, only_year=None, created_by=None):
     else:
         wb = openpyxl.load_workbook(source, data_only=True)
     stats = {'users_new': 0, 'users_seen': 0, 'assign_new': 0, 'assign_upd': 0,
-             'no_hotel': 0, 'cells': 0}
+             'no_hotel': 0, 'cells': 0, 'pending_new': 0, 'pending_upd': 0}
     before_users = User.query.count()
     seen_users = set()
     for ws in wb.worksheets:
@@ -503,9 +567,11 @@ def import_schedule_workbook(source, only_year=None, created_by=None):
                         comp_v = ws.cell(rr, colmap['comp']).value if colmap.get('comp') else None
                         hotel = _resolve_hotel_by_code(upok)
                         dept = resolve_department(dept_v)
-                        user = _find_or_create_user(epon, onoma, hotel, dept, comp_v, upok)
-                        if user.id not in seen_users:
-                            seen_users.add(user.id)
+                        full = (str(epon).strip() + ' ' + (str(onoma).strip() if onoma else '')).strip()
+                        nm = _norm(full)
+                        master = _route_name(full)   # ΜΟΝΟ επιβεβαιωμενη συνδεση -> αλλιως προθαλαμος
+                        if master and master.id not in seen_users:
+                            seen_users.add(master.id)
                         if not hotel:
                             stats['no_hotel'] += 1
                         for c, dt in datecols:
@@ -522,18 +588,33 @@ def import_schedule_workbook(source, only_year=None, created_by=None):
                                 whid = th.id if th else None
                             elif hotel:
                                 whid = hotel.id
-                            ex = ShiftAssignment.query.filter_by(user_id=user.id, work_date=dt).first()
-                            if ex:
-                                ex.shift_code = code
-                                ex.segments = json.dumps(segs, ensure_ascii=False)
-                                ex.work_hotel_id = whid
-                                stats['assign_upd'] += 1
+                            segj = json.dumps(segs, ensure_ascii=False)
+                            if master:
+                                ex = ShiftAssignment.query.filter_by(user_id=master.id, work_date=dt).first()
+                                if ex:
+                                    ex.shift_code = code; ex.segments = segj; ex.work_hotel_id = whid
+                                    stats['assign_upd'] += 1
+                                else:
+                                    db.session.add(ShiftAssignment(
+                                        user_id=master.id, work_date=dt, shift_code=code,
+                                        segments=segj, work_hotel_id=whid, created_by=created_by))
+                                    stats['assign_new'] += 1
                             else:
-                                db.session.add(ShiftAssignment(
-                                    user_id=user.id, work_date=dt, shift_code=code,
-                                    segments=json.dumps(segs, ensure_ascii=False),
-                                    work_hotel_id=whid, created_by=created_by))
-                                stats['assign_new'] += 1
+                                pend = PendingShift.query.filter_by(norm_name=nm, work_date=dt).first()
+                                if pend:
+                                    pend.shift_code = code; pend.segments = segj; pend.work_hotel_id = whid
+                                    pend.raw_name = full[:120]
+                                    stats['pending_upd'] += 1
+                                else:
+                                    db.session.add(PendingShift(
+                                        norm_name=nm, raw_name=full[:120],
+                                        epon=str(epon)[:80], onoma=(str(onoma)[:80] if onoma else None),
+                                        hotel_tag=(str(upok)[:20] if upok else None),
+                                        dept_raw=(str(dept_v)[:120] if dept_v else None),
+                                        employer=(str(comp_v)[:120] if comp_v else None),
+                                        work_date=dt, shift_code=code, segments=segj,
+                                        work_hotel_id=whid, created_by=created_by))
+                                    stats['pending_new'] += 1
                     rr += 1
                 db.session.commit()
                 r = rr
@@ -962,7 +1043,184 @@ def schedule_import():
     except Exception:
         _locked = set()
     purge_count = sum(1 for u in imported_staff_query().all() if u.id not in _locked)
-    return render_template('schedule_import.html', results=results, year=date.today().year, purge_count=purge_count)
+    pending_total = PendingShift.query.count()
+    return render_template('schedule_import.html', results=results, year=date.today().year, purge_count=purge_count, pending_total=pending_total)
+
+
+# ── ΤΑΥΤΟΠΟΙΗΣΗ: προθαλαμος ονοματων χωρις επιβεβαιωμενο master ────────────────
+def _confirm_link(norm_name, master_id, created_by=None):
+    """Ο χρηστης επιβεβαιωνει: φτιαχνει NameLink + μεταφερει ΟΛΕΣ τις PendingShift στο master."""
+    master = User.query.get(master_id)
+    if not master:
+        return 0
+    pend = PendingShift.query.filter_by(norm_name=norm_name).all()
+    rawn = pend[0].raw_name if pend else None
+    link = NameLink.query.filter_by(norm_name=norm_name).first()
+    if link:
+        link.user_id = master_id
+    else:
+        db.session.add(NameLink(norm_name=norm_name, user_id=master_id,
+                                raw_name=rawn, created_by=created_by))
+    moved = 0
+    for ps in pend:
+        ex = ShiftAssignment.query.filter_by(user_id=master_id, work_date=ps.work_date).first()
+        if ex:
+            ex.shift_code = ps.shift_code; ex.segments = ps.segments; ex.work_hotel_id = ps.work_hotel_id
+        else:
+            db.session.add(ShiftAssignment(user_id=master_id, work_date=ps.work_date,
+                shift_code=ps.shift_code, segments=ps.segments,
+                work_hotel_id=ps.work_hotel_id, created_by=created_by))
+            moved += 1
+        db.session.delete(ps)
+    db.session.commit()
+    return moved
+
+def _pending_pii_map():
+    try:
+        from payroll import EmployeePII as _PII
+        return {pp.user_id: pp for pp in _PII.query.all()}
+    except Exception:
+        return {}
+
+@app.route('/dashboard/schedule/identify')
+def schedule_identify():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    groups = {}
+    for ps in PendingShift.query.order_by(PendingShift.work_date).all():
+        g = groups.get(ps.norm_name)
+        if not g:
+            g = {'norm': ps.norm_name, 'raw': ps.raw_name, 'count': 0,
+                 'hotel_tag': ps.hotel_tag, 'dept': ps.dept_raw, 'employer': ps.employer,
+                 'dmin': ps.work_date, 'dmax': ps.work_date}
+            groups[ps.norm_name] = g
+        g['count'] += 1
+        if ps.work_date:
+            if not g['dmin'] or ps.work_date < g['dmin']: g['dmin'] = ps.work_date
+            if not g['dmax'] or ps.work_date > g['dmax']: g['dmax'] = ps.work_date
+    piimap = _pending_pii_map()
+    locked = _locked_uids()
+    items = []
+    for g in groups.values():
+        sugg = []
+        for u, sc in _suggest_masters(g['raw'] or g['norm'], limit=5):
+            pp = piimap.get(u.id)
+            sugg.append({'id': u.id, 'name': u.full_name,
+                         'emp_code': (pp.emp_code if pp else None),
+                         'afm': (pp.afm if pp else None),
+                         'locked': u.id in locked, 'score': sc})
+        g['suggestions'] = sugg
+        items.append(g)
+    items.sort(key=lambda x: (-x['count'], x['raw'] or ''))
+    return render_template('schedule_identify.html', items=items, total=len(items))
+
+@app.route('/dashboard/schedule/identify/link', methods=['POST'])
+def schedule_identify_link():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    nm = (request.form.get('norm_name') or '').strip()
+    mid = request.form.get('master_id', type=int)
+    if nm and mid:
+        moved = _confirm_link(nm, mid, created_by=session.get('user_id'))
+        u = User.query.get(mid)
+        log_activity('schedule_identify_link', '%s -> %s (%d βάρδιες)' % (nm, (u.full_name if u else mid), moved))
+    return redirect(url_for('schedule_identify'))
+
+@app.route('/dashboard/schedule/identify/dismiss', methods=['POST'])
+def schedule_identify_dismiss():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    nm = (request.form.get('norm_name') or '').strip()
+    if nm:
+        n = PendingShift.query.filter_by(norm_name=nm).delete()
+        db.session.commit()
+        log_activity('schedule_identify_dismiss', '%s (%s)' % (nm, n))
+    return redirect(url_for('schedule_identify'))
+
+@app.route('/dashboard/schedule/identify/search')
+def schedule_identify_search():
+    if not _auth() or not is_admin():
+        return jsonify([])
+    qraw = (request.args.get('q') or '').strip()
+    q = _norm(qraw)
+    if not qraw:
+        return jsonify([])
+    piimap = _pending_pii_map()
+    locked = _locked_uids()
+    res = []
+    for u in User.query.filter(User.is_active == True).all():
+        pp = piimap.get(u.id)
+        afm = (pp.afm if pp else '') or ''
+        emp = (pp.emp_code if pp else '') or ''
+        if (q and q in _norm(u.full_name or '')) or (qraw in afm) or (qraw.upper() in emp.upper()):
+            res.append({'id': u.id, 'name': u.full_name, 'emp_code': emp, 'afm': afm,
+                        'locked': u.id in locked})
+        if len(res) >= 20:
+            break
+    return jsonify(res)
+
+def _exact_master_map():
+    """norm_name -> λιστα ενεργων users με ΑΚΡΙΒΕΣ ιδιο ονομα."""
+    m = {}
+    for u in User.query.filter(User.is_active == True).all():
+        nm = _norm(u.full_name or '')
+        if nm:
+            m.setdefault(nm, []).append(u)
+    return m
+
+def _seed_locked_links(created_by=None):
+    """Ταυτοτητα (ΟΧΙ merge): NameLink καθε locked master -> στο ιδιο του το ονομα.
+    Skip: ασαφη (ιδιο norm_name σε >1 locked) + οσα εχουν ηδη link."""
+    locked = _locked_uids()
+    by_nm = {}
+    for u in User.query.filter(User.is_active == True).all():
+        if u.id in locked:
+            nm = _norm(u.full_name or '')
+            if nm:
+                by_nm.setdefault(nm, []).append(u)
+    n = 0; skipped = 0
+    for nm, us in by_nm.items():
+        if len(us) != 1:
+            skipped += 1; continue
+        if NameLink.query.filter_by(norm_name=nm).first():
+            continue
+        db.session.add(NameLink(norm_name=nm, user_id=us[0].id,
+                                raw_name=us[0].full_name, created_by=created_by))
+        n += 1
+    db.session.commit()
+    return n, skipped
+
+@app.route('/dashboard/schedule/identify/seed_locked', methods=['POST'])
+def schedule_identify_seed_locked():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    n, skipped = _seed_locked_links(created_by=session.get('user_id'))
+    log_activity('schedule_identify_seed_locked', '%d links, %d ασαφη' % (n, skipped))
+    # μετα το seed, τρεξε και αυτοματη ταυτοποιηση ακριβων για οσα ηδη ειναι στον προθαλαμο
+    return redirect(url_for('schedule_identify'))
+
+@app.route('/dashboard/schedule/identify/auto', methods=['POST'])
+def schedule_identify_auto():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    locked = _locked_uids()
+    exact = _exact_master_map()
+    norms = [r[0] for r in db.session.query(PendingShift.norm_name).distinct().all()]
+    linked = 0
+    for nm in norms:
+        cands = exact.get(nm) or []
+        target = None
+        if len(cands) == 1:
+            target = cands[0]
+        elif len(cands) > 1:
+            lk = [u for u in cands if u.id in locked]
+            if len(lk) == 1:
+                target = lk[0]
+        if target:
+            _confirm_link(nm, target.id, created_by=session.get('user_id'))
+            linked += 1
+    log_activity('schedule_identify_auto', '%d ακριβη ταιριασματα' % linked)
+    return redirect(url_for('schedule_identify'))
 
 
 # ── PASTE: μαζική επικόλληση προγράμματος από Excel (όνομα + Δ–Κ) ──────────────
@@ -1011,7 +1269,7 @@ def _parse_paste(raw, monday):
         name = cells[0].strip()
         if not name or _norm(name) in ('ονοματεπωνυμο', 'ονομα', 'επωνυμο', 'τμημα'):
             continue
-        user, warn = _match_name(name, ix, ixs)
+        user = _route_name(name); warn = None if user else "προς ταυτοποίηση (μη συνδεδεμένο)"
         dayvals = cells[1:8]
         parsed = []
         for i, dt in enumerate(days):
@@ -1211,6 +1469,55 @@ def _likely_dup(u1, u2):
     if _lev(f1, f2) <= 2 and min(len(f1), len(f2)) >= 3:
         return True                        # JOEY vs JOY, typos
     return False
+
+def _names_likely_same(full_a, full_b):
+    s1, f1 = _name_parts(full_a); s2, f2 = _name_parts(full_b)
+    if not s1 or s1 != s2:
+        return False
+    if f1 == f2 or not f1 or not f2:
+        return True
+    if f1.startswith(f2) or f2.startswith(f1):
+        return True
+    pl = 0
+    for a, b in zip(f1, f2):
+        if a == b: pl += 1
+        else: break
+    if pl >= 4:                            # ΝΙΚΟΣ <-> ΝΙΚΟΛΑΟΣ (κοινο προθεμα >=4)
+        return True
+    if _lev(f1, f2) <= 2 and min(len(f1), len(f2)) >= 3:
+        return True                        # NATALIA <-> NATALIIA
+    return False
+
+def _locked_uids():
+    try:
+        from payroll import EmployeePII as _PII
+        return {row[0] for row in db.session.query(_PII.user_id).filter_by(locked=True).all()}
+    except Exception:
+        return set()
+
+def _tok_key(name):
+    return ''.join(sorted([t for t in re.sub(r'[^a-z\u03b1-\u03c90-9 ]', '', _acc(name or '').lower()).split() if t]))
+
+def _match_existing(full):
+    """Ταιριαζει το ονομα με υπαρχον προφιλ - ΠΡΟΤΕΡΑΙΟΤΗΤΑ στο master (Λογιστηριο).
+    Ετσι οι βαρδιες κουμπωνουν στα master προφιλ αντι να φτιαχνονται διπλα."""
+    fn = _norm(full)
+    if not fn:
+        return None
+    users = User.query.filter(User.is_active == True).all()
+    locked = _locked_uids()
+    def prefer(cs):
+        for u in cs:
+            if u.id in locked: return u
+        return cs[0] if cs else None
+    ex = [u for u in users if _norm(u.full_name) == fn]
+    if ex: return prefer(ex)
+    tgt = _tok_key(full)
+    ts = [u for u in users if tgt and _tok_key(u.full_name) == tgt]
+    if ts: return prefer(ts)
+    fz = [u for u in users if u.id in locked and _names_likely_same(full, u.full_name or '')]
+    if fz: return fz[0]
+    return None
 
 def find_dup_groups():
     users = User.query.filter(User.is_active == True).order_by(User.full_name).all()

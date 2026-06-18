@@ -14,6 +14,13 @@ html[data-theme="dark"] .dropzone{background:#16202c;border-color:#33475b;color:
 {{ mp.topbar('calendar-up', 'ΕΣΤΙΑ — Εισαγωγή δεδομένων προσωπικού/προγράμματος', 'Πολλαπλά αρχεία · αυτόματη αναγνώριση') }}
 <div class="container" style="padding-bottom:0;"><div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;"><i class="ti ti-clipboard-text" style="font-size:22px;color:var(--mp-brand);"></i><div style="flex:1;min-width:200px;"><b>Γρήγορη επικόλληση (copy-paste)</b><div style="font-size:12px;color:#64748b;">Αντί για αρχείο, επικόλλησε απευθείας από το Excel (όνομα + Δ–Κ).</div></div><a class="btn" href="/dashboard/schedule/paste?embed=1"><i class="ti ti-clipboard-plus"></i> Επικόλληση από Excel</a></div></div>
 <div class="container">
+  {% if pending_total and pending_total > 0 %}
+  <div class="card" style="border-left:4px solid #d97706;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <i class="ti ti-user-search" style="font-size:22px;color:#d97706;"></i>
+    <div style="flex:1;min-width:200px;"><b>Εκκρεμεί ταυτοποίηση</b><div style="font-size:12px;color:#64748b;">Υπάρχουν βάρδιες ονομάτων που δεν έχουν συνδεθεί με κλειδωμένο προφίλ — δεν μπαίνουν στην πλατφόρμα μέχρι να τα ταυτοποιήσεις.</div></div>
+    <a class="btn" href="/dashboard/schedule/identify?embed=1" style="background:#d97706;color:#fff;"><i class="ti ti-user-check"></i> Ταυτοποίηση ({{ pending_total }})</a>
+  </div>
+  {% endif %}
 
   <div class="card">
     <p style="color:#475569;font-size:13px;margin-top:0;">Ανέβασε <b>ένα ή πολλά</b> αρχεία <b>.xlsx</b> (κράτα Ctrl/Shift για πολλαπλή επιλογή). Το σύστημα αναγνωρίζει αυτόματα:</p>

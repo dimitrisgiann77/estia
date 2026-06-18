@@ -32,45 +32,11 @@
   {% if request.args.get('ok')=='merged' %}<div class="banner" style="background:#dcfce7;color:#166534;padding:9px 12px;border-radius:9px;margin-bottom:12px;"><i class="ti ti-check"></i> Οι εγγραφές συγχωνεύτηκαν.</div>{% endif %}
 
   {% if dup_groups %}
-  <style>
-  .dupwrap{border:1px solid #fde68a;background:#fffaf0;border-radius:14px;padding:16px;margin-bottom:16px;}
-  .dupg{border:1px solid #f0e2c0;background:#fff;border-radius:12px;padding:10px;margin-bottom:10px;}
-  .duprow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:9px 12px;border:1px solid #eef2f6;border-radius:10px;margin-bottom:6px;cursor:pointer;transition:background .1s;}
-  .duprow:last-of-type{margin-bottom:0;}
-  .duprow:has(input[type=radio]:checked){background:#f0fdf4;border-color:#86c9a4;box-shadow:0 0 0 1px #86c9a4 inset;}
-  .duprow input[type=radio]{width:18px;height:18px;flex-shrink:0;}
-  .duprow .nm{flex:1;min-width:200px;font-size:14px;}
-  .duprow .meta{font-size:12px;color:#64748b;min-width:170px;}
-  .duprow .bd{font-size:13px;font-weight:700;color:#334155;white-space:nowrap;}
-  .duprow .keep-tag{display:none;font-size:10px;font-weight:700;color:#15803d;background:#dcfce7;border-radius:20px;padding:2px 9px;white-space:nowrap;}
-  .duprow:has(input[type=radio]:checked) .keep-tag{display:inline-block;}
-  .duprow .mrg{font-size:11px;color:#b45309;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
-  .duprow:has(input[type=radio]:checked) .mrg{visibility:hidden;}
-  .dupg-act{text-align:right;margin-top:6px;}
-  .dupg-act .b{display:inline-flex;align-items:center;gap:6px;}
-  </style>
-  <div class="dupwrap">
-    <h3 style="margin:0 0 6px;font-size:15px;color:#92400e;"><i class="ti ti-copy"></i> Πιθανές διπλοεγγραφές ({{ dup_groups|length }})</h3>
-    <p style="font-size:12.5px;color:#92400e;margin:0 0 12px;line-height:1.5;">Σε κάθε ομάδα διάλεξε ποιον <b>ΚΡΑΤΑΣ</b> (●) — μένουν <b>τα στοιχεία του</b> (θέση/τμήμα/ξενοδοχείο). Οι υπόλοιποι δίνουν <b>ΜΟΝΟ τις βάρδιές τους</b> και αρχειοθετούνται. Συνήθως κρατάς το <span style="background:#dbeafe;color:#1d4ed8;font-weight:700;border-radius:10px;padding:1px 7px;font-size:11px;">🔒 Λογιστήριο</span> (προεπιλεγμένο). Έλεγξε καλά πριν.</p>
-    {% for g in dup_groups %}
-    <form method="POST" action="/dashboard/schedule/staff/merge" class="dupg"
-          onsubmit="return confirm('Συγχώνευση: οι βάρδιες των άλλων θα περάσουν στον επιλεγμένο (●) και θα αρχειοθετηθούν. Συνέχεια;');">
-      {% for m in g %}
-      <label class="duprow">
-        <input type="radio" name="keep_id" value="{{ m.id }}" {{ 'checked' if loop.first }}>
-        <span class="keep-tag"><i class="ti ti-check"></i> ΚΡΑΤΑΣ</span>
-        <span class="nm"><b>{{ m.full_name }}</b> {{ lock_badge(m) }} <small style="color:#94a3b8;">{{ m.username }}</small></span>
-        <span class="meta">{{ dept_map.get(m.department_id,'—') }} · {{ hotel_map.get(m.home_hotel_id,'—') }}</span>
-        <span class="bd">{{ m._assign_n }} βάρδιες</span>
-        <span class="mrg"><input type="checkbox" name="drop_ids" value="{{ m.id }}" {{ '' if loop.first else 'checked' }} style="width:auto;"> δίνει βάρδιες</span>
-      </label>
-      {% endfor %}
-      <div class="dupg-act"><button class="b" type="submit"><i class="ti ti-arrows-join"></i> Συγχώνευση ομάδας</button></div>
-    </form>
-    {% endfor %}
+  <div class="card" style="border-left:4px solid #d97706;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <i class="ti ti-copy" style="font-size:22px;color:#d97706;"></i>
+    <div style="flex:1;min-width:200px;"><b>Πιθανές διπλοεγγραφές: {{ dup_groups|length }}</b><div style="font-size:12px;color:#64748b;">Η συγχώνευση διπλών γίνεται πλέον από <b>μία ενιαία σελίδα</b> — κρατάς εσύ το σωστό προφίλ και μεταφέρονται βάρδιες + στοιχεία.</div></div>
+    <a class="btn" href="/dashboard/payroll/duplicates?embed=1" style="background:#d97706;color:#fff;"><i class="ti ti-arrows-join"></i> Συγχώνευση διπλών</a>
   </div>
-  {% else %}
-  <div class="banner" style="background:#dcfce7;color:#166534;padding:9px 12px;border-radius:9px;margin-bottom:12px;"><i class="ti ti-check"></i> Δεν εντοπίστηκαν πιθανά διπλά.</div>
   {% endif %}
 
   <div class="card">

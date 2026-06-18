@@ -1,0 +1,128 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Ταυτοποίηση προσωπικού', theme.primary) }}
+<style>
+.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:9px;cursor:pointer;font:inherit;}
+.b.g{background:#16a34a;} .b.x{background:#fff;color:#b91c1c;border:1px solid #f0c4c4;}
+.pcard{border:1px solid #e6ecf2;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#fff;}
+html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
+.pname{font-size:17px;font-weight:700;}
+.chip{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11.5px;background:var(--soft,#f1f5f9);color:#475569;margin:2px 4px 2px 0;}
+.sg{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid #eef2f6;border-radius:10px;margin:5px 0;flex-wrap:wrap;}
+.sg .nm{font-weight:600;}
+.k{padding:2px 8px;border-radius:10px;font-size:11px;}
+.k.lock{background:#e7f0fb;color:#185FA5;} .k.mgmt{background:#eef2f6;color:#64748b;}
+.meta{font-size:12px;color:#64748b;}
+.sc{margin-left:auto;font-size:11px;color:#94a3b8;}
+.srch{width:100%;padding:8px 10px;border:1px solid #dbe3ea;border-radius:9px;font:inherit;margin-top:4px;}
+.srres{margin-top:6px;}
+details summary{cursor:pointer;color:var(--accent,#185FA5);font-size:13px;font-weight:600;}
+.empty{text-align:center;color:#64748b;padding:40px 10px;}
+</style></head><body>
+{{ mp.topbar('user-search', 'ΕΣΤΙΑ — Ταυτοποίηση προσωπικού', 'Σύνδεσε τα ονόματα του προγράμματος με τα κλειδωμένα προφίλ (αριθμός + ΑΦΜ)') }}
+<div class="container">
+
+  <div class="card" style="border-left:4px solid var(--accent,#185FA5);">
+    <b>Πώς δουλεύει:</b> Η εισαγωγή προγράμματος <u>δεν φτιάχνει</u> προφίλ και <u>δεν ενώνει</u> τίποτα μόνη της.
+    Όσα ονόματα δεν έχουν επιβεβαιωμένη σύνδεση με κλειδωμένο προφίλ Λογιστηρίου περιμένουν <b>εδώ</b>.
+    Διάλεξε εσύ το σωστό 🔒 master για κάθε όνομα — οι βάρδιες περνούν εκεί. Μέχρι τότε <b>δεν εμφανίζονται</b> πουθενά στην πλατφόρμα.
+  </div>
+
+  <div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <div style="flex:1;min-width:200px;font-size:13px;color:#475569;"><b>Γρήγορες κινήσεις (μία φορά):</b> πρώτα «κλείδωσε» τα κλειδωμένα προφίλ στο όνομά τους, μετά επιβεβαίωσε όσα ταιριάζουν 100%. Δεν είναι merge — απλή ταυτοποίηση.</div>
+    <form method="POST" action="/dashboard/schedule/identify/seed_locked{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;"
+          onsubmit="return confirm('Δημιουργία σύνδεσης κάθε κλειδωμένου προφίλ Λογιστηρίου στο ίδιο του το όνομα; (ταυτοποίηση, όχι merge)');">
+      <button class="b" type="submit"><i class="ti ti-lock-check"></i> Ταυτοποίηση κλειδωμένων</button>
+    </form>
+    {% if total > 0 %}
+    <form method="POST" action="/dashboard/schedule/identify/auto{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;"
+          onsubmit="return confirm('Σύνδεση όλων των ονομάτων του προθαλάμου που ταιριάζουν ΑΚΡΙΒΩΣ (100%) με ένα προφίλ; Τα αμφίβολα μένουν για έλεγχο.');">
+      <button class="b g" type="submit"><i class="ti ti-checks"></i> Επιβεβαίωση ακριβών ταιριασμάτων</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if total == 0 %}
+    <div class="card empty"><i class="ti ti-checks" style="font-size:34px;color:#16a34a;display:block;margin-bottom:8px;"></i>
+      Κανένα όνομα σε αναμονή ταυτοποίησης. Όλα τα προγράμματα είναι συνδεδεμένα. 🎉</div>
+  {% else %}
+    <div class="card" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-alert-triangle" style="font-size:22px;color:#d97706;"></i>
+      <b>{{ total }}</b> ονόματα περιμένουν ταυτοποίηση.
+    </div>
+
+    {% for it in items %}
+    <div class="pcard" data-norm="{{ it.norm }}">
+      <div class="pname">{{ it.raw or it.norm }}</div>
+      <div style="margin:6px 0;">
+        <span class="chip">📅 {{ it.count }} βάρδιες</span>
+        {% if it.dmin %}<span class="chip">{{ it.dmin.strftime('%d/%m/%Y') }} – {{ it.dmax.strftime('%d/%m/%Y') }}</span>{% endif %}
+        {% if it.hotel_tag %}<span class="chip">🏨 {{ it.hotel_tag }}</span>{% endif %}
+        {% if it.dept %}<span class="chip">{{ it.dept }}</span>{% endif %}
+        {% if it.employer %}<span class="chip">{{ it.employer }}</span>{% endif %}
+      </div>
+
+      {% if it.suggestions %}
+      <div class="meta" style="margin-top:8px;">Προτεινόμενα προφίλ (εσύ επιβεβαιώνεις):</div>
+      {% for s in it.suggestions %}
+      <div class="sg">
+        {% if s.locked %}<span class="k lock">🔒 Λογιστήριο</span>{% else %}<span class="k mgmt">Management</span>{% endif %}
+        <span class="nm">{{ s.name }}</span>
+        <span class="meta">{% if s.emp_code %}Κωδ: <b>{{ s.emp_code }}</b>{% endif %}{% if s.afm %} · ΑΦΜ: <b>{{ s.afm }}</b>{% endif %}{% if not s.emp_code and not s.afm %}<i>χωρίς κλειδιά</i>{% endif %}</span>
+        <span class="sc">{{ s.score }}%</span>
+        <form method="POST" action="/dashboard/schedule/identify/link{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;">
+          <input type="hidden" name="norm_name" value="{{ it.norm }}">
+          <input type="hidden" name="master_id" value="{{ s.id }}">
+          <button class="b g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="meta" style="margin-top:8px;">Δεν βρέθηκαν αυτόματες προτάσεις — ψάξε χειροκίνητα.</div>
+      {% endif %}
+
+      <details style="margin-top:8px;">
+        <summary>Χειροκίνητη αναζήτηση (όνομα / ΑΦΜ / κωδικός)</summary>
+        <input class="srch" type="text" placeholder="Πληκτρολόγησε όνομα, ΑΦΜ ή κωδικό…"
+               oninput="schSearch(this, '{{ it.norm }}')">
+        <div class="srres"></div>
+      </details>
+
+      <div style="margin-top:10px;border-top:1px dashed #e6ecf2;padding-top:8px;">
+        <form method="POST" action="/dashboard/schedule/identify/dismiss{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;display:inline;"
+              onsubmit="return confirm('Διαγραφή όλων των βαρδιών αυτού του ονόματος από τον προθάλαμο; (σκουπίδια / λάθος γραμμή)');">
+          <input type="hidden" name="norm_name" value="{{ it.norm }}">
+          <button class="b x" type="submit"><i class="ti ti-trash"></i> Αγνόησε / σκουπίδι</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+</div>
+<script>
+var EMBED = {{ 'true' if request.args.get('embed') else 'false' }};
+function schSearch(inp, norm){
+  var box = inp.parentNode.querySelector('.srres');
+  var q = inp.value.trim();
+  if(q.length < 2){ box.innerHTML=''; return; }
+  fetch('/dashboard/schedule/identify/search?q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!rows.length){ box.innerHTML='<div class="meta" style="padding:6px;">Καμία αντιστοιχία.</div>'; return; }
+      var h='';
+      rows.forEach(function(s){
+        h+='<div class="sg">'+
+           (s.locked?'<span class="k lock">🔒 Λογιστήριο</span>':'<span class="k mgmt">Management</span>')+
+           '<span class="nm">'+(s.name||'')+'</span>'+
+           '<span class="meta">'+(s.emp_code?('Κωδ: <b>'+s.emp_code+'</b>'):'')+(s.afm?(' · ΑΦΜ: <b>'+s.afm+'</b>'):'')+'</span>'+
+           '<form method="POST" action="/dashboard/schedule/identify/link'+(EMBED?'?embed=1':'')+'" style="margin:0 0 0 auto;">'+
+           '<input type="hidden" name="norm_name" value="'+norm+'">'+
+           '<input type="hidden" name="master_id" value="'+s.id+'">'+
+           '<button class="b g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button></form>'+
+           '</div>';
+      });
+      box.innerHTML=h;
+    });
+}
+</script>
+</body></html>
