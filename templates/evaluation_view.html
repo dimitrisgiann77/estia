@@ -17,12 +17,14 @@
     <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:14px;">
       <div><span class="muted" style="font-size:12px;">Σταθμισμένη βαθμολογία</span><br><span class="ev-score-big" style="color:{{ band_color.get(ev.band,('#f1f5f9','#64748b'))[1] }};">{{ '%.1f%%'|format(ev.score_pct) if ev.score_pct is not none else '—' }}</span></div>
       {% set bc = band_color.get(ev.band,('#f1f5f9','#64748b')) %}
-      <div><span class="ev-band-big" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ ev.band or '—' }}</span>{% if ev.status!='finalized' %} <span class="muted">(πρόχειρο)</span>{% endif %}</div>
+      <div><span class="ev-band-big" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ ev.band or '—' }}</span> {% set sc=st_color.get(ev.status,('#f1f5f9','#64748b')) %}<span class="ev-band-big" style="background:{{ sc[0] }};color:{{ sc[1] }};">{{ st_label.get(ev.status, ev.status) }}</span></div>
       {% if prev and prev.score_pct is not none and ev.score_pct is not none %}
         {% set d = ev.score_pct - prev.score_pct %}
         <div class="trend" style="color:{{ '#16a34a' if d>0 else ('#dc2626' if d<0 else '#64748b') }};"><i class="ti ti-{{ 'trending-up' if d>0 else ('trending-down' if d<0 else 'minus') }}"></i> {{ '%+.1f'|format(d) }} vs προηγ. ({{ prev.period_label }} {{ prev.year or '' }})</div>
       {% endif %}
       <div style="margin-left:auto;display:flex;gap:8px;">
+        {% if ev.status not in ['approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/approve" style="display:inline;"><button class="btn btn-ok" type="submit"><i class="ti ti-check"></i> Έγκριση</button></form>{% endif %}
+        {% if ev.status in ['submitted','approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/return" style="display:inline;" onsubmit="return confirm('Επιστροφή σε πρόχειρο για διορθώσεις;');"><button class="btn" type="submit" style="background:#b45309;"><i class="ti ti-arrow-back-up"></i> Επιστροφή</button></form>{% endif %}
         <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/edit?embed=1"><i class="ti ti-edit"></i> Επεξεργασία</a>
         <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/export.xlsx" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
         <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα</a>
@@ -49,6 +51,18 @@
       </div>
     {% endfor %}
   </div>
+
+  {% if goals %}
+  <div class="card">
+    <h3 style="font-size:15px;margin-bottom:8px;"><i class="ti ti-target-arrow"></i> Στόχοι & ενέργειες</h3>
+    {% for g in goals %}
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f5f5f5;">
+      <form method="POST" action="/dashboard/evaluations/goal/{{ g.id }}/toggle" style="display:inline;"><button type="submit" style="background:none;border:none;cursor:pointer;font-size:18px;color:{{ '#16a34a' if g.done else '#cbd5e1' }};"><i class="ti ti-{{ 'circle-check' if g.done else 'circle' }}"></i></button></form>
+      <span style="font-size:14px;{{ 'text-decoration:line-through;color:#94a3b8;' if g.done }}">{{ g.text }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if ev.general_comment %}
   <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Γενικό σχόλιο</div>{{ ev.general_comment }}</div>

@@ -1,0 +1,28 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Εκκρεμείς Αξιολογήσεις', theme.primary if theme else '#193847') }}</head><body>
+{{ mp.topbar('clock-exclamation', 'Εκκρεμείς Αξιολογήσεις', 'Εργαζόμενοι χωρίς εγκεκριμένη αξιολόγηση') }}
+<div class="container">
+  {{ mp.kpis([{'n':pend|length,'label':'Εκκρεμείς','color':'#dc2626'},{'n':done_n,'label':'Ολοκληρωμένες','color':'#16a34a'},{'n':year,'label':'Έτος'}]) }}
+  <div class="card">
+    <form class="filters" method="GET" action="/dashboard/evaluations/pending" id="pf">
+      <input type="hidden" name="embed" value="1">
+      <select name="year" onchange="pf.submit()">{% for y in years %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}</select>
+      <select name="period" onchange="pf.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==f_period }}>{{ p }}</option>{% endfor %}</select>
+      <span class="muted" style="font-size:12px;">Λίστα εργαζομένων που δεν έχουν εγκεκριμένη αξιολόγηση για {{ year }}{{ ' · '+f_period if f_period }}.</span>
+    </form>
+  </div>
+  <div class="card">
+    <table>
+      <thead><tr><th>Εργαζόμενος</th><th>Τμήμα</th><th>Ειδικότητα</th><th>Ξενοδοχείο</th><th></th></tr></thead>
+      <tbody>
+      {% for e in pend %}
+      <tr><td><b>{{ e.name }}</b></td><td>{{ e.department or '—' }}</td><td class="muted">{{ e.specialty or '—' }}</td><td>{{ e.hotel or '—' }}</td>
+        <td><a class="btn" href="/dashboard/evaluations/new?embed=1" style="padding:5px 12px;"><i class="ti ti-plus"></i> Αξιολόγηση</a></td></tr>
+      {% else %}
+      <tr><td colspan="5" style="text-align:center;color:#16a34a;padding:24px;"><i class="ti ti-circle-check"></i> Όλοι αξιολογήθηκαν για {{ year }}{{ ' · '+f_period if f_period }}.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα αξιολογήσεων</a>
+</div></body></html>

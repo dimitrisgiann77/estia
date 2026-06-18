@@ -58,7 +58,17 @@
   </div>
 
   <div class="card">
-    <div class="ev-f"><label>Γενικό σχόλιο</label><textarea name="general_comment" rows="3" placeholder="Γενική εικόνα, σημεία βελτίωσης, στόχοι...">{{ ev.general_comment if ev else '' }}</textarea></div>
+    <div class="ev-f"><label>Γενικό σχόλιο</label><textarea name="general_comment" rows="3" placeholder="Γενική εικόνα...">{{ ev.general_comment if ev else '' }}</textarea></div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:15px;margin-bottom:4px;"><i class="ti ti-target-arrow"></i> Στόχοι & ενέργειες βελτίωσης</h3>
+    <p class="muted" style="font-size:12px;margin-bottom:8px;">Συγκεκριμένοι στόχοι/ενέργειες για την επόμενη περίοδο (παρακολουθούνται στην προβολή).</p>
+    <div id="goal-list">
+      {% for g in goals %}<input type="text" name="goal_text" value="{{ g.text }}" placeholder="στόχος / ενέργεια" style="width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;">{% endfor %}
+      <input type="text" name="goal_text" placeholder="στόχος / ενέργεια..." style="width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;">
+    </div>
+    <button type="button" class="btn" onclick="addGoal()" style="background:#0f766e;padding:6px 12px;"><i class="ti ti-plus"></i> Στόχος</button>
   </div>
 
   <div class="ev-summary">
@@ -67,7 +77,7 @@
     <div class="muted" id="sc-count" style="font-size:12px;"></div>
     <div style="margin-left:auto;display:flex;gap:8px;">
       <button class="btn" type="submit" name="action" value="save" style="background:#64748b;"><i class="ti ti-device-floppy"></i> Αποθήκευση πρόχειρου</button>
-      <button class="btn btn-ok" type="submit" name="action" value="finalize"><i class="ti ti-check"></i> Οριστικοποίηση</button>
+      <button class="btn btn-ok" type="submit" name="action" value="submit"><i class="ti ti-send"></i> Υποβολή για έγκριση</button>
     </div>
   </div>
 </form>
@@ -95,6 +105,7 @@ function calc(){
   if(pct!==null){ if(pct>=80){band='Εξαιρετική';bg='#dcfce7';col='#16a34a';}else if(pct>=60){band='Καλή';bg='#fef3c7';col='#b45309';}else{band='Χρειάζεται προσοχή';bg='#fee2e2';col='#dc2626';} }
   be.textContent=band; be.style.background=bg; be.style.color=col;
 }
+function addGoal(){var i=document.createElement('input');i.type='text';i.name='goal_text';i.placeholder='στόχος / ενέργεια...';i.style.cssText='width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;';document.getElementById('goal-list').appendChild(i);}
 document.addEventListener('DOMContentLoaded',function(){fillEmp();calc();});
 </script>
 </body></html>

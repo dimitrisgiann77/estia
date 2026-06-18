@@ -5,13 +5,13 @@
 .act a,.act button{font-size:12px;text-decoration:none;color:#475569;background:none;border:none;cursor:pointer;padding:3px 5px;}
 .act a:hover{color:var(--mp-brand);}</style></head><body>
 {{ mp.topbar('star', 'Αξιολόγηση Προσωπικού', 'Αξιολογήσεις εργαζομένων — HR', 'Νέα αξιολόγηση', '/dashboard/evaluations/new?embed=1') }}
-<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a> <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#475569;"><i class="ti ti-template"></i> Πρότυπα</a></div>
+<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a> <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#475569;"><i class="ti ti-template"></i> Πρότυπα</a> <a class="btn" href="/dashboard/evaluations/pending?embed=1" style="background:#b45309;"><i class="ti ti-clock-exclamation"></i> Εκκρεμείς</a></div>
 <div class="container">
   {% set total = items|length %}
   {% set exc = items|selectattr('band','equalto','Εξαιρετική')|list|length %}
   {% set good = items|selectattr('band','equalto','Καλή')|list|length %}
   {% set att = items|selectattr('band','equalto','Χρειάζεται προσοχή')|list|length %}
-  {{ mp.kpis([{'n':total,'label':'Αξιολογήσεις'},{'n':exc,'label':'Εξαιρετικές','color':'#16a34a'},{'n':good,'label':'Καλές','color':'#b45309'},{'n':att,'label':'Χρειάζονται προσοχή','color':'#dc2626'}]) }}
+  {{ mp.kpis([{'n':total,'label':'Αξιολογήσεις'},{'n':submitted_n,'label':'Προς έγκριση','color':'#b45309','href':'/dashboard/evaluations?embed=1&band='},{'n':exc,'label':'Εξαιρετικές','color':'#16a34a'},{'n':att,'label':'Χρειάζονται προσοχή','color':'#dc2626'}]) }}
 
   <div class="card">
     <form class="filters" method="GET" action="/dashboard/evaluations">
@@ -37,7 +37,7 @@
         <td>{{ e.period_label }} {{ e.year or '' }}</td>
         <td class="muted">{{ e.eval_date.strftime('%d/%m/%Y') if e.eval_date else '—' }}</td>
         <td class="ev-pct">{{ '%.0f%%'|format(e.score_pct) if e.score_pct is not none else '—' }}</td>
-        <td>{% set bc = band_color.get(e.band, ('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ e.band or '—' }}</span>{% if e.status!='finalized' %} <span class="muted" style="font-size:11px;">draft</span>{% endif %}</td>
+        <td>{% set bc = band_color.get(e.band, ('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ e.band or '—' }}</span>{% set sc=st_color.get(e.status,('#f1f5f9','#64748b')) %}<span class="badge" style="background:{{ sc[0] }};color:{{ sc[1] }};margin-left:4px;">{{ st_label.get(e.status, e.status) }}</span></td>
         <td class="act"><a href="/dashboard/evaluations/{{ e.id }}?embed=1" title="Προβολή"><i class="ti ti-eye"></i></a><a href="/dashboard/evaluations/{{ e.id }}/edit?embed=1" title="Επεξεργασία"><i class="ti ti-edit"></i></a><a href="/dashboard/evaluations/{{ e.id }}/export.xlsx" title="Excel"><i class="ti ti-file-spreadsheet"></i></a></td>
         <td class="act"><form method="POST" action="/dashboard/evaluations/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή αξιολόγησης {{ e.code }};');"><button type="submit" title="Διαγραφή" style="color:#dc2626;"><i class="ti ti-trash"></i></button></form></td>
       </tr>

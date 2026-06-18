@@ -54,6 +54,7 @@ class Evaluation(db.Model):
     hotel     = db.relationship('Hotel')
     template  = db.relationship('EvalTemplate')
     scores    = db.relationship('EvalScore', backref='evaluation', cascade='all, delete-orphan')
+    goals     = db.relationship('EvalGoal', backref='evaluation', cascade='all, delete-orphan')
 
 class EvalScore(db.Model):
     id            = db.Column(db.Integer, primary_key=True)
@@ -61,6 +62,13 @@ class EvalScore(db.Model):
     criterion_id  = db.Column(db.Integer, db.ForeignKey('eval_criterion.id'))
     score         = db.Column(db.Float)
     comment       = db.Column(db.Text)
+
+class EvalGoal(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    evaluation_id = db.Column(db.Integer, db.ForeignKey('evaluation.id'))
+    text          = db.Column(db.String(300))
+    done          = db.Column(db.Boolean, default=False)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
 
 # ── Seed προτύπου (reference CONDIAN) ─────────────────────────────────────────
 _CORE = [
@@ -109,6 +117,12 @@ def band_for(pct):
 
 BAND_COLOR = {'Εξαιρετική': ('#dcfce7', '#16a34a'), 'Καλή': ('#fef3c7', '#b45309'),
               'Χρειάζεται προσοχή': ('#fee2e2', '#dc2626'), '—': ('#f1f5f9', '#64748b')}
+APPROVED_STATES = ('approved', 'finalized')   # finalized = legacy
+ST_LABEL = {'draft': 'Πρόχειρο', 'submitted': 'Προς έγκριση', 'approved': 'Εγκρίθηκε',
+            'finalized': 'Εγκρίθηκε', 'returned': 'Επιστράφηκε'}
+ST_COLOR = {'draft': ('#f1f5f9', '#64748b'), 'submitted': ('#fef3c7', '#b45309'),
+            'approved': ('#dcfce7', '#16a34a'), 'finalized': ('#dcfce7', '#16a34a'),
+            'returned': ('#fee2e2', '#dc2626')}
 
 def compute_pct(scores_map, criteria):
     """scores_map: {criterion_id: score}. Σταθμισμένο % με βάση weight & max_score."""
@@ -188,9 +202,11 @@ def evaluations_list():
         items = [e for e in items if e.employee and ql in (e.employee.full_name or '').lower()]
     periods = [p[0] for p in db.session.query(Evaluation.period_label).distinct().all() if p[0]]
     hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    submitted_n = Evaluation.query.filter_by(status='submitted').count()
     return render_template('evaluations_list.html', items=items, hotels=hotels,
                            periods=periods, f_hotel=f_hotel, f_band=f_band, f_period=f_period, q=q,
-                           band_color=BAND_COLOR, dept_name=_dept_name)
+                           band_color=BAND_COLOR, dept_name=_dept_name, st_label=ST_LABEL, st_color=ST_COLOR,
+                           submitted_n=submitted_n)
 
 @app.route('/dashboard/evaluations/new', methods=['GET', 'POST'])
 def evaluation_new():
@@ -205,7 +221,7 @@ def evaluation_new():
     templates = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all()
     return render_template('evaluation_form.html', ev=None, tmpl=tmpl, templates=templates,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores={}, today=date.today())
+                           scores={}, goals=[], today=date.today())
 
 @app.route('/dashboard/evaluations/<int:eid>')
 def evaluation_view(eid):
@@ -215,7 +231,8 @@ def evaluation_view(eid):
     smap = {s.criterion_id: s for s in ev.scores}
     prev = Evaluation.query.get(ev.prev_eval_id) if ev.prev_eval_id else None
     return render_template('evaluation_view.html', ev=ev, smap=smap, prev=prev,
-                           band_color=BAND_COLOR, dept_name=_dept_name,
+                           band_color=BAND_COLOR, dept_name=_dept_name, st_label=ST_LABEL, st_color=ST_COLOR,
+                           goals=sorted(ev.goals, key=lambda g: g.id),
                            criteria=ev.template.criteria if ev.template else [])
 
 @app.route('/dashboard/evaluations/<int:eid>/edit', methods=['GET', 'POST'])
@@ -227,9 +244,9 @@ def evaluation_edit(eid):
     if request.method == 'POST':
         return _save_evaluation(ev, tmpl)
     scores = {s.criterion_id: s for s in ev.scores}
-    return render_template('evaluation_form.html', ev=ev, tmpl=tmpl,
+    return render_template('evaluation_form.html', ev=ev, tmpl=tmpl, templates=None,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores=scores, today=date.today())
+                           scores=scores, goals=sorted(ev.goals, key=lambda g: g.id), today=date.today())
 
 @app.route('/dashboard/evaluations/<int:eid>/delete', methods=['POST'])
 def evaluation_delete(eid):
@@ -242,7 +259,7 @@ def evaluation_delete(eid):
 
 def _save_evaluation(ev, tmpl):
     fm = request.form
-    finalize = fm.get('action') == 'finalize'
+    action = fm.get('action', 'save')
     emp_id = fm.get('employee_id', type=int)
     if not emp_id or not tmpl:
         return redirect(url_for('evaluation_new') + '?embed=1')
@@ -259,12 +276,12 @@ def _save_evaluation(ev, tmpl):
     # ΟΛΑ τα queries ΠΡΙΝ δημιουργήσουμε το νέο record (αποφυγή autoflush half-built)
     emp = User.query.get(emp_id)
     exclude_code = ev.code if ev else None
-    _pq = Evaluation.query.filter(Evaluation.employee_id == emp_id, Evaluation.status == 'finalized')
+    _pq = Evaluation.query.filter(Evaluation.employee_id == emp_id, Evaluation.status.in_(APPROVED_STATES))
     if exclude_code:
         _pq = _pq.filter(Evaluation.code != exclude_code)
     prev = _pq.order_by(Evaluation.eval_date.desc()).first()
     # versioning: αν επεξεργαζόμαστε ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΗ → νέα version
-    if ev and ev.status == 'finalized':
+    if ev and ev.status in APPROVED_STATES:
         old = ev
         ev = Evaluation(supersedes_id=old.id, version=(old.version or 1) + 1, code=old.code)
         db.session.add(ev)
@@ -285,7 +302,14 @@ def _save_evaluation(ev, tmpl):
     ev.band = band_for(pct)
     ev.prev_eval_id = prev.id if prev else None
     ev.general_comment = (fm.get('general_comment') or '')[:4000]
-    ev.status = 'finalized' if finalize else 'draft'
+    if action == 'submit':
+        ev.status = 'submitted'
+    elif action == 'approve':
+        ev.status = 'approved'
+    elif action == 'finalize':
+        ev.status = 'approved'
+    else:
+        ev.status = 'draft'
     ev.updated_at = datetime.now()
     db.session.flush()
     if not ev.code:
@@ -298,6 +322,12 @@ def _save_evaluation(ev, tmpl):
             db.session.add(EvalScore(evaluation_id=ev.id, criterion_id=c.id,
                                      score=scores_map[c.id],
                                      comment=(fm.get('comment_%d' % c.id) or '')[:1000]))
+    for g in list(ev.goals):
+        db.session.delete(g)
+    for gtext in fm.getlist('goal_text'):
+        gtext = (gtext or '').strip()
+        if gtext:
+            db.session.add(EvalGoal(evaluation_id=ev.id, text=gtext[:300], done=False))
     db.session.commit()
     log_activity('evaluation_save', '%s %s' % (ev.code, ev.status))
     return redirect(url_for('evaluation_view', eid=ev.id) + '?embed=1')
@@ -349,7 +379,7 @@ def evaluation_export(eid):
 def latest_finalized():
     """Μία εγγραφή ανά code: η τελευταία ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΗ version (αγνοεί drafts & παλιές versions)."""
     best = {}
-    for e in Evaluation.query.filter_by(status='finalized').all():
+    for e in Evaluation.query.filter(Evaluation.status.in_(APPROVED_STATES)).all():
         k = e.code or ('id%d' % e.id)
         if k not in best or (e.version or 1) > (best[k].version or 1):
             best[k] = e
@@ -622,5 +652,50 @@ def evaluations_group_export():
     log_activity('eval_group_export', '%s %s' % (deps_m.get(dept_id, ''), period))
     return Response(buf.read(), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition': 'attachment; filename=group-evaluation.xlsx'})
+
+# ── Φ3: Workflow (έγκριση/επιστροφή), goals, εκκρεμείς ────────────────────────
+@app.route('/dashboard/evaluations/<int:eid>/approve', methods=['POST'])
+def evaluation_approve(eid):
+    if not _auth():
+        return redirect(url_for('login'))
+    ev = Evaluation.query.get_or_404(eid)
+    ev.status = 'approved'; ev.updated_at = datetime.now(); db.session.commit()
+    log_activity('evaluation_approve', ev.code or str(eid))
+    return redirect(url_for('evaluation_view', eid=eid) + '?embed=1')
+
+@app.route('/dashboard/evaluations/<int:eid>/return', methods=['POST'])
+def evaluation_return(eid):
+    if not _auth():
+        return redirect(url_for('login'))
+    ev = Evaluation.query.get_or_404(eid)
+    ev.status = 'returned'; ev.updated_at = datetime.now(); db.session.commit()
+    log_activity('evaluation_return', ev.code or str(eid))
+    return redirect(url_for('evaluation_view', eid=eid) + '?embed=1')
+
+@app.route('/dashboard/evaluations/goal/<int:gid>/toggle', methods=['POST'])
+def evaluation_goal_toggle(gid):
+    if not _auth():
+        return redirect(url_for('login'))
+    g = EvalGoal.query.get_or_404(gid)
+    g.done = not bool(g.done); db.session.commit()
+    return redirect(url_for('evaluation_view', eid=g.evaluation_id) + '?embed=1')
+
+@app.route('/dashboard/evaluations/pending')
+def evaluations_pending():
+    """Εκκρεμείς: ενεργοί εργαζόμενοι ΧΩΡΙΣ εγκεκριμένη αξιολόγηση για το επιλεγμένο έτος."""
+    if not _auth():
+        return redirect(url_for('login'))
+    year = request.args.get('year', type=int) or date.today().year
+    f_period = (request.args.get('period') or '').strip()
+    done_ids = set()
+    for e in latest_finalized():
+        if e.year == year and (not f_period or e.period_label == f_period):
+            done_ids.add(e.employee_id)
+    pend = [emp for emp in _employees() if emp['id'] not in done_ids]
+    pend.sort(key=lambda x: (x['hotel'], x['department'], x['name']))
+    periods = sorted({e.period_label for e in latest_finalized() if e.period_label})
+    years = sorted({e.year for e in latest_finalized() if e.year} | {date.today().year}, reverse=True)
+    return render_template('eval_pending.html', pend=pend, year=year, f_period=f_period,
+                           periods=periods, years=years, done_n=len(done_ids))
 
 print('[evaluations] module loaded (Αξιολόγηση Προσωπικού Φ1)')
