@@ -328,11 +328,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.86'
-APP_BUILD   = '366'
+APP_VERSION = '12.87'
+APP_BUILD   = '367'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.87', 'b': '367', 'date': '18/06/2026', 'time': '15:00', 'title': 'Records: προβολή + επεξεργασία + διαγραφή καταγραφών',
+     'items': ['Στο «Records» κάθε καταγραφή (πισίνας/νερού) έχει πλέον κουμπί επεξεργασίας ΚΑΙ διαγραφής (με επιβεβαίωση). Η διαγραφή είναι μόνο για admin/masteradmin.',
+               'Νέα routes: /pools/record/<id>/delete & /water/record/<id>/delete (POST, admin-only).']},
     {'v': '12.86', 'b': '366', 'date': '18/06/2026', 'time': '14:30', 'title': 'Ενημέρωση = toggle ανά ρόλο + αφαίρεση φίλτρου περιόδου από την μπάρα',
      'items': ['Η ομάδα μενού «Ενημέρωση» (Αναζήτηση/Roadmap/FAQ/feedback) γίνεται κρυφή/ορατή ανά ρόλο από «Μενού ανά ρόλο» (νέα γραμμή «Ενημέρωση»). Οι admin τη βλέπουν πάντα.',
                'Αφαιρέθηκε το global φίλτρο περιόδου («Όλα» με ημερομηνία) από την πάνω μπάρα — ήταν κατάλοιπο. Το φιλτράρισμα παραμένει διαθέσιμο server-side (default: όλα)· αν χρειαστεί φίλτρο σε συγκεκριμένο πίνακα, μπαίνει τοπικά εκεί.']},
@@ -2121,7 +2124,7 @@ def _records_items(user, ftype='all'):
         _pq = apply_period(PoolRecord.query.filter(PoolRecord.pool_id.in_(pids or [-1])), PoolRecord.record_date)
         for r in (_pq.order_by(PoolRecord.recorded_at.desc()).limit(120).all()):
             items.append({
-                'kind': 'pool', 'when': r.recorded_at, 'date': r.record_date,
+                'kind': 'pool', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
                 'hotel': r.pool.hotel.name if r.pool and r.pool.hotel else '—',
                 'place': r.pool.name if r.pool else '—',
@@ -2135,7 +2138,7 @@ def _records_items(user, ftype='all'):
         for r in (_wq.order_by(WaterRecord.recorded_at.desc()).limit(120).all()):
             ws = r.water_system
             items.append({
-                'kind': 'water', 'when': r.recorded_at, 'date': r.record_date,
+                'kind': 'water', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
                 'hotel': ws.hotel.name if ws and ws.hotel else '—',
                 'place': ws.name if ws else '—',
@@ -2155,7 +2158,29 @@ def records_feed():
     user = current_user()
     ftype = request.args.get('type', 'all')          # all | pools | water
     items = _records_items(user, ftype)
-    return render_template('records.html', items=items, ftype=ftype, user=user)
+    return render_template('records.html', items=items, ftype=ftype, user=user, is_admin=is_admin())
+
+@app.route('/pools/record/<int:record_id>/delete', methods=['POST'])
+def delete_pool_record(record_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    r = PoolRecord.query.get(record_id)
+    if r:
+        nm = r.pool.name if r.pool else ''
+        db.session.delete(r); db.session.commit()
+        log_activity('pool_record_delete', f'{nm} #{record_id}')
+    return redirect(request.referrer or (url_for('records_feed') + '?embed=1'))
+
+@app.route('/water/record/<int:record_id>/delete', methods=['POST'])
+def delete_water_record(record_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    r = WaterRecord.query.get(record_id)
+    if r:
+        nm = r.water_system.name if r.water_system else ''
+        db.session.delete(r); db.session.commit()
+        log_activity('water_record_delete', f'{nm} #{record_id}')
+    return redirect(request.referrer or (url_for('records_feed') + '?embed=1'))
 
 # v12.5 — Εξαγωγές Records (έτοιμες προς εκτύπωση)
 @app.route('/records/export.pdf')
