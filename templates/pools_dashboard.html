@@ -92,7 +92,7 @@ tr:last-child td { border-bottom:none; }
   <div class="grid2" style="margin-bottom:24px;">
     {% for tr in today_morning_list %}
     <div class="card">
-      <div class="card-title"><span class="badge badge-am">ΠΡΩΙ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at.strftime('%H:%M') if tr.recorded_at else '' }}</div>
+      <div class="card-title"><span class="badge badge-am">ΠΡΩΙ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at|gr('%H:%M') if tr.recorded_at else '' }}</div>
       <div class="grid3">
         <div class="stat-card"><div class="stat-label">Ελεύθερο χλώριο</div><div class="stat-value {{ 'ok' if tr.free_chlorine is not none and 0.4 <= tr.free_chlorine <= 1.5 else 'bad' if tr.free_chlorine is not none else '' }}">{{ tr.free_chlorine if tr.free_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · 0.4–1.5</div></div>
         <div class="stat-card"><div class="stat-label">Συνδ. χλώριο</div><div class="stat-value {{ 'ok' if tr.combined_chlorine is not none and tr.combined_chlorine <= 0.5 else 'bad' if tr.combined_chlorine is not none else '' }}">{{ tr.combined_chlorine if tr.combined_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · ≤0.5</div></div>
@@ -104,7 +104,7 @@ tr:last-child td { border-bottom:none; }
     {% endfor %}
     {% for tr in today_afternoon_list %}
     <div class="card">
-      <div class="card-title"><span class="badge badge-pm">ΑΠΟΓΕΥΜΑ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at.strftime('%H:%M') if tr.recorded_at else '' }}</div>
+      <div class="card-title"><span class="badge badge-pm">ΑΠΟΓΕΥΜΑ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.pool.hotel.name if tr.pool and tr.pool.hotel else '' }}{{ ' · ' + tr.pool.name if tr.pool else '' }}</span> — {{ tr.user.full_name if tr.user else '' }} — {{ tr.recorded_at|gr('%H:%M') if tr.recorded_at else '' }}</div>
       <div class="grid3">
         <div class="stat-card"><div class="stat-label">Ελεύθερο χλώριο</div><div class="stat-value {{ 'ok' if tr.free_chlorine is not none and 0.4 <= tr.free_chlorine <= 1.5 else 'bad' if tr.free_chlorine is not none else '' }}">{{ tr.free_chlorine if tr.free_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · 0.4–1.5</div></div>
         <div class="stat-card"><div class="stat-label">Συνδ. χλώριο</div><div class="stat-value {{ 'ok' if tr.combined_chlorine is not none and tr.combined_chlorine <= 0.5 else 'bad' if tr.combined_chlorine is not none else '' }}">{{ tr.combined_chlorine if tr.combined_chlorine is not none else '—' }}</div><div class="stat-sub">mg/L · ≤0.5</div></div>

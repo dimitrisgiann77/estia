@@ -97,7 +97,7 @@ tr:last-child td { border-bottom:none; }
   <div class="grid2">
     {% for tr in today_morning_list %}
     <div class="card">
-      <div class="card-title"><span class="badge badge-am">ΠΡΩΙ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.water_system.hotel.name if tr.water_system and tr.water_system.hotel else '' }}{{ ' · ' + tr.water_system.name if tr.water_system else '' }}</span> — {{ tr.user.full_name }} — {{ tr.recorded_at.strftime('%H:%M') }}</div>
+      <div class="card-title"><span class="badge badge-am">ΠΡΩΙ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.water_system.hotel.name if tr.water_system and tr.water_system.hotel else '' }}{{ ' · ' + tr.water_system.name if tr.water_system else '' }}</span> — {{ tr.user.full_name }} — {{ tr.recorded_at|gr('%H:%M') }}</div>
       <div class="grid3">
         <div class="stat-card">
           <div class="stat-label">CLO₂ Δεξαμενή</div>
@@ -130,7 +130,7 @@ tr:last-child td { border-bottom:none; }
 
     {% for tr in today_afternoon_list %}
     <div class="card">
-      <div class="card-title"><span class="badge badge-pm">ΑΠΟΓΕΥΜΑ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.water_system.hotel.name if tr.water_system and tr.water_system.hotel else '' }}{{ ' · ' + tr.water_system.name if tr.water_system else '' }}</span> — {{ tr.user.full_name }} — {{ tr.recorded_at.strftime('%H:%M') }}</div>
+      <div class="card-title"><span class="badge badge-pm">ΑΠΟΓΕΥΜΑ</span> &nbsp; <span style="color:#193847;font-weight:600;">{{ tr.water_system.hotel.name if tr.water_system and tr.water_system.hotel else '' }}{{ ' · ' + tr.water_system.name if tr.water_system else '' }}</span> — {{ tr.user.full_name }} — {{ tr.recorded_at|gr('%H:%M') }}</div>
       <div class="grid3">
         <div class="stat-card">
           <div class="stat-label">CLO₂ Δεξαμενή</div>

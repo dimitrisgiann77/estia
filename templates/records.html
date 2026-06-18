@@ -82,7 +82,7 @@ tr:last-child td { border-bottom:none; }
           {% for it in items %}
           <tr>
             <td>{{ it.date.strftime('%d/%m/%Y') }}</td>
-            <td class="muted">{{ it.when.strftime('%H:%M') if it.when else '—' }}</td>
+            <td class="muted">{{ it.when|gr('%H:%M') if it.when else '—' }}</td>
             <td>{% if it.kind == 'pool' %}<span class="badge badge-pool"><i class="ti ti-pool"></i> Πισίνα</span>{% else %}<span class="badge badge-water"><i class="ti ti-droplet"></i> Νερά</span>{% endif %}</td>
             <td><span class="badge {{ 'badge-am' if it.period == 'morning' else 'badge-pm' }}">{{ 'Πρωί' if it.period == 'morning' else 'Απόγ.' }}</span></td>
             <td>{{ it.hotel }}</td>

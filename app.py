@@ -329,11 +329,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.89'
-APP_BUILD   = '369'
+APP_VERSION = '12.90'
+APP_BUILD   = '370'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.90', 'b': '370', 'date': '18/06/2026', 'time': '17:00', 'title': 'Ώρα Ελλάδος στις υποβολές (όχι UTC)',
+     'items': ['Οι ώρες των υποβολών (Records, Πίνακας Πισινών, Πίνακας Νερών, εξαγωγές) δείχνουν πλέον ώρα Ελλάδος (Europe/Athens) αντί για UTC — π.χ. 09:54 αντί 06:54. Η αποθήκευση παραμένει UTC, μετατροπή στην εμφάνιση (filter |gr).']},
     {'v': '12.89', 'b': '369', 'date': '18/06/2026', 'time': '16:30', 'title': 'Κρυφή εγγραφή μέχρι το go-live',
      'items': ['Ο σύνδεσμος «Εγγραφή νέου χρήστη» κρύφτηκε από το login και το /register κλειδώθηκε (redirect στο login) — διακόπτης REGISTRATION_OPEN=False. Όταν πάμε live γίνεται True.']},
     {'v': '12.88', 'b': '368', 'date': '18/06/2026', 'time': '16:00', 'title': 'Redesign φορμών μετρήσεων + καθαρό header + mobile + υποχρεωτικά πεδία',
@@ -1429,7 +1431,7 @@ _RECORDS_HEADERS = ['Ημ/νία', 'Ώρα', 'Τύπος', 'Βάρδια', 'Ξε
 def _records_row(it):
     return [
         it['date'].strftime('%d/%m/%Y') if it.get('date') else '',
-        it['when'].strftime('%H:%M') if it.get('when') else '',
+        _gr_time(it['when'], '%H:%M') if it.get('when') else '',
         'Πισίνα' if it['kind'] == 'pool' else 'Νερά',
         'Πρωί' if it['period'] == 'morning' else 'Απόγευμα',
         it.get('hotel') or '', it.get('place') or '', it.get('user') or '',
