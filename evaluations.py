@@ -70,6 +70,18 @@ class EvalGoal(db.Model):
     done          = db.Column(db.Boolean, default=False)
     created_at    = db.Column(db.DateTime, default=datetime.now)
 
+class EvalPeriod(db.Model):
+    """v12.100 — Περίοδοι αξιολόγησης ορισμένες από HR (π.χ. «1η αξιολόγηση» 15/05/2026)."""
+    id        = db.Column(db.Integer, primary_key=True)
+    name      = db.Column(db.String(80))
+    ref_date  = db.Column(db.Date)
+    is_active = db.Column(db.Boolean, default=True)
+    sort      = db.Column(db.Integer, default=0)
+    created_at= db.Column(db.DateTime, default=datetime.now)
+    @property
+    def label(self):
+        return ('%s - %s' % (self.name, self.ref_date.strftime('%d/%m/%Y'))) if self.ref_date else (self.name or '')
+
 # ── Seed προτύπου (reference CONDIAN) ─────────────────────────────────────────
 _CORE = [
     ('Γνώση & Κατανόηση της δουλειάς', 0.05), ('Συνέπεια στο ωράριο', 0.06),
@@ -129,6 +141,9 @@ def ensure_eval_setup():
         db.session.rollback(); print('[evaluations] seed skipped:', e)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+def _active_periods():
+    return EvalPeriod.query.filter_by(is_active=True).order_by(EvalPeriod.sort, EvalPeriod.ref_date).all()
+
 def band_for(pct):
     if pct is None: return '—'
     if pct >= 80: return 'Εξαιρετική'
@@ -266,7 +281,7 @@ def evaluation_new():
     templates = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all()
     return render_template('evaluation_form.html', ev=None, tmpl=tmpl, templates=templates,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores={}, goals=[], today=date.today())
+                           scores={}, goals=[], periods=_active_periods(), today=date.today())
 
 @app.route('/dashboard/evaluations/<int:eid>')
 def evaluation_view(eid):
@@ -295,7 +310,7 @@ def evaluation_edit(eid):
     scores = {s.criterion_id: s for s in ev.scores}
     return render_template('evaluation_form.html', ev=ev, tmpl=tmpl, templates=None,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores=scores, goals=sorted(ev.goals, key=lambda g: g.id), today=date.today())
+                           scores=scores, goals=sorted(ev.goals, key=lambda g: g.id), periods=_active_periods(), today=date.today())
 
 @app.route('/dashboard/evaluations/<int:eid>/delete', methods=['POST'])
 def evaluation_delete(eid):
@@ -343,12 +358,19 @@ def _save_evaluation(ev, tmpl):
     ev.hotel_id = getattr(emp, 'home_hotel_id', None)
     ev.department_id = getattr(emp, 'department_id', None)
     ev.template_id = tmpl.id
-    ev.period_label = (fm.get('period_label') or '').strip()[:40]
-    ev.year = yr
-    try:
-        ev.eval_date = datetime.strptime(fm.get('eval_date', ''), '%Y-%m-%d').date()
-    except ValueError:
-        ev.eval_date = date.today()
+    pid = fm.get('period_id', type=int)
+    per = EvalPeriod.query.get(pid) if pid else None
+    if per:
+        ev.period_label = per.label[:60]
+        ev.year = per.ref_date.year if per.ref_date else yr
+        ev.eval_date = per.ref_date or date.today()
+    else:
+        ev.period_label = (fm.get('period_label') or '').strip()[:60]
+        ev.year = yr
+        try:
+            ev.eval_date = datetime.strptime(fm.get('eval_date', ''), '%Y-%m-%d').date()
+        except ValueError:
+            ev.eval_date = date.today()
     ev.score_pct = pct
     ev.band = band_for(pct)
     ev.prev_eval_id = prev.id if prev else None
@@ -755,5 +777,44 @@ def evaluations_pending():
     years = sorted({e.year for e in latest_finalized() if e.year} | {date.today().year}, reverse=True)
     return render_template('eval_pending.html', pend=pend, year=year, f_period=f_period,
                            periods=periods, years=years, done_n=len(done_ids))
+
+# ── Περίοδοι αξιολόγησης (HR) ─────────────────────────────────────────────────
+@app.route('/dashboard/evaluations/periods', methods=['GET', 'POST'])
+def eval_periods():
+    if not _auth():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        ds = request.form.get('ref_date', '')
+        if name:
+            try:
+                rd = datetime.strptime(ds, '%Y-%m-%d').date()
+            except ValueError:
+                rd = None
+            mx = db.session.query(db.func.max(EvalPeriod.sort)).scalar() or 0
+            db.session.add(EvalPeriod(name=name[:80], ref_date=rd, sort=mx + 1, is_active=True))
+            db.session.commit(); log_activity('eval_period_add', name)
+        return redirect(url_for('eval_periods') + '?embed=1')
+    periods = EvalPeriod.query.order_by(EvalPeriod.sort, EvalPeriod.ref_date).all()
+    used = {}
+    for pr in periods:
+        used[pr.id] = Evaluation.query.filter_by(period_label=pr.label).count()
+    return render_template('eval_periods.html', periods=periods, used=used, today=date.today())
+
+@app.route('/dashboard/evaluations/periods/<int:pid>/delete', methods=['POST'])
+def eval_period_delete(pid):
+    if not _auth():
+        return redirect(url_for('login'))
+    pr = EvalPeriod.query.get_or_404(pid)
+    db.session.delete(pr); db.session.commit()
+    return redirect(url_for('eval_periods') + '?embed=1')
+
+@app.route('/dashboard/evaluations/periods/<int:pid>/toggle', methods=['POST'])
+def eval_period_toggle(pid):
+    if not _auth():
+        return redirect(url_for('login'))
+    pr = EvalPeriod.query.get_or_404(pid)
+    pr.is_active = not bool(pr.is_active); db.session.commit()
+    return redirect(url_for('eval_periods') + '?embed=1')
 
 print('[evaluations] module loaded (Αξιολόγηση Προσωπικού Φ1)')

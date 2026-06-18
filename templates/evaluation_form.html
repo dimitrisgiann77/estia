@@ -57,9 +57,18 @@
           {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-spec="{{ e.specialty }}">{{ e.name }}</option>{% endfor %}
         </select>
       </div>
+      {% if periods %}
+      <div class="ef-f"><label>Περίοδος αξιολόγησης *</label>
+        <select name="period_id" required>
+          <option value="">— Επιλογή —</option>
+          {% for pr in periods %}<option value="{{ pr.id }}" {{ 'selected' if ev and ev.period_label==pr.label }}>{{ pr.name }}{{ ' - '+pr.ref_date.strftime('%d/%m/%Y') if pr.ref_date }}</option>{% endfor %}
+        </select>
+      </div>
+      {% else %}
       <div class="ef-f"><label>Περίοδος / Σαιζόν *</label><input type="text" name="period_label" placeholder="π.χ. Καλοκαίρι" value="{{ ev.period_label if ev else '' }}" required></div>
       <div class="ef-f"><label>Έτος *</label><input type="number" name="year" min="2020" max="2100" value="{{ ev.year if ev else today.year }}" required></div>
       <div class="ef-f"><label>Ημ/νία αξιολόγησης *</label><input type="date" name="eval_date" value="{{ (ev.eval_date.strftime('%Y-%m-%d') if ev and ev.eval_date else today.strftime('%Y-%m-%d')) }}" required></div>
+      {% endif %}
     </div>
     <div class="ef-info" id="emp-info"></div>
     {% if not ev and templates and templates|length>1 %}

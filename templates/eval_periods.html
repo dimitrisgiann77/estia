@@ -1,0 +1,32 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Περίοδοι Αξιολόγησης', theme.primary if theme else '#193847') }}</head><body>
+{{ mp.topbar('calendar-event', 'Περίοδοι Αξιολόγησης', 'Όρισε τις περιόδους (π.χ. «1η αξιολόγηση» 15/05/2026)') }}
+<div class="container">
+  <div class="card">
+    <form method="POST" action="/dashboard/evaluations/periods" class="filters">
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Ονομασία περιόδου</label><input type="text" name="name" placeholder="π.χ. 1η αξιολόγηση" required style="padding:9px;border:1px solid #d6eef3;border-radius:8px;min-width:220px;"></div>
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Ημερομηνία αναφοράς</label><input type="date" name="ref_date" style="padding:9px;border:1px solid #d6eef3;border-radius:8px;"></div>
+      <button class="btn" type="submit" style="align-self:flex-end;"><i class="ti ti-plus"></i> Προσθήκη</button>
+    </form>
+  </div>
+  <div class="card">
+    <table data-nocopy>
+      <thead><tr><th>Περίοδος</th><th>Ημ/νία</th><th>Χρήσεις</th><th>Κατάσταση</th><th></th></tr></thead>
+      <tbody>
+      {% for pr in periods %}
+      <tr>
+        <td><b>{{ pr.name }}</b></td>
+        <td>{{ pr.ref_date.strftime('%d/%m/%Y') if pr.ref_date else '—' }}</td>
+        <td>{{ used.get(pr.id, 0) }}</td>
+        <td>{% if pr.is_active %}<span class="badge" style="background:#dcfce7;color:#16a34a;">ενεργή</span>{% else %}<span class="badge" style="background:#f1f5f9;color:#64748b;">ανενεργή</span>{% endif %}</td>
+        <td style="white-space:nowrap;">
+          <form method="POST" action="/dashboard/evaluations/periods/{{ pr.id }}/toggle" style="display:inline;"><button class="btn" type="submit" style="padding:5px 10px;background:#64748b;" title="Ενεργή/Ανενεργή"><i class="ti ti-power"></i></button></form>
+          {% if not used.get(pr.id, 0) %}<form method="POST" action="/dashboard/evaluations/periods/{{ pr.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή περιόδου;');"><button class="btn" type="submit" style="padding:5px 10px;background:#dc2626;" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="5" class="muted" style="text-align:center;padding:22px;">Καμία περίοδος ακόμα — πρόσθεσε μία πάνω.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα αξιολογήσεων</a>
+</div></body></html>
