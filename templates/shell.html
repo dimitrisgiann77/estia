@@ -101,7 +101,7 @@ html[data-theme="dark"] .adm>summary:hover{background:#1b2735;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 @media(max-width:1120px){ .top .hdr-meta{display:none;} }
 @media(max-width:900px){ .top .apps .hbtn span{display:none;} .top .apps .hbtn{padding:7px 9px;} }
-@media(max-width:560px){ .top .apps{display:none;} .foot{font-size:10px;gap:6px;} }
+@media(max-width:560px){ .top .apps{display:none;} .foot{display:none!important;} .prof-menu{position:fixed;top:54px;right:6px;left:auto;width:auto;min-width:230px;max-width:calc(100vw - 12px);max-height:calc(100vh - 64px);overflow-y:auto;} }
 /* v12.8 — προφίλ dropdown */
 .top .prof{position:relative;}
 .top .who{background:rgba(255,255,255,.0);border:none;cursor:pointer;padding:5px 8px;border-radius:9px;}
@@ -184,22 +184,10 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
 <div class="app" id="app">
   <div class="top">
     <button class="ham" onclick="document.getElementById('app').classList.toggle('open')"><i class="ti ti-menu-2"></i></button>
-    <div class="brand"><img src="{{ theme.logo or '/static/img/logo-white.svg' }}" alt="logo"> <span>{{ theme.app_title }}</span></div>
     <div class="hdr-meta">
       <div class="hdr-clock"><b id="hclock">—:—:—</b><span id="hdate">—</span></div>
       <div class="hdr-weather" id="hweather"><i class="ti ti-cloud"></i><span class="t">—</span><span class="loc"></span></div>
     </div>
-    {% if nav_hotels|length > 1 %}
-    <div class="hdr-hotel" title="Εναλλαγή ξενοδοχείου">
-      <i class="ti ti-building-skyscraper"></i>
-      <select id="hotelSwitch" onchange="setHotel(this.value)">
-        <option value="all" {{ 'selected' if not active_hid }}>Όλα τα ξενοδοχεία</option>
-        {% for h in nav_hotels %}<option value="{{ h.id }}" {{ 'selected' if active_hid==h.id }}>{{ h.name }}</option>{% endfor %}
-      </select>
-    </div>
-    {% elif nav_hotels|length == 1 %}
-    <div class="hdr-hotel"><i class="ti ti-building-skyscraper"></i><span>{{ nav_hotels[0].name }}</span></div>
-    {% endif %}
     <div class="sp"></div>
     <div class="apps">
       {% if ws_show('operations') %}<button class="hbtn active" data-ws="operations" onclick="setWorkspace('operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>{% endif %}

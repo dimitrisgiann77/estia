@@ -3,205 +3,148 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>CONDIAN HOTELS — Pool Log</title>
+<title>Εστία — Πισίνες</title>
 <meta name="theme-color" content="#193847">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
 <style>
-.app-header.pool { background:#193847; }
-.period-btn.pool.active { color:#193847; border-bottom-color:#BB9549; }
-.submit-btn.pool { background:#193847; }
-.submit-btn.pool:hover { background:#122a36; }
-.select-field { width:100%; padding:10px 12px; border:1.5px solid #cfe8ef; border-radius:8px; font-size:15px; background:#f8fcff; color:#1a1a1a; }
-.select-field:focus { outline:none; border-color:#193847; background:white; }
-.pool-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.pool-pill { font-size:11px; padding:3px 8px; border-radius:10px; background:#e0f2fe; color:#193847; }
-.pool-pill.done { background:#dcfce7; color:#16a34a; }
-.check-row { display:flex; align-items:center; gap:8px; font-size:14px; color:#444; }
-.check-row input { width:18px; height:18px; }
-.action-tip { background:#fffbeb; border:1px solid #fde68a; color:#92400e; font-size:12px; padding:5px 8px; border-radius:6px; margin-top:4px; display:flex; gap:6px; align-items:flex-start; line-height:1.35; }
-.back-link{display:inline-flex;align-items:center;gap:5px;color:#193847;text-decoration:none;font-size:13px;font-weight:600;margin:10px 14px 0;}
-.next-steps-card{border:1px solid #fde68a;background:#fffbeb;border-radius:12px;}
-.next-steps-card .sec-title{color:#b45309;}
-.ns-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#92400e;line-height:1.4;padding:6px 0;border-top:1px dashed #fde68a;}
-.ns-item:first-of-type{border-top:none;}
-.ns-item.urgent{color:#b91c1c;font-weight:600;}
-.ns-ok{display:flex;gap:8px;align-items:center;font-size:13px;color:#16a34a;font-weight:600;}
-.ai-btn{margin-top:10px;width:100%;padding:9px;border:1px solid #c7b6e8;background:#f5f1fc;color:#5b3ea8;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
-.ai-reply{margin-top:8px;font-size:13px;color:#3c2a6b;background:#f5f1fc;border:1px solid #e3d9f5;border-radius:8px;padding:10px;line-height:1.5;white-space:pre-wrap;}
-
+:root{--brand:{{ theme.primary if theme else '#193847' }};--accent:{{ theme.accent if theme else '#BB9549' }};}
+*{box-sizing:border-box;}
+.mf-wrap{max-width:720px;margin:0 auto;padding:12px 12px 96px;}
+.mf-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.mf-back{display:inline-flex;align-items:center;gap:5px;color:var(--brand);text-decoration:none;font-size:13px;font-weight:600;}
+.mf-place{font-size:13px;font-weight:600;color:#1e293b;text-align:right;}
+.mf-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.mf-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:14px;font-weight:600;cursor:pointer;}
+.mf-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+.mf-card{background:#fff;border:1px solid #e7eef2;border-radius:16px;padding:14px;margin-bottom:12px;}
+.mf-card-h{font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.mf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:460px){.mf-grid{grid-template-columns:1fr;}}
+.mf-field label{display:block;font-size:12.5px;color:#334155;margin-bottom:5px;font-weight:500;}
+.mf-field .req{color:#dc2626;margin-left:2px;}
+.mf-field input[type=number],.mf-field input[type=text]{width:100%;padding:11px 12px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:16px;background:#f8fbfd;color:#0f172a;outline:none;transition:border-color .12s,box-shadow .12s;}
+.mf-field input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(25,56,71,.10);}
+.mf-field input.ok{border-color:#86c9a4;background:#f3fbf6;}
+.mf-field input.bad{border-color:#e8a3a3;background:#fdf4f4;box-shadow:0 0 0 3px rgba(220,38,38,.08);}
+.mf-hint{font-size:11px;margin-top:4px;display:flex;align-items:center;gap:4px;min-height:14px;}
+.mf-hint.ok{color:#16a34a;}
+.mf-hint.bad{color:#dc2626;}
+.mf-check{display:flex;align-items:center;gap:10px;font-size:14px;color:#334155;padding:4px 0;}
+.mf-check input{width:20px;height:20px;}
+.mf-notes{width:100%;min-height:70px;padding:11px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:15px;background:#f8fbfd;resize:vertical;color:#0f172a;}
+.mf-actions{border:1px solid #fcd9a6;background:#fffaf0;border-radius:16px;padding:14px;margin-bottom:12px;}
+.mf-actions-h{font-size:13px;font-weight:600;color:#b45309;display:flex;align-items:center;gap:7px;margin-bottom:8px;}
+.mf-act{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#92400e;line-height:1.45;padding:7px 0;border-top:1px solid #fde8c4;}
+.mf-act:first-of-type{border-top:none;}
+.mf-act.urgent{color:#b91c1c;font-weight:600;}
+.mf-actions.ok{border-color:#bbe7cd;background:#f3fbf6;}
+.mf-actions.ok .mf-actions-h{color:#16a34a;}
+.mf-ai{margin-top:10px;width:100%;padding:10px;border:1px solid #cfc2ea;background:#f6f2fc;color:#5b3ea8;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.mf-airep{margin-top:8px;font-size:13px;color:#3c2a6b;background:#f6f2fc;border:1px solid #e3d9f5;border-radius:10px;padding:10px;line-height:1.5;white-space:pre-wrap;}
+.mf-bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e7eef2;padding:10px 12px;display:flex;flex-direction:column;gap:6px;z-index:40;}
+.mf-count{font-size:11.5px;color:#64748b;text-align:center;}
+.mf-submit{width:100%;padding:14px;border:none;border-radius:12px;background:var(--brand);color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.mf-submit:disabled{background:#cbd5e1;color:#fff;cursor:not-allowed;}
+.mf-msg{font-size:13px;text-align:center;padding:8px;border-radius:10px;}
+.mf-msg.success{background:#dcfce7;color:#16a34a;}
+.mf-msg.error{background:#fee2e2;color:#dc2626;}
+.mf-sel{width:100%;padding:11px 12px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:15px;background:#f8fbfd;color:#0f172a;}
+.mf-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:10px;background:#dcfce7;color:#16a34a;margin-top:8px;font-weight:600;}
+html[data-theme="dark"] .mf-card,html[data-theme="dark"] .mf-tab{background:#141d2a;border-color:#243140;}
+html[data-theme="dark"] .mf-field input,html[data-theme="dark"] .mf-notes,html[data-theme="dark"] .mf-sel{background:#0f1722;border-color:#2c3a4a;color:#e6edf3;}
+html[data-theme="dark"] .mf-place{color:#e6edf3;}
+html[data-theme="dark"] .mf-bar{background:#141d2a;border-top-color:#243140;}
 </style>
-<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
-.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
-.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
-.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head>
 <body>
 
-<header class="app-header pool">
-  <div class="header-left">
-    <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
-    <div>
-      <div class="header-title">CONDIAN HOTELS — Pool Log</div>
-      <div class="header-sub" id="today-date"></div>
-    </div>
-  </div>
-  <div class="header-right">
-    <a href="/assistant" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.25);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-message-chatbot" style="font-size:14px;"></i> SpithaAI
-    </a>
-    <a href="/app" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-droplet" style="font-size:14px;"></i> Νερά
-    </a>
-    {% if user.role in ['admin','masteradmin'] %}
-    <a href="/pools/dashboard" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-layout-dashboard" style="font-size:14px;"></i> Dashboard
-    </a>
-    {% endif %}
-    <div class="lang-toggle">
-      <a href="/set-language/el" class="{{ 'active' if session.get('language','el')=='el' }}">ΕΛ</a>
-      <span>|</span>
-      <a href="/set-language/en" class="{{ 'active' if session.get('language','el')=='en' }}">EN</a>
-    </div>
-    <a href="/fault" class="logout-btn" title="Αναφορά βλάβης"><i class="ti ti-tool"></i></a>
-    <a href="/notifications" class="logout-btn" title="Ειδοποιήσεις" style="position:relative;"><i class="ti ti-bell"></i>{% if nav_unread %}<span style="position:absolute;top:-2px;right:-3px;background:#dc2626;color:#fff;font-size:9px;min-width:14px;height:14px;line-height:14px;border-radius:7px;text-align:center;padding:0 3px;">{{ nav_unread }}</span>{% endif %}</a>
-    <a href="/profile" class="logout-btn" title="Προφίλ"><i class="ti ti-user-circle"></i></a>
-    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
-  </div>
-</header>
-
-<div class="user-badge">
-  <i class="ti ti-user-circle"></i>
-  <span>{{ user.full_name }}</span>
-</div>
-<a href="/katagrafes" class="back-link"><i class="ti ti-arrow-left"></i> Σήμερα</a>
-
+<div class="mf-wrap">
 {% if not hotels %}
-<div class="app-content">
-  <div class="section" style="text-align:center;color:#888;">
-    <i class="ti ti-pool" style="font-size:32px;"></i>
-    <p style="margin-top:10px;" data-el="Δεν υπάρχουν πισίνες ακόμα." data-en="No pools yet.">Δεν υπάρχουν πισίνες ακόμα.</p>
-    {% if user.role in ['admin','masteradmin'] %}<p style="margin-top:6px;"><a href="/pools/dashboard" style="color:#193847;">Πρόσθεσε ξενοδοχείο & πισίνα →</a></p>{% endif %}
+  <div style="text-align:center;color:#94a3b8;padding:50px 10px;">
+    <i class="ti ti-pool" style="font-size:34px;"></i>
+    <p style="margin-top:10px;">Δεν υπάρχουν πισίνες ακόμα.</p>
   </div>
-</div>
 {% else %}
 
-<div class="period-bar">
-  <button class="period-btn pool active" id="btn-morning" onclick="setPeriod('morning')">
-    <i class="ti ti-sun"></i>
-    <span data-el="Πρωί" data-en="Morning">Πρωί</span>
-  </button>
-  <button class="period-btn pool" id="btn-afternoon" onclick="setPeriod('afternoon')">
-    <i class="ti ti-moon"></i>
-    <span data-el="Απόγευμα" data-en="Afternoon">Απόγευμα</span>
-  </button>
-</div>
-
-<div class="app-content">
-<form id="pool-form">
-<input type="hidden" id="period-input" name="period" value="morning">
-
-<!-- Επιλογή ξενοδοχείου & πισίνας -->
-<div class="section">
-  <div class="sec-title"><i class="ti ti-building"></i> <span data-el="Ξενοδοχείο & Πισίνα" data-en="Hotel & Pool">Ξενοδοχείο & Πισίνα</span></div>
-  <div class="field">
-    <label data-el="Ξενοδοχείο" data-en="Hotel">Ξενοδοχείο</label>
-    <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
+  <div class="mf-top">
+    <a href="/katagrafes" class="mf-back"><i class="ti ti-arrow-left"></i> Σήμερα</a>
+    <span class="mf-place" id="mf-place">Πισίνες</span>
   </div>
-  <div class="field">
-    <label data-el="Πισίνα" data-en="Pool">Πισίνα</label>
-    <select id="pool-select" name="pool_id" class="select-field" onchange="onPoolChange()"></select>
-    <div class="pool-pills" id="pool-status"></div>
-  </div>
-</div>
 
-<!-- Χημικές μετρήσεις -->
-<div class="section">
-  <div class="sec-title"><i class="ti ti-flask"></i> <span data-el="Χημικές μετρήσεις" data-en="Chemical readings">Χημικές μετρήσεις</span></div>
-  <div class="grid2">
-    <div class="field">
-      <label data-el="Ελεύθερο χλώριο (0.4–1.5)" data-en="Free chlorine (0.4–1.5)">Ελεύθερο χλώριο (0.4–1.5)</label>
-      <input type="number" name="free_chlorine" id="free_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()">
-      <div id="free_chlorine_st"></div>
+  <div class="mf-tabs">
+    <button type="button" class="mf-tab active" id="tab-morning" onclick="setPeriod('morning')"><i class="ti ti-sun"></i> Πρωί 08:00</button>
+    <button type="button" class="mf-tab" id="tab-afternoon" onclick="setPeriod('afternoon')"><i class="ti ti-moon"></i> Απόγευμα 17:00</button>
+  </div>
+
+  <form id="pool-form">
+  <input type="hidden" id="period-input" name="period" value="morning">
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-building"></i> Ξενοδοχείο & πισίνα</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Ξενοδοχείο</label><select id="hotel-select" class="mf-sel" onchange="onHotelChange()"></select></div>
+      <div class="mf-field"><label>Πισίνα</label><select id="pool-select" name="pool_id" class="mf-sel" onchange="onPoolChange()"></select></div>
     </div>
-    <div class="field">
-      <label data-el="Συνδεδεμένο χλώριο (≤0.5)" data-en="Combined chlorine (≤0.5)">Συνδεδεμένο χλώριο (≤0.5)</label>
-      <input type="number" name="combined_chlorine" id="combined_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()">
-      <div id="combined_chlorine_st"></div>
-    </div>
-    <div class="field">
-      <label data-el="pH (7.2–7.8)" data-en="pH (7.2–7.8)">pH (7.2–7.8)</label>
-      <input type="number" name="ph" id="ph" min="0" max="14" step="0.1" placeholder="pH" oninput="validate()">
-      <div id="ph_st"></div>
-    </div>
-    <div class="field">
-      <label data-el="Θερμοκρασία (≤32°C)" data-en="Temperature (≤32°C)">Θερμοκρασία (≤32°C)</label>
-      <input type="number" name="temp" id="temp" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()">
-      <div id="temp_st"></div>
-    </div>
-    <div class="field">
-      <label data-el="Θολότητα (≤1 NTU)" data-en="Turbidity (≤1 NTU)">Θολότητα (≤1 NTU)</label>
-      <input type="number" name="turbidity" id="turbidity" min="0" max="20" step="0.1" placeholder="NTU" oninput="validate()">
-      <div id="turbidity_st"></div>
+    <div id="pool-status"></div>
+  </div>
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-flask-2"></i> Χημικές μετρήσεις</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Ελεύθερο χλώριο <span class="req">*</span> <small style="color:#94a3b8;">(0.4–1.5)</small></label>
+        <input type="number" name="free_chlorine" id="free_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()"><div class="mf-hint" id="free_chlorine_st"></div></div>
+      <div class="mf-field"><label>Συνδεδεμένο χλώριο <span class="req">*</span> <small style="color:#94a3b8;">(≤0.5)</small></label>
+        <input type="number" name="combined_chlorine" id="combined_chlorine" min="0" max="10" step="0.01" placeholder="mg/L" oninput="validate()"><div class="mf-hint" id="combined_chlorine_st"></div></div>
+      <div class="mf-field"><label>pH <span class="req">*</span> <small style="color:#94a3b8;">(7.2–7.8)</small></label>
+        <input type="number" name="ph" id="ph" min="0" max="14" step="0.1" placeholder="pH" oninput="validate()"><div class="mf-hint" id="ph_st"></div></div>
+      <div class="mf-field"><label>Θερμοκρασία <span class="req">*</span> <small style="color:#94a3b8;">(≤32°C)</small></label>
+        <input type="number" name="temp" id="temp" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_st"></div></div>
+      <div class="mf-field"><label>Θολότητα <span class="req">*</span> <small style="color:#94a3b8;">(≤1 NTU)</small></label>
+        <input type="number" name="turbidity" id="turbidity" min="0" max="20" step="0.1" placeholder="NTU" oninput="validate()"><div class="mf-hint" id="turbidity_st"></div></div>
     </div>
   </div>
-</div>
 
-<!-- Περιοδικά (πρωί) -->
-<div class="section" id="morning-extra">
-  <div class="sec-title"><i class="ti ti-test-pipe"></i> <span data-el="Περιοδικά (πρωί)" data-en="Periodic (morning)">Περιοδικά (πρωί)</span></div>
-  <div class="grid2">
-    <div class="field">
-      <label data-el="Κυανουρικό οξύ (≤75)" data-en="Cyanuric acid (≤75)">Κυανουρικό οξύ (≤75)</label>
-      <input type="number" name="cyanuric_acid" id="cyanuric_acid" min="0" max="300" step="1" placeholder="mg/L" oninput="validate()">
-      <div id="cyanuric_acid_st"></div>
-    </div>
-    <div class="field">
-      <label data-el="Ολική αλκαλικότητα (80–120)" data-en="Total alkalinity (80–120)">Ολική αλκαλικότητα (80–120)</label>
-      <input type="number" name="total_alkalinity" id="total_alkalinity" min="0" max="400" step="1" placeholder="mg/L" oninput="validate()">
-      <div id="total_alkalinity_st"></div>
-    </div>
-    <div class="field">
-      <label data-el="ORP / Redox (≥650)" data-en="ORP / Redox (≥650)">ORP / Redox (≥650)</label>
-      <input type="number" name="orp" id="orp" min="0" max="1200" step="1" placeholder="mV" oninput="validate()">
-      <div id="orp_st"></div>
+  <div class="mf-card" id="morning-extra">
+    <div class="mf-card-h"><i class="ti ti-test-pipe"></i> Περιοδικά (πρωί)</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Κυανουρικό οξύ <span class="req">*</span> <small style="color:#94a3b8;">(≤75)</small></label>
+        <input type="number" name="cyanuric_acid" id="cyanuric_acid" min="0" max="300" step="1" placeholder="mg/L" oninput="validate()"><div class="mf-hint" id="cyanuric_acid_st"></div></div>
+      <div class="mf-field"><label>Ολική αλκαλικότητα <span class="req">*</span> <small style="color:#94a3b8;">(80–120)</small></label>
+        <input type="number" name="total_alkalinity" id="total_alkalinity" min="0" max="400" step="1" placeholder="mg/L" oninput="validate()"><div class="mf-hint" id="total_alkalinity_st"></div></div>
+      <div class="mf-field"><label>ORP / Redox <span class="req">*</span> <small style="color:#94a3b8;">(≥650)</small></label>
+        <input type="number" name="orp" id="orp" min="0" max="1200" step="1" placeholder="mV" oninput="validate()"><div class="mf-hint" id="orp_st"></div></div>
     </div>
   </div>
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-filter"></i> Λειτουργικά</div>
+    <label class="mf-check"><input type="checkbox" name="backwash_done" value="1"> Έγινε ανταπόπλυση φίλτρου (backwash)</label>
+  </div>
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-notes"></i> Σημειώσεις <small style="color:#94a3b8;text-transform:none;letter-spacing:0;font-weight:400;">(προαιρετικό)</small></div>
+    <textarea name="notes" id="notes" class="mf-notes" placeholder="Οποιαδήποτε παρατήρηση..."></textarea>
+  </div>
+
+  <div class="mf-actions" id="next-steps" style="display:none;">
+    <div class="mf-actions-h"><i class="ti ti-bulb"></i> Προτεινόμενες ενέργειες</div>
+    <div id="next-steps-body"></div>
+    {% if ai_configured %}<button type="button" class="mf-ai" id="ai-btn" onclick="askAI()"><i class="ti ti-message-chatbot"></i> Ανάλυση από SpithaAI</button>
+    <div class="mf-airep" id="ai-reply" style="display:none;"></div>{% endif %}
+  </div>
+
+  </form>
+{% endif %}
 </div>
 
-<!-- Λειτουργικά -->
-<div class="section">
-  <div class="sec-title"><i class="ti ti-filter"></i> <span data-el="Λειτουργικά" data-en="Operational">Λειτουργικά</span></div>
-  <label class="check-row">
-    <input type="checkbox" name="backwash_done" value="1">
-    <span data-el="Έγινε ανταπόπλυση φίλτρου (backwash)" data-en="Filter backwash done">Έγινε ανταπόπλυση φίλτρου (backwash)</span>
-  </label>
-</div>
-
-<!-- Παρατηρήσεις -->
-<div class="section">
-  <div class="sec-title"><i class="ti ti-notes"></i> <span data-el="Παρατηρήσεις" data-en="Notes">Παρατηρήσεις</span></div>
-  <textarea name="notes" id="notes" placeholder="..." style="width:100%;min-height:70px;padding:10px;border:1.5px solid #cfe8ef;border-radius:8px;font-size:14px;resize:vertical;background:#f8fcff;"></textarea>
-</div>
-
-<div class="section next-steps-card" id="next-steps" style="display:none;">
-  <div class="sec-title"><i class="ti ti-list-check"></i> <span data-el="Επόμενα βήματα" data-en="Next steps">Επόμενα βήματα</span></div>
-  <div id="next-steps-body"></div>
-  {% if ai_configured %}<button type="button" class="ai-btn" id="ai-btn" onclick="askAI()"><i class="ti ti-message-chatbot"></i> <span data-el="Ανάλυση από SpithaAI" data-en="Ask SpithaAI">Ανάλυση από SpithaAI</span></button>
-  <div class="ai-reply" id="ai-reply" style="display:none;"></div>{% endif %}
-</div>
-<div class="safety-note" style="font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-bottom:10px;display:flex;gap:6px;align-items:flex-start;"><i class="ti ti-alert-triangle"></i><span>{{ safety_note }}</span></div>
-<button type="button" class="submit-btn pool" onclick="submitForm()" id="submit-btn">
-  <i class="ti ti-send"></i>
-  <span data-el="Υποβολή αναφοράς" data-en="Submit report">Υποβολή αναφοράς</span>
-</button>
-
-<div id="submit-msg" style="display:none;" class="submit-msg"></div>
-
-</form>
+{% if hotels %}
+<div class="mf-bar">
+  <div class="mf-msg" id="submit-msg" style="display:none;"></div>
+  <div class="mf-count" id="mf-count"></div>
+  <button type="button" class="mf-submit" id="submit-btn" onclick="submitForm()" disabled><i class="ti ti-device-floppy"></i> <span id="submit-lbl">Συμπλήρωσε όλα τα πεδία</span></button>
 </div>
 {% endif %}
 

@@ -5,265 +5,141 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Εστία — Νερά Χρήσης</title>
 <meta name="theme-color" content="#193847">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
 <style>
-/* v12.3 — επιλογέας δικτύου: ΙΔΙΟ στυλ με τον επιλογέα πισίνας (pools.html) */
-.select-field { width:100%; padding:10px 12px; border:1.5px solid #cfe8ef; border-radius:8px; font-size:15px; background:#f8fcff; color:#1a1a1a; }
-.select-field:focus { outline:none; border-color:#193847; background:white; }
-.pool-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.pool-pill { font-size:11px; padding:3px 8px; border-radius:10px; background:#e0f2fe; color:#193847; }
-.back-link{display:inline-flex;align-items:center;gap:5px;color:#193847;text-decoration:none;font-size:13px;font-weight:600;margin:10px 14px 0;}
-.next-steps-card{border:1px solid #fde68a;background:#fffbeb;border-radius:12px;}
-.next-steps-card .sec-title{color:#b45309;}
-.ns-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#92400e;line-height:1.4;padding:6px 0;border-top:1px dashed #fde68a;}
-.ns-item:first-of-type{border-top:none;}
-.ns-item.urgent{color:#b91c1c;font-weight:600;}
-.ns-ok{display:flex;gap:8px;align-items:center;font-size:13px;color:#16a34a;font-weight:600;}
-.ai-btn{margin-top:10px;width:100%;padding:9px;border:1px solid #c7b6e8;background:#f5f1fc;color:#5b3ea8;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
-.ai-reply{margin-top:8px;font-size:13px;color:#3c2a6b;background:#f5f1fc;border:1px solid #e3d9f5;border-radius:8px;padding:10px;line-height:1.5;white-space:pre-wrap;}
-.pool-pill.done { background:#dcfce7; color:#16a34a; }
+:root{--brand:{{ theme.primary if theme else '#193847' }};--accent:{{ theme.accent if theme else '#BB9549' }};}
+*{box-sizing:border-box;}
+.mf-wrap{max-width:720px;margin:0 auto;padding:12px 12px 96px;}
+.mf-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+.mf-back{display:inline-flex;align-items:center;gap:5px;color:var(--brand);text-decoration:none;font-size:13px;font-weight:600;}
+.mf-place{font-size:13px;font-weight:600;color:#1e293b;text-align:right;}
+.mf-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.mf-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:12px;border:1px solid #e2e8f0;background:#fff;color:#64748b;font-size:14px;font-weight:600;cursor:pointer;}
+.mf-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);}
+.mf-card{background:#fff;border:1px solid #e7eef2;border-radius:16px;padding:14px;margin-bottom:12px;}
+.mf-card-h{font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+.mf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:460px){.mf-grid{grid-template-columns:1fr;}}
+.mf-sub{grid-column:1/-1;font-size:11px;color:#94a3b8;font-weight:600;margin-top:2px;}
+.mf-field label{display:block;font-size:12.5px;color:#334155;margin-bottom:5px;font-weight:500;}
+.mf-field .req{color:#dc2626;margin-left:2px;}
+.mf-field input[type=number],.mf-field input[type=text]{width:100%;padding:11px 12px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:16px;background:#f8fbfd;color:#0f172a;outline:none;transition:border-color .12s,box-shadow .12s;}
+.mf-field input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(25,56,71,.10);}
+.mf-field input.ok{border-color:#86c9a4;background:#f3fbf6;}
+.mf-field input.bad{border-color:#e8a3a3;background:#fdf4f4;box-shadow:0 0 0 3px rgba(220,38,38,.08);}
+.mf-hint{font-size:11px;margin-top:4px;display:flex;align-items:center;gap:4px;min-height:14px;}
+.mf-hint.ok{color:#16a34a;}.mf-hint.bad{color:#dc2626;}
+.mf-notes{width:100%;min-height:70px;padding:11px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:15px;background:#f8fbfd;resize:vertical;color:#0f172a;}
+.mf-actions{border:1px solid #fcd9a6;background:#fffaf0;border-radius:16px;padding:14px;margin-bottom:12px;}
+.mf-actions-h{font-size:13px;font-weight:600;color:#b45309;display:flex;align-items:center;gap:7px;margin-bottom:8px;}
+.mf-act{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#92400e;line-height:1.45;padding:7px 0;border-top:1px solid #fde8c4;}
+.mf-act:first-of-type{border-top:none;}
+.mf-act.urgent{color:#b91c1c;font-weight:600;}
+.mf-actions.ok{border-color:#bbe7cd;background:#f3fbf6;}
+.mf-actions.ok .mf-actions-h{color:#16a34a;}
+.mf-ai{margin-top:10px;width:100%;padding:10px;border:1px solid #cfc2ea;background:#f6f2fc;color:#5b3ea8;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.mf-airep{margin-top:8px;font-size:13px;color:#3c2a6b;background:#f6f2fc;border:1px solid #e3d9f5;border-radius:10px;padding:10px;line-height:1.5;white-space:pre-wrap;}
+.mf-bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e7eef2;padding:10px 12px;display:flex;flex-direction:column;gap:6px;z-index:40;}
+.mf-count{font-size:11.5px;color:#64748b;text-align:center;}
+.mf-submit{width:100%;padding:14px;border:none;border-radius:12px;background:var(--brand);color:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.mf-submit:disabled{background:#cbd5e1;cursor:not-allowed;}
+.mf-msg{font-size:13px;text-align:center;padding:8px;border-radius:10px;}
+.mf-msg.success{background:#dcfce7;color:#16a34a;}.mf-msg.error{background:#fee2e2;color:#dc2626;}
+.mf-sel{width:100%;padding:11px 12px;border:1.5px solid #cfe0e8;border-radius:10px;font-size:15px;background:#f8fbfd;color:#0f172a;}
+.mf-done{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:10px;background:#dcfce7;color:#16a34a;margin-top:8px;font-weight:600;}
+html[data-theme="dark"] .mf-card,html[data-theme="dark"] .mf-tab{background:#141d2a;border-color:#243140;}
+html[data-theme="dark"] .mf-field input,html[data-theme="dark"] .mf-notes,html[data-theme="dark"] .mf-sel{background:#0f1722;border-color:#2c3a4a;color:#e6edf3;}
+html[data-theme="dark"] .mf-place{color:#e6edf3;}
+html[data-theme="dark"] .mf-bar{background:#141d2a;border-top-color:#243140;}
 </style>
-<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
-.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
-.submit-btn,.submit-btn.pool,.btn-primary,.save-btn{background:var(--brand)!important;}
-.period-btn.active,.period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head>
 <body>
 
-<header class="app-header">
-  <div class="header-left">
-    <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
-    <div>
-      <div class="header-title">ΕΣΤΙΑ — Νερά Χρήσης · <span id="hdr-net">—</span></div>
-      <div class="header-sub" id="today-date"></div>
+<div class="mf-wrap">
+  <div class="mf-top">
+    <a href="/katagrafes" class="mf-back"><i class="ti ti-arrow-left"></i> Σήμερα</a>
+    <span class="mf-place" id="mf-place">Νερά Χρήσης</span>
+  </div>
+
+  <div class="mf-tabs">
+    <button type="button" class="mf-tab active" id="tab-morning" onclick="setPeriod('morning')"><i class="ti ti-sun"></i> Πρωί 08:00</button>
+    <button type="button" class="mf-tab" id="tab-afternoon" onclick="setPeriod('afternoon')"><i class="ti ti-moon"></i> Απόγευμα 17:00</button>
+  </div>
+
+  <form id="water-form">
+  <input type="hidden" id="period-input" name="period" value="morning">
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-building"></i> Ξενοδοχείο & δίκτυο νερού</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Ξενοδοχείο</label><select id="hotel-select" class="mf-sel" onchange="onHotelChange()"></select></div>
+      <div class="mf-field"><label>Δίκτυο νερού</label><select id="system-select" name="water_system_id" class="mf-sel" onchange="onSystemChange()"></select></div>
     </div>
+    <div id="system-status"></div>
   </div>
-  <div class="header-right">
-    <a href="/pools" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-pool" style="font-size:14px;"></i> Πισίνες
-    </a>
-    <a href="/assistant" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-message-chatbot" style="font-size:14px;"></i> SpithaAI
-    </a>
-    {% if user.role in ['admin','masteradmin'] %}
-    <a href="/dashboard" style="color:white;text-decoration:none;font-size:11px;padding:4px 8px;background:rgba(255,255,255,0.15);border-radius:6px;display:flex;align-items:center;gap:4px;">
-      <i class="ti ti-layout-dashboard" style="font-size:14px;"></i> Dashboard
-    </a>
-    {% endif %}
-    <div class="lang-toggle">
-      <a href="/set-language/el" class="{{ 'active' if session.get('language','el')=='el' }}">ΕΛ</a>
-      <span>|</span>
-      <a href="/set-language/en" class="{{ 'active' if session.get('language','el')=='en' }}">EN</a>
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-droplet"></i> ClO₂ (ppm) <small style="color:#94a3b8;text-transform:none;letter-spacing:0;font-weight:400;">(όριο 1–2)</small></div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Δεξαμενή <span class="req">*</span></label><input type="number" name="clo2_tank" id="clo2_tank" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_tank_st"></div></div>
+      <div class="mf-field"><label>Κουζίνα <span class="req">*</span></label><input type="number" name="clo2_kitchen" id="clo2_kitchen" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_kitchen_st"></div></div>
+      <div class="mf-field"><label>Σημείο κουζίνας</label><input type="text" name="location_kitchen" placeholder="π.χ. Κεντρική Κουζίνα"></div>
+      <div class="mf-field"><label>Απομακρυσμένο <span class="req">*</span></label><input type="number" name="clo2_remote" id="clo2_remote" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_remote_st"></div></div>
+      <div class="mf-field"><label>Σημείο απομακρ.</label><input type="text" name="location_remote" placeholder="π.χ. Δωμάτιο 101"></div>
     </div>
-    <a href="/notifications" class="logout-btn" title="Ειδοποιήσεις" style="position:relative;"><i class="ti ti-bell"></i>{% if nav_unread %}<span style="position:absolute;top:-2px;right:-3px;background:#dc2626;color:#fff;font-size:9px;min-width:14px;height:14px;line-height:14px;border-radius:7px;text-align:center;padding:0 3px;">{{ nav_unread }}</span>{% endif %}</a>
-    <a href="/profile" class="logout-btn" title="Προφίλ"><i class="ti ti-user-circle"></i></a>
-    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
-  </div>
-</header>
-
-<div class="user-badge">
-  <i class="ti ti-user-circle"></i>
-  <span>{{ user.full_name }}</span>
-  <div style="margin-left:auto; display:flex; gap:5px;" id="done-badges"></div>
-</div>
-<a href="/katagrafes" class="back-link"><i class="ti ti-arrow-left"></i> Σήμερα</a>
-
-<div class="period-bar">
-  <button class="period-btn active" id="btn-morning" onclick="setPeriod('morning')">
-    <i class="ti ti-sun"></i>
-    <span data-el="Πρωί" data-en="Morning">Πρωί</span>
-    <span class="done-dot" id="dot-morning" style="display:none;"></span>
-  </button>
-  <button class="period-btn" id="btn-afternoon" onclick="setPeriod('afternoon')">
-    <i class="ti ti-moon"></i>
-    <span data-el="Απόγευμα" data-en="Afternoon">Απόγευμα</span>
-    <span class="done-dot" id="dot-afternoon" style="display:none;"></span>
-  </button>
-</div>
-
-<div class="app-content">
-<form id="water-form">
-<input type="hidden" id="period-input" name="period" value="morning">
-
-<!-- v12.3 — Επιλογή ξενοδοχείου & δικτύου νερού (πάνω-πάνω, ίδιο στυλ με πισίνες) -->
-<div class="section">
-  <div class="sec-title"><i class="ti ti-building"></i> <span data-el="Ξενοδοχείο & Δίκτυο Νερού" data-en="Hotel & Water System">Ξενοδοχείο & Δίκτυο Νερού</span></div>
-  <div class="field">
-    <label data-el="Ξενοδοχείο" data-en="Hotel">Ξενοδοχείο</label>
-    <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
-  </div>
-  <div class="field">
-    <label data-el="Δίκτυο Νερού" data-en="Water System">Δίκτυο Νερού</label>
-    <select id="system-select" name="water_system_id" class="select-field" onchange="onSystemChange()"></select>
-    <div class="pool-pills" id="system-status"></div>
-  </div>
-</div>
-
-<!-- CLO2 -->
-<div class="section">
-  <div class="sec-title">
-    <i class="ti ti-flask"></i>
-    <span data-el="CLO₂ (ppm) — HI97779 — Στόχος: 1.0–2.0 ppm" data-en="CLO₂ (ppm) — HI97779 — Target: 1.0–2.0 ppm">CLO₂ (ppm) — HI97779 — Στόχος: 1.0–2.0 ppm</span>
-  </div>
-
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-building-warehouse" style="font-size:13px;"></i> <span data-el="Δεξαμενή" data-en="Tank">Δεξαμενή</span></div>
-    <div class="field">
-      <label data-el="CLO₂ (ppm)" data-en="CLO₂ (ppm)">CLO₂ (ppm)</label>
-      <input type="number" name="clo2_tank" id="clo2_tank" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-      <div id="clo2_tank_st"></div>
+    <div class="mf-grid" id="morning-clo2-extra" style="margin-top:12px;">
+      <div class="mf-sub">Μόνο πρωί</div>
+      <div class="mf-field"><label>Αναχώρηση ΖΝΧ <span class="req">*</span></label><input type="number" name="clo2_dhw_out" id="clo2_dhw_out" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_dhw_out_st"></div></div>
+      <div class="mf-field"><label>Επιστροφή ΖΝΧ <span class="req">*</span></label><input type="number" name="clo2_dhw_return" id="clo2_dhw_return" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_dhw_return_st"></div></div>
+      <div class="mf-field"><label>Αντ. Όσμωση <span class="req">*</span></label><input type="number" name="clo2_ro" id="clo2_ro" min="0" max="5" step="0.01" placeholder="ppm" oninput="validate()"><div class="mf-hint" id="clo2_ro_st"></div></div>
     </div>
   </div>
 
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-tools-kitchen-2" style="font-size:13px;"></i> <span data-el="Κουζίνα" data-en="Kitchen">Κουζίνα</span></div>
-    <div class="field">
-      <label data-el="Σημείο / Θέση" data-en="Location / Point">Σημείο / Θέση</label>
-      <input type="text" name="location_kitchen" class="location-field" placeholder="π.χ. Κεντρική Κουζίνα, Cooking Station">
-    </div>
-    <div class="field">
-      <label>CLO₂ (ppm)</label>
-      <input type="number" name="clo2_kitchen" id="clo2_kitchen" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-      <div id="clo2_kitchen_st"></div>
-    </div>
-  </div>
-
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-door" style="font-size:13px;"></i> <span data-el="Απομακρυσμένο" data-en="Remote point">Απομακρυσμένο</span></div>
-    <div class="field">
-      <label data-el="Σημείο / Δωμάτιο" data-en="Location / Room">Σημείο / Δωμάτιο</label>
-      <input type="text" name="location_remote" class="location-field" placeholder="π.χ. Δωμάτιο 101, Βοηθητικοί Χώροι">
-    </div>
-    <div class="field">
-      <label>CLO₂ (ppm)</label>
-      <input type="number" name="clo2_remote" id="clo2_remote" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-      <div id="clo2_remote_st"></div>
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-temperature"></i> Θερμοκρασίες (°C)</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>Δεξαμενή <span class="req">*</span> <small style="color:#94a3b8;">(≤20)</small></label><input type="number" name="temp_tank" id="temp_tank" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_tank_st"></div></div>
+      <div class="mf-field"><label>Κολεκτέρ ΖΝΧ <span class="req">*</span> <small style="color:#94a3b8;">(≥60)</small></label><input type="number" name="temp_dhw_out" id="temp_dhw_out" min="0" max="100" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_dhw_out_st"></div></div>
+      <div class="mf-field"><label>Κολεκτέρ Ανακυκλ. <span class="req">*</span> <small style="color:#94a3b8;">(≥50)</small></label><input type="number" name="temp_dhw_return" id="temp_dhw_return" min="0" max="100" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_dhw_return_st"></div></div>
+      <div class="mf-field"><label>Αντ. Όσμωση <span class="req">*</span></label><input type="number" name="temp_ro" id="temp_ro" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_ro_st"></div></div>
+      <div class="mf-sub">Κουζίνα</div>
+      <div class="mf-field"><label>Κρύο <span class="req">*</span></label><input type="number" name="temp_kitchen_cold" id="temp_kitchen_cold" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_kitchen_cold_st"></div></div>
+      <div class="mf-field"><label>Ζεστό <span class="req">*</span> <small style="color:#94a3b8;">(≥50)</small></label><input type="number" name="temp_kitchen_hot" id="temp_kitchen_hot" min="0" max="100" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_kitchen_hot_st"></div></div>
+      <div class="mf-sub">Απομακρυσμένο</div>
+      <div class="mf-field"><label>Κρύο <span class="req">*</span></label><input type="number" name="temp_remote_cold" id="temp_remote_cold" min="0" max="50" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_remote_cold_st"></div></div>
+      <div class="mf-field"><label>Ζεστό <span class="req">*</span> <small style="color:#94a3b8;">(≥50)</small></label><input type="number" name="temp_remote_hot" id="temp_remote_hot" min="0" max="100" step="0.1" placeholder="°C" oninput="validate()"><div class="mf-hint" id="temp_remote_hot_st"></div></div>
     </div>
   </div>
 
-  <div id="morning-clo2-extra">
-    <div style="border-top:0.5px solid var(--color-border-tertiary); margin:10px 0;"></div>
-    <div class="grid2">
-      <div class="field">
-        <label data-el="Αναχώρηση ΖΝΧ (ppm)" data-en="DHW Supply (ppm)">Αναχώρηση ΖΝΧ (ppm)</label>
-        <input type="number" name="clo2_dhw_out" id="clo2_dhw_out" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-        <div id="clo2_dhw_out_st"></div>
-      </div>
-      <div class="field">
-        <label data-el="Επιστροφή ΖΝΧ (ppm)" data-en="DHW Return (ppm)">Επιστροφή ΖΝΧ (ppm)</label>
-        <input type="number" name="clo2_dhw_return" id="clo2_dhw_return" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-        <div id="clo2_dhw_return_st"></div>
-      </div>
-    </div>
-    <div class="field" style="margin-top:8px;">
-      <label data-el="Αντ. Όσμωση (ppm)" data-en="Reverse Osmosis (ppm)">Αντ. Όσμωση (ppm)</label>
-      <input type="number" name="clo2_ro" id="clo2_ro" min="0" max="5" step="0.01" placeholder="π.χ. 1.5" oninput="validate()">
-      <div id="clo2_ro_st"></div>
+  <div class="mf-card" id="morning-ph">
+    <div class="mf-card-h"><i class="ti ti-flask"></i> pH δεξαμενής (πρωί)</div>
+    <div class="mf-grid">
+      <div class="mf-field"><label>pH <span class="req">*</span></label><input type="number" name="ph_tank" id="ph_tank" min="0" max="14" step="0.1" placeholder="pH" oninput="validate()"><div class="mf-hint" id="ph_tank_st"></div></div>
     </div>
   </div>
+
+  <div class="mf-card">
+    <div class="mf-card-h"><i class="ti ti-notes"></i> Σημειώσεις <small style="color:#94a3b8;text-transform:none;letter-spacing:0;font-weight:400;">(προαιρετικό)</small></div>
+    <textarea name="notes" id="notes" class="mf-notes" placeholder="Οποιαδήποτε παρατήρηση..."></textarea>
+  </div>
+
+  <div class="mf-actions" id="next-steps" style="display:none;">
+    <div class="mf-actions-h"><i class="ti ti-bulb"></i> Προτεινόμενες ενέργειες</div>
+    <div id="next-steps-body"></div>
+    {% if ai_configured %}<button type="button" class="mf-ai" id="ai-btn" onclick="askAI()"><i class="ti ti-message-chatbot"></i> Ανάλυση από SpithaAI</button>
+    <div class="mf-airep" id="ai-reply" style="display:none;"></div>{% endif %}
+  </div>
+
+  </form>
 </div>
 
-<!-- Θερμοκρασία -->
-<div class="section">
-  <div class="sec-title">
-    <i class="ti ti-thermometer"></i>
-    <span data-el="Θερμοκρασία (°C)" data-en="Temperature (°C)">Θερμοκρασία (°C)</span>
-  </div>
-
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-building-warehouse" style="font-size:13px;"></i> <span data-el="Δεξαμενή & ΖΝΧ" data-en="Tank & DHW">Δεξαμενή & ΖΝΧ</span></div>
-    <div class="grid2">
-      <div class="field">
-        <label data-el="Δεξαμενή (≤20°C)" data-en="Tank (≤20°C)">Δεξαμενή (≤20°C)</label>
-        <input type="number" name="temp_tank" id="temp_tank" min="0" max="50" step="0.1" placeholder="π.χ. 18" oninput="validate()">
-        <div id="temp_tank_st"></div>
-      </div>
-      <div class="field">
-        <label data-el="Κολεκτέρ ΖΝΧ (≥60°C)" data-en="DHW Collector (≥60°C)">Κολεκτέρ ΖΝΧ (≥60°C)</label>
-        <input type="number" name="temp_dhw_out" id="temp_dhw_out" min="0" max="100" step="0.1" placeholder="π.χ. 65" oninput="validate()">
-        <div id="temp_dhw_out_st"></div>
-      </div>
-      <div class="field">
-        <label data-el="Κολεκτέρ Ανακυκλ. (≥50°C)" data-en="Recirc. Collector (≥50°C)">Κολεκτέρ Ανακυκλ. (≥50°C)</label>
-        <input type="number" name="temp_dhw_return" id="temp_dhw_return" min="0" max="100" step="0.1" placeholder="π.χ. 55" oninput="validate()">
-        <div id="temp_dhw_return_st"></div>
-      </div>
-      <div class="field">
-        <label data-el="Αντ. Όσμωση" data-en="Reverse Osmosis">Αντ. Όσμωση</label>
-        <input type="number" name="temp_ro" id="temp_ro" min="0" max="50" step="0.1" placeholder="π.χ. 20">
-      </div>
-    </div>
-  </div>
-
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-tools-kitchen-2" style="font-size:13px;"></i> <span data-el="Κουζίνα" data-en="Kitchen">Κουζίνα</span></div>
-    <div class="grid2">
-      <div class="field">
-        <label data-el="Κρύο νερό" data-en="Cold water">Κρύο νερό</label>
-        <input type="number" name="temp_kitchen_cold" id="temp_kitchen_cold" min="0" max="50" step="0.1" placeholder="π.χ. 16">
-      </div>
-      <div class="field">
-        <label data-el="Ζεστό (≥50°C)" data-en="Hot (≥50°C)">Ζεστό (≥50°C)</label>
-        <input type="number" name="temp_kitchen_hot" id="temp_kitchen_hot" min="0" max="100" step="0.1" placeholder="π.χ. 55" oninput="validate()">
-        <div id="temp_kitchen_hot_st"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sub-section">
-    <div class="sub-label"><i class="ti ti-door" style="font-size:13px;"></i> <span data-el="Απομακρυσμένο" data-en="Remote point">Απομακρυσμένο</span></div>
-    <div class="grid2">
-      <div class="field">
-        <label data-el="Κρύο νερό" data-en="Cold water">Κρύο νερό</label>
-        <input type="number" name="temp_remote_cold" id="temp_remote_cold" min="0" max="50" step="0.1" placeholder="π.χ. 16">
-      </div>
-      <div class="field">
-        <label data-el="Ζεστό (≥50°C)" data-en="Hot (≥50°C)">Ζεστό (≥50°C)</label>
-        <input type="number" name="temp_remote_hot" id="temp_remote_hot" min="0" max="100" step="0.1" placeholder="π.χ. 52" oninput="validate()">
-        <div id="temp_remote_hot_st"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- pH μόνο πρωί -->
-<div class="section" id="morning-ph">
-  <div class="sec-title">
-    <i class="ti ti-droplet"></i>
-    <span data-el="pH Δεξαμενής" data-en="Tank pH">pH Δεξαμενής</span>
-  </div>
-  <div class="field" style="max-width:160px;">
-    <input type="number" name="ph_tank" id="ph_tank" min="6" max="9" step="0.1" placeholder="π.χ. 7.2">
-  </div>
-</div>
-
-<!-- Παρατηρήσεις -->
-<div class="section">
-  <div class="sec-title">
-    <i class="ti ti-notes"></i>
-    <span data-el="Παρατηρήσεις" data-en="Notes">Παρατηρήσεις</span>
-  </div>
-  <textarea name="notes" id="notes" placeholder="Γράψε οποιαδήποτε παρατήρηση..." style="width:100%;min-height:80px;padding:10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;resize:vertical;background:var(--color-background-secondary);color:var(--color-text-primary);"></textarea>
-</div>
-
-<div class="section next-steps-card" id="next-steps" style="display:none;">
-  <div class="sec-title"><i class="ti ti-list-check"></i> <span data-el="Επόμενα βήματα" data-en="Next steps">Επόμενα βήματα</span></div>
-  <div id="next-steps-body"></div>
-  {% if ai_configured %}<button type="button" class="ai-btn" id="ai-btn" onclick="askAI()"><i class="ti ti-message-chatbot"></i> <span data-el="Ανάλυση από SpithaAI" data-en="Ask SpithaAI">Ανάλυση από SpithaAI</span></button>
-  <div class="ai-reply" id="ai-reply" style="display:none;"></div>{% endif %}
-</div>
-<button type="button" class="submit-btn" onclick="submitForm()" id="submit-btn">
-  <i class="ti ti-send"></i>
-  <span data-el="Υποβολή αναφοράς" data-en="Submit report">Υποβολή αναφοράς</span>
-</button>
-
-<div id="submit-msg" style="display:none;" class="submit-msg"></div>
-
-</form>
+<div class="mf-bar">
+  <div class="mf-msg" id="submit-msg" style="display:none;"></div>
+  <div class="mf-count" id="mf-count"></div>
+  <button type="button" class="mf-submit" id="submit-btn" onclick="submitForm()" disabled><i class="ti ti-device-floppy"></i> <span id="submit-lbl">Συμπλήρωσε όλα τα πεδία</span></button>
 </div>
 
 <script>
