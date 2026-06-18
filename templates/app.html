@@ -14,6 +14,15 @@
 .select-field:focus { outline:none; border-color:#193847; background:white; }
 .pool-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .pool-pill { font-size:11px; padding:3px 8px; border-radius:10px; background:#e0f2fe; color:#193847; }
+.back-link{display:inline-flex;align-items:center;gap:5px;color:#193847;text-decoration:none;font-size:13px;font-weight:600;margin:10px 14px 0;}
+.next-steps-card{border:1px solid #fde68a;background:#fffbeb;border-radius:12px;}
+.next-steps-card .sec-title{color:#b45309;}
+.ns-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#92400e;line-height:1.4;padding:6px 0;border-top:1px dashed #fde68a;}
+.ns-item:first-of-type{border-top:none;}
+.ns-item.urgent{color:#b91c1c;font-weight:600;}
+.ns-ok{display:flex;gap:8px;align-items:center;font-size:13px;color:#16a34a;font-weight:600;}
+.ai-btn{margin-top:10px;width:100%;padding:9px;border:1px solid #c7b6e8;background:#f5f1fc;color:#5b3ea8;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.ai-reply{margin-top:8px;font-size:13px;color:#3c2a6b;background:#f5f1fc;border:1px solid #e3d9f5;border-radius:8px;padding:10px;line-height:1.5;white-space:pre-wrap;}
 .pool-pill.done { background:#dcfce7; color:#16a34a; }
 </style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
@@ -61,6 +70,7 @@
   <span>{{ user.full_name }}</span>
   <div style="margin-left:auto; display:flex; gap:5px;" id="done-badges"></div>
 </div>
+<a href="/katagrafes" class="back-link"><i class="ti ti-arrow-left"></i> Σήμερα</a>
 
 <div class="period-bar">
   <button class="period-btn active" id="btn-morning" onclick="setPeriod('morning')">
@@ -240,6 +250,12 @@
   <textarea name="notes" id="notes" placeholder="Γράψε οποιαδήποτε παρατήρηση..." style="width:100%;min-height:80px;padding:10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);font-size:14px;resize:vertical;background:var(--color-background-secondary);color:var(--color-text-primary);"></textarea>
 </div>
 
+<div class="section next-steps-card" id="next-steps" style="display:none;">
+  <div class="sec-title"><i class="ti ti-list-check"></i> <span data-el="Επόμενα βήματα" data-en="Next steps">Επόμενα βήματα</span></div>
+  <div id="next-steps-body"></div>
+  {% if ai_configured %}<button type="button" class="ai-btn" id="ai-btn" onclick="askAI()"><i class="ti ti-message-chatbot"></i> <span data-el="Ανάλυση από SpithaAI" data-en="Ask SpithaAI">Ανάλυση από SpithaAI</span></button>
+  <div class="ai-reply" id="ai-reply" style="display:none;"></div>{% endif %}
+</div>
 <button type="button" class="submit-btn" onclick="submitForm()" id="submit-btn">
   <i class="ti ti-send"></i>
   <span data-el="Υποβολή αναφοράς" data-en="Submit report">Υποβολή αναφοράς</span>
@@ -254,6 +270,8 @@
 const LANG = '{{ session.get("language", "el") }}';
 const HOTELS = {{ systems_json|tojson }};
 const DONE = {{ done|tojson }};
+const PRESET = {{ preset|tojson }};
+const AI_CONFIGURED = {{ 'true' if ai_configured else 'false' }};
 </script>
 <script src="/static/app.js"></script>
 </body>

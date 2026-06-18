@@ -11,6 +11,7 @@ from app import (app, db, current_user, is_admin, ROLE_RANK, role_rank, log_acti
 # ── MENU ανά ρόλο ─────────────────────────────────────────────────────────────
 # Κλειδιά λειτουργικών items (admin workspace μένει πάντα admin-only).
 MENU_ITEMS = [
+    ('today',        'Σήμερα (Καταγραφές)'),
     ('pools',        'Πισίνες'),
     ('water',        'Νερά Χρήσης'),
     ('pools_dash',   'Πίνακας Πισινών'),
@@ -28,8 +29,8 @@ ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· vie
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
     'manager': {'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash'},
-    'staff':   {'pools', 'water', 'pools_dash', 'records', 'coverage', 'faults_board',
-                'fault_submit', 'areas', 'areas_dash', 'whatsnew'},
+    # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
+    'staff':   {'today', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
 }
 
 def get_menu_vis():

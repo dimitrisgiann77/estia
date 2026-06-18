@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   applyLanguage();
   if (typeof HOTELS !== 'undefined') buildHotels();   // v12.3 — επιλογέας δικτύου
-  setPeriod('morning');
+  applyPreset();
 });
 
 function applyLanguage() {
@@ -161,6 +161,91 @@ function validate() {
   setBadge('temp_dhw_return', g('temp_dhw_return'), 50.0, null);
   setBadge('temp_kitchen_hot', g('temp_kitchen_hot'), 50.0, null);
   setBadge('temp_remote_hot',  g('temp_remote_hot'),  50.0, null);
+  renderNextSteps();
+}
+
+// v12.83 — κανόνες προτεινόμενων ενεργειών ΖΝΧ/δικτύου (mirror app.py WATER_ACTION_RULES)
+const W_RULES = {
+  temp_dhw_out:    {mn:60, mx:null, label:'Κολεκτέρ ΖΝΧ (Αναχ.)', low:'Κολεκτέρ ΖΝΧ <60°C: ανέβασε θερμοκρασία αποθήκευσης ≥60°C (κίνδυνος legionella)· έλεγξε λέβητα/εναλλάκτη/θερμοστάτη.'},
+  temp_dhw_return: {mn:50, mx:null, label:'Κολεκτέρ Ανακυκλ. (Επιστρ.)', low:'Επιστροφή ανακυκλοφορίας <50°C: ανεπαρκής ανακυκλοφορία· έλεγξε αντλία & βάνες· εξέτασε θερμική απολύμανση/flushing.'},
+  temp_kitchen_hot:{mn:50, mx:null, label:'Κουζίνα Ζεστό', low:'Ζεστό Κουζίνας <50°C: flushing του σημείου· έλεγξε ανακυκλοφορία/μόνωση γραμμής.'},
+  temp_remote_hot: {mn:50, mx:null, label:'Απομακρυσμένο Ζεστό', low:'Ζεστό Απομακρυσμένου <50°C: flushing· έλεγξε ανακυκλοφορία (κρίσιμο τελευταίο σημείο δικτύου).'},
+  temp_tank:       {mn:null, mx:20, label:'Δεξαμενή', high:'Δεξαμενή (κρύο) >20°C: εξέτασε ψύξη/μόνωση/ανανέωση νερού· κίνδυνος ανάπτυξης μικροβίων.'},
+  clo2_dhw_out:    {mn:1, mx:2, label:'ClO2 Αναχώρηση ΖΝΧ', low:'ClO2 Αναχώρηση ΖΝΧ <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Αναχώρηση ΖΝΧ >2 ppm: μείωσε δοσομέτρηση.'},
+  clo2_dhw_return: {mn:1, mx:2, label:'ClO2 Επιστροφή ΖΝΧ', low:'ClO2 Επιστροφή ΖΝΧ <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Επιστροφή ΖΝΧ >2 ppm: μείωσε δοσομέτρηση.'},
+  clo2_tank:       {mn:1, mx:2, label:'ClO2 Δεξαμενή', low:'ClO2 Δεξαμενή <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Δεξαμενή >2 ppm: μείωσε δοσομέτρηση.'},
+  clo2_kitchen:    {mn:1, mx:2, label:'ClO2 Κουζίνα', low:'ClO2 Κουζίνα <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Κουζίνα >2 ppm: μείωσε δοσομέτρηση.'},
+  clo2_remote:     {mn:1, mx:2, label:'ClO2 Απομακρυσμένο', low:'ClO2 Απομακρυσμένο <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Απομακρυσμένο >2 ppm: μείωσε δοσομέτρηση.'},
+  clo2_ro:         {mn:1, mx:2, label:'ClO2 Αντ. Όσμωση', low:'ClO2 Αντ. Όσμωση <1 ppm: αύξησε δοσομέτρηση· έλεγξε αντλία/απόθεμα.', high:'ClO2 Αντ. Όσμωση >2 ppm: μείωσε δοσομέτρηση.'}
+};
+function _wUrgent(id,val){
+  if(id==='temp_dhw_out'&&val<50) return true;
+  if((id==='temp_dhw_return'||id==='temp_kitchen_hot'||id==='temp_remote_hot')&&val<45) return true;
+  if((id==='clo2_dhw_out'||id==='clo2_dhw_return')&&val<0.3) return true;
+  return false;
+}
+function renderNextSteps(){
+  const card=document.getElementById('next-steps'); if(!card) return;
+  const body=document.getElementById('next-steps-body');
+  const tips=[]; let anyVal=false;
+  Object.keys(W_RULES).forEach(id=>{
+    const el=document.getElementById(id); if(!el||el.value==='') return;
+    const val=parseFloat(el.value); if(isNaN(val)) return;
+    anyVal=true;
+    const r=W_RULES[id]; let txt=null;
+    if(r.mn!=null && val<r.mn) txt=r.low;
+    else if(r.mx!=null && val>r.mx) txt=r.high;
+    if(txt) tips.push({lab:r.label,txt,urgent:_wUrgent(id,val)});
+  });
+  if(tips.length){
+    body.innerHTML=tips.map(t=>'<div class="ns-item'+(t.urgent?' urgent':'')+'"><i class="ti ti-'+(t.urgent?'alert-triangle':'arrow-right')+'"></i><span><b>'+t.lab+':</b> '+t.txt+'</span></div>').join('');
+    card.style.display='block';
+  } else if(anyVal){
+    body.innerHTML='<div class="ns-ok"><i class="ti ti-circle-check"></i> '+(LANG==='en'?'All readings within range.':'Όλες οι τιμές εντός ορίων.')+'</div>';
+    card.style.display='block';
+  } else { card.style.display='none'; }
+}
+function applyPreset(){
+  let per='morning';
+  try{
+    if(typeof PRESET!=='undefined'&&PRESET&&PRESET.id){
+      for(let hi=0;hi<HOTELS.length;hi++){
+        if((HOTELS[hi].systems||[]).some(x=>String(x.id)===String(PRESET.id))){
+          const hs=document.getElementById('hotel-select'); hs.value=hi; onHotelChange();
+          document.getElementById('system-select').value=PRESET.id; onSystemChange();
+          break;
+        }
+      }
+      if(PRESET.period) per=PRESET.period;
+    }
+  }catch(e){}
+  setPeriod(per);
+  try{
+    if(typeof PRESET!=='undefined'&&PRESET&&PRESET.values){
+      Object.keys(PRESET.values).forEach(k=>{
+        const el=document.querySelector('[name="'+k+'"]');
+        if(!el) return;
+        if(el.type==='checkbox') el.checked=!!PRESET.values[k]; else el.value=PRESET.values[k];
+      });
+      validate();
+    }
+  }catch(e){}
+}
+async function askAI(){
+  const btn=document.getElementById('ai-btn'); const out=document.getElementById('ai-reply');
+  if(!btn||!out) return;
+  const lines=[];
+  Object.keys(W_RULES).forEach(id=>{const el=document.getElementById(id); if(el&&el.value!=='') lines.push(id+'='+el.value);});
+  const notes=document.getElementById('notes')?.value||'';
+  const msg='Μετρήσεις δικτύου νερού/ΖΝΧ ('+currentPeriod+'): '+lines.join(', ')+(notes?('. Σημειώσεις: '+notes):'')+'. Δώσε σύντομες, πρακτικές ενέργειες (legionella/θερμοκρασίες/ClO2).';
+  btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='<i class="ti ti-loader"></i> '+(LANG==='en'?'Thinking...':'Ανάλυση...');
+  try{
+    const res=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:msg}]})});
+    const data=await res.json();
+    out.style.display='block';
+    out.textContent=data.reply||(data.error==='not_configured'?(LANG==='en'?'AI not configured.':'Το AI δεν έχει ρυθμιστεί.'):(LANG==='en'?'No response.':'Καμία απάντηση.'));
+  }catch(e){ out.style.display='block'; out.textContent=(LANG==='en'?'Connection error.':'Σφάλμα σύνδεσης.'); }
+  btn.disabled=false; btn.innerHTML=orig;
 }
 
 async function submitForm() {

@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyLanguage();
   if (typeof HOTELS !== 'undefined' && HOTELS.length) {
     buildHotels();
-    setPeriod('morning');
+    applyPreset();
   }
 });
 
@@ -72,6 +72,35 @@ function onPoolChange() {
   });
 }
 
+function applyPreset() {
+  let per = 'morning';
+  try {
+    if (typeof PRESET !== 'undefined' && PRESET && PRESET.id) {
+      // βρες το ξενοδοχείο που έχει αυτή την πισίνα
+      for (let hi=0; hi<HOTELS.length; hi++) {
+        if ((HOTELS[hi].pools||[]).some(p => String(p.id)===String(PRESET.id))) {
+          const hs=document.getElementById('hotel-select'); hs.value=hi; onHotelChange();
+          document.getElementById('pool-select').value=PRESET.id; onPoolChange();
+          break;
+        }
+      }
+      if (PRESET.period) per = PRESET.period;
+    }
+  } catch(e){}
+  setPeriod(per);
+  try {
+    if (typeof PRESET !== 'undefined' && PRESET && PRESET.values) {
+      Object.keys(PRESET.values).forEach(k => {
+        const el=document.querySelector('[name="'+k+'"]');
+        if (!el) return;
+        if (el.type==='checkbox') el.checked=!!PRESET.values[k];
+        else el.value=PRESET.values[k];
+      });
+      validate();
+    }
+  } catch(e){}
+}
+
 function setPeriod(period) {
   currentPeriod = period;
   document.getElementById('period-input').value = period;
@@ -109,9 +138,61 @@ function setBadge(id) {
   st.innerHTML = isNaN(val) ? '' : (badge(val, mn, mx) + actionFor(id, val, mn, mx));
 }
 
+const NS_FIELDS = ['free_chlorine','combined_chlorine','ph','temp','turbidity','cyanuric_acid','total_alkalinity','orp'];
 function validate() {
-  ['free_chlorine','combined_chlorine','ph','temp','turbidity',
-   'cyanuric_acid','total_alkalinity','orp'].forEach(setBadge);
+  NS_FIELDS.forEach(setBadge);
+  renderNextSteps();
+}
+
+function renderNextSteps() {
+  const card=document.getElementById('next-steps'); if(!card) return;
+  const body=document.getElementById('next-steps-body');
+  const tips=[]; let anyVal=false;
+  NS_FIELDS.forEach(id => {
+    const el=document.getElementById(id); if(!el||el.value==='') return;
+    const val=parseFloat(el.value); if(isNaN(val)) return;
+    anyVal=true;
+    const [mn,mx]=LIMITS[id]||[null,null];
+    const rule=(typeof ACTIONS!=='undefined')?ACTIONS[id]:null; if(!rule) return;
+    let txt=null;
+    if(mn!=null && val<mn) txt=rule.low;
+    else if(mx!=null && val>mx) txt=rule.high;
+    if(txt){
+      const lab=(typeof PARAM_LABELS!=='undefined'&&PARAM_LABELS[id])?PARAM_LABELS[id]:id;
+      const urgent=(id==='free_chlorine'&&val<0.2)||(id==='combined_chlorine'&&val>1.0)||(id==='turbidity'&&val>2.0);
+      tips.push({lab,txt,urgent});
+    }
+  });
+  if(tips.length){
+    body.innerHTML = tips.map(t =>
+      '<div class="ns-item'+(t.urgent?' urgent':'')+'"><i class="ti ti-'+(t.urgent?'alert-triangle':'arrow-right')+'"></i><span><b>'+t.lab+':</b> '+t.txt+'</span></div>'
+    ).join('');
+    card.style.display='block';
+  } else if(anyVal){
+    body.innerHTML = '<div class="ns-ok"><i class="ti ti-circle-check"></i> '+(LANG==='en'?'All readings within range.':'Όλες οι τιμές εντός ορίων.')+'</div>';
+    card.style.display='block';
+  } else {
+    card.style.display='none';
+  }
+}
+
+async function askAI() {
+  const btn=document.getElementById('ai-btn'); const out=document.getElementById('ai-reply');
+  if(!btn||!out) return;
+  const pid=document.getElementById('pool-select')?.value;
+  const lines=[];
+  NS_FIELDS.forEach(id => { const el=document.getElementById(id); if(el&&el.value!=='') lines.push(id+'='+el.value); });
+  const notes=document.getElementById('notes')?.value||'';
+  const msg='Μετρήσεις πισίνας ('+currentPeriod+'): '+lines.join(', ')+(notes?('. Σημειώσεις: '+notes):'')+'. Δώσε σύντομες, πρακτικές ενέργειες για εύρυθμη λειτουργία.';
+  btn.disabled=true; const orig=btn.innerHTML; btn.innerHTML='<i class="ti ti-loader"></i> '+(LANG==='en'?'Thinking...':'Ανάλυση...');
+  try{
+    const res=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pool_id:pid,messages:[{role:'user',content:msg}]})});
+    const data=await res.json();
+    out.style.display='block';
+    out.textContent=data.reply||(data.error==='not_configured'?(LANG==='en'?'AI not configured.':'Το AI δεν έχει ρυθμιστεί.'):(LANG==='en'?'No response.':'Καμία απάντηση.'));
+  }catch(e){ out.style.display='block'; out.textContent=(LANG==='en'?'Connection error.':'Σφάλμα σύνδεσης.'); }
+  btn.disabled=false; btn.innerHTML=orig;
 }
 
 async function submitForm() {

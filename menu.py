@@ -9,6 +9,7 @@ from app import app, db, current_user, is_admin, log_activity, Setting
 # ── Κατάλογος ΟΛΩΝ των στοιχείων (deduped). master=μόνο masteradmin ──
 MENU_CATALOG = [
     ('dashboard',   'Dashboard',              'ti-layout-dashboard', '/overview',                    False),
+    ('today',       'Σήμερα (Καταγραφές)',    'ti-clipboard-list',   '/katagrafes',                  False),
     ('pools',       'Πισίνες',                'ti-pool',             '/pools',                       False),
     ('water',       'Νερά Χρήσης',            'ti-droplet',          '/app',                         False),
     ('pools_dash',  'Πίνακας Πισινών',        'ti-chart-bar',        '/pools/dashboard',             False),
@@ -58,7 +59,7 @@ CAT = {i[0]: {'id': i[0], 'label': i[1], 'icon': i[2], 'url': i[3], 'master': i[
 
 DEFAULT_LAYOUT = [
     {'title': 'Λειτουργία', 'items': ['dashboard', 'pools_dash', 'water_dash', 'faults_board', 'surveys']},
-    {'title': 'Καταγραφές', 'items': ['pools', 'water', 'areas_rec', 'fault_submit', 'records', 'coverage']},
+    {'title': 'Καταγραφές', 'items': ['today', 'pools', 'water', 'areas_rec', 'fault_submit', 'records', 'coverage']},
     {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['pay_mitroo', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff']},
     {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},
     {'title': 'Διαχείριση συστήματος', 'items': ['users', 'menu_roles', 'menu_builder', 'activity', 'feedback_adm', 'hotels', 'areas_admin', 'templates', 'fault_set', 'fault_cat', 'email', 'theme', 'ai']},

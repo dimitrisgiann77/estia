@@ -328,11 +328,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.82'
-APP_BUILD   = '362'
+APP_VERSION = '12.83'
+APP_BUILD   = '363'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.83', 'b': '363', 'date': '18/06/2026', 'time': '12:00', 'title': 'Νέα οθόνη «Σήμερα» καταγραφών + redesign φορμών Πισινών/Νερών',
+     'items': ['Νέα οθόνη «Σήμερα» (Καταγραφές): κάρτες ανά πισίνα & δίκτυο νερού με 2 slots (πρωί 08:00 / απόγευμα 17:00), πράσινο = έγινε. Ένα tap ανοίγει τη φόρμα έτοιμη (λιγότερα κλικ).',
+               'Οι φόρμες ανοίγουν προ-επιλεγμένες (πισίνα/δίκτυο + ώρα) και προ-συμπληρώνονται αν υπάρχει ήδη καταγραφή (επεξεργάσιμες).',
+               'Ζωντανό πάνελ «Επόμενα βήματα»: καθώς γράφεις τις μετρήσεις, προτείνει ενέργειες για εύρυθμη λειτουργία (όρια -> ενέργειες). Έτοιμο για ανάλυση SpithaAI όταν ενεργοποιηθεί το AI.',
+               'Ο συντηρητής (staff) βλέπει στο μενού ΜΟΝΟ την καταγραφή· τα στατιστικά/πίνακες μένουν σε admin/masteradmin.']},
     {'v': '12.82', 'b': '362', 'date': '17/06/2026', 'time': '22:30', 'title': 'Πλήρες lossless round-trip των 2 μητρώων (ανεξάρτητα από Epsilon)',
      'items': ['Το export βγάζει ΟΛΑ τα πεδία: ταυτότητα (ΑΦΜ/ΑΜΚΑ/ΙΚΑ/IBAN/ημ.πρόσληψης-αποχώρησης/κέντρο κόστους/ειδικότητα) + όλα τα οικονομικά ανά μήνα (μικτά/ΕΦΚΑ/ΦΜΥ/καθαρά/κόστος εργοδότη).',
                'Η «Φόρτωση Μητρώου» διαβάζει πλέον και το φύλλο «Μισθοδοσία ανά μήνα» -> γεμίζει τα ποσά (δεν εξαρτάται από τα 11 Epsilon). Το export Management βγαίνει σε φύλλο «Μητρώο Management» (επαναφορτώσιμο).',
@@ -1676,6 +1681,55 @@ def water_systems_payload(user=None):
                                     for s in systems]})
     return hotels, payload
 
+_POOL_FIELDS = ['free_chlorine','combined_chlorine','ph','temp','turbidity',
+                'cyanuric_acid','total_alkalinity','orp']
+_WATER_FIELDS = ['clo2_tank','clo2_kitchen','clo2_remote','clo2_dhw_out','clo2_dhw_return','clo2_ro',
+                 'location_kitchen','location_remote','temp_tank','temp_dhw_out','temp_dhw_return','temp_ro',
+                 'temp_kitchen_cold','temp_kitchen_hot','temp_remote_cold','temp_remote_hot','ph_tank']
+
+def _pool_preset(pool_id, period):
+    """v12.83 — preset για άνοιγμα φόρμας πισίνας από την οθόνη «Σήμερα» (με prefill αν υπάρχει εγγραφή)."""
+    if not pool_id:
+        return None
+    try:
+        pid = int(pool_id)
+    except (TypeError, ValueError):
+        return None
+    per = period if period in ('morning', 'afternoon') else 'morning'
+    rec = PoolRecord.query.filter_by(pool_id=pid, record_date=date.today(), period=per).first()
+    vals = {}
+    if rec:
+        for f in _POOL_FIELDS:
+            v = getattr(rec, f, None)
+            if v is not None:
+                vals[f] = v
+        if rec.backwash_done:
+            vals['backwash_done'] = True
+        if rec.notes:
+            vals['notes'] = rec.notes
+    return {'kind': 'pool', 'id': pid, 'period': per, 'values': vals, 'editing': bool(rec)}
+
+def _water_preset(sys_id, period):
+    """v12.83 — preset για άνοιγμα φόρμας νερών από την οθόνη «Σήμερα» (με prefill αν υπάρχει εγγραφή)."""
+    if not sys_id:
+        return None
+    try:
+        sid = int(sys_id)
+    except (TypeError, ValueError):
+        return None
+    per = period if period in ('morning', 'afternoon') else 'morning'
+    rec = WaterRecord.query.filter_by(water_system_id=sid, record_date=date.today(), period=per).first()
+    vals = {}
+    if rec:
+        for f in _WATER_FIELDS:
+            v = getattr(rec, f, None)
+            if v is not None and v != '':
+                vals[f] = v
+        if rec.notes:
+            vals['notes'] = rec.notes
+    return {'kind': 'water', 'id': sid, 'period': per, 'values': vals, 'editing': bool(rec)}
+
+
 @app.route('/app')
 def water_app():
     if 'user_id' not in session:
@@ -1689,8 +1743,10 @@ def water_app():
     for r in WaterRecord.query.filter_by(record_date=date.today()).all():
         if r.water_system_id:
             done.setdefault(str(r.water_system_id), {})[r.period] = r.id
+    preset = _water_preset(request.args.get('sys'), request.args.get('period'))
     return render_template('app.html', user=user, hotels=hotels,
-                           systems_json=systems_json, done=done)
+                           systems_json=systems_json, done=done,
+                           preset=preset, ai_configured=(resolve_provider() is not None))
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -1799,6 +1855,49 @@ def hotels_payload(user=None):
     } for h in hotels]
     return hotels, payload
 
+@app.route('/katagrafes')
+def katagrafes_today():
+    """v12.83 — Ενιαία οθόνη «Σήμερα» για τον συντηρητή: κάρτες πισινών & δικτύων
+    νερού με 2 slots (πρωί 08:00 / απόγευμα 17:00), tap → φόρμα με preset."""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if not can_log():
+        return redirect(url_for('pools_dashboard'))
+    user = current_user()
+    hotels = scoped_hotels(user)
+    today = date.today()
+    # done maps: pool_id/system_id -> {period: record_id}
+    pdone = {}
+    for r in PoolRecord.query.filter_by(record_date=today).all():
+        pdone.setdefault(r.pool_id, {})[r.period] = r.id
+    wdone = {}
+    for r in WaterRecord.query.filter_by(record_date=today).all():
+        if r.water_system_id:
+            wdone.setdefault(r.water_system_id, {})[r.period] = r.id
+    cards = []
+    for h in hotels:
+        pools = [p for p in h.pools if p.is_active]
+        systems = (WaterSystem.query.filter_by(hotel_id=h.id, is_active=True)
+                   .order_by(WaterSystem.name).all())
+        if not pools and not systems:
+            continue
+        cards.append({
+            'hotel': h.name,
+            'pools': [{'id': p.id, 'name': p.name, 'location': p.location or '',
+                       'done': pdone.get(p.id, {})} for p in pools],
+            'systems': [{'id': s.id, 'name': s.name, 'location': s.location or '',
+                         'done': wdone.get(s.id, {})} for s in systems],
+        })
+    # σύνολα για κεφαλίδα προόδου
+    tot = sum(len(c['pools']) + len(c['systems']) for c in cards) * 2
+    dn = 0
+    for c in cards:
+        for p in c['pools']: dn += len(p['done'])
+        for s in c['systems']: dn += len(s['done'])
+    return render_template('katagrafes.html', user=user, cards=cards,
+                           total_slots=tot, done_slots=dn)
+
+
 @app.route('/pools')
 def pools_app():
     if 'user_id' not in session:
@@ -1811,9 +1910,11 @@ def pools_app():
     done = {}
     for r in todays:
         done.setdefault(str(r.pool_id), []).append(r.period)
+    preset = _pool_preset(request.args.get('pool'), request.args.get('period'))
     return render_template('pools.html', user=user, hotels=hotels,
                            hotels_json=hotels_json, done=done, limits=POOL_LIMITS,
-                           action_rules=ACTION_RULES, param_labels=PARAM_LABELS, safety_note=SAFETY_NOTE)
+                           action_rules=ACTION_RULES, param_labels=PARAM_LABELS, safety_note=SAFETY_NOTE,
+                           preset=preset, ai_configured=(resolve_provider() is not None))
 
 @app.route('/submit-pool', methods=['POST'])
 def submit_pool():
@@ -2038,6 +2139,8 @@ def _records_items(user, ftype='all'):
 def records_feed():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
+        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     ftype = request.args.get('type', 'all')          # all | pools | water
     items = _records_items(user, ftype)
@@ -2073,6 +2176,8 @@ def records_export_xlsx():
 def pools_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
+        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     hotels = allowed_hotels(user)
     hids = {h.id for h in hotels}
@@ -2207,6 +2312,8 @@ def toggle_user(user_id):
 def pools_coverage():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
+        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     hids = {h.id for h in allowed_hotels(user)}
     pools = [p for p in Pool.query.filter_by(is_active=True).order_by(Pool.hotel_id, Pool.name).all() if p.hotel_id in hids]

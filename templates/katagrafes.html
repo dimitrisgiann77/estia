@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="{{ session.get('language','el') }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Εστία — Καταγραφές · Σήμερα</title>
+<meta name="theme-color" content="#193847">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+:root{--brand:{{ theme.primary if theme else '#193847' }};--accent:{{ theme.accent if theme else '#BB9549' }};}
+.kt-wrap{max-width:760px;margin:0 auto;padding:14px;}
+.kt-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.kt-title{font-size:18px;font-weight:600;color:var(--brand);display:flex;align-items:center;gap:8px;}
+.kt-date{font-size:12px;color:#888;}
+.kt-prog{background:#eef2f6;border-radius:10px;height:8px;overflow:hidden;margin:4px 0 6px;}
+.kt-prog>span{display:block;height:100%;background:var(--accent);}
+.kt-prog-lbl{font-size:12px;color:#64748b;margin-bottom:14px;}
+.kt-hotel{font-size:13px;font-weight:600;color:#334155;margin:18px 0 8px;display:flex;align-items:center;gap:6px;}
+.kt-sub{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;margin:10px 0 6px;}
+.kt-card{background:#fff;border:1px solid #e7eef2;border-radius:14px;padding:12px;margin-bottom:8px;}
+.kt-card-name{font-size:14px;font-weight:600;color:#1e293b;display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.kt-card-loc{font-size:11px;color:#94a3b8;margin-bottom:8px;}
+.kt-slots{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.kt-slot{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 6px;border-radius:10px;text-decoration:none;font-size:13px;font-weight:600;border:1px solid transparent;transition:transform .06s;}
+.kt-slot:active{transform:scale(.97);}
+.kt-slot .kt-time{font-size:14px;}
+.kt-slot .kt-st{font-size:10px;font-weight:500;display:flex;align-items:center;gap:3px;}
+.kt-slot.done{background:#dcfce7;color:#16a34a;border-color:#bbf7d0;}
+.kt-slot.todo{background:#f8fafc;color:#475569;border:1px dashed #cbd5e1;}
+.kt-empty{text-align:center;color:#94a3b8;padding:40px 10px;}
+@media(max-width:380px){.kt-slot .kt-time{font-size:13px;}}
+</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+
+<header class="app-header pool" style="background:var(--brand);">
+  <div class="header-left">
+    <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
+    <div>
+      <div class="header-title">Εστία — Καταγραφές</div>
+      <div class="header-sub" id="today-date"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="/profile" class="logout-btn" title="Προφίλ"><i class="ti ti-user-circle"></i></a>
+    <a href="/logout" class="logout-btn"><i class="ti ti-logout"></i></a>
+  </div>
+</header>
+
+<div class="kt-wrap">
+  <div class="kt-top">
+    <div class="kt-title"><i class="ti ti-clipboard-list"></i> Σήμερα</div>
+    <div class="kt-date" id="hdr-date"></div>
+  </div>
+
+  {% if total_slots %}
+  <div class="kt-prog"><span style="width:{{ (100*done_slots/total_slots)|round(0,'floor')|int }}%;"></span></div>
+  <div class="kt-prog-lbl">{{ done_slots }} / {{ total_slots }} καταγραφές ολοκληρωμένες σήμερα</div>
+  {% endif %}
+
+  {% if not cards %}
+  <div class="kt-empty">
+    <i class="ti ti-pool" style="font-size:34px;"></i>
+    <p style="margin-top:10px;">Δεν υπάρχουν πισίνες ή δίκτυα νερού.</p>
+  </div>
+  {% endif %}
+
+  {% for c in cards %}
+  <div class="kt-hotel"><i class="ti ti-building"></i> {{ c.hotel }}</div>
+
+  {% if c.pools %}
+  <div class="kt-sub">Πισίνες</div>
+  {% for p in c.pools %}
+  <div class="kt-card">
+    <div class="kt-card-name"><i class="ti ti-pool"></i> {{ p.name }}</div>
+    {% if p.location %}<div class="kt-card-loc">{{ p.location }}</div>{% endif %}
+    <div class="kt-slots">
+      {% set m = p.done.get('morning') %}
+      <a class="kt-slot {{ 'done' if m else 'todo' }}" href="/pools?pool={{ p.id }}&period=morning">
+        <span class="kt-time"><i class="ti ti-sun"></i> 08:00</span>
+        <span class="kt-st">{% if m %}<i class="ti ti-check"></i> Καταχωρήθηκε{% else %}<i class="ti ti-pencil"></i> Καταχώρηση{% endif %}</span>
+      </a>
+      {% set a = p.done.get('afternoon') %}
+      <a class="kt-slot {{ 'done' if a else 'todo' }}" href="/pools?pool={{ p.id }}&period=afternoon">
+        <span class="kt-time"><i class="ti ti-moon"></i> 17:00</span>
+        <span class="kt-st">{% if a %}<i class="ti ti-check"></i> Καταχωρήθηκε{% else %}<i class="ti ti-pencil"></i> Καταχώρηση{% endif %}</span>
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if c.systems %}
+  <div class="kt-sub">Νερά χρήσης / ΖΝΧ</div>
+  {% for s in c.systems %}
+  <div class="kt-card">
+    <div class="kt-card-name"><i class="ti ti-droplet"></i> {{ s.name }}</div>
+    {% if s.location %}<div class="kt-card-loc">{{ s.location }}</div>{% endif %}
+    <div class="kt-slots">
+      {% set m = s.done.get('morning') %}
+      <a class="kt-slot {{ 'done' if m else 'todo' }}" href="/app?sys={{ s.id }}&period=morning">
+        <span class="kt-time"><i class="ti ti-sun"></i> 08:00</span>
+        <span class="kt-st">{% if m %}<i class="ti ti-check"></i> Καταχωρήθηκε{% else %}<i class="ti ti-pencil"></i> Καταχώρηση{% endif %}</span>
+      </a>
+      {% set a = s.done.get('afternoon') %}
+      <a class="kt-slot {{ 'done' if a else 'todo' }}" href="/app?sys={{ s.id }}&period=afternoon">
+        <span class="kt-time"><i class="ti ti-moon"></i> 17:00</span>
+        <span class="kt-st">{% if a %}<i class="ti ti-check"></i> Καταχωρήθηκε{% else %}<i class="ti ti-pencil"></i> Καταχώρηση{% endif %}</span>
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+</div>
+
+<script>
+(function(){
+  var d=new Date();
+  var s=d.toLocaleDateString('{{ "en-GB" if session.get("language")=="en" else "el-GR" }}',{weekday:'long',day:'numeric',month:'long'});
+  var hd=document.getElementById('hdr-date'); if(hd) hd.textContent=s;
+  var td=document.getElementById('today-date'); if(td) td.textContent=s;
+})();
+</script>
+</body>
+</html>
