@@ -29,6 +29,22 @@
 .kt-slot.done{background:#dcfce7;color:#16a34a;border-color:#bbf7d0;}
 .kt-slot.todo{background:#f8fafc;color:#475569;border:1px dashed #cbd5e1;}
 .kt-empty{text-align:center;color:#94a3b8;padding:40px 10px;}
+.kt-sec{font-size:13px;font-weight:600;color:#334155;margin:18px 0 8px;display:flex;align-items:center;gap:6px;}
+.kt-alert{border:1px solid #fcd9a6;background:#fffaf0;border-radius:14px;padding:12px;margin-bottom:8px;}
+.kt-alert.urgent{border-color:#f3b4b4;background:#fdf3f3;}
+.kt-alert-h{font-size:13px;font-weight:600;color:#b45309;display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.kt-alert.urgent .kt-alert-h{color:#b91c1c;}
+.kt-alert-it{font-size:12px;color:#92400e;line-height:1.4;padding:3px 0 3px 18px;}
+.kt-alert.urgent .kt-alert-it{color:#9f1d1d;}
+.kt-fault{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #e7eef2;border-radius:12px;padding:10px 12px;margin-bottom:7px;text-decoration:none;}
+.kt-fault .pr{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;background:#f59e0b;}
+.kt-fault .pr.high{background:#dc2626;}
+.kt-fault-b{flex:1;min-width:0;}
+.kt-fault-d{font-size:13px;color:#1e293b;font-weight:500;}
+.kt-fault-m{font-size:11px;color:#94a3b8;margin-top:2px;}
+.kt-qa{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;}
+.kt-qa a{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:var(--brand);font-size:14px;font-weight:600;text-decoration:none;}
+.kt-link{font-size:12px;color:var(--brand);text-decoration:none;font-weight:600;}
 @media(max-width:380px){.kt-slot .kt-time{font-size:13px;}}
 </style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
@@ -61,6 +77,27 @@
   <div class="kt-prog-lbl">{{ done_slots }} / {{ total_slots }} καταγραφές ολοκληρωμένες σήμερα</div>
   {% endif %}
 
+  {% if alerts %}
+  <div class="kt-sec"><i class="ti ti-alert-triangle"></i> Ειδοποιήσεις εκτός ορίου</div>
+  {% for a in alerts %}
+  <div class="kt-alert {{ 'urgent' if a.urgent }}">
+    <div class="kt-alert-h"><i class="ti ti-{{ 'droplet' if a.kind=='water' else 'pool' }}"></i> {{ a.place }} · {{ a.period }}</div>
+    {% for it in a['items'] %}<div class="kt-alert-it">• <b>{{ it.label }}:</b> {{ it.action }}</div>{% endfor %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if faults_count %}
+  <div class="kt-sec"><i class="ti ti-tool"></i> Ανοιχτές βλάβες ({{ faults_count }}){% if is_admin %} <a href="/dashboard/faults" class="kt-link" style="margin-left:auto;">Όλες →</a>{% endif %}</div>
+  {% for f in faults_open %}
+  <a class="kt-fault" href="{{ ('/dashboard/fault/%d' % f.id) if is_admin else '#' }}">
+    <span class="pr {{ 'high' if f.high }}"></span>
+    <div class="kt-fault-b"><div class="kt-fault-d">{{ f.desc }}</div><div class="kt-fault-m">{{ f.code }} · {{ f.hotel }} · {{ f.status }}{% if f.priority=='Υψηλή' %} · Υψηλή{% endif %}</div></div>
+  </a>
+  {% endfor %}
+  {% endif %}
+
+  {% if cards %}<div class="kt-sec"><i class="ti ti-clipboard-list"></i> Καταγραφές ημέρας</div>{% endif %}
   {% if not cards %}
   <div class="kt-empty">
     <i class="ti ti-pool" style="font-size:34px;"></i>
@@ -115,6 +152,11 @@
   {% endfor %}
   {% endif %}
   {% endfor %}
+
+  <div class="kt-qa">
+    <a href="/fault"><i class="ti ti-tool"></i> Δήλωση βλάβης</a>
+    <a href="/areas"><i class="ti ti-checklist"></i> Καταγραφή τομέων</a>
+  </div>
 </div>
 
 <script>

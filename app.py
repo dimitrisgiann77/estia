@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.91'
-APP_BUILD   = '371'
+APP_VERSION = '12.92'
+APP_BUILD   = '372'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.92', 'b': '372', 'date': '18/06/2026', 'time': '18:00', 'title': 'Dashboard Συντήρησης («Σήμερα») + κρυφά tabs όταν έρχεσαι από slot',
+     'items': ['Το «Σήμερα» έγινε dashboard Συντήρησης: εκκρεμότητες καταγραφής + ειδοποιήσεις εκτός ορίου (σημερινές) + ανοιχτές βλάβες + γρήγορες ενέργειες (Δήλωση βλάβης/Καταγραφή τομέων). Πάντα ορατό στο μενού Συντήρηση για όσους κάνουν καταγραφή.',
+               'Όταν ανοίγεις φόρμα από slot, τα Πρωί/Απόγευμα κρύβονται (έχει ήδη επιλεγεί η ώρα).']},
     {'v': '12.91', 'b': '371', 'date': '18/06/2026', 'time': '17:30', 'title': 'ΟΛΗ η πλατφόρμα σε ώρα Ελλάδος (Europe/Athens)',
      'items': ['Όλη η διεργασία τρέχει σε TZ=Europe/Athens και ΑΠΟΘΗΚΕΥΕΙ τις ώρες τοπικά (όχι UTC) — υποβολές, ημερομηνία καταγραφής, βλάβες, πρόγραμμα, μισθοδοσία, logs, ειδοποιήσεις, backups, σχόλια: όλα σε ώρα Ελλάδος.',
                'Το date.today()/τώρα δείχνει σωστή ημέρα Ελλάδος (διορθώνει και υποβολές αργά το βράδυ). Σχεδιαστές υπενθυμίσεων/backup ήδη σε Αθήνα.']},
@@ -1925,8 +1928,45 @@ def katagrafes_today():
     for c in cards:
         for p in c['pools']: dn += len(p['done'])
         for s in c['systems']: dn += len(s['done'])
+    hids = {h.id for h in hotels}
+    # v12.92 — Ειδοποιήσεις εκτός ορίου (σημερινές μετρήσεις σε scope)
+    alerts = []
+    _per_gr = {'morning': 'Πρωί', 'afternoon': 'Απόγευμα'}
+    for r in PoolRecord.query.filter_by(record_date=today).all():
+        if not r.pool or r.pool.hotel_id not in hids:
+            continue
+        acts = compute_pool_actions(r)
+        if acts:
+            alerts.append({'place': (r.pool.hotel.name + ' · ' + r.pool.name) if r.pool.hotel else r.pool.name,
+                           'period': _per_gr.get(r.period, r.period), 'kind': 'pool',
+                           'urgent': any(a['urgent'] for a in acts), 'items': acts})
+    for r in WaterRecord.query.filter_by(record_date=today).all():
+        ws = r.water_system
+        if not ws or ws.hotel_id not in hids:
+            continue
+        acts = compute_water_actions(r)
+        if acts:
+            alerts.append({'place': (ws.hotel.name + ' · ' + ws.name) if ws.hotel else ws.name,
+                           'period': _per_gr.get(r.period, r.period), 'kind': 'water',
+                           'urgent': any(a['urgent'] for a in acts), 'items': acts})
+    alerts.sort(key=lambda a: not a['urgent'])
+    # v12.92 — Ανοιχτές βλάβες (scope)
+    faults_open, faults_count = [], 0
+    try:
+        from faults import Fault, TERMINAL, STATUS_LABELS
+        fq = Fault.query.filter(~Fault.status.in_(TERMINAL), Fault.hotel_id.in_(hids or [-1]))
+        faults_count = fq.count()
+        for f in fq.order_by(Fault.submitted_at.desc()).limit(6).all():
+            faults_open.append({'code': f.code, 'desc': (f.description or '')[:90],
+                                'priority': f.priority, 'status': STATUS_LABELS.get(f.status, f.status),
+                                'hotel': f.hotel.name if f.hotel else '', 'id': f.id,
+                                'high': (f.priority == 'Υψηλή')})
+    except Exception:
+        pass
     return render_template('katagrafes.html', user=user, cards=cards,
-                           total_slots=tot, done_slots=dn)
+                           total_slots=tot, done_slots=dn,
+                           alerts=alerts, faults_open=faults_open, faults_count=faults_count,
+                           is_admin=is_admin())
 
 
 @app.route('/pools')

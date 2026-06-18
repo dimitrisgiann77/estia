@@ -102,6 +102,10 @@ function applyPreset(){
     if(PRESET.period) per=PRESET.period;
   } }catch(e){}
   setPeriod(per);
+  if(typeof PRESET!=='undefined'&&PRESET&&PRESET.period){
+    const tabs=document.querySelector('.mf-tabs'); if(tabs) tabs.style.display='none';
+    const pl=document.getElementById('mf-place'); if(pl) pl.innerHTML += ' · <i class="ti ti-'+(per==='morning'?'sun':'moon')+'"></i> '+(per==='morning'?'Πρωί 08:00':'Απόγευμα 17:00');
+  }
   try{ if(typeof PRESET!=='undefined'&&PRESET&&PRESET.values){
     Object.keys(PRESET.values).forEach(k=>{ const el=document.querySelector('[name="'+k+'"]'); if(!el) return;
       if(el.type==='checkbox') el.checked=!!PRESET.values[k]; else el.value=PRESET.values[k]; });
