@@ -214,10 +214,10 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
     </div>
     <div class="sp"></div>
     <div class="apps">
-      <button class="hbtn active" data-ws="operations" onclick="setWorkspace('operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>
-      <button class="hbtn" data-ws="staffhub" onclick="setWorkspace('staffhub')" title="Staff HUB"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>
-      {% if is_admin %}<button class="hbtn" data-ws="admin" onclick="setWorkspace('admin')" title="Admin"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% else %}<button class="hbtn" onclick="estiaSoon('Admin')" title="Admin — σύντομα"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% endif %}
-      <button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>
+      {% if ws_show('operations') %}<button class="hbtn active" data-ws="operations" onclick="setWorkspace('operations')" title="Operations"><i class="ti ti-tools"></i><span>Operations</span></button>{% endif %}
+      {% if ws_show('staffhub') %}<button class="hbtn" data-ws="staffhub" onclick="setWorkspace('staffhub')" title="Staff HUB"><i class="ti ti-users-group"></i><span>Staff HUB</span></button>{% endif %}
+      {% if ws_show('admin') and is_admin %}<button class="hbtn" data-ws="admin" onclick="setWorkspace('admin')" title="Admin"><i class="ti ti-shield-lock"></i><span>Admin</span></button>{% endif %}
+      {% if ws_show('guestapp') %}<button class="hbtn" onclick="estiaSoon('Guest App')" title="Guest App — σύντομα"><i class="ti ti-user-heart"></i><span>Guest App</span></button>{% endif %}
     </div>
     <div class="ic" onclick="go('/messages?embed=1',null)" title="Μηνύματα"><i class="ti ti-mail"></i>{% if msg_unread %}<span class="badge">{{ msg_unread }}</span>{% endif %}</div>
     <div class="note" id="note">
