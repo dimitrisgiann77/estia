@@ -35,6 +35,15 @@
     </div>
   </div>
 
+  {% if not ev and templates and templates|length>1 %}
+  <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:13px;font-weight:600;">Πρότυπο (φύλλο):</span>
+    <select onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;">
+      {% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}</option>{% endfor %}
+    </select>
+    <span class="muted" style="font-size:12px;">Διάλεξε διαφορετικό πρότυπο/τμήμα αν χρειάζεται.</span>
+  </div>
+  {% endif %}
   <div class="card">
     <h3 style="font-size:15px;margin-bottom:6px;">Κριτήρια (κλίμακα 1–{{ tmpl.scale_max if tmpl else 10 }})</h3>
     {% set ns = namespace(g='') %}

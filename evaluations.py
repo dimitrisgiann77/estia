@@ -196,10 +196,14 @@ def evaluations_list():
 def evaluation_new():
     if not _auth():
         return redirect(url_for('login'))
-    tmpl = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.id).first()
+    tid = request.args.get('template_id', type=int)
+    tmpl = (EvalTemplate.query.filter_by(id=tid, is_active=True).first() if tid else None) \
+           or EvalTemplate.query.filter_by(is_active=True, scope='general').order_by(EvalTemplate.id).first() \
+           or EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.id).first()
     if request.method == 'POST' and tmpl:
         return _save_evaluation(None, tmpl)
-    return render_template('evaluation_form.html', ev=None, tmpl=tmpl,
+    templates = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all()
+    return render_template('evaluation_form.html', ev=None, tmpl=tmpl, templates=templates,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
                            scores={}, today=date.today())
 
@@ -449,5 +453,174 @@ def evaluations_employee(uid):
                            dept=deps_m.get(getattr(emp, 'department_id', None), '—'),
                            hotel=hotels_m.get(getattr(emp, 'home_hotel_id', None), '—'),
                            band_color=BAND_COLOR, avg=_avg([t['pct'] for t in trend]))
+
+# ── Φ2: Διαχείριση / variants προτύπων ───────────────────────────────────────
+def _criterion_used(cid):
+    return EvalScore.query.filter_by(criterion_id=cid).count() > 0
+
+@app.route('/dashboard/evaluations/templates')
+def eval_templates():
+    if not _auth():
+        return redirect(url_for('login'))
+    tmpls = EvalTemplate.query.order_by(EvalTemplate.scope, EvalTemplate.name).all()
+    rows = []
+    for t in tmpls:
+        wsum = round(sum(c.weight or 0 for c in t.criteria), 3)
+        used = Evaluation.query.filter_by(template_id=t.id).count()
+        rows.append({'t': t, 'n': len(t.criteria), 'wsum': wsum, 'used': used})
+    return render_template('eval_templates.html', rows=rows)
+
+@app.route('/dashboard/evaluations/templates/<int:tid>', methods=['GET', 'POST'])
+def eval_template_edit(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    t = EvalTemplate.query.get_or_404(tid)
+    if request.method == 'POST':
+        fm = request.form
+        t.name = (fm.get('name') or t.name).strip()[:80]
+        t.scope = (fm.get('scope') or 'general').strip()[:40]
+        try: t.scale_max = max(1, int(fm.get('scale_max') or 10))
+        except ValueError: pass
+        # update existing criteria
+        for c in list(t.criteria):
+            if fm.get('del_%d' % c.id) and not _criterion_used(c.id):
+                db.session.delete(c); continue
+            c.label = (fm.get('label_%d' % c.id) or c.label).strip()[:200]
+            c.grp = (fm.get('grp_%d' % c.id) or c.grp or '').strip()[:40]
+            try: c.weight = float(fm.get('weight_%d' % c.id) or 0)
+            except ValueError: pass
+            try: c.sort = int(fm.get('sort_%d' % c.id) or c.sort)
+            except ValueError: pass
+        # add new criteria (παράλληλες λίστες)
+        labels = fm.getlist('new_label'); grps = fm.getlist('new_grp'); weights = fm.getlist('new_weight')
+        base = (max([c.sort for c in t.criteria], default=-1)) + 1
+        for i, lab in enumerate(labels):
+            lab = (lab or '').strip()
+            if not lab: continue
+            try: w = float(weights[i]) if i < len(weights) and weights[i] else 0
+            except ValueError: w = 0
+            g = (grps[i].strip() if i < len(grps) and grps[i] else 'Βασικά κριτήρια')
+            db.session.add(EvalCriterion(template_id=t.id, grp=g[:40], label=lab[:200], weight=w, sort=base + i, max_score=t.scale_max))
+        db.session.commit()
+        log_activity('eval_template_save', t.name)
+        return redirect(url_for('eval_template_edit', tid=t.id) + '?embed=1&ok=1')
+    wsum = round(sum(c.weight or 0 for c in t.criteria), 3)
+    used_ids = {c.id for c in t.criteria if _criterion_used(c.id)}
+    return render_template('eval_template_edit.html', t=t, criteria=t.criteria, wsum=wsum,
+                           used_ids=used_ids, ok=request.args.get('ok'))
+
+@app.route('/dashboard/evaluations/templates/<int:tid>/clone', methods=['POST'])
+def eval_template_clone(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    src = EvalTemplate.query.get_or_404(tid)
+    name = (request.form.get('name') or (src.name + ' (αντίγραφο)')).strip()[:80]
+    scope = (request.form.get('scope') or 'general').strip()[:40]
+    nt = EvalTemplate(name=name, scope=scope, scale_max=src.scale_max, is_active=True)
+    db.session.add(nt); db.session.flush()
+    for c in src.criteria:
+        db.session.add(EvalCriterion(template_id=nt.id, grp=c.grp, label=c.label, weight=c.weight, sort=c.sort, max_score=c.max_score))
+    db.session.commit()
+    log_activity('eval_template_clone', '%s -> %s' % (src.name, name))
+    return redirect(url_for('eval_template_edit', tid=nt.id) + '?embed=1')
+
+@app.route('/dashboard/evaluations/templates/<int:tid>/toggle', methods=['POST'])
+def eval_template_toggle(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    t = EvalTemplate.query.get_or_404(tid)
+    t.is_active = not bool(t.is_active); db.session.commit()
+    return redirect(url_for('eval_templates') + '?embed=1')
+
+# ── Φ2: Group roll-up matrix (κριτήρια × υπάλληλοι ανά τμήμα/περίοδο) ──────────
+def _group_data(dept_id, year, period, mode):
+    hotels_m, deps_m = _maps()
+    evs = latest_finalized()
+    if year:   evs = [e for e in evs if e.year == year]
+    if period: evs = [e for e in evs if e.period_label == period]
+    def did_of(e):
+        return (getattr(e.employee, 'department_id', None) if (mode == 'current' and e.employee) else e.department_id)
+    if dept_id:
+        evs = [e for e in evs if did_of(e) == dept_id]
+    evs.sort(key=lambda e: (e.employee.full_name if e.employee else ''))
+    # γραμμές κριτηρίων: από το πρότυπο του 1ου eval (ή general), match με LABEL
+    tmpl = (evs[0].template if evs and evs[0].template else
+            EvalTemplate.query.filter_by(scope='general', is_active=True).first() or EvalTemplate.query.first())
+    rows = [{'label': c.label, 'grp': c.grp, 'weight': c.weight} for c in (tmpl.criteria if tmpl else [])]
+    cols = []
+    for e in evs:
+        by_lab = {}
+        for sc in e.scores:
+            cr = EvalCriterion.query.get(sc.criterion_id)
+            if cr: by_lab[cr.label] = sc.score
+        cols.append({'name': e.employee.full_name if e.employee else '—', 'id': e.id,
+                     'emp_id': e.employee_id, 'pct': e.score_pct, 'band': e.band, 'by_lab': by_lab})
+    # dept avg ανά κριτήριο
+    for r in rows:
+        vals = [c['by_lab'].get(r['label']) for c in cols]
+        vals = [v for v in vals if v is not None]
+        r['avg'] = round(sum(vals) / len(vals), 1) if vals else None
+    return rows, cols, deps_m
+
+@app.route('/dashboard/evaluations/group')
+def evaluations_group():
+    if not _auth():
+        return redirect(url_for('login'))
+    mode = request.args.get('mode', 'snapshot')
+    if mode not in ('snapshot', 'current'): mode = 'snapshot'
+    dept_id = request.args.get('department_id', type=int)
+    year = request.args.get('year', type=int)
+    period = (request.args.get('period') or '').strip()
+    try:
+        from schedule import Department
+        depts = Department.query.order_by(Department.name).all()
+    except Exception:
+        depts = []
+    if not dept_id and depts:
+        # default: το πρώτο τμήμα που έχει αξιολογήσεις
+        used = {e.department_id for e in latest_finalized() if e.department_id}
+        for d in depts:
+            if d.id in used: dept_id = d.id; break
+    rows, cols, deps_m = _group_data(dept_id, year, period, mode)
+    years = sorted({e.year for e in latest_finalized() if e.year}, reverse=True)
+    periods = sorted({e.period_label for e in latest_finalized() if e.period_label})
+    return render_template('eval_group.html', rows=rows, cols=cols, depts=depts, deps_m=deps_m,
+                           dept_id=dept_id, year=year, period=period, mode=mode,
+                           years=years, periods=periods, band_color=BAND_COLOR)
+
+@app.route('/dashboard/evaluations/group/export.xlsx')
+def evaluations_group_export():
+    if not _auth():
+        return redirect(url_for('login'))
+    mode = request.args.get('mode', 'snapshot')
+    dept_id = request.args.get('department_id', type=int)
+    year = request.args.get('year', type=int)
+    period = (request.args.get('period') or '').strip()
+    rows, cols, deps_m = _group_data(dept_id, year, period, mode)
+    import io as _io, openpyxl
+    from openpyxl.styles import Font
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Group'
+    ws['A1'] = 'CONDIAN HOTELS — GROUP EVALUATION'; ws['A1'].font = Font(bold=True, size=13)
+    ws['A2'] = 'Τμήμα: %s · %s %s' % (deps_m.get(dept_id, '—'), period or '', year or '')
+    hr = 4
+    ws.cell(hr, 1, 'ΚΡΙΤΗΡΙΟ').font = Font(bold=True)
+    ws.cell(hr, 2, 'ΒΑΡΟΣ').font = Font(bold=True)
+    for j, c in enumerate(cols):
+        ws.cell(hr, 3 + j, c['name']).font = Font(bold=True)
+    ws.cell(hr, 3 + len(cols), 'ΜΟ ΤΜΗΜΑΤΟΣ').font = Font(bold=True)
+    r = hr + 1
+    for row in rows:
+        ws.cell(r, 1, row['label']); ws.cell(r, 2, row['weight'])
+        for j, c in enumerate(cols):
+            ws.cell(r, 3 + j, c['by_lab'].get(row['label']))
+        ws.cell(r, 3 + len(cols), row['avg']); r += 1
+    ws.cell(r + 1, 1, 'ΣΥΝΟΛΟ %').font = Font(bold=True)
+    for j, c in enumerate(cols):
+        ws.cell(r + 1, 3 + j, c['pct'])
+    ws.column_dimensions['A'].width = 50
+    buf = _io.BytesIO(); wb.save(buf); buf.seek(0)
+    log_activity('eval_group_export', '%s %s' % (deps_m.get(dept_id, ''), period))
+    return Response(buf.read(), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': 'attachment; filename=group-evaluation.xlsx'})
 
 print('[evaluations] module loaded (Αξιολόγηση Προσωπικού Φ1)')

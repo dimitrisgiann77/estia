@@ -5,7 +5,7 @@
 .act a,.act button{font-size:12px;text-decoration:none;color:#475569;background:none;border:none;cursor:pointer;padding:3px 5px;}
 .act a:hover{color:var(--mp-brand);}</style></head><body>
 {{ mp.topbar('star', 'Αξιολόγηση Προσωπικού', 'Αξιολογήσεις εργαζομένων — HR', 'Νέα αξιολόγηση', '/dashboard/evaluations/new?embed=1') }}
-<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a></div>
+<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a> <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#475569;"><i class="ti ti-template"></i> Πρότυπα</a></div>
 <div class="container">
   {% set total = items|length %}
   {% set exc = items|selectattr('band','equalto','Εξαιρετική')|list|length %}

@@ -1,0 +1,64 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Πρότυπο — ' + t.name, theme.primary if theme else '#193847') }}
+<style>
+.cr{display:grid;grid-template-columns:150px 1fr 90px 60px 30px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f5f5f5;}
+.cr input{padding:7px 8px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;width:100%;}
+.cr .w{text-align:center;}
+.hdr{display:grid;grid-template-columns:150px 1fr 90px 60px 30px;gap:8px;font-size:11px;color:#94a3b8;font-weight:700;padding-bottom:4px;}
+.wsum{font-size:14px;font-weight:700;}
+@media(max-width:700px){.cr,.hdr{grid-template-columns:1fr 70px 30px;}.cr .grp,.hdr .grp,.cr .sort,.hdr .sort{display:none;}}
+</style></head><body>
+{{ mp.topbar('template', 'Πρότυπο: ' + t.name, ('Πεδίο: ' + ('Κοινό' if t.scope=='general' else t.scope))) }}
+<div class="container">
+  {% if ok %}<div class="card" style="background:#dcfce7;color:#166534;">✓ Αποθηκεύτηκε.</div>{% endif %}
+  <form method="POST" action="/dashboard/evaluations/templates/{{ t.id }}">
+  <div class="card">
+    <div class="filters">
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Όνομα</label><input type="text" name="name" value="{{ t.name }}" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;min-width:240px;"></div>
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Πεδίο (τμήμα ή «general»)</label><input type="text" name="scope" value="{{ t.scope }}" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;"></div>
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Μέγ. κλίμακα</label><input type="number" name="scale_max" value="{{ t.scale_max }}" min="1" max="100" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;width:90px;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="hdr"><span class="grp">Ομάδα</span><span>Κριτήριο</span><span style="text-align:center;">Βάρος</span><span class="sort" style="text-align:center;">Σειρά</span><span></span></div>
+    <div id="crit-list">
+    {% for c in criteria %}
+      <div class="cr">
+        <input class="grp" name="grp_{{ c.id }}" value="{{ c.grp or '' }}" placeholder="ομάδα">
+        <input name="label_{{ c.id }}" value="{{ c.label }}">
+        <input class="w wcalc" name="weight_{{ c.id }}" type="number" step="0.005" value="{{ c.weight }}" oninput="wsum()">
+        <input class="sort" name="sort_{{ c.id }}" type="number" value="{{ c.sort }}" style="text-align:center;">
+        <span>{% if c.id in used_ids %}<i class="ti ti-lock" title="Χρησιμοποιείται σε αξιολογήσεις — δεν διαγράφεται" style="color:#cbd5e1;"></i>{% else %}<label title="Διαγραφή"><input type="checkbox" name="del_{{ c.id }}" style="width:auto;"></label>{% endif %}</span>
+      </div>
+    {% endfor %}
+    </div>
+    <div id="new-list"></div>
+    <button type="button" class="btn" onclick="addRow()" style="margin-top:10px;background:#0f766e;"><i class="ti ti-plus"></i> Νέο κριτήριο</button>
+    <div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div>Σύνολο βαρών: <span class="wsum" id="wsum">{{ '%.3f'|format(wsum) }}</span> <span class="muted" id="wnote"></span></div>
+      <button class="btn btn-ok" type="submit" style="margin-left:auto;"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+    </div>
+  </div>
+  </form>
+  <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Πρότυπα</a>
+</div>
+<script>
+function wsum(){
+  var t=0; document.querySelectorAll('.wcalc').forEach(function(e){var v=parseFloat(e.value);if(!isNaN(v))t+=v;});
+  document.getElementById('wsum').textContent=t.toFixed(3);
+  var n=document.getElementById('wnote'); var ok=Math.abs(t-1)<0.001;
+  n.textContent=ok?'✓ (=1.0)':'(ιδανικά = 1.0)'; n.style.color=ok?'#16a34a':'#dc2626';
+}
+function addRow(){
+  var d=document.createElement('div'); d.className='cr';
+  d.innerHTML='<input class="grp" name="new_grp" placeholder="ομάδα" value="Βασικά κριτήρια">'+
+    '<input name="new_label" placeholder="νέο κριτήριο">'+
+    '<input class="w wcalc" name="new_weight" type="number" step="0.005" placeholder="0.00" oninput="wsum()">'+
+    '<input class="sort" type="number" placeholder="" style="text-align:center;" disabled>'+
+    '<span><i class="ti ti-arrow-up" style="color:#cbd5e1;"></i></span>';
+  document.getElementById('new-list').appendChild(d);
+}
+document.addEventListener('DOMContentLoaded',wsum);
+</script>
+</body></html>

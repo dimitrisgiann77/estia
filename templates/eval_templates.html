@@ -1,0 +1,29 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Πρότυπα Αξιολόγησης', theme.primary if theme else '#193847') }}</head><body>
+{{ mp.topbar('template', 'Πρότυπα Αξιολόγησης', 'Φύλλα κριτηρίων — κοινό & variants ανά τμήμα') }}
+<div class="container">
+  <div class="card">
+    <p class="muted" style="font-size:13px;margin-bottom:10px;">Κάθε πρότυπο = ένα «φύλλο» κριτηρίων με βάρη. Φτιάξε <b>variant</b> (αντίγραφο) και προσάρμοσέ το ανά τμήμα (προσθήκη κριτηρίων / αλλαγή βαρών). Στη φόρμα νέας αξιολόγησης διαλέγεις ποιο πρότυπο θα χρησιμοποιήσεις.</p>
+    <table data-nocopy>
+      <thead><tr><th>Πρότυπο</th><th>Πεδίο</th><th>Κριτήρια</th><th>Σύνολο βαρών</th><th>Χρήσεις</th><th>Κατάσταση</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><a class="code" href="/dashboard/evaluations/templates/{{ r.t.id }}?embed=1"><b>{{ r.t.name }}</b></a></td>
+        <td>{{ 'Κοινό' if r.t.scope=='general' else r.t.scope }}</td>
+        <td>{{ r.n }}</td>
+        <td><b style="color:{{ '#16a34a' if (r.wsum>0.999 and r.wsum<1.001) else '#dc2626' }};">{{ '%.3f'|format(r.wsum) }}</b>{% if not (r.wsum>0.999 and r.wsum<1.001) %} <span class="muted" style="font-size:11px;">(≠1.0)</span>{% endif %}</td>
+        <td>{{ r.used }}</td>
+        <td>{% if r.t.is_active %}<span class="badge" style="background:#dcfce7;color:#16a34a;">ενεργό</span>{% else %}<span class="badge" style="background:#f1f5f9;color:#64748b;">ανενεργό</span>{% endif %}</td>
+        <td style="white-space:nowrap;">
+          <a class="btn" href="/dashboard/evaluations/templates/{{ r.t.id }}?embed=1" style="padding:5px 10px;"><i class="ti ti-edit"></i></a>
+          <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/clone" style="display:inline;"><input type="hidden" name="name" value="{{ r.t.name }} (variant)"><button class="btn" type="submit" style="padding:5px 10px;background:#0f766e;" title="Δημιουργία variant"><i class="ti ti-copy"></i></button></form>
+          <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/toggle" style="display:inline;"><button class="btn" type="submit" style="padding:5px 10px;background:#64748b;" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα αξιολογήσεων</a>
+</div></body></html>

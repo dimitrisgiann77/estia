@@ -22,6 +22,7 @@
       <select name="period" onchange="ff.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==f_period }}>{{ p }}</option>{% endfor %}</select>
       <select name="hotel_id" onchange="ff.submit()"><option value="">Όλα τα ξενοδοχεία</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==f_hotel }}>{{ h.name }}</option>{% endfor %}</select>
     </form>
+    <a class="btn" href="/dashboard/evaluations/group?embed=1&mode={{ mode }}" style="margin-top:8px;background:#475569;"><i class="ti ti-users-group"></i> Group matrix ανά τμήμα</a>
     <div class="muted" style="font-size:12px;margin-top:8px;">Ομαδοποίηση: <b>{{ 'Snapshot — τμήμα/ξενοδοχείο τη στιγμή της αξιολόγησης' if mode=='snapshot' else 'Τρέχον — σημερινό τμήμα/ξενοδοχείο από το Μητρώο' }}</b></div>
   </div>
 

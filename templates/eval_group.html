@@ -1,0 +1,49 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Group Evaluation', theme.primary if theme else '#193847') }}
+<style>
+.gm{overflow-x:auto;}
+.gm table{min-width:600px;}
+.gm th.rot{font-size:12px;}
+.gm td.sc,.gm th.sc{text-align:center;}
+.gm .avg{background:#f7fbff;font-weight:700;}
+.gm .tot td{border-top:2px solid #cfe0e6;font-weight:700;}
+.cell-l{color:#dc2626;}.cell-m{color:#b45309;}.cell-h{color:#16a34a;}
+.ev-band{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
+</style></head><body>
+{{ mp.topbar('users-group', 'Group Evaluation — Τμήμα', 'Κριτήρια × υπάλληλοι, μέσος όρος τμήματος') }}
+<div class="container">
+  <div class="card">
+    <form class="filters" method="GET" action="/dashboard/evaluations/group" id="gf">
+      <input type="hidden" name="embed" value="1"><input type="hidden" name="mode" value="{{ mode }}">
+      <select name="department_id" onchange="gf.submit()">{% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==dept_id }}>{{ d.name }}</option>{% endfor %}</select>
+      <select name="year" onchange="gf.submit()"><option value="">Όλα τα έτη</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}</select>
+      <select name="period" onchange="gf.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==period }}>{{ p }}</option>{% endfor %}</select>
+      <select name="mode" onchange="gf.submit()"><option value="snapshot" {{ 'selected' if mode=='snapshot' }}>Snapshot</option><option value="current" {{ 'selected' if mode=='current' }}>Τρέχον</option></select>
+      <a class="btn" href="/dashboard/evaluations/group/export.xlsx?department_id={{ dept_id or '' }}&year={{ year or '' }}&period={{ period }}&mode={{ mode }}" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+    </form>
+  </div>
+
+  <div class="card gm">
+    {% if not cols %}
+    <p class="muted" style="text-align:center;padding:24px;">Καμία αξιολόγηση για αυτό το τμήμα/περίοδο.</p>
+    {% else %}
+    <table data-nocopy>
+      <thead><tr><th>Κριτήριο</th><th class="sc">Βάρος</th>{% for c in cols %}<th class="sc rot"><a class="code" href="/dashboard/evaluations/employee/{{ c.emp_id }}?embed=1">{{ c.name }}</a></th>{% endfor %}<th class="sc avg">ΜΟ Τμήμ.</th></tr></thead>
+      <tbody>
+      {% set ns = namespace(g='') %}
+      {% for r in rows %}
+        {% if r.grp != ns.g %}<tr><td colspan="{{ cols|length + 3 }}" style="font-weight:700;color:var(--mp-brand);font-size:12px;background:#f7fbff;">{{ r.grp }}</td></tr>{% set ns.g=r.grp %}{% endif %}
+        <tr>
+          <td>{{ r.label }}</td>
+          <td class="sc muted">{{ '%.0f%%'|format((r.weight or 0)*100) }}</td>
+          {% for c in cols %}{% set v = c.by_lab.get(r.label) %}<td class="sc {{ 'cell-h' if v is not none and v>=8 else ('cell-m' if v is not none and v>=6 else ('cell-l' if v is not none else '')) }}">{{ v|round(1) if v is not none else '—' }}</td>{% endfor %}
+          <td class="sc avg">{{ r.avg if r.avg is not none else '—' }}</td>
+        </tr>
+      {% endfor %}
+      <tr class="tot"><td>ΣΥΝΟΛΟ %</td><td></td>{% for c in cols %}<td class="sc">{% set bc=band_color.get(c.band,('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ '%.0f%%'|format(c.pct) if c.pct is not none else '—' }}</span></td>{% endfor %}<td class="sc avg"></td></tr>
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  <a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Στατιστικά</a>
+</div></body></html>
