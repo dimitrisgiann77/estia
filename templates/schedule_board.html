@@ -28,7 +28,7 @@
   .legend{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;margin:6px 0;} .legend span{display:inline-flex;align-items:center;gap:4px;} .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
 </style>
 </head><body>
-{{ mp.topbar('calendar-week', 'ΕΣΤΙΑ — Πρόγραμμα Εργασίας', cur_hotel.name if cur_hotel else '') }}
+{{ mp.topbar('calendar-week', 'ΕΣΤΙΑ — Πρόγραμμα Εργασίας', cur_hotel.name if cur_hotel else '', 'Επικόλληση Excel', '/dashboard/schedule/paste?embed=1') }}
 <div class="container">
 
   <form class="sched-toolbar" method="GET" action="/dashboard/schedule">

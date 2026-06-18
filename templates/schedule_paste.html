@@ -1,0 +1,60 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Επικόλληση Προγράμματος', theme.primary if theme else '#193847') }}
+<style>
+.pst{max-width:1100px;margin:0 auto;}
+.pst textarea{width:100%;min-height:150px;font-family:ui-monospace,monospace;font-size:13px;padding:12px;border:1px solid #d6eef3;border-radius:10px;background:#fbfdff;white-space:pre;}
+.pst .hint{font-size:12px;color:#64748b;margin:6px 0 12px;}
+.pg{width:100%;border-collapse:collapse;font-size:12.5px;}
+.pg th,.pg td{border:1px solid #e2e8f0;padding:6px 8px;text-align:center;}
+.pg th.nm,.pg td.nm{text-align:left;white-space:nowrap;}
+.pg th{background:#f1f5f9;font-weight:600;}
+.pg td.unk{background:#fef2f2;color:#dc2626;font-weight:600;}
+.pg td.has{background:#f0fdf4;}
+.pg .miss{color:#dc2626;font-weight:600;}
+.pg .ok{color:#16a34a;font-weight:600;}
+</style></head><body>
+{{ mp.topbar('clipboard-text', 'Επικόλληση Προγράμματος από Excel', 'Όνομα + Δ–Κ ανά γραμμή — ταίριασμα με Μητρώο') }}
+<div class="container pst">
+  {% if saved %}
+  <div class="card" style="background:#dcfce7;color:#166534;"><b>✓ Αποθηκεύτηκε:</b> {{ saved.new }} νέες αναθέσεις, {{ saved.upd }} ενημερώσεις{% if saved.unmatched %} · <span style="color:#b45309;">{{ saved.unmatched }} γραμμές χωρίς ταίριασμα (αγνοήθηκαν)</span>{% endif %}.</div>
+  {% endif %}
+
+  <div class="card">
+    <form method="POST" action="/dashboard/schedule/paste">
+      <div class="filters" style="margin-bottom:10px;">
+        <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Εβδομάδα (Δευτέρα)</label><input type="date" name="week_start" value="{{ week_start }}" style="padding:9px;border:1px solid #d6eef3;border-radius:8px;"></div>
+      </div>
+      <label style="font-size:12px;font-weight:700;color:#475569;">Επικόλληση από Excel</label>
+      <div class="hint">Κάθε γραμμή: <b>Ονοματεπώνυμο</b> ⇥ Δευτέρα ⇥ Τρίτη ⇥ … ⇥ Κυριακή. Π.χ. <code>ΚΑΤΡΙΝΗΣ ΓΕΩΡΓΙΟΣ ⇥ 08:00-16:00 ⇥ ΡΕΠΟ ⇥ ΑΔ …</code>. Κωδικοί: ΕΡΓ/ώρες, ΑΔ, ΑΠ, ΑΣΘ, ΑΡΓ, ΑΝ· tag ξενοδοχείου π.χ. <code>AST-08:00-16:00</code>.</div>
+      <textarea name="data" placeholder="Επικόλλησε εδώ (Ctrl+V) από το Excel...">{{ raw }}</textarea>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button class="btn" type="submit" name="action" value="preview"><i class="ti ti-eye"></i> Προεπισκόπηση</button>
+        {% if rows %}<button class="btn btn-ok" type="submit" name="action" value="commit" onclick="return confirm('Αποθήκευση προγράμματος για την επιλεγμένη εβδομάδα;');"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>{% endif %}
+      </div>
+    </form>
+  </div>
+
+  {% if rows is not none %}
+  <div class="card">
+    <h3 style="font-size:15px;margin-bottom:10px;">Προεπισκόπηση — εβδομάδα {{ monday.strftime('%d/%m/%Y') }}</h3>
+    {% set dn = ['Δευ','Τρι','Τετ','Πεμ','Παρ','Σαβ','Κυρ'] %}
+    <div style="overflow-x:auto;">
+    <table class="pg">
+      <thead><tr><th class="nm">Εργαζόμενος (από Excel)</th><th class="nm">Ταίριασμα Μητρώου</th>{% for d in days %}<th>{{ dn[loop.index0] }} {{ d.strftime('%d/%m') }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="nm">{{ r.name }}</td>
+        <td class="nm">{% if r.user %}<span class="ok"><i class="ti ti-check"></i> {{ r.user.full_name }}</span>{% else %}<span class="miss"><i class="ti ti-x"></i> {{ r.warn }}</span>{% endif %}</td>
+        {% for d in r.days %}<td class="{{ 'unk' if d.unknown else ('has' if d.code) }}">{% if d.unknown %}{{ d.raw }}?{% else %}{{ d.label }}{% endif %}</td>{% endfor %}
+      </tr>
+      {% else %}<tr><td colspan="{{ days|length + 2 }}" style="color:#94a3b8;padding:18px;">Καμία γραμμή — επικόλλησε δεδομένα.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="hint" style="margin-top:10px;">Πράσινο = θα γραφτεί · κόκκινο = άγνωστος κωδικός (αγνοείται) · γραμμές χωρίς ταίριασμα αγνοούνται. Έλεγξε & πάτα <b>Αποθήκευση</b>.</p>
+  </div>
+  {% endif %}
+
+  <a class="btn" href="/dashboard/schedule?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Πρόγραμμα</a>
+</div></body></html>

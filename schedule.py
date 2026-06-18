@@ -965,6 +965,123 @@ def schedule_import():
     return render_template('schedule_import.html', results=results, year=date.today().year, purge_count=purge_count)
 
 
+# ── PASTE: μαζική επικόλληση προγράμματος από Excel (όνομα + Δ–Κ) ──────────────
+def _name_index():
+    ix, ixs = {}, {}
+    for u in User.query.filter(User.is_active == True).all():
+        if getattr(u, 'employment_active', None) is False:
+            continue
+        fn = u.full_name or ''
+        k = _norm(fn)
+        if k:
+            ix.setdefault(k, []).append(u)
+        toks = sorted([t for t in re.sub(r'[^a-zα-ω0-9 ]', '', _acc(fn).lower()).split() if t])
+        ks = ''.join(toks)
+        if ks:
+            ixs.setdefault(ks, []).append(u)
+    return ix, ixs
+
+def _match_name(name, ix, ixs):
+    k = _norm(name)
+    if k in ix:
+        return (ix[k][0], None) if len(ix[k]) == 1 else (None, 'διπλό όνομα στο Μητρώο')
+    toks = sorted([t for t in re.sub(r'[^a-zα-ω0-9 ]', '', _acc(name).lower()).split() if t])
+    ks = ''.join(toks)
+    if ks in ixs:
+        return (ixs[ks][0], None) if len(ixs[ks]) == 1 else (None, 'αμφίσημο όνομα')
+    return (None, 'δεν βρέθηκε στο Μητρώο')
+
+def _cell_label(code, segs):
+    if code is None:
+        return '—'
+    if code == 'ΕΡΓ':
+        if segs:
+            return 'ΕΡΓ ' + ', '.join('%s-%s' % (x.get('start'), x.get('end')) for x in segs)
+        return 'ΕΡΓ'
+    return code
+
+def _parse_paste(raw, monday):
+    ix, ixs = _name_index()
+    days = [monday + timedelta(days=i) for i in range(7)]
+    rows = []
+    for line in (raw or '').splitlines():
+        if not line.strip():
+            continue
+        cells = line.split('	')
+        name = cells[0].strip()
+        if not name or _norm(name) in ('ονοματεπωνυμο', 'ονομα', 'επωνυμο', 'τμημα'):
+            continue
+        user, warn = _match_name(name, ix, ixs)
+        dayvals = cells[1:8]
+        parsed = []
+        for i, dt in enumerate(days):
+            raw_v = dayvals[i].strip() if i < len(dayvals) else ''
+            code, segs, tag = parse_cell(raw_v) if raw_v else (None, [], None)
+            whid = None
+            if tag:
+                th = _resolve_hotel_by_code(tag); whid = th.id if th else None
+            elif user is not None:
+                whid = getattr(user, 'home_hotel_id', None)
+            unknown = bool(raw_v) and code is None
+            lbl = _cell_label(code, segs)
+            if unknown and (_norm(raw_v) in ('ρεπο', 'ρεπ', 'ρ', 'off', 'repo', 'dayoff') or raw_v in ('-', '—', '/')):
+                unknown = False; lbl = 'ΡΕΠΟ'   # ρεπό = κενή ημέρα (καμία ανάθεση)
+            parsed.append({'date': dt, 'raw': raw_v, 'code': code, 'segs': segs,
+                           'whid': whid, 'label': lbl, 'unknown': unknown})
+        rows.append({'name': name, 'user': user, 'warn': warn, 'days': parsed,
+                     'matched': user is not None})
+    return rows, days
+
+@app.route('/dashboard/schedule/paste', methods=['GET', 'POST'])
+def schedule_paste():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    monday = _week_arg()
+    rows = None; saved = None
+    if request.method == 'POST':
+        raw = request.form.get('data', '')
+        ws = request.form.get('week_start', '')
+        try:
+            monday = monday_of(datetime.strptime(ws, '%Y-%m-%d').date())
+        except Exception:
+            monday = _week_arg()
+        rows, days = _parse_paste(raw, monday)
+        if request.form.get('action') == 'commit':
+            user = current_user(); n_new = n_upd = 0
+            for r in rows:
+                if not r['user']:
+                    continue
+                for d in r['days']:
+                    if d['code'] is None:
+                        continue
+                    a = ShiftAssignment.query.filter_by(user_id=r['user'].id, work_date=d['date']).first()
+                    if a:
+                        a.shift_code = d['code']; a.segments = json.dumps(d['segs'], ensure_ascii=False)
+                        a.work_hotel_id = d['whid']; n_upd += 1
+                    else:
+                        db.session.add(ShiftAssignment(user_id=r['user'].id, work_date=d['date'],
+                            shift_code=d['code'], segments=json.dumps(d['segs'], ensure_ascii=False),
+                            work_hotel_id=d['whid'], created_by=user.id)); n_new += 1
+                    u = r['user']
+                    if getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+                        wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=monday).first()
+                        if not wp:
+                            wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=monday, status='draft'); db.session.add(wp)
+                        elif wp.status in ('submitted', 'locked'):
+                            wp.status = 'draft'
+            db.session.commit()
+            seed_schedule()
+            log_activity('schedule_paste', 'νέες %d / ενημ. %d' % (n_new, n_upd))
+            saved = {'new': n_new, 'upd': n_upd,
+                     'unmatched': sum(1 for r in rows if not r['user'])}
+    else:
+        days = [monday + timedelta(days=i) for i in range(7)]
+    return render_template('schedule_paste.html', rows=rows, days=days, monday=monday,
+                           week_start=monday.strftime('%Y-%m-%d'), saved=saved,
+                           raw=request.form.get('data', ''))
+
+
+
 # ── ADMIN settings (κωδικοί / τμήματα / αργίες / πολιτική / κανόνες) ───────────
 @app.route('/dashboard/schedule/settings', methods=['GET', 'POST'])
 def schedule_settings():
