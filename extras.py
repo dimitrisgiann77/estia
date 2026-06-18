@@ -97,6 +97,20 @@ def _vis_for_role(role):
     cfg = get_menu_vis()
     return set(cfg.get(role, DEFAULT_VIS.get(role, set())))
 
+def menu_allows(key, user=None):
+    """Ιδιο φιλτρο με το menu_show() αλλα καλειται απο routes (π.χ. guard σελιδας).
+    True αν ο χρηστης επιτρεπεται να δει το στοιχειο `key` του μενου."""
+    u = user or current_user()
+    role = u.role if u else None
+    rank = role_rank(role) if role else -1
+    if rank >= ROLE_RANK['admin']:
+        return True
+    if role in ROLES_CFG:
+        return key in _vis_for_role(role)
+    if rank >= ROLE_RANK['staff']:
+        return key in _vis_for_role('staff')
+    return key == 'whatsnew'
+
 @app.context_processor
 def _inject_menu_show():
     u = current_user()

@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.112'
-APP_BUILD   = '392'
+APP_VERSION = '12.113'
+APP_BUILD   = '393'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.113', 'b': '393', 'date': '19/06/2026', 'time': '05:35', 'title': 'Πίνακας Νερών: πρόσβαση με το προφίλ (όχι μόνο admin) + scope ξενοδοχείων',
+     'items': ['Όταν έδινες τον «Πίνακα Νερών» σε manager, το στοιχείο εμφανιζόταν αλλά η σελίδα ζητούσε login (ήταν κλειδωμένη σε admin). Τώρα η πρόσβαση ακολουθεί το δικαίωμα του μενού (water_dash) — όπως ο «Πίνακας Πισινών».',
+               'Για μη-admin, ο Πίνακας Νερών δείχνει ΜΟΝΟ τα ανατεθειμένα ξενοδοχεία (scope προφίλ) και κρύβει τη διαχείριση δικτύων (προσθήκη/επεξεργασία/διαγραφή = admin-only).']},
     {'v': '12.112', 'b': '392', 'date': '19/06/2026', 'time': '05:10', 'title': 'Μενού ανά ρόλο: κοινό μητρώο (auto-sync) + drag & drop ανά ρόλο',
      'items': ['ΑΡΧΙΤΕΚΤΟΝΙΚΗ: τα ρυθμιζόμενα στοιχεία μενού ορίζονται πλέον ΜΙΑ φορά (MENU_REG στο extras.py). Από εκεί τραβάνε ΚΑΙ το πλαϊνό μενού (η ομάδα «Συντήρηση» γίνεται render με loop) ΚΑΙ ο επεξεργαστής. Νέο στοιχείο «Συντήρησης» = εμφανίζεται αυτόματα παντού.',
                'ΔΙΟΡΘΩΣΗ: ο «Πίνακας Νερών» ήταν κλειδωμένος σε admin (δεν φαινόταν στη λίστα ανά ρόλο). Τώρα είναι κανονικό ρυθμιζόμενο στοιχείο — μπορείς να τον δώσεις σε Manager/Staff. Όλα τα στοιχεία της «Συντήρησης» περνούν πλέον σωστά από έλεγχο ορατότητας (πριν κάποια εμφανίζονταν ανεξάρτητα από το tick).',
@@ -2176,22 +2179,33 @@ def api_assistant():
 # ──────────────────────────────────────────────────────────────────────────
 @app.route('/dashboard')
 def dashboard():
-    if not is_admin():
+    # v12.113 — πρόσβαση βάσει δικαιώματος μενού (water_dash), όχι μόνο admin.
+    if 'user_id' not in session:
         return redirect(url_for('login'))
-    hotels  = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
-    systems = (WaterSystem.query.filter_by(is_active=True)
-               .order_by(WaterSystem.hotel_id, WaterSystem.name).all())
+    import extras as _E
+    me = current_user()
+    if not (is_admin() or _E.menu_allows('water_dash', me)):
+        return redirect(url_for('katagrafes_today')) if can_log() else redirect(url_for('login'))
+    # scope ξενοδοχείων: admin=όλα, αλλιώς μόνο τα ανατεθειμένα (mirror Πίνακα Πισινών)
+    if is_admin():
+        hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    else:
+        hotels = allowed_hotels(me)
+    hids = {h.id for h in hotels}
+    systems = [s for s in WaterSystem.query.filter_by(is_active=True)
+               .order_by(WaterSystem.hotel_id, WaterSystem.name).all() if s.hotel_id in hids]
+    sys_ids = [s.id for s in systems]
     # v12.3 — φίλτρα ανά ξενοδοχείο / δίκτυο / χρήστη
     f_hotel  = request.args.get('hotel_id', type=int) or active_hotel_id()
     f_system = request.args.get('system_id', type=int)
     f_staff  = request.args.get('staff_id', type=int)
     def _scope(q):
-        if f_system:
+        if f_system and f_system in sys_ids:
             return q.filter(WaterRecord.water_system_id == f_system)
         if f_hotel:
             sids = [s.id for s in systems if s.hotel_id == f_hotel]
             return q.filter(WaterRecord.water_system_id.in_(sids or [-1]))
-        return q
+        return q.filter(WaterRecord.water_system_id.in_(sys_ids or [-1]))
     q = _scope(WaterRecord.query)
     if f_staff:
         q = q.filter(WaterRecord.user_id == f_staff)
@@ -2204,7 +2218,7 @@ def dashboard():
     today_a = [r for r in today_records if r.period == 'afternoon']
     return render_template('dashboard.html', records=records, users=users,
                            today_morning_list=today_m, today_afternoon_list=today_a,
-                           hotels=hotels, systems=systems,
+                           hotels=hotels, systems=systems, is_admin=is_admin(),
                            f_hotel=f_hotel, f_system=f_system, f_staff=f_staff)
 
 

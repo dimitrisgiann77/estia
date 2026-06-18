@@ -240,6 +240,7 @@ tr:last-child td { border-bottom:none; }
     </div>
   </div>
 
+  {% if is_admin %}
   <!-- v12.3 — Διαχείριση Δικτύων Νερού (mirror Ξενοδοχεία & Πισίνες) -->
   <div class="grid2">
     <div class="card">
@@ -287,6 +288,7 @@ tr:last-child td { border-bottom:none; }
       <p style="font-size:12px;color:#888;margin-top:10px;">Κάθε ξενοδοχείο μπορεί να έχει περισσότερα από ένα δίκτυα (π.χ. κεντρικό, παράρτημα). Οι καταχωρήσεις νερών γίνονται ανά δίκτυο — δεν αλληλοκαλύπτονται.</p>
     </div>
   </div>
+  {% endif %}
 
   <!-- v12.4: οι Χρήστες μεταφέρθηκαν σε δική τους σελίδα: /dashboard/users -->
 
