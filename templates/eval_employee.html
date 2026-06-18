@@ -1,0 +1,48 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Αξιολογήσεις — ' + emp.full_name, theme.primary if theme else '#193847') }}
+<style>
+.ev-band{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.spark{display:flex;align-items:flex-end;gap:6px;height:90px;padding:6px 0;}
+.spark .b{flex:1;min-width:26px;background:var(--mp-brand);border-radius:5px 5px 0 0;position:relative;}
+.spark .b small{position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:10px;color:#475569;font-weight:700;}
+.spark .b span{position:absolute;bottom:-30px;left:0;right:0;text-align:center;font-size:10px;color:#94a3b8;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;}@media(max-width:820px){.two{grid-template-columns:1fr;}}
+.crit-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:13px;}
+</style></head><body>
+{{ mp.topbar('user-star', emp.full_name, 'Ιστορικό αξιολογήσεων') }}
+<div class="container">
+  <div class="card">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+      <div><span class="muted" style="font-size:12px;">Μέσος όρος (όλες)</span><br><span style="font-size:28px;font-weight:800;">{{ '%.1f%%'|format(avg) if avg is not none else '—' }}</span></div>
+      <div class="muted" style="font-size:13px;">Τμήμα: <b>{{ dept }}</b> · Ξενοδοχείο: <b>{{ hotel }}</b> <span style="font-size:11px;">(τρέχον από Μητρώο)</span></div>
+      <a class="btn" href="/dashboard/evaluations?embed=1" style="margin-left:auto;background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα</a>
+    </div>
+  </div>
+
+  {% if trend|length > 1 %}
+  <div class="card">
+    <h3 style="font-size:15px;margin-bottom:6px;"><i class="ti ti-trending-up"></i> Διαχρονική εξέλιξη</h3>
+    <div class="spark">
+      {% for t in trend %}<div class="b" style="height:{{ (t.pct or 0)|round(0,'floor')|int }}%;background:{{ '#16a34a' if t.pct and t.pct>=80 else ('#b45309' if t.pct and t.pct>=60 else '#dc2626') }};" title="{{ t.period }}: {{ t.pct }}%"><small>{{ '%.0f'|format(t.pct) if t.pct is not none else '' }}</small><span>{{ t.period }}</span></div>{% endfor %}
+    </div>
+    <div style="height:24px;"></div>
+  </div>
+  {% endif %}
+
+  <div class="two">
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:10px;">Αξιολογήσεις</h3>
+      <table data-nocopy><thead><tr><th>Περίοδος</th><th>Βαθμός</th><th>Βαθμίδα</th></tr></thead><tbody>
+      {% for t in trend|reverse %}<tr><td><a class="code" href="/dashboard/evaluations/{{ t.id }}?embed=1">{{ t.period }}</a></td><td><b>{{ '%.1f%%'|format(t.pct) if t.pct is not none else '—' }}</b></td>
+        <td>{% set bc=band_color.get(t.band,('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ t.band or '—' }}</span></td></tr>
+      {% else %}<tr><td colspan="3" class="muted" style="text-align:center;padding:18px;">Καμία αξιολόγηση</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="card">
+      <h3 style="font-size:15px;margin-bottom:10px;">Μέσος όρος ανά κριτήριο</h3>
+      <div class="muted" style="font-size:12px;margin-bottom:6px;">Από χαμηλότερο σε υψηλότερο (σημεία βελτίωσης πάνω)</div>
+      {% for c in crit_avg %}<div class="crit-row"><div>{{ c.label }} <span class="muted" style="font-size:11px;">{{ c.grp }}</span></div><b style="color:{{ '#16a34a' if c.avg>=8 else ('#b45309' if c.avg>=6 else '#dc2626') }};">{{ c.avg }}</b></div>
+      {% else %}<div class="muted" style="text-align:center;padding:18px;">—</div>{% endfor %}
+    </div>
+  </div>
+</div></body></html>

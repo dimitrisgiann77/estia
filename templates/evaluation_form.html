@@ -4,7 +4,8 @@
 .ev-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
 .ev-f label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;}
 .ev-f input,.ev-f select,.ev-f textarea{width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;}
-.ev-info{font-size:12px;color:#64748b;margin-top:6px;}
+.ev-info{font-size:12.5px;color:#185FA5;margin-top:8px;background:#eaf3fb;border:1px solid #cfe3f5;border-radius:8px;padding:7px 10px;display:none;}
+.ev-info.show{display:block;}
 .ev-grp{font-size:12px;font-weight:700;color:var(--mp-brand);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px;}
 .ev-crit{display:grid;grid-template-columns:1fr 90px 1fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;}
 .ev-crit .lab{font-size:13px;color:#1e293b;}
@@ -66,8 +67,9 @@
 function fillEmp(){
   var s=document.getElementById('emp'),o=s.options[s.selectedIndex],i=document.getElementById('emp-info');
   if(!o||!o.value){i.textContent='';return;}
-  var parts=[];if(o.dataset.dep)parts.push('Τμήμα: '+o.dataset.dep);if(o.dataset.spec)parts.push('Ειδικότητα: '+o.dataset.spec);if(o.dataset.hotel)parts.push('Ξενοδοχείο: '+o.dataset.hotel);
-  i.textContent=parts.join(' · ');
+  var parts=[];if(o.dataset.dep)parts.push('Τμήμα: <b>'+o.dataset.dep+'</b>');if(o.dataset.hotel)parts.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');if(o.dataset.spec)parts.push('Ειδικότητα: '+o.dataset.spec);
+  i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+parts.join(' · ');
+  i.classList.toggle('show', parts.length>0);
 }
 function calc(){
   var num=0,den=0,n=0,tot=document.querySelectorAll('.sc').length;

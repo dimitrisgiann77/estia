@@ -5,6 +5,7 @@
 .act a,.act button{font-size:12px;text-decoration:none;color:#475569;background:none;border:none;cursor:pointer;padding:3px 5px;}
 .act a:hover{color:var(--mp-brand);}</style></head><body>
 {{ mp.topbar('star', 'Αξιολόγηση Προσωπικού', 'Αξιολογήσεις εργαζομένων — HR', 'Νέα αξιολόγηση', '/dashboard/evaluations/new?embed=1') }}
+<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a></div>
 <div class="container">
   {% set total = items|length %}
   {% set exc = items|selectattr('band','equalto','Εξαιρετική')|list|length %}
@@ -30,7 +31,7 @@
       {% for e in items %}
       <tr>
         <td><a class="code" href="/dashboard/evaluations/{{ e.id }}?embed=1">{{ e.code }}</a>{% if e.version and e.version>1 %} <span class="muted">v{{ e.version }}</span>{% endif %}</td>
-        <td><b>{{ e.employee.full_name if e.employee else '—' }}</b></td>
+        <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a></td>
         <td>{{ dept_name(e.department_id) }}</td>
         <td>{{ e.hotel.name if e.hotel else '—' }}</td>
         <td>{{ e.period_label }} {{ e.year or '' }}</td>

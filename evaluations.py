@@ -341,4 +341,113 @@ def evaluation_export(eid):
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition': 'attachment; filename=' + fname})
 
+# ── Φ2: Στατιστικά ────────────────────────────────────────────────────────────
+def latest_finalized():
+    """Μία εγγραφή ανά code: η τελευταία ΟΡΙΣΤΙΚΟΠΟΙΗΜΕΝΗ version (αγνοεί drafts & παλιές versions)."""
+    best = {}
+    for e in Evaluation.query.filter_by(status='finalized').all():
+        k = e.code or ('id%d' % e.id)
+        if k not in best or (e.version or 1) > (best[k].version or 1):
+            best[k] = e
+    return list(best.values())
+
+def _maps():
+    hotels = {h.id: h.name for h in Hotel.query.all()}
+    deps = {}
+    try:
+        from schedule import Department
+        deps = {d.id: d.name for d in Department.query.all()}
+    except Exception:
+        pass
+    return hotels, deps
+
+def _grp(e, mode, deps, hotels):
+    if mode == 'current' and e.employee:
+        did = getattr(e.employee, 'department_id', None); hid = getattr(e.employee, 'home_hotel_id', None)
+    else:
+        did = e.department_id; hid = e.hotel_id
+    return (deps.get(did, '—'), hotels.get(hid, '—'), hid)
+
+def _avg(vals):
+    vals = [v for v in vals if v is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+@app.route('/dashboard/evaluations/stats')
+def evaluations_stats():
+    if not _auth():
+        return redirect(url_for('login'))
+    mode = request.args.get('mode', 'snapshot')
+    if mode not in ('snapshot', 'current'): mode = 'snapshot'
+    f_year = request.args.get('year', type=int)
+    f_period = (request.args.get('period') or '').strip()
+    f_hotel = request.args.get('hotel_id', type=int)
+    hotels_m, deps_m = _maps()
+    evs = latest_finalized()
+    if f_year:   evs = [e for e in evs if e.year == f_year]
+    if f_period: evs = [e for e in evs if e.period_label == f_period]
+    if f_hotel:
+        evs = [e for e in evs if _grp(e, mode, deps_m, hotels_m)[2] == f_hotel]
+    # KPIs
+    pcts = [e.score_pct for e in evs if e.score_pct is not None]
+    kpi = {'n': len(evs), 'avg': _avg(pcts),
+           'att': sum(1 for e in evs if e.score_pct is not None and e.score_pct < 60),
+           'top': sum(1 for e in evs if e.score_pct is not None and e.score_pct >= 80)}
+    # roll-up ανά τμήμα & ανά property
+    bd, bh = {}, {}
+    for e in evs:
+        dn, hn, hid = _grp(e, mode, deps_m, hotels_m)
+        bd.setdefault(dn, []).append(e.score_pct)
+        bh.setdefault(hn, []).append(e.score_pct)
+    by_dept = sorted([{'name': k, 'count': len(v), 'avg': _avg(v),
+                       'att': sum(1 for x in v if x is not None and x < 60)} for k, v in bd.items()],
+                     key=lambda r: (r['avg'] is None, -(r['avg'] or 0)))
+    by_hotel = sorted([{'name': k, 'count': len(v), 'avg': _avg(v)} for k, v in bh.items()],
+                      key=lambda r: (r['avg'] is None, -(r['avg'] or 0)))
+    def _row(e):
+        dn, hn, _ = _grp(e, mode, deps_m, hotels_m)
+        return {'id': e.id, 'emp_id': e.employee_id, 'name': e.employee.full_name if e.employee else '—',
+                'dept': dn, 'hotel': hn, 'pct': e.score_pct, 'band': e.band,
+                'period': '%s %s' % (e.period_label or '', e.year or '')}
+    ranked = sorted([e for e in evs if e.score_pct is not None], key=lambda e: e.score_pct, reverse=True)
+    top = [_row(e) for e in ranked[:8]]
+    attention = [_row(e) for e in ranked if e.score_pct < 60]
+    years = sorted({e.year for e in latest_finalized() if e.year}, reverse=True)
+    periods = sorted({e.period_label for e in latest_finalized() if e.period_label})
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    return render_template('eval_stats.html', kpi=kpi, by_dept=by_dept, by_hotel=by_hotel,
+                           top=top, attention=attention, mode=mode, years=years, periods=periods,
+                           hotels=hotels, f_year=f_year, f_period=f_period, f_hotel=f_hotel,
+                           band_color=BAND_COLOR)
+
+@app.route('/dashboard/evaluations/employee/<int:uid>')
+def evaluations_employee(uid):
+    if not _auth():
+        return redirect(url_for('login'))
+    emp = User.query.get_or_404(uid)
+    evs = [e for e in latest_finalized() if e.employee_id == uid]
+    evs.sort(key=lambda e: (e.year or 0, e.eval_date or date.min))
+    # trend
+    trend = [{'period': '%s %s' % (e.period_label or '', e.year or ''), 'pct': e.score_pct,
+              'band': e.band, 'id': e.id} for e in evs]
+    # per-criterion average (σε όλες τις αξιολογήσεις του)
+    crit_sum, crit_cnt, crit_lab = {}, {}, {}
+    for e in evs:
+        for sc in e.scores:
+            if sc.score is None: continue
+            crit_sum[sc.criterion_id] = crit_sum.get(sc.criterion_id, 0) + sc.score
+            crit_cnt[sc.criterion_id] = crit_cnt.get(sc.criterion_id, 0) + 1
+    if evs and evs[-1].template:
+        for c in evs[-1].template.criteria:
+            crit_lab[c.id] = (c.label, c.grp)
+    crit_avg = []
+    for cid, tot in crit_sum.items():
+        lab, grp = crit_lab.get(cid, ('(κριτήριο)', ''))
+        crit_avg.append({'label': lab, 'grp': grp, 'avg': round(tot / crit_cnt[cid], 1)})
+    crit_avg.sort(key=lambda r: r['avg'])
+    hotels_m, deps_m = _maps()
+    return render_template('eval_employee.html', emp=emp, trend=trend, crit_avg=crit_avg,
+                           dept=deps_m.get(getattr(emp, 'department_id', None), '—'),
+                           hotel=hotels_m.get(getattr(emp, 'home_hotel_id', None), '—'),
+                           band_color=BAND_COLOR, avg=_avg([t['pct'] for t in trend]))
+
 print('[evaluations] module loaded (Αξιολόγηση Προσωπικού Φ1)')
