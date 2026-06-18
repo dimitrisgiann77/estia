@@ -87,7 +87,7 @@
         <tbody>
         {% for r in dg.rows %}
           <tr>
-            <td class="name">{{ r.user.full_name }}{% if r.user.login_enabled is sameas false %} <i class="ti ti-lock" title="χωρίς login" style="font-size:11px;opacity:.5"></i>{% endif %}</td>
+            <td class="name">{{ r.user.full_name }} {{ lock_badge(r.user) }}</td>
             {% for c in r.cells %}{% set st=shift_lookup.get(c.code) %}
               <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-edit="{{ '1' if blk.editable else '0' }}" style="{{ ('background:'+st.color+'22;border:1px solid '+st.color+'66;') if st else '' }}" onclick="openEditor(this)">{% if c.elsewhere %}<span class="x">⇄</span>{% endif %}{{ c.label or '+' }}{% if c.code=='ΕΡΓ' and c.hours %}<span class="hh">{{ c.hours }}h</span>{% endif %}</div></td>
             {% endfor %}
