@@ -281,26 +281,19 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
       {% else %}
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Dashboard</div>{% endif %}
 
-      {% if menu_show('pools') or menu_show('water') %}
-      <div class="grp" data-ws="operations staffhub">Καταγραφές</div>
+      {% if menu_show('today') or menu_show('pools') or menu_show('water') or menu_show('areas') or menu_show('fault_submit') or menu_show('faults_board') or menu_show('pools_dash') or menu_show('records') or menu_show('coverage') or menu_show('areas_dash') or is_admin %}
+      <div class="grp" data-ws="operations staffhub">Συντήρηση</div>
+      {% if menu_show('today') %}<div class="item" data-ws="operations staffhub" data-url="/katagrafes?embed=1"><i class="ti ti-clipboard-list"></i> Σήμερα</div>{% endif %}
       {% if menu_show('pools') %}<div class="item" data-ws="operations staffhub" data-url="/pools?embed=1"><i class="ti ti-pool"></i> Πισίνες</div>{% endif %}
       {% if menu_show('water') %}<div class="item" data-ws="operations staffhub" data-url="/app?embed=1"><i class="ti ti-droplet"></i> Νερά Χρήσης</div>{% endif %}
-      {% endif %}
-
-      {% if menu_show('pools_dash') or menu_show('records') or menu_show('coverage') or menu_show('faults_board') or is_admin %}
-      <div class="grp" data-ws="operations">Παρακολούθηση</div>
+      {% if menu_show('areas') %}<div class="item" data-ws="operations staffhub" data-url="/areas?embed=1"><i class="ti ti-checklist"></i> Καταγραφή τομέων</div>{% endif %}
+      {% if menu_show('fault_submit') %}<div class="item" data-ws="operations staffhub" data-url="/fault?embed=1"><i class="ti ti-tool"></i> Δήλωση βλάβης</div>{% endif %}
+      {% if menu_show('faults_board') %}<div class="item" data-ws="operations" data-url="/dashboard/faults?embed=1"><i class="ti ti-alert-triangle"></i> Πίνακας Βλαβών</div>{% endif %}
       {% if menu_show('pools_dash') %}<div class="item" data-ws="operations" data-url="/pools/dashboard?embed=1"><i class="ti ti-layout-dashboard"></i> Πίνακας Πισινών</div>{% endif %}
       {% if is_admin %}<div class="item" data-ws="operations" data-url="/dashboard?embed=1"><i class="ti ti-droplet-filled"></i> Πίνακας Νερών</div>{% endif %}
+      {% if menu_show('areas_dash') %}<div class="item" data-ws="operations" data-url="/areas/dashboard?embed=1"><i class="ti ti-clipboard-list"></i> Πίνακας τομέων</div>{% endif %}
       {% if menu_show('records') %}<div class="item" data-ws="operations" data-url="/records?embed=1"><i class="ti ti-list-details"></i> Records</div>{% endif %}
       {% if menu_show('coverage') %}<div class="item" data-ws="operations" data-url="/pools/coverage?embed=1"><i class="ti ti-calendar-stats"></i> Εβδομαδιαία κάλυψη</div>{% endif %}
-      {% if menu_show('faults_board') %}<div class="item" data-ws="operations" data-url="/dashboard/faults?embed=1"><i class="ti ti-alert-triangle"></i> Πίνακας Βλαβών</div>{% endif %}
-      {% endif %}
-
-      {% if menu_show('fault_submit') or menu_show('areas') or menu_show('areas_dash') %}
-      <div class="grp" data-ws="operations">Συντήρηση</div>
-      {% if menu_show('fault_submit') %}<div class="item" data-ws="operations" data-url="/fault?embed=1"><i class="ti ti-tool"></i> Δήλωση βλάβης</div>{% endif %}
-      {% if menu_show('areas') %}<div class="item" data-ws="operations" data-url="/areas?embed=1"><i class="ti ti-checklist"></i> Καταγραφή τομέων</div>{% endif %}
-      {% if menu_show('areas_dash') %}<div class="item" data-ws="operations" data-url="/areas/dashboard?embed=1"><i class="ti ti-clipboard-list"></i> Πίνακας τομέων</div>{% endif %}
       {% endif %}
 
       {% if menu_show('surveys') %}
