@@ -89,7 +89,10 @@ tr:last-child td { border-bottom:none; }
             <td>{{ it.place }}</td>
             <td>{{ it.user }}</td>
             <td>{% if it.updated %}<span class="badge badge-upd" title="Έχει ενημερωθεί μετά την αρχική υποβολή">διορθώθηκε</span>{% endif %}</td>
-            <td><a href="{{ it.edit_url }}" class="badge badge-am" style="text-decoration:none;" title="Άνοιγμα"><i class="ti ti-edit"></i></a></td>
+            <td style="white-space:nowrap;">
+              <a href="{{ it.edit_url }}" class="badge badge-am" style="text-decoration:none;" title="Επεξεργασία"><i class="ti ti-edit"></i></a>
+              {% if is_admin %}<form method="POST" action="{{ ('/pools/record/%d/delete' % it.id) if it.kind=='pool' else ('/water/record/%d/delete' % it.id) }}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="badge" style="background:#fee2e2;color:#b91c1c;border:none;cursor:pointer;text-decoration:none;" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}
+            </td>
           </tr>
           {% endfor %}
           {% if not items %}
