@@ -1,0 +1,49 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Αξιολόγηση Προσωπικού', theme.primary if theme else '#193847') }}
+<style>.ev-band{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.ev-pct{font-weight:700;font-size:14px;}
+.act a,.act button{font-size:12px;text-decoration:none;color:#475569;background:none;border:none;cursor:pointer;padding:3px 5px;}
+.act a:hover{color:var(--mp-brand);}</style></head><body>
+{{ mp.topbar('star', 'Αξιολόγηση Προσωπικού', 'Αξιολογήσεις εργαζομένων — HR', 'Νέα αξιολόγηση', '/dashboard/evaluations/new?embed=1') }}
+<div class="container">
+  {% set total = items|length %}
+  {% set exc = items|selectattr('band','equalto','Εξαιρετική')|list|length %}
+  {% set good = items|selectattr('band','equalto','Καλή')|list|length %}
+  {% set att = items|selectattr('band','equalto','Χρειάζεται προσοχή')|list|length %}
+  {{ mp.kpis([{'n':total,'label':'Αξιολογήσεις'},{'n':exc,'label':'Εξαιρετικές','color':'#16a34a'},{'n':good,'label':'Καλές','color':'#b45309'},{'n':att,'label':'Χρειάζονται προσοχή','color':'#dc2626'}]) }}
+
+  <div class="card">
+    <form class="filters" method="GET" action="/dashboard/evaluations">
+      <input type="hidden" name="embed" value="1">
+      <input type="text" name="q" value="{{ q }}" placeholder="Αναζήτηση υπαλλήλου...">
+      <select name="hotel_id" onchange="this.form.submit()"><option value="">Όλα τα ξενοδοχεία</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==f_hotel }}>{{ h.name }}</option>{% endfor %}</select>
+      <select name="band" onchange="this.form.submit()"><option value="">Όλες οι βαθμίδες</option>{% for b in ['Εξαιρετική','Καλή','Χρειάζεται προσοχή'] %}<option value="{{ b }}" {{ 'selected' if b==f_band }}>{{ b }}</option>{% endfor %}</select>
+      <select name="period" onchange="this.form.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==f_period }}>{{ p }}</option>{% endfor %}</select>
+      <button class="btn" type="submit"><i class="ti ti-search"></i> Φίλτρο</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th>Κωδικός</th><th>Υπάλληλος</th><th>Τμήμα</th><th>Ξενοδοχείο</th><th>Περίοδος</th><th>Ημ/νία</th><th>Βαθμός</th><th>Βαθμίδα</th><th></th><th></th></tr></thead>
+      <tbody>
+      {% for e in items %}
+      <tr>
+        <td><a class="code" href="/dashboard/evaluations/{{ e.id }}?embed=1">{{ e.code }}</a>{% if e.version and e.version>1 %} <span class="muted">v{{ e.version }}</span>{% endif %}</td>
+        <td><b>{{ e.employee.full_name if e.employee else '—' }}</b></td>
+        <td>{{ dept_name(e.department_id) }}</td>
+        <td>{{ e.hotel.name if e.hotel else '—' }}</td>
+        <td>{{ e.period_label }} {{ e.year or '' }}</td>
+        <td class="muted">{{ e.eval_date.strftime('%d/%m/%Y') if e.eval_date else '—' }}</td>
+        <td class="ev-pct">{{ '%.0f%%'|format(e.score_pct) if e.score_pct is not none else '—' }}</td>
+        <td>{% set bc = band_color.get(e.band, ('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ e.band or '—' }}</span>{% if e.status!='finalized' %} <span class="muted" style="font-size:11px;">draft</span>{% endif %}</td>
+        <td class="act"><a href="/dashboard/evaluations/{{ e.id }}?embed=1" title="Προβολή"><i class="ti ti-eye"></i></a><a href="/dashboard/evaluations/{{ e.id }}/edit?embed=1" title="Επεξεργασία"><i class="ti ti-edit"></i></a><a href="/dashboard/evaluations/{{ e.id }}/export.xlsx" title="Excel"><i class="ti ti-file-spreadsheet"></i></a></td>
+        <td class="act"><form method="POST" action="/dashboard/evaluations/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή αξιολόγησης {{ e.code }};');"><button type="submit" title="Διαγραφή" style="color:#dc2626;"><i class="ti ti-trash"></i></button></form></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" style="text-align:center;color:#9aa7ad;padding:26px;">Καμία αξιολόγηση ακόμα. <a href="/dashboard/evaluations/new?embed=1">Νέα αξιολόγηση →</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div></body></html>

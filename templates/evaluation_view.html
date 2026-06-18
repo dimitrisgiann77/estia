@@ -1,0 +1,56 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Αξιολόγηση ' + (ev.code or ''), theme.primary if theme else '#193847') }}
+<style>
+.ev-h{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+.ev-h .kv{font-size:13px;}.ev-h .kv .k{color:#94a3b8;font-size:11px;}
+.ev-band-big{padding:5px 14px;border-radius:20px;font-size:14px;font-weight:700;display:inline-block;}
+.ev-score-big{font-size:34px;font-weight:800;}
+.ev-grp{font-size:12px;font-weight:700;color:var(--mp-brand);text-transform:uppercase;margin:14px 0 4px;}
+.crit-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;}
+.crit-row .sc{font-weight:700;min-width:42px;text-align:right;}
+.crit-row .cm{color:#94a3b8;font-size:12px;}
+.trend{font-size:13px;font-weight:600;}
+</style></head><body>
+{{ mp.topbar('star', 'Αξιολόγηση ' + (ev.code or ''), (ev.employee.full_name if ev.employee else '')) }}
+<div class="container">
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:14px;">
+      <div><span class="muted" style="font-size:12px;">Σταθμισμένη βαθμολογία</span><br><span class="ev-score-big" style="color:{{ band_color.get(ev.band,('#f1f5f9','#64748b'))[1] }};">{{ '%.1f%%'|format(ev.score_pct) if ev.score_pct is not none else '—' }}</span></div>
+      {% set bc = band_color.get(ev.band,('#f1f5f9','#64748b')) %}
+      <div><span class="ev-band-big" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ ev.band or '—' }}</span>{% if ev.status!='finalized' %} <span class="muted">(πρόχειρο)</span>{% endif %}</div>
+      {% if prev and prev.score_pct is not none and ev.score_pct is not none %}
+        {% set d = ev.score_pct - prev.score_pct %}
+        <div class="trend" style="color:{{ '#16a34a' if d>0 else ('#dc2626' if d<0 else '#64748b') }};"><i class="ti ti-{{ 'trending-up' if d>0 else ('trending-down' if d<0 else 'minus') }}"></i> {{ '%+.1f'|format(d) }} vs προηγ. ({{ prev.period_label }} {{ prev.year or '' }})</div>
+      {% endif %}
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/edit?embed=1"><i class="ti ti-edit"></i> Επεξεργασία</a>
+        <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/export.xlsx" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+        <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα</a>
+      </div>
+    </div>
+    <div class="ev-h">
+      <div class="kv"><div class="k">Υπάλληλος</div><b>{{ ev.employee.full_name if ev.employee else '—' }}</b></div>
+      <div class="kv"><div class="k">Τμήμα</div>{{ dept_name(ev.department_id) or '—' }}</div>
+      <div class="kv"><div class="k">Ξενοδοχείο</div>{{ ev.hotel.name if ev.hotel else '—' }}</div>
+      <div class="kv"><div class="k">Περίοδος</div>{{ ev.period_label }} {{ ev.year or '' }}</div>
+      <div class="kv"><div class="k">Ημ/νία</div>{{ ev.eval_date.strftime('%d/%m/%Y') if ev.eval_date else '—' }}</div>
+      <div class="kv"><div class="k">Αξιολογητής</div>{{ ev.evaluator.full_name if ev.evaluator else '—' }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    {% set ns = namespace(g='') %}
+    {% for c in criteria %}
+      {% if c.grp != ns.g %}<div class="ev-grp">{{ c.grp }}</div>{% set ns.g = c.grp %}{% endif %}
+      {% set s = smap.get(c.id) %}
+      <div class="crit-row">
+        <div>{{ c.label }} <span class="muted" style="font-size:11px;">({{ '%.0f%%'|format((c.weight or 0)*100) }})</span>{% if s and s.comment %}<div class="cm">{{ s.comment }}</div>{% endif %}</div>
+        <div class="sc">{{ s.score|round(1) if s and s.score is not none else '—' }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if ev.general_comment %}
+  <div class="card"><div class="muted" style="font-size:12px;margin-bottom:4px;">Γενικό σχόλιο</div>{{ ev.general_comment }}</div>
+  {% endif %}
+</div></body></html>

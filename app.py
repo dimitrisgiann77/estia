@@ -331,11 +331,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.92'
-APP_BUILD   = '372'
+APP_VERSION = '12.93'
+APP_BUILD   = '373'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.93', 'b': '373', 'date': '18/06/2026', 'time': '19:00', 'title': 'HR — Module Αξιολόγησης Προσωπικού (Φ1)',
+     'items': ['Νέο module evaluations.py: φόρμα αξιολόγησης με το πρότυπο CONDIAN (25 σταθμισμένα κριτήρια, κλίμακα 1-10), ζωντανό σταθμισμένο % + βαθμίδα (Εξαιρετική/Καλή/Χρειάζεται προσοχή).',
+               'Κάθε αξιολόγηση = ξεχωριστό record με μοναδικό κωδικό EVAL-έτος-νο, version/ιστορικό, σύγκριση με προηγούμενη. Λίστα με φίλτρα, προβολή, επεξεργασία, διαγραφή, export Excel. Μόνο HR/admin.',
+               'Μενού HR → «Αξιολόγηση προσωπικού». Στοιχεία υπαλλήλου/τμήματος/property από το Μητρώο.']},
     {'v': '12.92', 'b': '372', 'date': '18/06/2026', 'time': '18:00', 'title': 'Dashboard Συντήρησης («Σήμερα») + κρυφά tabs όταν έρχεσαι από slot',
      'items': ['Το «Σήμερα» έγινε dashboard Συντήρησης: εκκρεμότητες καταγραφής + ειδοποιήσεις εκτός ορίου (σημερινές) + ανοιχτές βλάβες + γρήγορες ενέργειες (Δήλωση βλάβης/Καταγραφή τομέων). Πάντα ορατό στο μενού Συντήρηση για όσους κάνουν καταγραφή.',
                'Όταν ανοίγεις φόρμα από slot, τα Πρωί/Απόγευμα κρύβονται (έχει ήδη επιλεγεί η ώρα).']},
@@ -3630,8 +3634,10 @@ payroll  = _try_import('payroll')
 people   = _try_import('people')
 diag     = _try_import('diag')
 menu     = _try_import('menu')
+evaluations = _try_import('evaluations')
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
+if evaluations: evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
 seed_team()
 if faults:   faults.seed_faults()
 if surveys:  surveys.seed_surveys()
