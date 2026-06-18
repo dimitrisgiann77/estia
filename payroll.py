@@ -1946,13 +1946,25 @@ def payroll_merge(uid):
         for fld in ('afm','amka','ika_am','father_name','bank_name','bank_iban','emp_code'):
             if not getattr(pk, fld, None) and getattr(po, fld, None):
                 setattr(pk, fld, getattr(po, fld))
+    # v12.106 — μετάφερε ΚΑΙ τις βάρδιες στον keep (διπλή μέρα: κρατάμε του keep)
+    moved_sh = 0
+    try:
+        from schedule import ShiftAssignment as _SA
+        _kd = {a.work_date for a in _SA.query.filter_by(user_id=keep.id).all()}
+        for a in _SA.query.filter_by(user_id=other.id).all():
+            if a.work_date in _kd:
+                db.session.delete(a)
+            else:
+                a.user_id = keep.id; _kd.add(a.work_date); moved_sh += 1
+    except Exception:
+        pass
     other.employment_active = False; other.login_enabled = False
     PPL.clear_flags(other.id)
     PPL.clear_flags(keep.id, 'possible_dup')
     PPL.log_event(keep.id,'merge','Συγχώνευση: «%s» (#%d) -> σε αυτό το προφίλ' % (other.full_name or other.username, other.id))
     PPL.log_event(other.id,'merge','Συγχωνεύτηκε στο «%s» (#%d) - αρχειοθετήθηκε' % (keep.full_name or keep.username, keep.id))
     db.session.commit()
-    log_activity('payroll_merge', '%s -> %s' % (other.id, keep.id))
+    log_activity('payroll_merge', '%s -> %s (βάρδιες %d)' % (other.id, keep.id, moved_sh))
     return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
 
 
