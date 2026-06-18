@@ -1082,6 +1082,15 @@ def _pending_pii_map():
     except Exception:
         return {}
 
+@app.context_processor
+def _inject_pending_identify():
+    def pending_identify_count():
+        try:
+            return db.session.query(PendingShift.norm_name).distinct().count()
+        except Exception:
+            return 0
+    return {'pending_identify_count': pending_identify_count}
+
 @app.route('/dashboard/schedule/identify')
 def schedule_identify():
     if not _auth() or not is_admin():
