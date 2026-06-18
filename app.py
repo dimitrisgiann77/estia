@@ -105,6 +105,7 @@ APP_URL        = os.environ.get('APP_URL', 'https://estia.condianhotels.gr')   #
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 REG_CODE = os.environ.get('REG_CODE', 'condian2026')          # κωδικός εγγραφής προσωπικού
+REGISTRATION_OPEN = False   # v12.89 — κρυφή εγγραφή μέχρι να πάμε live (κρύβει link + κλειδώνει /register)
 ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', 'true').lower() in ('1','true','yes','on')
 REMINDER_HOUR = int(os.environ.get('REMINDER_HOUR', '18'))    # ώρα υπενθύμισης (Europe/Athens)
 
@@ -328,11 +329,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.88'
-APP_BUILD   = '368'
+APP_VERSION = '12.89'
+APP_BUILD   = '369'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.89', 'b': '369', 'date': '18/06/2026', 'time': '16:30', 'title': 'Κρυφή εγγραφή μέχρι το go-live',
+     'items': ['Ο σύνδεσμος «Εγγραφή νέου χρήστη» κρύφτηκε από το login και το /register κλειδώθηκε (redirect στο login) — διακόπτης REGISTRATION_OPEN=False. Όταν πάμε live γίνεται True.']},
     {'v': '12.88', 'b': '368', 'date': '18/06/2026', 'time': '16:00', 'title': 'Redesign φορμών μετρήσεων + καθαρό header + mobile + υποχρεωτικά πεδία',
      'items': ['Νέο, καθαρό UI στις φόρμες Πισινών & Νερών (mobile-first): tabs Πρωί/Απόγευμα, μεγάλα πεδία, sticky κουμπί αποθήκευσης με μετρητή «X από N».',
                'Όλα τα πεδία μέτρησης ΥΠΟΧΡΕΩΤΙΚΑ (εκτός Σημειώσεων) — το κουμπί ενεργοποιείται μόνο όταν συμπληρωθούν όλα.',
@@ -1560,7 +1563,7 @@ def login():
     if request.method == 'POST':
         _k = _login_key()
         if _login_blocked(_k):
-            return render_template('login.html', error='Πολλες αποτυχημενες προσπαθειες. Δοκιμασε ξανα σε λιγα λεπτα.')
+            return render_template('login.html', error='Πολλες αποτυχημενες προσπαθειες. Δοκιμασε ξανα σε λιγα λεπτα.', reg_open=REGISTRATION_OPEN)
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username, is_active=True).first()
@@ -1574,7 +1577,7 @@ def login():
             return redirect(url_for('index'))
         _login_record_fail(_k)
         error = 'Λαθος username η password'
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, reg_open=REGISTRATION_OPEN)
 
 @app.route('/logout')
 def logout():
@@ -1632,6 +1635,8 @@ def account_page():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if not REGISTRATION_OPEN:
+        return redirect(url_for('login'))
     if not REG_CODE:
         return render_template('register.html', enabled=False, error=None, done=False)
     error = None
