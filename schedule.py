@@ -1241,57 +1241,49 @@ def find_dup_groups():
     out = []
     for gid, members in groups.items():
         if len(members) > 1:
-            # εμπλουτισμός: πλήθος αναθέσεων ανά μέλος (για επιλογή canonical)
+            # εμπλουτισμός: πλήθος βαρδιών + αν είναι κλειδωμένο (Λογιστήριο)
+            try:
+                from payroll import EmployeePII as _PII
+                _locked = {row[0] for row in db.session.query(_PII.user_id).filter_by(locked=True).all()}
+            except Exception:
+                _locked = set()
             for m in members:
                 m._assign_n = ShiftAssignment.query.filter_by(user_id=m.id).count()
-            members.sort(key=lambda m: m._assign_n, reverse=True)
+                m._locked = m.id in _locked
+            # default keep = πρώτα το κλειδωμένο (Λογιστήριο), μετά όποιος έχει τις περισσότερες βάρδιες
+            members.sort(key=lambda m: (not m._locked, -m._assign_n))
             out.append(members)
     out.sort(key=lambda g: g[0].full_name or '')
     return out
 
 def merge_users(keep_id, drop_ids):
+    """v12.103 — ΜΟΝΟ βάρδιες μεταφέρονται στον keep. Θέση/τμήμα/ξενοδοχείο/προφίλ
+    του keep ΜΕΝΟΥΝ ως έχουν (τα ήδη assigned στη βάση). Οι διπλοί αρχειοθετούνται."""
     keep = User.query.get(keep_id)
     if not keep:
         return 0
     moved = 0
     keep_dates = {a.work_date for a in ShiftAssignment.query.filter_by(user_id=keep_id).all()}
-    # home_hotel heuristic: όπου έχει τις περισσότερες αναθέσεις συνολικά
-    hotel_count = {}
     for d in drop_ids:
         u = User.query.get(d)
         if not u or u.id == keep_id:
             continue
-        # μέτρα αναθέσεις ανά work_hotel
+        # ΜΟΝΟ βάρδιες -> keep (διπλή μέρα: κρατάμε του keep)
         for a in ShiftAssignment.query.filter_by(user_id=d).all():
             if a.work_date in keep_dates:
-                db.session.delete(a)               # διπλή μέρα -> κράτα του keep
+                db.session.delete(a)
             else:
                 a.user_id = keep_id; keep_dates.add(a.work_date); moved += 1
-                if a.work_hotel_id:
-                    hotel_count[a.work_hotel_id] = hotel_count.get(a.work_hotel_id, 0) + 1
-        # EmploymentProfile: μετάφερε αν λείπει στον keep
-        kp = EmploymentProfile.query.filter_by(user_id=keep_id).first()
+        # ΔΕΝ μεταφέρουμε θέση/τμήμα/ξενοδοχείο/προφίλ — καθαρίζουμε του διπλού
         dp = EmploymentProfile.query.filter_by(user_id=d).first()
-        if dp and not kp:
-            dp.user_id = keep_id
-        elif dp:
+        if dp:
             db.session.delete(dp)
-        # specialties (faults)
         try:
             import faults as _flt
             for us in _flt.UserSpecialty.query.filter_by(user_id=d).all():
                 db.session.delete(us)
         except Exception:
             pass
-        # fill blanks στον keep
-        if not keep.department_id and u.department_id:
-            keep.department_id = u.department_id
-        if not keep.home_hotel_id and u.home_hotel_id:
-            keep.home_hotel_id = u.home_hotel_id
-        if not keep.employer and u.employer:
-            keep.employer = u.employer
-        if not keep.subunit and u.subunit:
-            keep.subunit = u.subunit
         db.session.delete(u)
     db.session.commit()
     return moved
