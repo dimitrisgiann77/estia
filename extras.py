@@ -10,27 +10,37 @@ from app import (app, db, current_user, is_admin, ROLE_RANK, role_rank, log_acti
 
 # ── MENU ανά ρόλο ─────────────────────────────────────────────────────────────
 # Κλειδιά λειτουργικών items (admin workspace μένει πάντα admin-only).
-MENU_ITEMS = [
-    ('today',        'Σήμερα (Καταγραφές)'),
-    ('pools',        'Πισίνες'),
-    ('water',        'Νερά Χρήσης'),
-    ('pools_dash',   'Πίνακας Πισινών'),
-    ('records',      'Records'),
-    ('coverage',     'Εβδομαδιαία κάλυψη'),
-    ('faults_board', 'Πίνακας Βλαβών'),
-    ('fault_submit', 'Δήλωση βλάβης'),
-    ('areas',        'Καταγραφή τομέων'),
-    ('areas_dash',   'Πίνακας τομέων'),
-    ('surveys',      'Ερωτηματολόγια'),
-    ('schedule',     'Πρόγραμμα Εργασίας'),
-    ('evals',        'Αξιολόγηση προσωπικού'),
-    ('whatsnew',     'Τι νέο'),
-    ('info',         'Ενημέρωση (Αναζήτηση/Roadmap/FAQ)'),
+# ── ΚΟΙΝΟ ΜΗΤΡΩΟ ΜΕΝΟΥ (single source of truth) ───────────────────────────────
+# Κάθε ρυθμιζόμενο στοιχείο ορίζεται ΜΙΑ φορά εδώ. Από αυτό τραβάνε:
+#  (α) το πλαϊνό μενού (shell.html — η ομάδα «Συντήρηση» γίνεται render με loop),
+#  (β) ο επεξεργαστής «Μενού ανά ρόλο» (drag & drop).
+# Νέο στοιχείο «Συντήρησης» = πρόσθεσέ το εδώ -> εμφανίζεται ΑΥΤΟΜΑΤΑ και στα δύο.
+# πεδία: key, label, icon, url, ws (workspaces), group
+MENU_REG = [
+    {'k': 'today',        'label': 'Σήμερα (Καταγραφές)', 'short': 'Σήμερα', 'icon': 'ti-layout-dashboard', 'url': '/katagrafes',       'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'pools',        'label': 'Πισίνες',             'icon': 'ti-pool',             'url': '/pools',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'water',        'label': 'Νερά Χρήσης',         'icon': 'ti-droplet',          'url': '/app',              'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'areas',        'label': 'Καταγραφή τομέων',    'icon': 'ti-checklist',        'url': '/areas',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'fault_submit', 'label': 'Δήλωση βλάβης',       'icon': 'ti-tool',             'url': '/fault',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'faults_board', 'label': 'Πίνακας Βλαβών',      'icon': 'ti-alert-triangle',   'url': '/dashboard/faults', 'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'pools_dash',   'label': 'Πίνακας Πισινών',     'icon': 'ti-layout-dashboard', 'url': '/pools/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'water_dash',   'label': 'Πίνακας Νερών',       'icon': 'ti-droplet-filled',   'url': '/dashboard',        'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'areas_dash',   'label': 'Πίνακας τομέων',      'icon': 'ti-clipboard-list',   'url': '/areas/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'records',      'label': 'Records',             'icon': 'ti-list-details',     'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'coverage',     'label': 'Εβδομαδιαία κάλυψη',  'icon': 'ti-calendar-stats',   'url': '/pools/coverage',   'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
+    {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
+    {'k': 'evals',        'label': 'Αξιολόγηση προσωπικού','icon': 'ti-star',            'url': '/dashboard/evaluations','ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
+    {'k': 'whatsnew',     'label': 'Τι νέο',              'icon': 'ti-sparkles',         'url': '/dashboard/whatsnew','ws': 'operations admin',   'group': 'Ενημέρωση'},
+    {'k': 'info',         'label': 'Ενημέρωση (Αναζήτηση/Roadmap/FAQ)', 'icon': 'ti-info-circle', 'url': '/dashboard/search', 'ws': 'operations admin', 'group': 'Ενημέρωση'},
 ]
+MENU_GROUPS_ORDER = ['Συντήρηση', 'Υποδοχή', 'HR — Ανθρώπινο Δυναμικό', 'Ενημέρωση']
+MENU_ITEMS = [(it['k'], it['label']) for it in MENU_REG]
+_REG_BY_KEY = {it['k']: it for it in MENU_REG}
 ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· viewer = ελάχιστα
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
-    'manager': {'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
+    'manager': {'today', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
     'staff':   {'today', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
 }
@@ -100,7 +110,11 @@ def _inject_menu_show():
         allowed = _vis_for_role('staff')
     else:
         allowed = {'whatsnew'}                          # viewer
-    return {'menu_show': (lambda key: key in allowed)}
+    maint_visible = [it for it in MENU_REG
+                     if it['group'] == 'Συντήρηση' and it['k'] in allowed]
+    return {'menu_show': (lambda key: key in allowed),
+            'maint_visible': maint_visible,
+            'menu_reg': MENU_REG}
 
 @app.route('/dashboard/menu-roles', methods=['GET', 'POST'])
 def menu_roles():
@@ -127,6 +141,7 @@ def menu_roles():
         log_activity('menu_roles_save')
         return redirect('/dashboard/menu-roles?embed=1&ok=1')
     return render_template('menu_roles.html', items=MENU_ITEMS, roles=ROLES_CFG,
+                           reg=MENU_REG, groups_order=MENU_GROUPS_ORDER,
                            vis={r: _vis_for_role(r) for r in ROLES_CFG},
                            ws_items=WS_ITEMS, ws_vis={r: _ws_for_role(r) for r in ROLES_CFG},
                            role_labels={'manager': 'Manager (υποδοχή)', 'staff': 'Staff'})

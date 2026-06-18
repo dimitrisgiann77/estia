@@ -1,25 +1,63 @@
 {% import '_monitoring.html' as mp %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Μενού ανά ρόλο', theme.primary) }}
-<style>table{width:100%;border-collapse:collapse;font-size:13px;}th,td{padding:8px;border-bottom:1px solid #eef2f6;text-align:center;}th:first-child,td:first-child{text-align:left;}
-.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;}</style></head><body>
-{{ mp.topbar('adjustments-cog', 'ΕΣΤΙΑ — Μενού ανά ρόλο', 'Τι βλέπει κάθε ρόλος στο πλαϊνό μενού') }}
-<div class="container"><div class="card">
-  {% if request.args.get('ok') %}<div style="background:#dcfce7;color:#166534;padding:9px 12px;border-radius:9px;margin-bottom:10px;">✓ Αποθηκεύτηκε.</div>{% endif %}
-  <p style="font-size:13px;color:#64748b;">Οι <b>Admin/Master</b> βλέπουν πάντα τα πάντα. Εδώ ρυθμίζεις τι βλέπουν οι <b>Manager</b> (υποδοχή) και το <b>Staff</b>. Η πρόσβαση στα admin (Χρήστες/Εισαγωγές/Ρυθμίσεις) μένει πάντα μόνο σε admin.</p>
-  <form method="POST">
-    <table>
-      <thead><tr><th>Επιλογή μενού</th>{% for r in roles %}<th>{{ role_labels[r] }}</th>{% endfor %}</tr></thead>
-      <tbody>
-      {% for key, label in items %}
-        <tr><td>{{ label }}</td>
-          {% for r in roles %}<td><input type="checkbox" name="{{ r }}__{{ key }}" {{ 'checked' if key in vis[r] }} style="width:auto;transform:scale(1.3);"></td>{% endfor %}
-        </tr>
+<style>
+.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;font:inherit;}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0;}
+.col{border:1px solid #e6ecf2;border-radius:14px;background:#fff;display:flex;flex-direction:column;}
+.col h4{margin:0;padding:10px 12px;border-bottom:1px solid #eef2f6;font-size:14px;display:flex;align-items:center;gap:6px;}
+.col .body{padding:10px;flex:1;min-height:90px;}
+.col.drop.over{outline:2px dashed var(--accent,#185FA5);outline-offset:-4px;background:#f0f7ff;}
+.col.locked{opacity:.9;background:#f8fafc;}
+html[data-theme="dark"] .col{background:#16202c;border-color:#33475b;}
+.chip{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid #e6ecf2;border-radius:9px;margin:5px 0;background:#fff;font-size:13px;}
+html[data-theme="dark"] .chip{background:#1b2734;border-color:#33475b;}
+.chip .x{margin-left:auto;cursor:pointer;color:#b91c1c;border:none;background:none;font-size:16px;line-height:1;}
+.palette{border:1px dashed #cbd5e1;border-radius:14px;padding:12px;background:#fbfdff;margin-top:4px;}
+html[data-theme="dark"] .palette{background:#16202c;border-color:#33475b;}
+.pgroup{margin-bottom:8px;}
+.pgroup .gt{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin:8px 2px 4px;}
+.pitem{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid #dbe3ea;border-radius:20px;margin:3px;background:#fff;font-size:12.5px;cursor:grab;}
+html[data-theme="dark"] .pitem{background:#1b2734;border-color:#33475b;}
+.pitem .pp{border:1px solid #cbd5e1;border-radius:12px;font-size:10px;font-weight:700;padding:1px 7px;cursor:pointer;color:#64748b;user-select:none;}
+.pitem .pp.on{background:#16a34a;color:#fff;border-color:#16a34a;}
+.muted{color:#64748b;font-size:12px;}
+table.ws{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+table.ws th,table.ws td{padding:8px;border-bottom:1px solid #eef2f6;text-align:center;}
+table.ws th:first-child,table.ws td:first-child{text-align:left;}
+@media(max-width:760px){.cols{grid-template-columns:1fr;}}
+</style></head><body>
+{{ mp.topbar('adjustments-cog', 'ΕΣΤΙΑ — Μενού ανά ρόλο', 'Σύρε τα στοιχεία στους ρόλους · Admin βλέπει πάντα τα πάντα') }}
+<div class="container">
+  {% if request.args.get('ok') %}<div class="card" style="background:#dcfce7;color:#166534;">✓ Αποθηκεύτηκε.</div>{% endif %}
+  <div class="card">
+  <p class="muted" style="margin-top:0;">Σύρε ένα στοιχείο από τα «Διαθέσιμα» μέσα στη στήλη <b>Manager</b> ή <b>Staff</b> — ή πάτα τα κουμπιά <b>M</b>/<b>S</b>. Οι <b>Admin/Master</b> βλέπουν πάντα τα πάντα· η πρόσβαση στα admin (Χρήστες/Εισαγωγές/Ρυθμίσεις) μένει πάντα μόνο σε admin. <b>Νέα στοιχεία «Συντήρησης» εμφανίζονται εδώ αυτόματα.</b></p>
+  <form method="POST" id="frm">
+    <div style="display:none" id="hidden">
+      {% for r in roles %}{% for it in reg %}<input type="checkbox" name="{{ r }}__{{ it.k }}" id="cb_{{ r }}_{{ it.k }}" {{ 'checked' if it.k in vis[r] }}>{% endfor %}{% endfor %}
+    </div>
+    <div class="cols">
+      <div class="col locked"><h4><i class="ti ti-shield-check"></i> Admin / Master <span class="muted" style="font-weight:400;">(όλα)</span></h4><div class="body" id="col_admin"></div></div>
+      <div class="col drop" data-role="manager"><h4><i class="ti ti-user-cog"></i> Manager</h4><div class="body" id="col_manager"></div></div>
+      <div class="col drop" data-role="staff"><h4><i class="ti ti-user"></i> Staff</h4><div class="body" id="col_staff"></div></div>
+    </div>
+    <div class="palette">
+      <div class="muted" style="margin-bottom:2px;"><b>Διαθέσιμα στοιχεία</b> — σύρε στη στήλη ή πάτα M/S</div>
+      {% for g in groups_order %}
+      <div class="pgroup"><div class="gt">{{ g }}</div>
+        {% for it in reg if it.group==g %}
+        <span class="pitem" draggable="true" data-k="{{ it.k }}">
+          <i class="ti {{ it.icon }}"></i> {{ it.short|default(it.label) }}
+          <span class="pp" data-role="manager" data-k="{{ it.k }}">M</span>
+          <span class="pp" data-role="staff" data-k="{{ it.k }}">S</span>
+        </span>
+        {% endfor %}
+      </div>
       {% endfor %}
-      </tbody>
-    </table>
+    </div>
+
     <h3 style="font-size:14px;margin:22px 0 6px;color:#334155;"><i class="ti ti-layout-navbar"></i> Πάνω κουμπιά (Workspaces) ανά ρόλο</h3>
-    <p style="font-size:12px;color:#64748b;margin:0 0 8px;">Ποιους «κόσμους» (πάνω δεξιά) βλέπει κάθε ρόλος. <b>Admin/Master</b> βλέπουν πάντα και τα 4. Το <b>Admin</b> workspace μένει πάντα μόνο για admin.</p>
-    <table>
+    <p class="muted" style="margin:0 0 8px;">Ποιους «κόσμους» (πάνω δεξιά) βλέπει κάθε ρόλος. <b>Admin/Master</b> βλέπουν πάντα και τα 4. Το <b>Admin</b> workspace μένει πάντα μόνο για admin.</p>
+    <table class="ws">
       <thead><tr><th>Workspace</th>{% for r in roles %}<th>{{ role_labels[r] }}</th>{% endfor %}<th>Admin/Master</th></tr></thead>
       <tbody>
       {% for key, label in ws_items %}
@@ -30,6 +68,50 @@
       {% endfor %}
       </tbody>
     </table>
-    <div style="margin-top:12px;text-align:right;"><button class="b" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button></div>
+    <div style="margin-top:14px;text-align:right;"><button class="b" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button></div>
   </form>
-</div></div></body></html>
+  </div>
+</div>
+<script>
+var REG = {{ reg|tojson }};
+var ROLES = {{ roles|tojson }};
+function cb(role,k){ return document.getElementById('cb_'+role+'_'+k); }
+function renderRole(role){
+  var body=document.getElementById('col_'+role); if(!body) return; body.innerHTML='';
+  REG.forEach(function(it){
+    var c=cb(role,it.k);
+    if(c && c.checked){
+      var d=document.createElement('div'); d.className='chip';
+      d.innerHTML='<i class="ti '+it.icon+'"></i> '+(it.short||it.label)+'<button type="button" class="x" title="Αφαίρεση">&times;</button>';
+      d.querySelector('.x').onclick=function(){ setRole(it.k,role,false); };
+      body.appendChild(d);
+    }
+  });
+  if(!body.children.length) body.innerHTML='<div class="muted" style="text-align:center;padding:16px;">— κανένα —</div>';
+  document.querySelectorAll('.pp[data-role="'+role+'"]').forEach(function(p){
+    var c=cb(role,p.dataset.k); p.classList.toggle('on', !!(c&&c.checked));
+  });
+}
+function renderAdmin(){
+  var body=document.getElementById('col_admin'); body.innerHTML='';
+  REG.forEach(function(it){
+    var d=document.createElement('div'); d.className='chip';
+    d.innerHTML='<i class="ti '+it.icon+'"></i> '+(it.short||it.label);
+    body.appendChild(d);
+  });
+}
+function setRole(k,role,on){ var c=cb(role,k); if(c){ c.checked=on; renderRole(role); } }
+document.querySelectorAll('.pitem').forEach(function(el){
+  el.addEventListener('dragstart',function(e){ e.dataTransfer.setData('text/plain', el.dataset.k); });
+});
+document.querySelectorAll('.col.drop').forEach(function(col){
+  col.addEventListener('dragover',function(e){ e.preventDefault(); col.classList.add('over'); });
+  col.addEventListener('dragleave',function(){ col.classList.remove('over'); });
+  col.addEventListener('drop',function(e){ e.preventDefault(); col.classList.remove('over'); var k=e.dataTransfer.getData('text/plain'); if(k) setRole(k,col.dataset.role,true); });
+});
+document.querySelectorAll('.pp').forEach(function(p){
+  p.addEventListener('click',function(){ var c=cb(p.dataset.role,p.dataset.k); setRole(p.dataset.k,p.dataset.role, !(c&&c.checked)); });
+});
+renderAdmin(); ROLES.forEach(renderRole);
+</script>
+</body></html>
