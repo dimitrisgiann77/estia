@@ -1232,6 +1232,96 @@ def schedule_identify_auto():
     return redirect(url_for('schedule_identify'))
 
 
+@app.route('/dashboard/schedule/identify/clear_all', methods=['POST'])
+def schedule_identify_clear_all():
+    # v12.114 — καθαρισμος ΟΛΟΥ του προθαλαμου (1 κλικ αντι N «Αγνόησε»)· ιδανικο
+    # για reset πριν σωστο re-import (π.χ. οταν τα ξενοδοχεια ηταν λαθος στην πηγη).
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    n = PendingShift.query.delete()
+    db.session.commit()
+    log_activity('schedule_identify_clear_all', '%d βαρδιες προθαλαμου' % (n or 0))
+    return redirect(url_for('schedule_identify') + ('?embed=1' if request.args.get('embed') else ''))
+
+
+@app.route('/dashboard/schedule/imported')
+def schedule_imported():
+    # v12.114 — ενιαια οθονη: εισηγμενα (keyless) προφιλ με badge + προταση 🔒 master
+    # + κουμπια «Συγχωνευση με Master» / «Διαγραφη». Ξεχωριζει «αληθινος→merge» απο «σκουπιδι→delete».
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    locked = _locked_uids()
+    piimap = _pending_pii_map()
+    rows = []
+    for u in imported_staff_query().filter(User.is_active == True).all():
+        if u.id in locked:
+            continue
+        sugg = None
+        for cand, sc in _suggest_masters(u.full_name or '', limit=8):
+            if cand.id == u.id or cand.id not in locked:
+                continue
+            pp = piimap.get(cand.id)
+            sugg = {'id': cand.id, 'name': cand.full_name,
+                    'emp_code': (pp.emp_code if pp else None),
+                    'afm': (pp.afm if pp else None), 'score': sc}
+            break
+        rows.append({'id': u.id, 'name': u.full_name,
+                     'shifts': ShiftAssignment.query.filter_by(user_id=u.id).count(),
+                     'suggestion': sugg})
+    rows.sort(key=lambda r: (0 if r['suggestion'] else 1, -r['shifts'], r['name'] or ''))
+    return render_template('schedule_imported.html', rows=rows, total=len(rows))
+
+
+@app.route('/dashboard/schedule/imported/merge', methods=['POST'])
+def schedule_imported_merge():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    drop_id = int(request.form.get('drop_id') or 0)
+    master_id = int(request.form.get('master_id') or 0)
+    drop = User.query.get(drop_id); master = User.query.get(master_id)
+    locked = _locked_uids()
+    if drop and master and drop.id != master.id and drop.id not in locked:
+        # μεταφορα ΜΟΝΟ βαρδιων στο master (διπλη μερα: κραταμε του master)
+        keep_dates = {a.work_date for a in ShiftAssignment.query.filter_by(user_id=master_id).all()}
+        for a in ShiftAssignment.query.filter_by(user_id=drop_id).all():
+            if a.work_date in keep_dates:
+                db.session.delete(a)
+            else:
+                a.user_id = master_id; keep_dates.add(a.work_date)
+        # NameLink ωστε μελλοντικα imports αυτου του ονοματος να πανε στο master
+        nm = _norm(drop.full_name or '')
+        if nm:
+            link = NameLink.query.filter_by(norm_name=nm).first()
+            if link:
+                link.user_id = master_id
+            else:
+                db.session.add(NameLink(norm_name=nm, user_id=master_id,
+                                        raw_name=drop.full_name, created_by=session.get('user_id')))
+        db.session.commit()
+        # τωρα ο drop ειναι χωρις βαρδιες -> πληρης διαγραφη (cascade)
+        try:
+            from payroll import _hard_delete_user as _hdel
+            _hdel(drop_id)
+        except Exception:
+            db.session.rollback()
+        log_activity('schedule_imported_merge', '%d -> %d' % (drop_id, master_id))
+    return redirect(url_for('schedule_imported') + ('?embed=1' if request.args.get('embed') else ''))
+
+
+@app.route('/dashboard/schedule/imported/delete', methods=['POST'])
+def schedule_imported_delete():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    uid = int(request.form.get('uid') or 0)
+    try:
+        from payroll import _hard_delete_user as _hdel
+        ok, _r = _hdel(uid)
+        log_activity('schedule_imported_delete', '%d (%s)' % (uid, 'ok' if ok else _r))
+    except Exception:
+        db.session.rollback()
+    return redirect(url_for('schedule_imported') + ('?embed=1' if request.args.get('embed') else ''))
+
+
 # ── PASTE: μαζική επικόλληση προγράμματος από Excel (όνομα + Δ–Κ) ──────────────
 def _name_index():
     ix, ixs = {}, {}
@@ -1624,28 +1714,28 @@ def imported_staff_query():
 def schedule_staff_purge():
     if not _auth() or not is_admin():
         return redirect(url_for('login'))
+    # v12.114 — full cascade ανά χρηστη μεσω _hard_delete_user (καθαριζει ολους τους
+    # σχετιζομενους πινακες + προστατευει τα κλειδωμενα)· per-user try ωστε ενα FK
+    # σφαλμα να ΜΗΝ μπλοκαρει τους υπολοιπους (πριν: μερικη διαγραφη -> FK violation).
     staff = imported_staff_query().all()
     try:
-        from payroll import EmployeePII as _PII
+        from payroll import EmployeePII as _PII, _hard_delete_user as _hdel
         locked_ids = {p.user_id for p in _PII.query.filter_by(locked=True).all()}
     except Exception:
-        locked_ids = set()
+        locked_ids = set(); _hdel = None
     staff = [u for u in staff if u.id not in locked_ids]   # v12.56: μην σβήνεις κλειδωμένους (Epsilon)
-    ids = [u.id for u in staff]
-    n = len(ids)
-    if ids:
-        ShiftAssignment.query.filter(ShiftAssignment.user_id.in_(ids)).delete(synchronize_session=False)
-        EmploymentProfile.query.filter(EmploymentProfile.user_id.in_(ids)).delete(synchronize_session=False)
-        try:
-            import faults as _flt
-            _flt.UserSpecialty.query.filter(_flt.UserSpecialty.user_id.in_(ids)).delete(synchronize_session=False)
-        except Exception:
-            pass
-        for u in staff:
-            db.session.delete(u)
-        db.session.commit()
-    log_activity('schedule_staff_purge', f'{n} εργαζόμενοι')
-    return redirect('/dashboard/schedule/import?embed=1&purged=' + str(n))
+    done = 0; failed = 0
+    for u in staff:
+        ok = False
+        if _hdel:
+            try:
+                ok, _r = _hdel(u.id)
+            except Exception:
+                db.session.rollback(); ok = False
+        if ok: done += 1
+        else:  failed += 1
+    log_activity('schedule_staff_purge', 'v12.114: %d διαγραφηκαν, %d απετυχαν' % (done, failed))
+    return redirect('/dashboard/schedule/import?embed=1&purged=' + str(done))
 
 
 # ── ΕΙΣΑΓΩΓΗ ΜΗΤΡΩΟΥ ΕΡΓΑΖΟΜΕΝΩΝ (payroll «Εργαζόμενοι» — καθαρή πηγή) ─────────

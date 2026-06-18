@@ -73,6 +73,9 @@ html[data-theme="dark"] .dropzone{background:#16202c;border-color:#33475b;color:
       <button type="submit" style="background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;"><i class="ti ti-trash"></i> Καθαρισμός {{ purge_count }} εγγραφών</button>
     </form>
     {% endif %}
+    <div style="margin-top:10px;font-size:13px;">
+      <a href="/dashboard/schedule/imported?embed=1" style="color:#185FA5;font-weight:600;text-decoration:none;"><i class="ti ti-user-cog"></i> Διαχείριση ανά προφίλ (συγχώνευση με Master ή διαγραφή) →</a>
+    </div>
   </div>
 </div><script>(function(){var dz=document.getElementById('dz'),inp=document.getElementById('dzin'),lst=document.getElementById('dzlist');if(!dz)return;
 dz.addEventListener('click',function(e){if(e.target!==inp)inp.click();});

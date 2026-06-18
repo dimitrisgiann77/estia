@@ -1,0 +1,76 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Διαχείριση εισηγμένων προφίλ', theme.primary) }}
+<style>
+.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:9px;cursor:pointer;font:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.b.g{background:#16a34a;} .b.x{background:#fff;color:#b91c1c;border:1px solid #f0c4c4;}
+.pcard{border:1px solid #e6ecf2;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#fff;}
+html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
+.pname{font-size:17px;font-weight:700;}
+.chip{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11.5px;background:var(--soft,#f1f5f9);color:#475569;margin:2px 4px 2px 0;}
+.sg{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid #eef2f6;border-radius:10px;margin:5px 0;flex-wrap:wrap;}
+.sg .nm{font-weight:600;}
+.k{padding:2px 8px;border-radius:10px;font-size:11px;}
+.k.lock{background:#e7f0fb;color:#185FA5;} .k.mgmt{background:#eef2f6;color:#64748b;}
+.meta{font-size:12px;color:#64748b;}
+.sc{margin-left:auto;font-size:11px;color:#94a3b8;}
+.empty{text-align:center;color:#64748b;padding:40px 10px;}
+.row-actions{margin-top:10px;border-top:1px dashed #e6ecf2;padding-top:8px;display:flex;gap:8px;flex-wrap:wrap;}
+</style></head><body>
+{{ mp.topbar('user-cog', 'ΕΣΤΙΑ — Διαχείριση εισηγμένων προφίλ', 'Εισηγμένα προφίλ χωρίς κλειδιά: συγχώνευσέ τα με το επίσημο προφίλ ή διέγραψέ τα') }}
+<div class="container">
+
+  <div class="card" style="border-left:4px solid var(--accent,#185FA5);">
+    <b>Τι είναι εδώ:</b> προφίλ που μπήκαν από <u>παλιότερες εισαγωγές</u> και <u>δεν είναι κλειδωμένα (Λογιστήριο)</u>.
+    Για κάθε ένα: αν είναι ο ίδιος άνθρωπος με ένα 🔒 master → <b>Συγχώνευση</b> (οι βάρδιες περνούν στο επίσημο, το διπλό σβήνει, φτιάχνεται μόνιμη σύνδεση).
+    Αν είναι σκουπίδι → <b>Διαγραφή</b>. Τα 🔒 κλειδωμένα προστατεύονται.
+    <a href="/dashboard/schedule/identify{{ '?embed=1' if request.args.get('embed') }}" style="color:var(--accent,#185FA5);font-weight:600;">↩ Ταυτοποίηση προσωπικού (προθάλαμος βαρδιών)</a>
+  </div>
+
+  {% if total == 0 %}
+    <div class="card empty"><i class="ti ti-checks" style="font-size:34px;color:#16a34a;display:block;margin-bottom:8px;"></i>
+      Κανένα εισηγμένο προφίλ χωρίς κλειδιά. Όλα είναι καθαρά. 🎉</div>
+  {% else %}
+    <div class="card" style="display:flex;align-items:center;gap:10px;">
+      <i class="ti ti-user-cog" style="font-size:22px;color:#d97706;"></i>
+      <b>{{ total }}</b> εισηγμένα προφίλ προς διαχείριση.
+    </div>
+
+    {% for r in rows %}
+    <div class="pcard">
+      <div class="pname">{{ r.name }} <span class="k mgmt">Management</span></div>
+      <div style="margin:6px 0;">
+        <span class="chip">📅 {{ r.shifts }} βάρδιες</span>
+        <span class="chip"><i>χωρίς κλειδιά</i></span>
+      </div>
+
+      {% if r.suggestion %}
+      <div class="meta" style="margin-top:8px;">Προτεινόμενο 🔒 επίσημο προφίλ:</div>
+      <div class="sg">
+        <span class="k lock">🔒 Λογιστήριο</span>
+        <span class="nm">{{ r.suggestion.name }}</span>
+        <span class="meta">{% if r.suggestion.emp_code %}Κωδ: <b>{{ r.suggestion.emp_code }}</b>{% endif %}{% if r.suggestion.afm %} · ΑΦΜ: <b>{{ r.suggestion.afm }}</b>{% endif %}</span>
+        <span class="sc">{{ r.suggestion.score }}%</span>
+        <form method="POST" action="/dashboard/schedule/imported/merge{{ '?embed=1' if request.args.get('embed') }}" style="margin:0 0 0 auto;"
+              onsubmit="return confirm('Συγχώνευση «{{ r.name }}» με το επίσημο «{{ r.suggestion.name }}»; Οι {{ r.shifts }} βάρδιες περνούν στο επίσημο και το διπλό διαγράφεται.');">
+          <input type="hidden" name="drop_id" value="{{ r.id }}">
+          <input type="hidden" name="master_id" value="{{ r.suggestion.id }}">
+          <button class="b g" type="submit"><i class="ti ti-arrow-merge"></i> Συγχώνευση με Master</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="meta" style="margin-top:8px;">Δεν βρέθηκε αντίστοιχο 🔒 επίσημο προφίλ — αν είναι αληθινός, πρόσθεσέ τον πρώτα στο μητρώο· αλλιώς διέγραψέ τον.</div>
+      {% endif %}
+
+      <div class="row-actions">
+        <form method="POST" action="/dashboard/schedule/imported/delete{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;"
+              onsubmit="return confirm('Οριστική διαγραφή του προφίλ «{{ r.name }}» + {{ r.shifts }} βαρδιών του; Δεν αναιρείται.');">
+          <input type="hidden" name="uid" value="{{ r.id }}">
+          <button class="b x" type="submit"><i class="ti ti-trash"></i> Διαγραφή</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+</div>
+</body></html>

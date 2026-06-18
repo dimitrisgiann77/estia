@@ -38,7 +38,17 @@ details summary{cursor:pointer;color:var(--accent,#185FA5);font-size:13px;font-w
           onsubmit="return confirm('Σύνδεση όλων των ονομάτων του προθαλάμου που ταιριάζουν ΑΚΡΙΒΩΣ (100%) με ένα προφίλ; Τα αμφίβολα μένουν για έλεγχο.');">
       <button class="b g" type="submit"><i class="ti ti-checks"></i> Επιβεβαίωση ακριβών ταιριασμάτων</button>
     </form>
+    <form method="POST" action="/dashboard/schedule/identify/clear_all{{ '?embed=1' if request.args.get('embed') }}" style="margin:0;"
+          onsubmit="return confirm('ΚΑΘΑΡΙΣΜΟΣ ΟΛΟΥ ΤΟΥ ΠΡΟΘΑΛΑΜΟΥ: θα διαγραφούν ΟΛΕΣ οι βάρδιες σε αναμονή ({{ total }} ονόματα). Χρησιμοποίησέ το πριν ένα σωστό re-import. Δεν αναιρείται. Συνέχεια;');">
+      <button class="b x" type="submit"><i class="ti ti-trash-x"></i> Καθαρισμός προθαλάμου</button>
+    </form>
     {% endif %}
+  </div>
+
+  <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <i class="ti ti-users-group" style="font-size:20px;color:var(--accent,#185FA5);"></i>
+    <div style="flex:1;min-width:200px;font-size:13px;color:#475569;">Έχεις παλιά <b>εισηγμένα προφίλ</b> (χωρίς κλειδιά) από προηγούμενες εισαγωγές; Διαχειρίσου τα (συγχώνευση με Master ή διαγραφή) σε μία οθόνη.</div>
+    <a class="b" href="/dashboard/schedule/imported{{ '?embed=1' if request.args.get('embed') }}"><i class="ti ti-user-cog"></i> Διαχείριση εισηγμένων προφίλ</a>
   </div>
 
   {% if total == 0 %}

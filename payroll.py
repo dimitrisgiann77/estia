@@ -2308,6 +2308,11 @@ def _hard_delete_user(uid):
             import evaluations as _e
             _e.Evaluation.query.filter_by(employee_id=uid).delete(synchronize_session=False)
         except Exception: pass
+        try:
+            from schedule import NameLink as _NL
+            _NL.query.filter_by(user_id=uid).delete(synchronize_session=False)
+            _NL.query.filter_by(created_by=uid).delete(synchronize_session=False)
+        except Exception: pass
         db.session.delete(u)
         db.session.commit()
         return (True, 'ok')
