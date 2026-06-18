@@ -2243,6 +2243,71 @@ def export_management():
     return _xlsx_response(wb, 'ΜΗΤΡΩΟ ΜΙΣΘΟΔΟΣΙΑΣ MANAGEMENT (live).xlsx')
 
 
+# ── v12.104 — Οριστική διαγραφή προφίλ (μόνο μη-κλειδωμένα· προστασία Λογιστηρίου) ──
+def _hard_delete_user(uid):
+    u = User.query.get(uid)
+    if not u:
+        return (False, 'δεν βρέθηκε')
+    pii = EmployeePII.query.filter_by(user_id=uid).first()
+    if pii and pii.locked:
+        return (False, 'κλειδωμένο Λογιστηρίου — προστατεύεται')
+    try:
+        Agreement.query.filter_by(user_id=uid).delete(synchronize_session=False)
+        MgmtAssignment.query.filter_by(user_id=uid).delete(synchronize_session=False)
+        try:
+            LegalNetImport.query.filter_by(user_id=uid).delete(synchronize_session=False)
+        except Exception: pass
+        if pii:
+            db.session.delete(pii)
+        try:
+            from schedule import ShiftAssignment as _SA, EmploymentProfile as _EP
+            _SA.query.filter_by(user_id=uid).delete(synchronize_session=False)
+            _EP.query.filter_by(user_id=uid).delete(synchronize_session=False)
+        except Exception: pass
+        try:
+            import faults as _f
+            _f.UserSpecialty.query.filter_by(user_id=uid).delete(synchronize_session=False)
+        except Exception: pass
+        try:
+            import people as _p
+            _p.ProfileEvent.query.filter_by(entity_type='employee', entity_id=uid).delete(synchronize_session=False)
+            _p.AttentionFlag.query.filter_by(entity_type='employee', entity_id=uid).delete(synchronize_session=False)
+        except Exception: pass
+        try:
+            import evaluations as _e
+            _e.Evaluation.query.filter_by(employee_id=uid).delete(synchronize_session=False)
+        except Exception: pass
+        db.session.delete(u)
+        db.session.commit()
+        return (True, 'ok')
+    except Exception as ex:
+        db.session.rollback()
+        return (False, str(ex)[:140])
+
+@app.route('/dashboard/payroll/employee/<int:uid>/delete', methods=['POST'])
+def payroll_employee_delete(uid):
+    if not _padmin():
+        return redirect(url_for('login'))
+    ok, reason = _hard_delete_user(uid)
+    log_activity('payroll_employee_delete', '%s %s' % (uid, 'ok' if ok else reason))
+    if ok:
+        return redirect(url_for('payroll_grid') + '?embed=1&deleted=1')
+    return redirect(url_for('payroll_employee', uid=uid) + '?embed=1&delerr=1')
+
+@app.route('/dashboard/payroll/employees/delete', methods=['POST'])
+def payroll_employees_delete():
+    if not _padmin():
+        return redirect(url_for('login'))
+    ids = [int(x) for x in request.form.getlist('del_ids') if x.isdigit()]
+    n = skip = 0
+    for uid in ids:
+        ok, _r = _hard_delete_user(uid)
+        if ok: n += 1
+        else: skip += 1
+    log_activity('payroll_employees_delete', 'del=%d skip=%d' % (n, skip))
+    return redirect(url_for('payroll_grid') + '?embed=1&deleted=%d&skipped=%d' % (n, skip))
+
+
 @app.context_processor
 def _inject_lock_badge():
     """v12.102 — badge προέλευσης προφίλ: Λογιστήριο (κλειδωμένο/Epsilon) vs Management. Διαθέσιμο σε ΟΛΑ τα templates."""
