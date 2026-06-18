@@ -33,6 +33,44 @@ DEFAULT_VIS = {
     'staff':   {'today', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
 }
 
+# ── v12.85 — Ορατότητα «πάνω κουμπιών» (workspaces) ανά ρόλο ──────────────────
+WS_ITEMS = [('operations', 'Operations'), ('staffhub', 'Staff HUB'),
+            ('guestapp', 'Guest App'), ('admin', 'Admin')]
+DEFAULT_WS = {
+    'manager': {'operations', 'staffhub', 'guestapp'},
+    'staff':   {'operations', 'staffhub'},
+}
+
+def get_ws_vis():
+    from app import Setting
+    row = Setting.query.get('workspace_vis')
+    if row and row.value:
+        try:
+            return json.loads(row.value)
+        except Exception:
+            pass
+    return {r: sorted(DEFAULT_WS.get(r, set())) for r in ROLES_CFG}
+
+def _ws_for_role(role):
+    cfg = get_ws_vis()
+    return set(cfg.get(role, DEFAULT_WS.get(role, set())))
+
+@app.context_processor
+def _inject_ws_show():
+    u = current_user()
+    role = u.role if u else None
+    rank = role_rank(role) if role else -1
+    if rank >= ROLE_RANK['admin']:
+        allowed = {k for k, _ in WS_ITEMS}            # admin/master: όλα
+    elif role in ROLES_CFG:
+        allowed = _ws_for_role(role)
+    elif rank >= ROLE_RANK['staff']:
+        allowed = _ws_for_role('staff')
+    else:
+        allowed = {'operations'}                       # viewer
+    return {'ws_show': (lambda key: key in allowed)}
+
+
 def get_menu_vis():
     from app import Setting
     row = Setting.query.get('menu_vis')
@@ -75,11 +113,20 @@ def menu_roles():
         if not row:
             row = Setting(key='menu_vis'); db.session.add(row)
         row.value = json.dumps(cfg, ensure_ascii=False)
+        # v12.85 — workspace_vis (πάνω κουμπιά) ανά ρόλο
+        wcfg = {}
+        for r in ROLES_CFG:
+            wcfg[r] = [k for k, _ in WS_ITEMS if request.form.get(f'ws__{r}__{k}')]
+        wrow = Setting.query.get('workspace_vis')
+        if not wrow:
+            wrow = Setting(key='workspace_vis'); db.session.add(wrow)
+        wrow.value = json.dumps(wcfg, ensure_ascii=False)
         db.session.commit()
         log_activity('menu_roles_save')
         return redirect('/dashboard/menu-roles?embed=1&ok=1')
     return render_template('menu_roles.html', items=MENU_ITEMS, roles=ROLES_CFG,
                            vis={r: _vis_for_role(r) for r in ROLES_CFG},
+                           ws_items=WS_ITEMS, ws_vis={r: _ws_for_role(r) for r in ROLES_CFG},
                            role_labels={'manager': 'Manager (υποδοχή)', 'staff': 'Staff'})
 
 
