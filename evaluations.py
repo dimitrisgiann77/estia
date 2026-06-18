@@ -89,6 +89,26 @@ _CORE = [
 _LANG = [('Γερμανικά', 0.02), ('Αγγλικά', 0.025), ('Γαλλικά', 0.025),
          ('Ιταλικά', 0.01), ('Ρώσικα', 0.01), ('Άλλες ξένες γλώσσες', 0.01)]
 
+def _seed_menu_evals():
+    """Μία φορά: πρόσθεσε 'evals' στο αποθηκευμένο menu_vis (manager on) ώστε να εμφανίζεται & να ρυθμίζεται."""
+    try:
+      with app.app_context():
+        from app import Setting
+        if Setting.query.get('menu_vis_evals_seeded'):
+            return
+        row = Setting.query.get('menu_vis')
+        if row and row.value:
+            import json as _j
+            cfg = _j.loads(row.value)
+            cfg.setdefault('manager', [])
+            if 'evals' not in cfg['manager']:
+                cfg['manager'].append('evals')
+            row.value = _j.dumps(cfg, ensure_ascii=False)
+        db.session.add(Setting(key='menu_vis_evals_seeded', value='1'))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback(); print('[evaluations] menu seed skipped:', e)
+
 def ensure_eval_setup():
     """Seed του κοινού προτύπου CONDIAN (idempotent)."""
     try:

@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.98'
-APP_BUILD   = '378'
+APP_VERSION = '12.99'
+APP_BUILD   = '379'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.99', 'b': '379', 'date': '18/06/2026', 'time': '22:30', 'title': 'Αξιολόγηση: ρυθμιζόμενη στο «Μενού ανά ρόλο» + polish φόρμας',
+     'items': ['Η «Αξιολόγηση προσωπικού» μπήκε ως γραμμή στο «Μενού ανά ρόλο» (ρυθμίζεις αν τη βλέπει ο Manager). Staff δεν τη βλέπει ποτέ (route manager+).',
+               'Polish στη μάσκα αξιολόγησης: καθαρές κάρτες, ομάδες κριτηρίων, μεγάλα πεδία βαθμού με χρωματικό feedback (πράσινο/πορτοκαλί/κόκκινο), sticky μπάρα με progress + βαθμός + βαθμίδα.']},
     {'v': '12.98', 'b': '378', 'date': '18/06/2026', 'time': '22:00', 'title': 'Αξιολόγηση — πρόσβαση Managers (scoped ανά ξενοδοχείο)',
      'items': ['Οι managers αποκτούν το μενού «Αξιολόγηση προσωπικού»: δημιουργούν & υποβάλλουν αξιολογήσεις ΜΟΝΟ για το προσωπικό των ανατεθειμένων ξενοδοχείων τους. Δεν εγκρίνουν, δεν διαγράφουν, δεν βλέπουν πρότυπα/στατιστικά/άλλα ξενοδοχεία.',
                'Η τελική έγκριση/επιστροφή μένει στο HR/admin. Αν ένας manager δεν έχει ανάθεση ξενοδοχείων, βλέπει όλους (όπως σήμερα) — όρισε αναθέσεις από Διαχείριση → Χρήστες.']},
@@ -3652,7 +3655,9 @@ menu     = _try_import('menu')
 evaluations = _try_import('evaluations')
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
-if evaluations: evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
+if evaluations:
+    evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
+    evaluations._seed_menu_evals()    # one-time: 'evals' στο menu_vis (manager on)
 seed_team()
 if faults:   faults.seed_faults()
 if surveys:  surveys.seed_surveys()

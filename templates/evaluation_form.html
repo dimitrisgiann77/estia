@@ -1,83 +1,117 @@
 {% import '_monitoring.html' as mp %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Νέα Αξιολόγηση', theme.primary if theme else '#193847') }}
 <style>
-.ev-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
-.ev-f label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;}
-.ev-f input,.ev-f select,.ev-f textarea{width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;}
-.ev-info{font-size:12.5px;color:#185FA5;margin-top:8px;background:#eaf3fb;border:1px solid #cfe3f5;border-radius:8px;padding:7px 10px;display:none;}
-.ev-info.show{display:block;}
-.ev-grp{font-size:12px;font-weight:700;color:var(--mp-brand);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px;}
-.ev-crit{display:grid;grid-template-columns:1fr 90px 1fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;}
-.ev-crit .lab{font-size:13px;color:#1e293b;}
-.ev-crit .lab small{color:#9aa7ad;}
-.ev-crit input.sc{text-align:center;font-weight:600;}
-.ev-crit input.cm{font-size:12px;}
-@media(max-width:640px){.ev-crit{grid-template-columns:1fr 70px;}.ev-crit .cm{grid-column:1/-1;}}
-.ev-summary{position:sticky;bottom:0;background:#fff;border-top:2px solid #e0f0ff;padding:14px 0;margin-top:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.ev-score-big{font-size:30px;font-weight:800;}
-.ev-band-big{padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;}
+.efx{max-width:920px;margin:0 auto;padding:0 4px 120px;}
+.ef-card{background:#fff;border:1px solid #e7eef2;border-radius:16px;padding:18px;margin-bottom:14px;}
+.ef-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;}
+.ef-f label{display:block;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:#94a3b8;font-weight:700;margin-bottom:5px;}
+.ef-f input,.ef-f select,.ef-f textarea{width:100%;padding:11px 12px;border:1.5px solid #d6e4ec;border-radius:10px;font-size:15px;background:#f8fbfd;color:#0f172a;outline:none;}
+.ef-f input:focus,.ef-f select:focus,.ef-f textarea:focus{border-color:var(--mp-brand);background:#fff;box-shadow:0 0 0 3px rgba(25,56,71,.08);}
+.ef-info{display:none;margin-top:10px;font-size:13px;color:#185FA5;background:#eaf3fb;border:1px solid #cfe3f5;border-radius:10px;padding:9px 12px;}
+.ef-info.show{display:block;}
+.ef-tpl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.ef-tpl select{padding:9px 12px;border:1.5px solid #d6e4ec;border-radius:10px;font-size:14px;background:#f8fbfd;}
+.ef-h{font-size:16px;font-weight:600;margin-bottom:2px;}
+.ef-grp{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mp-brand);margin:16px 0 4px;padding-top:10px;border-top:1px dashed #e2ecf2;}
+.ef-grp:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
+.crit{padding:12px 0;border-bottom:1px solid #f1f6f9;}
+.crit:last-child{border-bottom:none;}
+.crit-top{display:flex;align-items:center;gap:14px;}
+.crit-label{flex:1;font-size:14px;color:#1e293b;line-height:1.35;}
+.crit-w{display:inline-block;font-size:10px;font-weight:700;color:#64748b;background:#eef3f6;border-radius:20px;padding:1px 8px;margin-left:6px;vertical-align:middle;}
+.crit-score{position:relative;flex-shrink:0;}
+.crit-score input{width:74px;text-align:center;font-size:19px;font-weight:700;padding:9px 6px;border:1.5px solid #d6e4ec;border-radius:12px;background:#f8fbfd;color:#0f172a;outline:none;-moz-appearance:textfield;}
+.crit-score input::-webkit-outer-spin-button,.crit-score input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.crit-score input:focus{border-color:var(--mp-brand);background:#fff;}
+.crit-score input.s-h{border-color:#86c9a4;background:#f3fbf6;color:#15803d;}
+.crit-score input.s-m{border-color:#f1c889;background:#fffaf0;color:#b45309;}
+.crit-score input.s-l{border-color:#e8a3a3;background:#fdf4f4;color:#dc2626;}
+.crit-score .mx{position:absolute;right:8px;bottom:6px;font-size:10px;color:#b8c4cc;pointer-events:none;}
+.crit-comment{margin-top:8px;width:100%;font-size:13px;padding:8px 11px;border:1px solid #e2ecf2;border-radius:9px;background:#fbfdfe;color:#334155;}
+.crit-comment::placeholder{color:#b8c4cc;}
+.goal-in{width:100%;padding:10px 12px;border:1.5px solid #d6e4ec;border-radius:10px;font-size:14px;background:#f8fbfd;margin-bottom:8px;}
+.ef-bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e2ecf2;box-shadow:0 -4px 16px rgba(15,40,55,.06);padding:12px 18px;z-index:50;}
+.ef-bar-in{max-width:920px;margin:0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.ef-prog{flex:1;min-width:120px;}
+.ef-prog .track{height:7px;background:#eef3f6;border-radius:5px;overflow:hidden;}
+.ef-prog .track>span{display:block;height:100%;background:var(--mp-brand);transition:width .2s;}
+.ef-prog .lbl{font-size:11px;color:#94a3b8;margin-top:4px;}
+.ef-score{text-align:center;}
+.ef-score .n{font-size:26px;font-weight:800;line-height:1;}
+.ef-score .b{font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;display:inline-block;margin-top:3px;}
+.ef-btns{display:flex;gap:8px;}
+.ef-btn{padding:12px 16px;border:none;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+.ef-btn.draft{background:#eef2f5;color:#475569;}
+.ef-btn.submit{background:#16a34a;color:#fff;}
+@media(max-width:640px){.crit-comment{font-size:12px;}.ef-bar-in{gap:10px;}.ef-score .n{font-size:22px;}.ef-btn{padding:11px 12px;font-size:13px;}}
 </style></head><body>
 {{ mp.topbar('star', (('Επεξεργασία ' + ev.code) if ev else 'Νέα Αξιολόγηση'), 'HR — Αξιολόγηση εργαζομένου') }}
-<div class="container">
+<div class="efx">
 <form method="POST" id="ev-form" action="{{ ('/dashboard/evaluations/%d/edit'%ev.id) if ev else '/dashboard/evaluations/new' }}">
-  <div class="card">
-    <div class="ev-meta">
-      <div class="ev-f"><label>Εργαζόμενος *</label>
+
+  <div class="ef-card">
+    <div class="ef-meta">
+      <div class="ef-f"><label>Εργαζόμενος *</label>
         <select name="employee_id" id="emp" onchange="fillEmp()" required>
           <option value="">— Επιλογή —</option>
           {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-spec="{{ e.specialty }}">{{ e.name }}</option>{% endfor %}
         </select>
-        <div class="ev-info" id="emp-info"></div>
       </div>
-      <div class="ev-f"><label>Περίοδος / Σαιζόν *</label><input type="text" name="period_label" placeholder="π.χ. Καλοκαίρι" value="{{ ev.period_label if ev else '' }}" required></div>
-      <div class="ev-f"><label>Έτος *</label><input type="number" name="year" min="2020" max="2100" value="{{ ev.year if ev else today.year }}" required></div>
-      <div class="ev-f"><label>Ημ/νία αξιολόγησης *</label><input type="date" name="eval_date" value="{{ (ev.eval_date.strftime('%Y-%m-%d') if ev and ev.eval_date else today.strftime('%Y-%m-%d')) }}" required></div>
+      <div class="ef-f"><label>Περίοδος / Σαιζόν *</label><input type="text" name="period_label" placeholder="π.χ. Καλοκαίρι" value="{{ ev.period_label if ev else '' }}" required></div>
+      <div class="ef-f"><label>Έτος *</label><input type="number" name="year" min="2020" max="2100" value="{{ ev.year if ev else today.year }}" required></div>
+      <div class="ef-f"><label>Ημ/νία αξιολόγησης *</label><input type="date" name="eval_date" value="{{ (ev.eval_date.strftime('%Y-%m-%d') if ev and ev.eval_date else today.strftime('%Y-%m-%d')) }}" required></div>
     </div>
+    <div class="ef-info" id="emp-info"></div>
+    {% if not ev and templates and templates|length>1 %}
+    <div class="ef-tpl" style="margin-top:12px;">
+      <span style="font-size:12px;font-weight:700;color:#64748b;">Φύλλο κριτηρίων:</span>
+      <select onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value">
+        {% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
   </div>
 
-  {% if not ev and templates and templates|length>1 %}
-  <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:13px;font-weight:600;">Πρότυπο (φύλλο):</span>
-    <select onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;">
-      {% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}</option>{% endfor %}
-    </select>
-    <span class="muted" style="font-size:12px;">Διάλεξε διαφορετικό πρότυπο/τμήμα αν χρειάζεται.</span>
-  </div>
-  {% endif %}
-  <div class="card">
-    <h3 style="font-size:15px;margin-bottom:6px;">Κριτήρια (κλίμακα 1–{{ tmpl.scale_max if tmpl else 10 }})</h3>
+  <div class="ef-card">
+    <div class="ef-h">Κριτήρια <span style="font-size:12px;color:#94a3b8;font-weight:400;">(κλίμακα 1–{{ tmpl.scale_max if tmpl else 10 }})</span></div>
     {% set ns = namespace(g='') %}
     {% for c in criteria %}
-      {% if c.grp != ns.g %}<div class="ev-grp">{{ c.grp }}</div>{% set ns.g = c.grp %}{% endif %}
-      <div class="ev-crit">
-        <div class="lab">{{ c.label }} <small>(βάρος {{ '%.0f%%'|format((c.weight or 0)*100) }})</small></div>
-        <input class="sc" type="number" name="score_{{ c.id }}" min="0" max="{{ c.max_score or 10 }}" step="0.5" data-w="{{ c.weight or 0 }}" data-m="{{ c.max_score or 10 }}" value="{{ scores[c.id].score if scores.get(c.id) else '' }}" oninput="calc()" placeholder="–">
-        <input class="cm" type="text" name="comment_{{ c.id }}" value="{{ scores[c.id].comment if scores.get(c.id) else '' }}" placeholder="σχόλιο (προαιρετικό)">
+      {% if c.grp != ns.g %}<div class="ef-grp">{{ c.grp }}</div>{% set ns.g = c.grp %}{% endif %}
+      <div class="crit">
+        <div class="crit-top">
+          <div class="crit-label">{{ c.label }}<span class="crit-w">{{ '%.0f%%'|format((c.weight or 0)*100) }}</span></div>
+          <div class="crit-score">
+            <input class="sc" type="number" name="score_{{ c.id }}" min="0" max="{{ c.max_score or 10 }}" step="0.5" data-w="{{ c.weight or 0 }}" data-m="{{ c.max_score or 10 }}" value="{{ scores[c.id].score if scores.get(c.id) else '' }}" oninput="calc()" placeholder="–" inputmode="decimal">
+            <span class="mx">/{{ c.max_score or 10 }}</span>
+          </div>
+        </div>
+        <input class="crit-comment" type="text" name="comment_{{ c.id }}" value="{{ scores[c.id].comment if scores.get(c.id) else '' }}" placeholder="Σχόλιο (προαιρετικό)">
       </div>
     {% endfor %}
   </div>
 
-  <div class="card">
-    <div class="ev-f"><label>Γενικό σχόλιο</label><textarea name="general_comment" rows="3" placeholder="Γενική εικόνα...">{{ ev.general_comment if ev else '' }}</textarea></div>
-  </div>
-
-  <div class="card">
-    <h3 style="font-size:15px;margin-bottom:4px;"><i class="ti ti-target-arrow"></i> Στόχοι & ενέργειες βελτίωσης</h3>
-    <p class="muted" style="font-size:12px;margin-bottom:8px;">Συγκεκριμένοι στόχοι/ενέργειες για την επόμενη περίοδο (παρακολουθούνται στην προβολή).</p>
+  <div class="ef-card">
+    <div class="ef-h"><i class="ti ti-target-arrow"></i> Στόχοι & ενέργειες βελτίωσης</div>
+    <p style="font-size:12px;color:#94a3b8;margin:2px 0 10px;">Συγκεκριμένοι στόχοι για την επόμενη περίοδο (παρακολουθούνται στην προβολή).</p>
     <div id="goal-list">
-      {% for g in goals %}<input type="text" name="goal_text" value="{{ g.text }}" placeholder="στόχος / ενέργεια" style="width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;">{% endfor %}
-      <input type="text" name="goal_text" placeholder="στόχος / ενέργεια..." style="width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;">
+      {% for g in goals %}<input class="goal-in" type="text" name="goal_text" value="{{ g.text }}" placeholder="στόχος / ενέργεια">{% endfor %}
+      <input class="goal-in" type="text" name="goal_text" placeholder="στόχος / ενέργεια...">
     </div>
-    <button type="button" class="btn" onclick="addGoal()" style="background:#0f766e;padding:6px 12px;"><i class="ti ti-plus"></i> Στόχος</button>
+    <button type="button" class="ef-btn draft" onclick="addGoal()" style="background:#e8f5ef;color:#0f766e;"><i class="ti ti-plus"></i> Στόχος</button>
   </div>
 
-  <div class="ev-summary">
-    <div><span class="muted" style="font-size:12px;">Σταθμισμένη βαθμολογία</span><br><span class="ev-score-big" id="sc-pct">—</span></div>
-    <div><span class="ev-band-big" id="sc-band" style="background:#f1f5f9;color:#64748b;">—</span></div>
-    <div class="muted" id="sc-count" style="font-size:12px;"></div>
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <button class="btn" type="submit" name="action" value="save" style="background:#64748b;"><i class="ti ti-device-floppy"></i> Αποθήκευση πρόχειρου</button>
-      <button class="btn btn-ok" type="submit" name="action" value="submit"><i class="ti ti-send"></i> Υποβολή για έγκριση</button>
+  <div class="ef-card">
+    <div class="ef-f"><label>Γενικό σχόλιο</label><textarea name="general_comment" rows="3" placeholder="Γενική εικόνα, δυνατά σημεία, σημεία βελτίωσης...">{{ ev.general_comment if ev else '' }}</textarea></div>
+  </div>
+
+  <div class="ef-bar">
+    <div class="ef-bar-in">
+      <div class="ef-prog"><div class="track"><span id="pg" style="width:0%;"></span></div><div class="lbl" id="sc-count">0 από {{ criteria|length }} κριτήρια</div></div>
+      <div class="ef-score"><div class="n" id="sc-pct">—</div><div class="b" id="sc-band" style="background:#f1f5f9;color:#64748b;">—</div></div>
+      <div class="ef-btns">
+        <button class="ef-btn draft" type="submit" name="action" value="save"><i class="ti ti-device-floppy"></i> Πρόχειρο</button>
+        <button class="ef-btn submit" type="submit" name="action" value="submit"><i class="ti ti-send"></i> Υποβολή για έγκριση</button>
+      </div>
     </div>
   </div>
 </form>
@@ -85,27 +119,27 @@
 <script>
 function fillEmp(){
   var s=document.getElementById('emp'),o=s.options[s.selectedIndex],i=document.getElementById('emp-info');
-  if(!o||!o.value){i.textContent='';return;}
-  var parts=[];if(o.dataset.dep)parts.push('Τμήμα: <b>'+o.dataset.dep+'</b>');if(o.dataset.hotel)parts.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');if(o.dataset.spec)parts.push('Ειδικότητα: '+o.dataset.spec);
-  i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+parts.join(' · ');
-  i.classList.toggle('show', parts.length>0);
+  if(!o||!o.value){i.classList.remove('show');return;}
+  var p=[];if(o.dataset.dep)p.push('Τμήμα: <b>'+o.dataset.dep+'</b>');if(o.dataset.hotel)p.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');if(o.dataset.spec)p.push('Ειδικότητα: '+o.dataset.spec);
+  i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+p.join(' · ');i.classList.add('show');
 }
 function calc(){
   var num=0,den=0,n=0,tot=document.querySelectorAll('.sc').length;
   document.querySelectorAll('.sc').forEach(function(el){
+    el.classList.remove('s-h','s-m','s-l');
     if(el.value==='')return; var v=parseFloat(el.value); if(isNaN(v))return;
-    var w=parseFloat(el.dataset.w)||0, m=parseFloat(el.dataset.m)||10;
-    num+=v*w; den+=w*m; n++;
+    el.classList.add(v>=8?'s-h':(v>=6?'s-m':'s-l'));
+    var w=parseFloat(el.dataset.w)||0,m=parseFloat(el.dataset.m)||10; num+=v*w; den+=w*m; n++;
   });
-  var pct = den>0 ? Math.round(num/den*1000)/10 : null;
-  var pe=document.getElementById('sc-pct'),be=document.getElementById('sc-band'),ce=document.getElementById('sc-count');
-  pe.textContent = pct===null?'—':pct.toFixed(1)+'%';
-  ce.textContent = n+' από '+tot+' κριτήρια';
-  var band='—',bg='#f1f5f9',col='#64748b';
-  if(pct!==null){ if(pct>=80){band='Εξαιρετική';bg='#dcfce7';col='#16a34a';}else if(pct>=60){band='Καλή';bg='#fef3c7';col='#b45309';}else{band='Χρειάζεται προσοχή';bg='#fee2e2';col='#dc2626';} }
-  be.textContent=band; be.style.background=bg; be.style.color=col;
+  var pct=den>0?Math.round(num/den*1000)/10:null;
+  document.getElementById('sc-pct').textContent=pct===null?'—':pct.toFixed(1)+'%';
+  document.getElementById('sc-count').textContent=n+' από '+tot+' κριτήρια';
+  document.getElementById('pg').style.width=(tot?Math.round(n/tot*100):0)+'%';
+  var be=document.getElementById('sc-band'),band='—',bg='#f1f5f9',col='#64748b';
+  if(pct!==null){if(pct>=80){band='Εξαιρετική';bg='#dcfce7';col='#16a34a';}else if(pct>=60){band='Καλή';bg='#fef3c7';col='#b45309';}else{band='Χρειάζεται προσοχή';bg='#fee2e2';col='#dc2626';}}
+  be.textContent=band;be.style.background=bg;be.style.color=col;
 }
-function addGoal(){var i=document.createElement('input');i.type='text';i.name='goal_text';i.placeholder='στόχος / ενέργεια...';i.style.cssText='width:100%;padding:9px 10px;border:1px solid #d6eef3;border-radius:8px;font-size:14px;margin-bottom:6px;';document.getElementById('goal-list').appendChild(i);}
+function addGoal(){var i=document.createElement('input');i.type='text';i.name='goal_text';i.className='goal-in';i.placeholder='στόχος / ενέργεια...';document.getElementById('goal-list').appendChild(i);i.focus();}
 document.addEventListener('DOMContentLoaded',function(){fillEmp();calc();});
 </script>
 </body></html>

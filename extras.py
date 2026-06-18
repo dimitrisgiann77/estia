@@ -23,13 +23,14 @@ MENU_ITEMS = [
     ('areas_dash',   'Πίνακας τομέων'),
     ('surveys',      'Ερωτηματολόγια'),
     ('schedule',     'Πρόγραμμα Εργασίας'),
+    ('evals',        'Αξιολόγηση προσωπικού'),
     ('whatsnew',     'Τι νέο'),
     ('info',         'Ενημέρωση (Αναζήτηση/Roadmap/FAQ)'),
 ]
 ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· viewer = ελάχιστα
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
-    'manager': {'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info'},
+    'manager': {'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
     'staff':   {'today', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
 }
