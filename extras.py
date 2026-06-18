@@ -139,7 +139,7 @@ class Feedback(db.Model):
     text       = db.Column(db.Text)
     page       = db.Column(db.String(200))
     status     = db.Column(db.String(10), default='new')    # new | seen | done
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 KIND_LABEL = {'bug': '🐞 Bug', 'idea': '💡 Ιδέα', 'other': '💬 Άλλο'}
 

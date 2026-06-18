@@ -102,7 +102,7 @@ class Agreement(db.Model):
     hour_wage_override = db.Column(db.Float)
     channels_json      = db.Column(db.Text)
     note               = db.Column(db.String(200))
-    created_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at         = db.Column(db.DateTime, default=datetime.now)
     created_by         = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 
@@ -126,7 +126,7 @@ class EmployeePII(db.Model):
     locked           = db.Column(db.Boolean, default=False)   # v12.56: κλειδωμένο μητρώο (πηγή=Epsilon)
     cost_center      = db.Column(db.String(8))   # v12.59: managerial μονάδα (AST/CNT/IRO/SRG/PSV/CND)
     emp_code         = db.Column(db.String(12), index=True)  # v12.60: Κωδ. Εργαζομένου (master Excel)
-    updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at       = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     updated_by       = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 
@@ -542,7 +542,7 @@ class PayrollRun(db.Model):
     rates_version = db.Column(db.Integer)
     note          = db.Column(db.String(200))
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
     locked_at     = db.Column(db.DateTime)
     approved_by   = db.Column(db.Integer, db.ForeignKey('user.id'))
     approved_at   = db.Column(db.DateTime)
@@ -602,7 +602,7 @@ class LegalNetImport(db.Model):
     period_kind   = db.Column(db.String(24), default='monthly')  # monthly/Δώρο Πάσχα/Επίδομα Αδείας...
     import_hash   = db.Column(db.String(40), unique=True, index=True)
     source_file   = db.Column(db.String(160))
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
 
 
 # ── EPSILON PARSER ────────────────────────────────────────────────────────────
@@ -1143,8 +1143,8 @@ def payroll_approve():
         cu = current_user()
         run.status = 'verified'
         run.approved_by = cu.id if cu else None
-        run.approved_at = datetime.utcnow()
-        run.locked_at = datetime.utcnow()
+        run.approved_at = datetime.now()
+        run.locked_at = datetime.now()
         db.session.commit()
         comp = Company.query.get(run.company_id)
         period = '%s %s' % (MONTHS_EL2[run.month], run.year)
@@ -1367,7 +1367,7 @@ def sync_master_bytes(raw):
         row = Setting.query.get('master_last_sync')
         if not row:
             row = Setting(key='master_last_sync'); db.session.add(row)
-        row.value = datetime.utcnow().isoformat(timespec='minutes')
+        row.value = datetime.now().isoformat(timespec='minutes')
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -1421,7 +1421,7 @@ def _master_sync_tick():
             hour = int(os.environ.get('MASTER_SYNC_HOUR', '4'))
         except Exception:
             hour = 4
-        now = datetime.utcnow()
+        now = datetime.now()
         if now.hour != hour:
             return
         slot = now.strftime('%Y-%m-%d')
@@ -1705,7 +1705,7 @@ class MgmtAssignment(db.Model):
     valid_to      = db.Column(db.Date)
     needs_date    = db.Column(db.Boolean, default=False)
     source        = db.Column(db.String(40), default='mgmt2026')
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
 
 
 def _hotel_by_unit(unit):

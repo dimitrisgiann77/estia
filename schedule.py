@@ -131,8 +131,8 @@ class ShiftAssignment(db.Model):
     work_hotel_id = db.Column(db.Integer, db.ForeignKey('hotel.id'))   # != home αν δανεικός
     note          = db.Column(db.String(200))
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at    = db.Column(db.DateTime, default=datetime.now)
+    updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     import_hash   = db.Column(db.String(40), index=True)
     __table_args__ = (db.UniqueConstraint('user_id', 'work_date', name='uq_user_date'),)
 
@@ -156,7 +156,7 @@ class WeekPlan(db.Model):
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False, index=True)
     week_start    = db.Column(db.Date, nullable=False, index=True)   # Δευτέρα
     status        = db.Column(db.String(12), default='draft')
-    updated_at    = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     updated_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
     __table_args__ = (db.UniqueConstraint('hotel_id', 'department_id', 'week_start', name='uq_weekplan'),)
 
@@ -169,7 +169,7 @@ class ScheduleSubmission(db.Model):
     status        = db.Column(db.String(12), default='submitted')
     snapshot      = db.Column(db.Text)          # JSON: τι ακριβώς δηλώθηκε
     changes       = db.Column(db.Text)          # JSON diff από parent_version
-    submitted_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_at  = db.Column(db.DateTime, default=datetime.now)
     submitted_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 

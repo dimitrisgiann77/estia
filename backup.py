@@ -55,7 +55,7 @@ class BackupLog(db.Model):
     sp_url      = db.Column(db.Text)
     error       = db.Column(db.Text)
     by_user_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    created_at  = db.Column(db.DateTime, default=_dt.datetime.utcnow)
+    created_at  = db.Column(db.DateTime, default=_dt.datetime.now)
 
 
 def ensure_backup_columns():
@@ -154,7 +154,7 @@ def dump_bytes():
     """Όλους τους πίνακες -> gzipped JSON bytes. Σειρά FK-safe (sorted_tables)."""
     tables = list(db.metadata.sorted_tables)
     out = {'estia_backup': 1,
-           'created_utc': _dt.datetime.utcnow().isoformat(),
+           'created_utc': _dt.datetime.now().isoformat(),
            'app_version': APP_VERSION, 'app_build': APP_BUILD,
            'dialect': (db.engine.dialect.name if db.engine is not None else ''),
            'tables': []}

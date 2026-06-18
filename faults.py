@@ -115,7 +115,7 @@ class Fault(db.Model):
     assigned_user_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     completed_by      = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     cover_image   = db.Column(db.Text, nullable=True)
-    submitted_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_at  = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, nullable=True)
     completed_at  = db.Column(db.DateTime, nullable=True)
     resolution_seconds = db.Column(db.Integer, nullable=True)
@@ -145,7 +145,7 @@ class FaultChangeLog(db.Model):
     from_value  = db.Column(db.String(200))
     to_value    = db.Column(db.String(200))
     by_user_id  = db.Column(db.Integer, db.ForeignKey('user.id'))
-    at          = db.Column(db.DateTime, default=datetime.utcnow)
+    at          = db.Column(db.DateTime, default=datetime.now)
     by_user     = db.relationship('User')
 
 class FaultComment(db.Model):
@@ -155,7 +155,7 @@ class FaultComment(db.Model):
     text       = db.Column(db.Text)
     file_url   = db.Column(db.Text, nullable=True)
     by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    at         = db.Column(db.DateTime, default=datetime.utcnow)
+    at         = db.Column(db.DateTime, default=datetime.now)
     by_user    = db.relationship('User')
 
 class FaultAttachment(db.Model):
@@ -163,7 +163,7 @@ class FaultAttachment(db.Model):
     fault_id   = db.Column(db.Integer, db.ForeignKey('fault.id'), nullable=False)
     url        = db.Column(db.Text, nullable=False)
     by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    at         = db.Column(db.DateTime, default=datetime.utcnow)
+    at         = db.Column(db.DateTime, default=datetime.now)
 
 class FaultTag(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
@@ -179,7 +179,7 @@ class SLATarget(db.Model):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def gen_code(hotel):
-    year = datetime.utcnow().year
+    year = datetime.now().year
     prefix = HOTEL_PREFIX.get(hotel.name, 'GEN')
     last = (Fault.query.filter(Fault.code.like('%s-%d-%%' % (prefix, year)))
                        .order_by(Fault.id.desc()).first())
@@ -387,7 +387,7 @@ def faults_inbox():
     if f_priority: q = q.filter(Fault.priority == f_priority)
     if f_assignee: q = q.filter(Fault.assigned_user_id == f_assignee)
     if search:     q = q.filter((Fault.description.ilike('%%%s%%' % search)) | (Fault.code.ilike('%%%s%%' % search)))
-    midnight = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     if chip == 'mine':   q = q.filter(Fault.assigned_user_id == user.id)
     elif chip == 'today': q = q.filter(Fault.submitted_at >= midnight)
     elif chip == 'open':  q = q.filter(~Fault.status.in_(TERMINAL))
@@ -451,9 +451,9 @@ def fault_set_status(fid):
     to = request.form.get('to')
     if not f.can_transition(to):
         return redirect(url_for('fault_detail', fid=fid) + '?embed=1&err=1')
-    frm = f.status; f.status = to; f.updated_at = datetime.utcnow()
+    frm = f.status; f.status = to; f.updated_at = datetime.now()
     if to == 'done':
-        f.completed_at = datetime.utcnow(); f.completed_by = user.id
+        f.completed_at = datetime.now(); f.completed_by = user.id
         if f.submitted_at:
             f.resolution_seconds = int((f.completed_at - f.submitted_at).total_seconds())
     log_change(f, 'κατάσταση', 'status', STATUS_LABELS.get(frm, frm), STATUS_LABELS.get(to, to), user.id)
@@ -470,7 +470,7 @@ def fault_take(fid):
     f = Fault.query.get_or_404(fid)
     if not can_view(user, f):
         return redirect(url_for('faults_inbox') + '?embed=1')
-    f.assigned_user_id = user.id; f.updated_at = datetime.utcnow()
+    f.assigned_user_id = user.id; f.updated_at = datetime.now()
     log_change(f, 'σχέση', 'Ανάθεση σε', '', user.full_name, user.id)
     if f.can_transition('assigned'):
         f.status = 'assigned'
@@ -487,7 +487,7 @@ def fault_assign(fid):
     f = Fault.query.get_or_404(fid)
     uid = request.form.get('assignee_id', type=int)
     target = User.query.get(uid) if uid else None
-    f.assigned_user_id = uid or None; f.updated_at = datetime.utcnow()
+    f.assigned_user_id = uid or None; f.updated_at = datetime.now()
     log_change(f, 'σχέση', 'Ανάθεση σε', '', target.full_name if target else '—', user.id)
     if target and f.can_transition('assigned'):
         f.status = 'assigned'
@@ -532,7 +532,7 @@ def faults_bulk():
             continue
         if action == 'complete' and f.status not in TERMINAL:
             frm = f.status; f.status = 'done'
-            f.completed_at = datetime.utcnow(); f.completed_by = user.id
+            f.completed_at = datetime.now(); f.completed_by = user.id
             if f.submitted_at:
                 f.resolution_seconds = int((f.completed_at - f.submitted_at).total_seconds())
             log_change(f, 'κατάσταση', 'status', STATUS_LABELS.get(frm, frm), 'Ολοκληρώθηκε', user.id); n += 1
@@ -622,7 +622,7 @@ def sla_state(f):
     """(code, label): '' | overdue 'Εκπρόθεσμη' | stale 'Χρονίζει'. Παγώνει σε paused/winter/τερματικές."""
     if (not f.submitted_at) or f.status in TERMINAL or f.status in ('paused', 'winter'):
         return ('', '')
-    now = datetime.utcnow()
+    now = datetime.now()
     if f.due_at and now > f.due_at:
         return ('overdue', 'Εκπρόθεσμη')
     elapsed_min = (now - f.submitted_at).total_seconds() / 60.0
@@ -787,7 +787,7 @@ def faults_export():
                 f.submitted_at.strftime('%d/%m/%Y %H:%M') if f.submitted_at else '',
                 f.completed_at.strftime('%d/%m/%Y %H:%M') if f.completed_at else '',
                 sla_state(f)[1]]
-    fname = 'estia-faults-%s' % datetime.utcnow().strftime('%Y%m%d-%H%M')
+    fname = 'estia-faults-%s' % datetime.now().strftime('%Y%m%d-%H%M')
     if fmt == 'csv':
         import io
         buf = io.StringIO(); w = csv.writer(buf); w.writerow(headers)
@@ -803,7 +803,7 @@ def faults_export():
         pdf.add_page()
         pdf.set_font('dv', 'B', 14); pdf.set_text_color(*NAVY); pdf.cell(0, 9, 'Εστία — Βλάβες', ln=1)
         pdf.set_font('dv', '', 9); pdf.set_text_color(90, 90, 90)
-        pdf.cell(0, 6, 'Σύνολο: %d · %s' % (len(faults), datetime.utcnow().strftime('%d/%m/%Y %H:%M')), ln=1); pdf.ln(2)
+        pdf.cell(0, 6, 'Σύνολο: %d · %s' % (len(faults), datetime.now().strftime('%d/%m/%Y %H:%M')), ln=1); pdf.ln(2)
         widths = [30, 40, 50, 22, 34, 38, 30, 30]
         pdf.set_font('dv', 'B', 8); pdf.set_fill_color(*NAVY); pdf.set_text_color(255, 255, 255)
         for h, w in zip(headers[:8], widths): pdf.cell(w, 7, h, fill=True)
@@ -963,7 +963,7 @@ def import_ht_faults(commit=True, batch=500):
                 description=(row.get('description') or '').strip() or '(χωρίς περιγραφή)',
                 priority=pr, status=st,
                 source=(row.get('source') or 'Ενδοξενοδοχειακά').strip(),
-                submitted_at=sub or datetime.utcnow(), updated_at=upd,
+                submitted_at=sub or datetime.now(), updated_at=upd,
                 completed_at=completed_at, resolution_seconds=resolution,
                 imported_from='hoteltoolbox',
                 legacy_from=((row.get('from') or '').strip()[:120] or None),

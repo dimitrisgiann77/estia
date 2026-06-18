@@ -11,7 +11,7 @@ from app import (app, db, current_user, is_admin, log_activity, User, APP_VERSIO
 
 class ErrorLog(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
     path       = db.Column(db.String(300))
     method     = db.Column(db.String(10))
     user_id    = db.Column(db.Integer)

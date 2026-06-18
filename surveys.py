@@ -30,7 +30,7 @@ class Survey(db.Model):
     is_active    = db.Column(db.Boolean, default=True)
     thank_you    = db.Column(db.String(300), default='Ευχαριστούμε για τον χρόνο σας!')
     created_by   = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=datetime.now)
     hotel        = db.relationship('Hotel')
     questions    = db.relationship('SurveyQuestion', backref='survey',
                                    order_by='SurveyQuestion.sort', cascade='all, delete-orphan')
@@ -52,7 +52,7 @@ class SurveyResponse(db.Model):
     respondent_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     name         = db.Column(db.String(120))
     room         = db.Column(db.String(60))
-    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    submitted_at = db.Column(db.DateTime, default=datetime.now)
     import_hash  = db.Column(db.String(40), index=True, nullable=True)   # v12.30 idempotent import
     hotel        = db.relationship('Hotel')
     answers      = db.relationship('SurveyAnswer', backref='response', cascade='all, delete-orphan')
@@ -151,7 +151,7 @@ def surveys_list():
         'active':  sum(1 for r in rows if r['s'].is_active),
         'total':   len(rows),
         'responses': total_resp,
-        'today':   SurveyResponse.query.filter(SurveyResponse.submitted_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)).count(),
+        'today':   SurveyResponse.query.filter(SurveyResponse.submitted_at >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)).count(),
     }
     return render_template('surveys_list.html', rows=rows, kpi=kpi, user=user,
                            QTYPE_LABELS=QTYPE_LABELS)
@@ -305,7 +305,7 @@ def survey_export_csv(sid):
             a = amap.get(q.id)
             row.append((a.value_text if a and a.value_text is not None else (a.value_num if a and a.value_num is not None else '')))
         w.writerow(row)
-    fname = 'survey-%d-%s.csv' % (sid, datetime.utcnow().strftime('%Y%m%d'))
+    fname = 'survey-%d-%s.csv' % (sid, datetime.now().strftime('%Y%m%d'))
     return Response('﻿' + buf.getvalue(), mimetype='text/csv; charset=utf-8',
                     headers={'Content-Disposition': 'attachment; filename=%s' % fname})
 

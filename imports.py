@@ -26,7 +26,7 @@ class ImportUpload(db.Model):
     data         = db.Column(db.LargeBinary)
     is_csv       = db.Column(db.Boolean, default=False)
     uploaded_by  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=datetime.now)
     result_json  = db.Column(db.Text)
 
 
@@ -183,7 +183,7 @@ def import_faults_from_upload(up, mapping):
             code=code, hotel_id=hid, category_id=cid,
             description=desc, priority=pr, status=st,
             source='Εισαγωγή αρχείου',
-            submitted_at=sub or datetime.utcnow(), updated_at=upd,
+            submitted_at=sub or datetime.now(), updated_at=upd,
             completed_at=completed_at, resolution_seconds=resolution,
             imported_from='upload',
             legacy_from=(_cell(row, mapping.get('from'))[:120] or None),
@@ -333,7 +333,7 @@ def import_surveys_from_upload(up, title, hotel_id, meta_map):
             continue
         resp = S.SurveyResponse(survey_id=sv.id, hotel_id=hotel_id, source='import',
                                 name=(nval[:120] or None), room=(rval[:60] or None),
-                                submitted_at=_parse_date_any(dval) or datetime.utcnow(),
+                                submitted_at=_parse_date_any(dval) or datetime.now(),
                                 import_hash=h40)
         db.session.add(resp)
         db.session.flush()

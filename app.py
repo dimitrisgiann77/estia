@@ -42,6 +42,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text
 from datetime import datetime, date, timedelta
 import os, smtplib, threading, json, time, secrets, urllib.request, urllib.error, urllib.parse
+# v12.91 — Ολόκληρη η πλατφόρμα σε ώρα Ελλάδος (Europe/Athens)
+os.environ.setdefault('TZ', 'Europe/Athens')
+try:
+    time.tzset()
+except Exception:
+    pass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -316,24 +322,23 @@ def inject_theme():
 
 @app.template_filter('gr')
 def _gr_time(dt, fmt='%d/%m %H:%M'):
-    """Εμφάνιση UTC datetime σε ώρα Ελλάδας (Europe/Athens)."""
+    """v12.91 — όλη η πλατφόρμα τρέχει σε ώρα Ελλάδος (TZ=Europe/Athens), οι datetimes είναι ήδη τοπικοί· απλή μορφοποίηση."""
     if not dt:
         return ''
     try:
-        from zoneinfo import ZoneInfo
-        return dt.replace(tzinfo=ZoneInfo('UTC')).astimezone(ZoneInfo('Europe/Athens')).strftime(fmt)
+        return dt.strftime(fmt)
     except Exception:
-        try:
-            return dt.strftime(fmt)
-        except Exception:
-            return str(dt)
+        return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.90'
-APP_BUILD   = '370'
+APP_VERSION = '12.91'
+APP_BUILD   = '371'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.91', 'b': '371', 'date': '18/06/2026', 'time': '17:30', 'title': 'ΟΛΗ η πλατφόρμα σε ώρα Ελλάδος (Europe/Athens)',
+     'items': ['Όλη η διεργασία τρέχει σε TZ=Europe/Athens και ΑΠΟΘΗΚΕΥΕΙ τις ώρες τοπικά (όχι UTC) — υποβολές, ημερομηνία καταγραφής, βλάβες, πρόγραμμα, μισθοδοσία, logs, ειδοποιήσεις, backups, σχόλια: όλα σε ώρα Ελλάδος.',
+               'Το date.today()/τώρα δείχνει σωστή ημέρα Ελλάδος (διορθώνει και υποβολές αργά το βράδυ). Σχεδιαστές υπενθυμίσεων/backup ήδη σε Αθήνα.']},
     {'v': '12.90', 'b': '370', 'date': '18/06/2026', 'time': '17:00', 'title': 'Ώρα Ελλάδος στις υποβολές (όχι UTC)',
      'items': ['Οι ώρες των υποβολών (Records, Πίνακας Πισινών, Πίνακας Νερών, εξαγωγές) δείχνουν πλέον ώρα Ελλάδος (Europe/Athens) αντί για UTC — π.χ. 09:54 αντί 06:54. Η αποθήκευση παραμένει UTC, μετατροπή στην εμφάνιση (filter |gr).']},
     {'v': '12.89', 'b': '369', 'date': '18/06/2026', 'time': '16:30', 'title': 'Κρυφή εγγραφή μέχρι το go-live',
@@ -651,7 +656,7 @@ PERIOD_LABELS = [
 ]
 
 def _period_bounds(key, today=None):
-    t = today or datetime.utcnow().date()
+    t = today or datetime.now().date()
     if key == 'today': return t, t
     if key == 'yesterday': d = t - timedelta(days=1); return d, d
     if key == 'l7': return t - timedelta(days=6), t
@@ -757,7 +762,7 @@ class ActivityLog(db.Model):
     hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=True)   # v12.22
     action     = db.Column(db.String(60))
     detail     = db.Column(db.String(300))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     user       = db.relationship('User')
     hotel      = db.relationship('Hotel')
 
@@ -781,7 +786,7 @@ class User(db.Model):
     login_enabled     = db.Column(db.Boolean)
     employment_active = db.Column(db.Boolean)
     is_active  = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     hotels     = db.relationship('Hotel', secondary=user_hotels, backref='members')
 
 class WaterRecord(db.Model):
@@ -789,7 +794,7 @@ class WaterRecord(db.Model):
     user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     record_date = db.Column(db.Date, default=date.today, nullable=False)
     period      = db.Column(db.String(10), nullable=False)
-    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_at = db.Column(db.DateTime, default=datetime.now)
     updated_at  = db.Column(db.DateTime, nullable=True)
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     clo2_tank        = db.Column(db.Float)
@@ -821,7 +826,7 @@ class Hotel(db.Model):
     is_active  = db.Column(db.Boolean, default=True)
     company_id = db.Column(db.Integer)   # v12.47 — Μισθοδοσία: νομικός εργοδότης (payroll.Company)
     ypok_code  = db.Column(db.String(8))  # v12.58 — Κωδικός Υποκαταστήματος (ΑΠΔ/Epsilon)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     pools = db.relationship('Pool', backref='hotel', order_by='Pool.name')
 
 class Pool(db.Model):
@@ -832,7 +837,7 @@ class Pool(db.Model):
     pool_type  = db.Column(db.String(20), default='pool')
     volume_m3  = db.Column(db.Float)          # όγκος σε m³ (για δοσολογία)
     is_active  = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class PoolRecord(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -840,7 +845,7 @@ class PoolRecord(db.Model):
     user_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     record_date = db.Column(db.Date, default=date.today, nullable=False)
     period      = db.Column(db.String(10), nullable=False)
-    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_at = db.Column(db.DateTime, default=datetime.now)
     updated_at  = db.Column(db.DateTime, nullable=True)
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     free_chlorine     = db.Column(db.Float)
@@ -865,13 +870,13 @@ class WaterSystem(db.Model):
     name       = db.Column(db.String(120), nullable=False)
     location   = db.Column(db.String(120))
     is_active  = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     hotel      = db.relationship('Hotel')
 
 
 class ReminderSent(db.Model):
     day = db.Column(db.String(10), primary_key=True)        # 'YYYY-MM-DD' lock ανά ημέρα
-    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    sent_at = db.Column(db.DateTime, default=datetime.now)
 
 class FaultReport(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -883,7 +888,7 @@ class FaultReport(db.Model):
     status      = db.Column(db.String(12), default='open')   # open / resolved
     answer      = db.Column(db.Text)
     answered_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at  = db.Column(db.DateTime, default=datetime.now)
     resolved_at = db.Column(db.DateTime, nullable=True)
     user = db.relationship('User', foreign_keys=[user_id])
     pool = db.relationship('Pool')
@@ -894,7 +899,7 @@ class Notification(db.Model):
     text       = db.Column(db.String(300))
     link       = db.Column(db.String(120))
     is_read    = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 # v12.38 — Καρφιτσωμένα widgets (pin to dashboard). Νέος πίνακας· create_all το δημιουργεί.
 class PinnedWidget(db.Model):
@@ -903,7 +908,7 @@ class PinnedWidget(db.Model):
     title      = db.Column(db.String(80), nullable=False)
     icon       = db.Column(db.String(40))
     link       = db.Column(db.String(300))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 # v12.9 — Μηνύματα μεταξύ χρηστών (νέος πίνακας· create_all το δημιουργεί αυτόματα)
 class Message(db.Model):
@@ -912,7 +917,7 @@ class Message(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     body         = db.Column(db.Text, nullable=False)
     is_read      = db.Column(db.Boolean, default=False)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=datetime.now)
     sender    = db.relationship('User', foreign_keys=[sender_id])
     recipient = db.relationship('User', foreign_keys=[recipient_id])
 
@@ -922,7 +927,7 @@ class EmailLog(db.Model):
     recipients = db.Column(db.String(300))
     ok         = db.Column(db.Boolean, default=False)
     via        = db.Column(db.String(10))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class Setting(db.Model):
     key   = db.Column(db.String(40), primary_key=True)
@@ -959,7 +964,7 @@ class Area(db.Model):
     name         = db.Column(db.String(120))
     location     = db.Column(db.String(120))
     is_active    = db.Column(db.Boolean, default=True)
-    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at   = db.Column(db.DateTime, default=datetime.now)
     hotel        = db.relationship('Hotel')
     template     = db.relationship('MonitorTemplate')
 
@@ -970,7 +975,7 @@ class Reading(db.Model):
     user_id     = db.Column(db.Integer, db.ForeignKey('user.id'))
     record_date = db.Column(db.Date, default=date.today)
     period      = db.Column(db.String(10), default='day')
-    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_at = db.Column(db.DateTime, default=datetime.now)
     updated_at  = db.Column(db.DateTime)
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
     values      = db.Column(db.Text)     # JSON {pkey: value}
@@ -1792,7 +1797,7 @@ def submit():
                                          record_date=date.today(), period=period).first()
     if record:
         apply_record(record, data, period)
-        record.updated_at = datetime.utcnow()
+        record.updated_at = datetime.now()
         record.updated_by = user.id
     else:
         record = WaterRecord(user_id=user.id, water_system_id=ws.id,
@@ -1823,7 +1828,7 @@ def edit_record(record_id):
         return redirect(url_for('water_app'))
     if request.method == 'POST':
         apply_record(record, request.form, record.period)
-        record.updated_at = datetime.utcnow()
+        record.updated_at = datetime.now()
         record.updated_by = user.id
         db.session.commit()
         if user.role == 'admin':
@@ -1958,7 +1963,7 @@ def submit_pool():
     record = PoolRecord.query.filter_by(pool_id=pool.id, record_date=date.today(), period=period).first()
     if record:
         apply_pool_record(record, data, period)
-        record.updated_at = datetime.utcnow()
+        record.updated_at = datetime.now()
         record.updated_by = user.id
     else:
         record = PoolRecord(pool_id=pool.id, user_id=user.id, record_date=date.today(), period=period)
@@ -1985,7 +1990,7 @@ def edit_pool_record(record_id):
         return redirect(url_for('pools_app'))
     if request.method == 'POST':
         apply_pool_record(record, request.form, record.period)
-        record.updated_at = datetime.utcnow()
+        record.updated_at = datetime.now()
         record.updated_by = user.id
         db.session.commit()
         log_activity('pool_edit', record.pool.name if record.pool else '')
@@ -2422,7 +2427,7 @@ def notifications_list():
     unread = Notification.query.filter_by(user_id=session['user_id'], is_read=False).count()
     def _ago(dt):
         if not dt: return ''
-        sec = (datetime.utcnow() - dt).total_seconds()
+        sec = (datetime.now() - dt).total_seconds()
         if sec < 60: return 'μόλις τώρα'
         if sec < 3600: return f'{int(sec//60)}\' πριν'
         if sec < 86400: return f'{int(sec//3600)}ω πριν'
@@ -2735,7 +2740,7 @@ def areas_submit():
     rec = Reading.query.filter_by(area_id=area.id, record_date=date.today(), period=period).first()
     if rec:
         rec.values = json.dumps(vals); rec.notes = data.get('notes', '')
-        rec.updated_at = datetime.utcnow(); rec.updated_by = user.id
+        rec.updated_at = datetime.now(); rec.updated_by = user.id
     else:
         rec = Reading(area_id=area.id, template_key=area.template_key, user_id=user.id,
                       record_date=date.today(), period=period, values=json.dumps(vals), notes=data.get('notes', ''))
@@ -2902,7 +2907,7 @@ def overview():
         water_today = 0
     try:
         SR = __import__('surveys').SurveyResponse
-        _t0 = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        _t0 = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         surveys_today = SR.query.filter(SR.submitted_at >= _t0).count()
     except Exception:
         surveys_today = 0
@@ -3035,7 +3040,7 @@ def activity_log():
     f_action = request.args.get('action')
     search   = (request.args.get('q') or '').strip()
     chip     = request.args.get('chip')          # today | 7d | 30d | logins
-    now = datetime.utcnow()
+    now = datetime.now()
     midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
     aid = active_hotel_id()                       # v12.22 — scope ανά ξενοδοχείο
     def hscope(query):
@@ -3473,7 +3478,7 @@ def _athens_now():
         from zoneinfo import ZoneInfo
         return datetime.now(ZoneInfo('Europe/Athens'))
     except Exception:
-        return datetime.utcnow() + timedelta(hours=3)
+        return datetime.now() + timedelta(hours=3)
 
 def missing_today():
     today = date.today()

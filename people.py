@@ -24,7 +24,7 @@ class ProfileEvent(db.Model):
     event       = db.Column(db.String(40))     # created/import/match/merge/assignment/edit/status
     detail      = db.Column(db.Text)
     actor_id    = db.Column(db.Integer)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at  = db.Column(db.DateTime, default=datetime.now)
 
 
 class AttentionFlag(db.Model):
@@ -36,7 +36,7 @@ class AttentionFlag(db.Model):
     severity    = db.Column(db.String(10), default='warn')  # info/warn/high
     detail      = db.Column(db.Text)
     resolved    = db.Column(db.Boolean, default=False, index=True)
-    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at  = db.Column(db.DateTime, default=datetime.now)
     resolved_at = db.Column(db.DateTime)
     resolved_by = db.Column(db.Integer)
 
@@ -100,7 +100,7 @@ def clear_flags(entity_id, flag_type=None, entity_type='employee'):
         q = q.filter_by(flag_type=flag_type)
     aid = _actor()
     for f in q.all():
-        f.resolved = True; f.resolved_at = datetime.utcnow(); f.resolved_by = aid
+        f.resolved = True; f.resolved_at = datetime.now(); f.resolved_by = aid
 
 
 def events_for(entity_id, entity_type='employee'):
@@ -156,7 +156,7 @@ def attention_resolve(fid):
     if not is_admin():
         return redirect(url_for('login'))
     f = AttentionFlag.query.get_or_404(fid)
-    f.resolved = True; f.resolved_at = datetime.utcnow()
+    f.resolved = True; f.resolved_at = datetime.now()
     cu = current_user(); f.resolved_by = cu.id if cu else None
     db.session.commit()
     return redirect(url_for('attention_center', entity=f.entity_type) + '&embed=1')
@@ -169,7 +169,7 @@ class NotDuplicate(db.Model):
     a_id  = db.Column(db.Integer, index=True)
     b_id  = db.Column(db.Integer, index=True)
     entity_type = db.Column(db.String(20), default='employee')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 def _pair(a, b):
     return (min(a, b), max(a, b))
