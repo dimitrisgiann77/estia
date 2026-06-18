@@ -23,8 +23,8 @@
         <div class="trend" style="color:{{ '#16a34a' if d>0 else ('#dc2626' if d<0 else '#64748b') }};"><i class="ti ti-{{ 'trending-up' if d>0 else ('trending-down' if d<0 else 'minus') }}"></i> {{ '%+.1f'|format(d) }} vs προηγ. ({{ prev.period_label }} {{ prev.year or '' }})</div>
       {% endif %}
       <div style="margin-left:auto;display:flex;gap:8px;">
-        {% if ev.status not in ['approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/approve" style="display:inline;"><button class="btn btn-ok" type="submit"><i class="ti ti-check"></i> Έγκριση</button></form>{% endif %}
-        {% if ev.status in ['submitted','approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/return" style="display:inline;" onsubmit="return confirm('Επιστροφή σε πρόχειρο για διορθώσεις;');"><button class="btn" type="submit" style="background:#b45309;"><i class="ti ti-arrow-back-up"></i> Επιστροφή</button></form>{% endif %}
+        {% if is_admin and ev.status not in ['approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/approve" style="display:inline;"><button class="btn btn-ok" type="submit"><i class="ti ti-check"></i> Έγκριση</button></form>{% endif %}
+        {% if is_admin and ev.status in ['submitted','approved','finalized'] %}<form method="POST" action="/dashboard/evaluations/{{ ev.id }}/return" style="display:inline;" onsubmit="return confirm('Επιστροφή σε πρόχειρο για διορθώσεις;');"><button class="btn" type="submit" style="background:#b45309;"><i class="ti ti-arrow-back-up"></i> Επιστροφή</button></form>{% endif %}
         <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/edit?embed=1"><i class="ti ti-edit"></i> Επεξεργασία</a>
         <a class="btn" href="/dashboard/evaluations/{{ ev.id }}/export.xlsx" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
         <a class="btn" href="/dashboard/evaluations?embed=1" style="background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα</a>
