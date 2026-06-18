@@ -19,7 +19,7 @@
   <div class="grid" style="margin-top:10px;">
     <div class="card"><h3>Στοιχεία</h3>
       <div class="meta">
-        <div><b>Ονοματεπώνυμο:</b> {{ u.full_name or u.username }}</div>
+        <div><b>Ονοματεπώνυμο:</b> {{ u.full_name or u.username }} {{ lock_badge(u) }}</div>
         <div><b>Εταιρεία:</b> {{ comp.legal_name if comp else '—' }}</div>
         <div><b>Ξενοδοχείο (home):</b> {{ hotel.name if hotel else '—' }}</div>
         <div><b>Σύνδεση:</b> {{ 'Ναι' if u.login_enabled else 'Όχι (μόνο μητρώο)' }}</div>

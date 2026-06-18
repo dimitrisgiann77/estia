@@ -31,7 +31,7 @@
       {% for e in items %}
       <tr>
         <td><a class="code" href="/dashboard/evaluations/{{ e.id }}?embed=1">{{ e.code }}</a>{% if e.version and e.version>1 %} <span class="muted">v{{ e.version }}</span>{% endif %}</td>
-        <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a></td>
+        <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a> {{ lock_badge(e.employee) if e.employee }}</td>
         <td>{{ dept_name(e.department_id) }}</td>
         <td>{{ e.hotel.name if e.hotel else '—' }}</td>
         <td>{{ e.period_label }} {{ e.year or '' }}</td>

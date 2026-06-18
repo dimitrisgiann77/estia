@@ -22,11 +22,11 @@
       <tr>
         <td><span class="reason">{{ r.reason }}</span></td>
         <td>
-          <a class="nm" href="/dashboard/payroll/employee/{{ r.a.id }}?embed=1">{{ r.a.full_name or r.a.username }}</a> <span class="muted">#{{ r.a.id }}</span>
+          <a class="nm" href="/dashboard/payroll/employee/{{ r.a.id }}?embed=1">{{ r.a.full_name or r.a.username }}</a> {{ lock_badge(r.a) }} <span class="muted">#{{ r.a.id }}</span>
           <div class="prof">ΑΦΜ {{ r.a_sum.afm }} · Κωδ {{ r.a_sum.code }} · αναθ. {{ r.a_sum.assignments }}<br>Καθαρά: {{ r.a_sum.years }}</div>
         </td>
         <td>
-          <a class="nm" href="/dashboard/payroll/employee/{{ r.b.id }}?embed=1">{{ r.b.full_name or r.b.username }}</a> <span class="muted">#{{ r.b.id }}</span>
+          <a class="nm" href="/dashboard/payroll/employee/{{ r.b.id }}?embed=1">{{ r.b.full_name or r.b.username }}</a> {{ lock_badge(r.b) }} <span class="muted">#{{ r.b.id }}</span>
           <div class="prof">ΑΦΜ {{ r.b_sum.afm }} · Κωδ {{ r.b_sum.code }} · αναθ. {{ r.b_sum.assignments }}<br>Καθαρά: {{ r.b_sum.years }}</div>
         </td>
         <td style="white-space:nowrap;">

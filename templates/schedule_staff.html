@@ -42,7 +42,7 @@
       {% for m in g %}
         <tr style="border:none;">
           <td style="border:none;width:24px;"><input type="radio" name="keep_id" value="{{ m.id }}" {{ 'checked' if loop.first }} style="width:auto;"></td>
-          <td style="border:none;"><b>{{ m.full_name }}</b> <small style="color:#94a3b8;">{{ m.username }}</small></td>
+          <td style="border:none;"><b>{{ m.full_name }}</b> {{ lock_badge(m) }} <small style="color:#94a3b8;">{{ m.username }}</small></td>
           <td style="border:none;font-size:12px;color:#64748b;">{{ dept_map.get(m.department_id,'—') }} · {{ hotel_map.get(m.home_hotel_id,'—') }}</td>
           <td style="border:none;font-size:12px;">{{ m._assign_n }} βάρδιες</td>
           <td style="border:none;"><label style="font-size:11px;color:#b45309;"><input type="checkbox" name="drop_ids" value="{{ m.id }}" {{ '' if loop.first else 'checked' }} style="width:auto;"> συγχώνευση</label></td>
@@ -72,7 +72,7 @@
         <form method="POST">
           <input type="hidden" name="action" value="edit"><input type="hidden" name="user_id" value="{{ u.id }}">
           <input type="hidden" name="f_hotel" value="{{ f_hotel or '' }}"><input type="hidden" name="f_dept" value="{{ f_dept or '' }}">
-          <td><b>{{ u.full_name }}</b><br><small style="color:#94a3b8;">{{ u.username }}</small></td>
+          <td><b>{{ u.full_name }}</b> {{ lock_badge(u) }}<br><small style="color:#94a3b8;">{{ u.username }}</small></td>
           <td><select name="department_id"><option value="">—</option>{% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==u.department_id }}>{{ d.name }}</option>{% endfor %}</select></td>
           <td><select name="home_hotel_id"><option value="">—</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==u.home_hotel_id }}>{{ h.name }}</option>{% endfor %}</select></td>
           <td><input type="text" name="employer" value="{{ u.employer or '' }}" style="min-width:120px;"></td>

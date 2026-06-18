@@ -68,7 +68,7 @@
     <tbody>
     {% for r in rows %}
       <tr>
-        <td class="l">{{ r.user.full_name or r.user.username }}{% for f in r.flags %}<span class="flag">{{ f }}</span>{% endfor %}</td>
+        <td class="l">{{ r.user.full_name or r.user.username }} {{ lock_badge(r.user) }}{% for f in r.flags %}<span class="flag">{{ f }}</span>{% endfor %}</td>
         <td class="l muted">{{ r.hotel }}{% if r.dept %} · {{ r.dept }}{% endif %}</td>
         <td class="l">{% if r.cc %}<span style="background:#e0e7ff;color:#3730a3;padding:1px 6px;border-radius:8px;font-size:10px;">{{ r.cc }}</span>{% endif %}</td>
         <td>{{ r.work_days }}</td><td>{{ r.repo }}</td><td>{{ '%.1f'|format(r.extra_hours) }}</td>

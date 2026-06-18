@@ -31,7 +31,7 @@
       </div>
     </div>
     <div class="ev-h">
-      <div class="kv"><div class="k">Υπάλληλος</div><b>{{ ev.employee.full_name if ev.employee else '—' }}</b></div>
+      <div class="kv"><div class="k">Υπάλληλος</div><b>{{ ev.employee.full_name if ev.employee else '—' }}</b> {{ lock_badge(ev.employee) if ev.employee }}</div>
       <div class="kv"><div class="k">Τμήμα</div>{{ dept_name(ev.department_id) or '—' }}</div>
       <div class="kv"><div class="k">Ξενοδοχείο</div>{{ ev.hotel.name if ev.hotel else '—' }}</div>
       <div class="kv"><div class="k">Περίοδος</div>{{ ev.period_label }} {{ ev.year or '' }}</div>

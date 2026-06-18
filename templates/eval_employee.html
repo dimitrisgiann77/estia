@@ -14,7 +14,7 @@
   <div class="card">
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
       <div><span class="muted" style="font-size:12px;">Μέσος όρος (όλες)</span><br><span style="font-size:28px;font-weight:800;">{{ '%.1f%%'|format(avg) if avg is not none else '—' }}</span></div>
-      <div class="muted" style="font-size:13px;">Τμήμα: <b>{{ dept }}</b> · Ξενοδοχείο: <b>{{ hotel }}</b> <span style="font-size:11px;">(τρέχον από Μητρώο)</span></div>
+      <div class="muted" style="font-size:13px;">Τμήμα: <b>{{ dept }}</b> · Ξενοδοχείο: <b>{{ hotel }}</b> <span style="font-size:11px;">(τρέχον από Μητρώο)</span> {{ lock_badge(emp) }}</div>
       <a class="btn" href="/dashboard/evaluations?embed=1" style="margin-left:auto;background:#64748b;"><i class="ti ti-arrow-left"></i> Λίστα</a>
     </div>
   </div>

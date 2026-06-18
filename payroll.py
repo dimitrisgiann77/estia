@@ -2243,4 +2243,29 @@ def export_management():
     return _xlsx_response(wb, 'ΜΗΤΡΩΟ ΜΙΣΘΟΔΟΣΙΑΣ MANAGEMENT (live).xlsx')
 
 
+@app.context_processor
+def _inject_lock_badge():
+    """v12.102 — badge προέλευσης προφίλ: Λογιστήριο (κλειδωμένο/Epsilon) vs Management. Διαθέσιμο σε ΟΛΑ τα templates."""
+    from markupsafe import Markup
+    cache = {}
+    def _ids():
+        if 'ids' not in cache:
+            try:
+                cache['ids'] = {row[0] for row in db.session.query(EmployeePII.user_id).filter_by(locked=True).all()}
+            except Exception:
+                cache['ids'] = set()
+        return cache['ids']
+    def emp_locked(u):
+        uid = getattr(u, 'id', u)
+        return uid in _ids()
+    def lock_badge(u):
+        uid = getattr(u, 'id', u)
+        if uid is None:
+            return ''
+        if uid in _ids():
+            return Markup('<span title="Master \u03c0\u03c1\u03bf\u03c6\u03af\u03bb \u039b\u03bf\u03b3\u03b9\u03c3\u03c4\u03b7\u03c1\u03af\u03bf\u03c5 (Epsilon) \u2014 \u03ba\u03bb\u03b5\u03b9\u03b4\u03c9\u03bc\u03ad\u03bd\u03bf, \u03c0\u03b7\u03b3\u03ae \u03b1\u03bb\u03ae\u03b8\u03b5\u03b9\u03b1\u03c2" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:#dbeafe;color:#1d4ed8;vertical-align:middle;white-space:nowrap;"><i class="ti ti-lock"></i> \u039b\u03bf\u03b3\u03b9\u03c3\u03c4\u03ae\u03c1\u03b9\u03bf</span>')
+        return Markup('<span title="\u03a0\u03c1\u03bf\u03c6\u03af\u03bb Management / \u03b5\u03b9\u03c3\u03b1\u03b3\u03c9\u03b3\u03ae\u03c2 (\u03bc\u03b7 \u03ba\u03bb\u03b5\u03b9\u03b4\u03c9\u03bc\u03ad\u03bd\u03bf)" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:#f1f5f9;color:#64748b;vertical-align:middle;white-space:nowrap;"><i class="ti ti-users"></i> Management</span>')
+    return {'emp_locked': emp_locked, 'lock_badge': lock_badge}
+
+
 print('payroll module loaded (Φ2.4 μητρώο + v12.71 Management + v12.72 scan + v12.77 dups + v12.79 grid + v12.80 export)')

@@ -31,7 +31,7 @@
         {% for r in rows %}
         {% set uid = r.user.id %}
         <tr>
-          <td class="ro">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }}</td>
+          <td class="ro">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ lock_badge(r.user) }}</td>
           <td class="ro">{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
           <td class="ro muted">{{ r.pii.afm if r.pii and r.pii.afm else '—' }}</td>
           <td><input name="f_unit_{{ uid }}" value="{{ r.mgmt.unit if r.mgmt and r.mgmt.unit else '' }}"></td>
