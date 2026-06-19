@@ -1,0 +1,39 @@
+{% set parts = (u.name or '').split() %}
+{% set initials = ((parts[0][0] if parts else '') ~ (parts[1][0] if parts|length>1 else ''))|upper %}
+<div style="padding:2px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+    <div style="width:46px;height:46px;border-radius:50%;background:#e7f0fb;color:#185FA5;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">{{ initials or '–' }}</div>
+    <div style="min-width:0;">
+      <div style="font-size:16px;font-weight:700;">{{ u.name }}</div>
+      <div style="font-size:12px;color:#64748b;">@{{ u.username }} · {{ u.role }}</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;">
+    {% if u.locked %}<span class="cbadge lock">🔒 Λογιστήριο</span>
+    {% elif u.login %}<span class="cbadge login">λογαριασμός</span>
+    {% else %}<span class="cbadge mgmt">Management</span>{% endif %}
+    {% if u.login %}<span class="cbadge ok">login ✓</span>{% else %}<span class="cbadge muted">χωρίς login</span>{% endif %}
+    {% if not u.active %}<span class="cbadge off">ανενεργός</span>{% endif %}
+  </div>
+
+  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+    <tr><td class="k">Κωδικός</td><td class="v">{{ u.code or '—' }}</td></tr>
+    <tr><td class="k">ΑΦΜ</td><td class="v">{{ u.afm or '—' }}</td></tr>
+    <tr><td class="k">ΑΜΚΑ</td><td class="v">{{ u.amka or '—' }}</td></tr>
+    <tr><td class="k">Ξενοδοχείο</td><td class="v">{{ u.hotel or '—' }}</td></tr>
+    <tr><td class="k">Τμήμα</td><td class="v">{{ u.dept or '—' }}</td></tr>
+    <tr><td class="k">Βάρδιες</td><td class="v">{{ u.shifts }}</td></tr>
+  </table>
+
+  <div style="margin-top:14px;display:flex;flex-direction:column;gap:7px;">
+    <a class="cbtn" href="/dashboard/payroll/employee/{{ u.id }}?embed=1"><i class="ti ti-id"></i> Πλήρης καρτέλα</a>
+    {% if not u.locked %}
+      <button class="cbtn" onclick="toggleLogin({{ u.id }})"><i class="ti ti-key"></i> {{ 'Κλείσιμο login' if u.login else 'Ενεργοποίηση login' }}</button>
+      <a class="cbtn" href="/dashboard/payroll/duplicates?embed=1"><i class="ti ti-arrows-join"></i> Συγχώνευση διπλών</a>
+      <button class="cbtn danger" onclick="delProfile({{ u.id }}, '{{ u.name|replace("'","") }}')"><i class="ti ti-trash"></i> Οριστική διαγραφή</button>
+    {% else %}
+      <div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:6px;"><i class="ti ti-shield-lock"></i> Προστατευμένο — αλλαγές μόνο χειροκίνητα από τη Διαχείριση.</div>
+    {% endif %}
+  </div>
+</div>
