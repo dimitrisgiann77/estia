@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.122'
-APP_BUILD   = '402'
+APP_VERSION = '12.123'
+APP_BUILD   = '403'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.123', 'b': '403', 'date': '19/06/2026', 'time': '04:10', 'title': 'Χρήστες: καθαρό header + νέος χρήστης εμφανίζεται/κάνει login',
+     'items': ['Αφαιρέθηκε το διπλό εσωτερικό header μέσα στη σελίδα Χρηστών (το παρέχει ήδη το πάνω μενού).',
+               'Ο νέος χρήστης που δημιουργείς από admin είναι πλέον εγκεκριμένος + ενεργός για login και εμφανίζεται αμέσως στη λίστα. Αν το username υπάρχει ή λείπει κωδικός, βγαίνει σαφές μήνυμα (πριν αποτύγχανε σιωπηλά).']},
     {'v': '12.122', 'b': '402', 'date': '19/06/2026', 'time': '03:40', 'title': 'Διόρθωση: παράθυρο βάρδιας δεν άνοιγε σε επόμενες εβδομάδες (scroll)',
      'items': ['BUG: σε προβολή πολλών εβδομάδων, μόνο η πρώτη άνοιγε το παράθυρο δήλωσης· οι επόμενες όχι, γιατί το popup (position:fixed) τοποθετούνταν εκτός οθόνης όταν είχες κατέβει στη σελίδα. Τώρα τοποθετείται σωστά στο σημείο του κελιού.']},
     {'v': '12.121', 'b': '401', 'date': '19/06/2026', 'time': '03:15', 'title': 'Διόρθωση: ο admin επεξεργάζεται πάντα + κωδικοί ανά ρόλο',
@@ -2422,18 +2425,24 @@ def add_user():
     if not is_admin():
         return redirect(url_for('login'))
     data = request.form
-    if not User.query.filter_by(username=data['username']).first():
-        db.session.add(User(
-            username=data['username'],
-            password=generate_password_hash(data['password']),
-            full_name=data['full_name'],
-            email=data.get('email', '').strip(),
-            phone=data.get('phone', '').strip(),
-            role=data.get('role', 'staff'),
-            language=data.get('language', 'el')
-        ))
-        db.session.commit()
-        log_activity('user_add', data.get('username', ''))
+    uname = (data.get('username') or '').strip()
+    if not uname or not (data.get('password') or ''):
+        return redirect(url_for('users_admin') + '?error=user_missing')
+    if User.query.filter_by(username=uname).first():
+        return redirect(url_for('users_admin') + '?error=user_exists')
+    db.session.add(User(
+        username=uname,
+        password=generate_password_hash(data['password']),
+        full_name=(data.get('full_name') or '').strip(),
+        email=data.get('email', '').strip(),
+        phone=data.get('phone', '').strip(),
+        role=data.get('role', 'staff'),
+        language=data.get('language', 'el'),
+        approved=True,         # v12.123: λογαριασμός από admin = εγκεκριμένος
+        login_enabled=True     # v12.123: πραγματικός λογαριασμός (εμφανίζεται & κάνει login)
+    ))
+    db.session.commit()
+    log_activity('user_add', uname)
     return redirect(url_for('users_admin') + '?success=user_added')
 
 @app.route('/dashboard/delete-user/<int:user_id>', methods=['POST'])
@@ -2624,6 +2633,9 @@ ROADMAP = [
         {'t': 'Backups → SharePoint, Κέντρο Εισαγωγής, Feedback χρηστών', 's': 'done'},
         {'t': 'Αυτόματο backup πριν από κάθε καθαρισμό/μαζική διαγραφή', 's': 'planned'},
         {'t': 'Αρχειοθέτηση/απενεργοποίηση όποιου στοιχείου δεν χρησιμοποιείται', 's': 'planned'},
+        {'t': 'Συμμάζεμα οθονών προφίλ → 2 οθόνες (Επίσημο Μητρώο 🔒 + Διαχείριση Προσωπικού)', 's': 'planned'},
+        {'t': 'In-app Documentation (/dashboard/docs) — όλες οι λειτουργίες, auto-updated ανά version', 's': 'planned'},
+        {'t': 'Ξεκαθάρισμα «προσωπικό vs χρήστες login» (αν το προσωπικό πρέπει να είναι users ή merge με master)', 's': 'idea'},
         {'t': 'Μεταφράσεις EN/UK', 's': 'planned'},
         {'t': 'Σύνδεση μισθοδοσίας με ΕΡΓΑΝΗ/Epsilon (μέσω προγράμματος)', 's': 'idea'},
     ]},

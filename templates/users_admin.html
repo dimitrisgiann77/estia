@@ -57,16 +57,7 @@ html[data-theme="dark"] .umodal-box .muted { color:#7b8a98; }
 </head>
 <body>
 
-<div class="topbar">
-  <div>
-    <div class="topbar-title"><img src="/static/img/logo-white.svg" style="height:22px;vertical-align:middle;margin-right:8px;"> ΕΣΤΙΑ — Χρήστες</div>
-    <div class="topbar-sub">Διαχείριση λογαριασμών, ρόλων & αναθέσεων ξενοδοχείων</div>
-  </div>
-  <div>
-    <a href="/dashboard/activity"><i class="ti ti-history"></i> Ιστορικό ενεργειών</a>
-    <a href="/logout"><i class="ti ti-logout"></i> Έξοδος</a>
-  </div>
-</div>
+<!-- v12.123: αφαιρέθηκε το εσωτερικό header (το παρέχει ήδη το shell) -->
 
 <div class="container">
 
@@ -79,6 +70,8 @@ html[data-theme="dark"] .umodal-box .muted { color:#7b8a98; }
   {% elif request.args.get('success') == 'password_reset' %}
   <div class="success-msg">Ο κωδικός άλλαξε!</div>
   {% endif %}
+  {% if request.args.get('error') == 'user_exists' %}<div class="success-msg" style="background:#fee2e2;color:#b91c1c;">Το username χρησιμοποιείται ήδη — δεν δημιουργήθηκε χρήστης.</div>{% endif %}
+  {% if request.args.get('error') == 'user_missing' %}<div class="success-msg" style="background:#fee2e2;color:#b91c1c;">Χρειάζονται username και κωδικός.</div>{% endif %}
 
   {% if pending %}
   <div class="card" style="border:1px solid #fde68a;background:#fffdf5;">
