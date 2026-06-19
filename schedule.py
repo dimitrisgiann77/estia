@@ -896,19 +896,32 @@ def schedule_cell():
 
 @app.route('/dashboard/schedule/cells_bulk', methods=['POST'])
 def schedule_cells_bulk():
-    """v12.117 — μαζική εφαρμογη βαρδιας σε ευρος ημερων ενος εργαζομενου
-    (drag-select στο μηνιαιο grid). Ιδιος ελεγχος/λογικη με το /schedule/cell."""
+    """v12.130 — μαζική εφαρμογή βάρδιας σε πολλά κελιά (drag-select).
+    Δέχεται {user_id, dates[]} (γραμμή) ή {cells:[{user_id,date}]} (ορθογώνιο: πολλοί × μέρες)."""
     if not _auth():
         return ('', 401)
     if not can_edit_schedule():
         return jsonify(ok=False, err='forbidden'), 403
     user = current_user()
     d = request.json or {}
-    try:
-        uid = int(d['user_id'])
-        dates = d.get('dates') or []
-    except Exception:
-        return jsonify(ok=False, err='bad'), 400
+    pairs = []
+    cells = d.get('cells')
+    if cells:
+        for c in cells:
+            try:
+                pairs.append((int(c['user_id']), datetime.strptime(c['date'], '%Y-%m-%d').date()))
+            except Exception:
+                continue
+    else:
+        try:
+            uid0 = int(d['user_id'])
+        except Exception:
+            return jsonify(ok=False, err='bad'), 400
+        for ds in (d.get('dates') or []):
+            try:
+                pairs.append((uid0, datetime.strptime(ds, '%Y-%m-%d').date()))
+            except Exception:
+                continue
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     _whid = d.get('work_hotel_id'); _whid = int(_whid) if _whid else None
@@ -921,12 +934,8 @@ def schedule_cells_bulk():
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
     done = 0; locked = 0
-    weeks = set()
-    for ds in dates:
-        try:
-            wd = datetime.strptime(ds, '%Y-%m-%d').date()
-        except Exception:
-            continue
+    touched = set()
+    for uid, wd in pairs:
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
         a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
@@ -940,17 +949,14 @@ def schedule_cells_bulk():
             a.shift_code = code
             a.segments = json.dumps(segs, ensure_ascii=False)
             a.work_hotel_id = _whid
-        weeks.add(monday_of(wd))
+        touched.add((uid, monday_of(wd)))
         done += 1
-    # WeekPlan -> draft για τις επηρεασμενες εβδομαδες (οπως το single)
-    u = User.query.get(uid)
-    if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
-        for ws in weeks:
-            wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id,
-                                          week_start=ws).first()
+    for uid, ws in touched:
+        u = User.query.get(uid)
+        if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+            wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws).first()
             if not wp:
-                wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id,
-                              week_start=ws, status='draft')
+                wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws, status='draft')
                 db.session.add(wp)
             if wp.status in ('submitted', 'locked'):
                 wp.status = 'draft'
