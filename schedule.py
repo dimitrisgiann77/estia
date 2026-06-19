@@ -164,7 +164,7 @@ class PendingShift(db.Model):
     import_hash   = db.Column(db.String(40), index=True)
     created_at    = db.Column(db.DateTime, default=datetime.now)
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
-    __table_args__ = (db.UniqueConstraint('norm_name', 'work_date', name='uq_pending_name_date'),)
+    # v12.132: επιτρέπονται πολλές βάρδιες/μέρα στον προθάλαμο (αφαιρέθηκε το unique norm_name+work_date)
 
 class Holiday(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
@@ -222,6 +222,7 @@ def ensure_schedule_columns():
             from sqlalchemy import text as _text
             if db.engine.dialect.name == 'postgresql':
                 db.session.execute(_text('ALTER TABLE shift_assignment DROP CONSTRAINT IF EXISTS uq_user_date'))
+                db.session.execute(_text('ALTER TABLE pending_shift DROP CONSTRAINT IF EXISTS uq_pending_name_date'))
                 db.session.commit()
         except Exception as _e:
             db.session.rollback()
@@ -656,9 +657,9 @@ def import_schedule_workbook(source, only_year=None, created_by=None):
                                 whid = hotel.id
                             segj = json.dumps(segs, ensure_ascii=False)
                             if master:
-                                ex = ShiftAssignment.query.filter_by(user_id=master.id, work_date=dt).first()
+                                ex = ShiftAssignment.query.filter_by(user_id=master.id, work_date=dt, shift_code=code, segments=segj).first()
                                 if ex:
-                                    ex.shift_code = code; ex.segments = segj; ex.work_hotel_id = whid
+                                    ex.work_hotel_id = whid
                                     stats['assign_upd'] += 1
                                 else:
                                     db.session.add(ShiftAssignment(
@@ -666,9 +667,9 @@ def import_schedule_workbook(source, only_year=None, created_by=None):
                                         segments=segj, work_hotel_id=whid, created_by=created_by))
                                     stats['assign_new'] += 1
                             else:
-                                pend = PendingShift.query.filter_by(norm_name=nm, work_date=dt).first()
+                                pend = PendingShift.query.filter_by(norm_name=nm, work_date=dt, shift_code=code, segments=segj).first()
                                 if pend:
-                                    pend.shift_code = code; pend.segments = segj; pend.work_hotel_id = whid
+                                    pend.work_hotel_id = whid
                                     pend.raw_name = full[:120]
                                     stats['pending_upd'] += 1
                                 else:
@@ -723,6 +724,8 @@ def week_grid(hotel_id, dept_id, week_start):
                   .filter(ShiftAssignment.user_id.in_(uids))
                   .filter(ShiftAssignment.work_date >= days[0], ShiftAssignment.work_date <= days[6]).all()):
             amap.setdefault((a.user_id, a.work_date.isoformat()), []).append(a)
+    _colors = {st.code: st.color for st in ShiftType.query.all()}
+    _hotels = {h.id: h.name for h in Hotel.query.all()}
     rows = []
     for u in users:
         cells = []
@@ -756,7 +759,10 @@ def week_grid(hotel_id, dept_id, week_start):
                         _es = json.loads(a.segments) if a.segments else []
                     except Exception:
                         _es = []
-                    _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id})
+                    _tm = ' & '.join("%s-%s" % (s.get('start'), s.get('end')) for s in _es) if _es else ''
+                    _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hotel_id) else None
+                    _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
+                                     'times': _tm, 'hotel': _hn, 'color': _colors.get(a.shift_code, '#64748b')})
                 cells.append({'date': d.isoformat(), 'code': first.shift_code, 'segs': fsegs,
                               'label': '\n'.join(labels), 'hours': round(day_hours, 1),
                               'elsewhere': bool(first.work_hotel_id and first.work_hotel_id != hotel_id),
@@ -1596,10 +1602,9 @@ def _confirm_link(norm_name, master_id, created_by=None):
                                 raw_name=rawn, created_by=created_by))
     moved = 0
     for ps in pend:
-        ex = ShiftAssignment.query.filter_by(user_id=master_id, work_date=ps.work_date).first()
-        if ex:
-            ex.shift_code = ps.shift_code; ex.segments = ps.segments; ex.work_hotel_id = ps.work_hotel_id
-        else:
+        dup = ShiftAssignment.query.filter_by(user_id=master_id, work_date=ps.work_date,
+            shift_code=ps.shift_code, segments=ps.segments).first()
+        if not dup:
             db.session.add(ShiftAssignment(user_id=master_id, work_date=ps.work_date,
                 shift_code=ps.shift_code, segments=ps.segments,
                 work_hotel_id=ps.work_hotel_id, created_by=created_by))
