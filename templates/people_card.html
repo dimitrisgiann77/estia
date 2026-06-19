@@ -39,10 +39,10 @@
   {% endif %}
 
   <div style="margin-top:14px;display:flex;flex-direction:column;gap:7px;">
-    <a class="cbtn" href="/dashboard/payroll/employee/{{ u.id }}?embed=1"><i class="ti ti-id"></i> Πλήρης καρτέλα</a>
+    <a class="cbtn" href="/dashboard/payroll/employee/{{ u.id }}?embed=1&back=people"><i class="ti ti-id"></i> Πλήρης καρτέλα</a>
     {% if not u.locked %}
       <button class="cbtn" onclick="toggleLogin({{ u.id }})"><i class="ti ti-key"></i> {{ 'Κλείσιμο login' if u.login else 'Ενεργοποίηση login' }}</button>
-      <a class="cbtn" href="/dashboard/payroll/duplicates?embed=1"><i class="ti ti-arrows-join"></i> Συγχώνευση διπλών</a>
+      <a class="cbtn" href="/dashboard/people?embed=1&tab=dups"><i class="ti ti-arrows-join"></i> Συγχώνευση διπλών</a>
       <button class="cbtn danger" onclick="delProfile({{ u.id }}, '{{ u.name|replace("'","") }}')"><i class="ti ti-trash"></i> Οριστική διαγραφή</button>
     {% else %}
       <div style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:6px;"><i class="ti ti-shield-lock"></i> Προστατευμένο — αλλαγές μόνο χειροκίνητα από τη Διαχείριση.</div>
