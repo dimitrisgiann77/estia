@@ -18,7 +18,7 @@
   table.grid th,table.grid td{border:1px solid var(--bd,#e2e8f0);padding:4px 6px;text-align:center;}
   table.grid th.name,table.grid td.name{text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);min-width:160px;}
   table.grid th{background:var(--soft,#f1f5f9);font-weight:600;} table.grid th.sun,table.grid td.sun{background:#fff4f4;}
-  .cell{min-width:78px;height:34px;cursor:pointer;border-radius:6px;font-size:11px;line-height:1.2;}
+  .cell{min-width:78px;min-height:34px;cursor:pointer;border-radius:6px;font-size:11px;line-height:1.25;white-space:pre-line;}
   .cell.empty{color:#cbd5e1;} .cell .hh{font-size:9px;opacity:.7;display:block;} .cell .x{font-size:8px;color:#e11d48;font-weight:700;}
   .cell[data-edit="1"]{user-select:none;} .cell.sel{outline:2px solid #185FA5;outline-offset:-1px;}
   .tot{font-weight:700;} td.warn{color:#dc2626;}
@@ -119,7 +119,7 @@
 
 <div class="editor" id="editor">
   <h5 id="ed-title">Βάρδια</h5><div class="codes" id="ed-codes"></div>
-  <div class="times" id="ed-times" style="display:none;"><input type="time" id="ed-start" value="07:00"> – <input type="time" id="ed-end" value="15:30"></div>
+  <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον βάρδια</button></div>
   <div class="ed-actions"><button class="btn" onclick="clearCell()"><i class="ti ti-trash"></i> Καθάρισε</button><button class="btn pri" onclick="saveCell()">Αποθήκευση</button></div>
 </div>
 
@@ -156,21 +156,50 @@ document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
   el.addEventListener('mouseenter',function(){if(selecting&&selList&&selList.indexOf(el)>=0)markRange(selList,anchorIdx,selList.indexOf(el));});
 });
 window.addEventListener('mouseup',function(){if(!selecting)return;selecting=false;if(curSel.length)openEd();});
+var segState=[];
+function mkTime(val,cb){
+  var v=(val||'00:00').split(':');
+  var wrap=document.createElement('span'); wrap.style.whiteSpace='nowrap';
+  var hs=document.createElement('select');
+  for(var h=0;h<24;h++){var o=document.createElement('option');var hh=('0'+h).slice(-2);o.value=hh;o.text=hh;hs.appendChild(o);}
+  var ms=document.createElement('select');
+  for(var m=0;m<60;m+=5){var o2=document.createElement('option');var mm=('0'+m).slice(-2);o2.value=mm;o2.text=mm;ms.appendChild(o2);}
+  var H=('0'+parseInt(v[0]||'0')).slice(-2), M=('0'+parseInt(v[1]||'0')).slice(-2);
+  if(!Array.prototype.some.call(ms.options,function(o){return o.value===M;})){var ox=document.createElement('option');ox.value=M;ox.text=M;ms.appendChild(ox);}
+  hs.value=H; ms.value=M;
+  function upd(){cb(hs.value+':'+ms.value);} hs.onchange=upd; ms.onchange=upd;
+  hs.style.padding='4px';ms.style.padding='4px';
+  wrap.appendChild(hs);var c=document.createElement('span');c.textContent=':';c.style.margin='0 2px';wrap.appendChild(c);wrap.appendChild(ms);
+  return wrap;
+}
+function renderSegs(){
+  var w=document.getElementById('ed-segs'); w.innerHTML='';
+  segState.forEach(function(sg,idx){
+    var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:4px;margin:4px 0;';
+    row.appendChild(mkTime(sg.start,function(v){segState[idx].start=v;}));
+    var d=document.createElement('span');d.textContent='–';d.style.margin='0 2px';row.appendChild(d);
+    row.appendChild(mkTime(sg.end,function(v){segState[idx].end=v;}));
+    if(segState.length>1){var x=document.createElement('button');x.type='button';x.textContent='×';x.style.cssText='border:none;background:#fee2e2;color:#b91c1c;border-radius:6px;cursor:pointer;padding:2px 7px;';x.onclick=function(){segState.splice(idx,1);renderSegs();};row.appendChild(x);}
+    w.appendChild(row);
+  });
+}
+function addSeg(){var last=segState[segState.length-1];segState.push({start:(last?last.end:'07:00'),end:'17:00'});renderSegs();}
 function openEd(){
   var codes=document.getElementById('ed-codes');codes.innerHTML='';
   SHIFTS.forEach(function(s){var b=document.createElement('button');b.textContent=s.code;b.style.background=s.color;b.onclick=function(){pick(s.code);};codes.appendChild(b);});
   var last=curSel[curSel.length-1];
+  var ex=[];try{ex=JSON.parse(last.getAttribute('data-segs')||'[]');}catch(e){}
+  segState = ex.length?ex.map(function(s){return {start:s.start,end:s.end};}):[{start:'07:00',end:'15:30'}];
   pick(last.getAttribute('data-code')||'ΕΡΓ',true);
-  var segs=[];try{segs=JSON.parse(last.getAttribute('data-segs')||'[]');}catch(e){}
-  if(segs.length){document.getElementById('ed-start').value=segs[0].start;document.getElementById('ed-end').value=segs[0].end;}
+  renderSegs();
   var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
-  ed.style.display='block';ed.style.left=Math.min(rc.left,window.innerWidth-260)+'px';ed.style.top=(rc.bottom+6)+'px';
+  ed.style.display='block';ed.style.left=Math.min(rc.left+(window.scrollX||0),window.innerWidth-260)+'px';ed.style.top=(rc.bottom+(window.scrollY||0)+6)+'px';
 }
-function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-times').style.display=(code==='ΕΡΓ')?'flex':'none';if(!silent&&code!=='ΕΡΓ')saveCell();}
-function segsNow(){return pickedCode==='ΕΡΓ'?[{start:document.getElementById('ed-start').value,end:document.getElementById('ed-end').value}]:[];}
-function apply(code){ if(!curSel.length)return; var uid=curSel[0].getAttribute('data-uid');
+function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ')?'block':'none';if(!silent&&code!=='ΕΡΓ')saveCell();}
+function segsNow(){if(pickedCode!=='ΕΡΓ')return [];return segState.filter(function(s){return s.start&&s.end;});}
+function apply(code){if(!curSel.length)return;var uid=curSel[0].getAttribute('data-uid');
   var dates=curSel.map(function(c){return c.getAttribute('data-date');});
-  var url,body; if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segsNow()};}
+  var url,body;if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segsNow()};}
   else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segsNow()};}
   fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j)location.reload();});
 }

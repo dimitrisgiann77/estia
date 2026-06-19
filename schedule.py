@@ -252,6 +252,23 @@ def worked_hours(a):
     p = assignment_hours(a)
     return round(max(0.0, p - shift_break(p)), 4)
 
+# v12.119 — Επιτρεπτοί κωδικοί καταχώρησης (ρυθμιζόμενο από Πρόγραμμα·Ρυθμίσεις).
+def _entry_codes_setting():
+    row = Setting.query.get('sched_entry_codes')
+    if row and row.value:
+        try:
+            vals = [c for c in json.loads(row.value) if c]
+            return vals or None
+        except Exception:
+            pass
+    return None  # None = όλοι οι ενεργοί κωδικοί
+def entry_shift_types():
+    sts = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
+    allow = _entry_codes_setting()
+    if allow is not None:
+        sts = [s for s in sts if s.code in allow]
+    return sts
+
 def parse_cell(v):
     """Κελί Excel -> (shift_code, segments[list], work_hotel_tag).
     Πιστή μεταφορά λογικής ENGINE_v2: τμήματα ΕΡΓ, κωδικοί, cross-hotel tag."""
@@ -687,7 +704,7 @@ def week_grid(hotel_id, dept_id, week_start):
                     segs = []
                 label = a.shift_code
                 if segs:
-                    label = ' & '.join(f"{s['start']} - {s['end']}" for s in segs)
+                    label = '\n'.join(f"{s['start']} - {s['end']}" for s in segs)
                 cells.append({'date': d.isoformat(), 'code': a.shift_code, 'segs': segs,
                               'label': label, 'hours': round(hrs, 1),
                               'elsewhere': bool(a.work_hotel_id and a.work_hotel_id != hotel_id),
@@ -776,7 +793,7 @@ def schedule_board():
     blocks = [_build_block(hotel_id, dept_list, week_start + timedelta(days=7 * i), user) for i in range(weeks)]
     shift_types = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
     shift_lookup = {st.code: st for st in shift_types}
-    shift_types_json = json.dumps([{'code': st.code, 'color': st.color} for st in shift_types], ensure_ascii=False)
+    shift_types_json = json.dumps([{'code': st.code, 'color': st.color} for st in entry_shift_types()], ensure_ascii=False)
     cur_hotel = Hotel.query.get(hotel_id) if hotel_id else None
     return render_template('schedule_board.html',
         shift_lookup=shift_lookup, shift_types_json=shift_types_json,
@@ -1195,7 +1212,7 @@ def schedule_monthly():
         months=MONTHS_EL, day_hdr=day_hdr, ndays=data['ndays'],
         can_edit=(can_edit_schedule() and is_admin()),
         shift_types=shift_types,
-        shift_types_json=json.dumps([{'code': s.code, 'color': s.color} for s in shift_types], ensure_ascii=False),
+        shift_types_json=json.dumps([{'code': s.code, 'color': s.color} for s in entry_shift_types()], ensure_ascii=False),
         years=list(range(date.today().year - 2, date.today().year + 2)),
         is_admin=is_admin())
 
@@ -1862,9 +1879,18 @@ def schedule_settings():
             s = ShiftType.query.get(request.form.get('id', type=int))
             if s:
                 s.active = not s.active; db.session.commit()
+        elif act == 'entry_codes':
+            codes = request.form.getlist('entry_code')
+            row = Setting.query.get('sched_entry_codes')
+            if not row:
+                row = Setting(key='sched_entry_codes'); db.session.add(row)
+            row.value = json.dumps(codes, ensure_ascii=False)
+            db.session.commit()
         return redirect('/dashboard/schedule/settings?embed=1&ok=1')
+    _allow = _entry_codes_setting()
     return render_template('schedule_settings.html',
         policy=get_policy(), shift_types=ShiftType.query.order_by(ShiftType.sort).all(),
+        entry_codes=_allow, entry_all=(_allow is None),
         depts=Department.query.order_by(Department.sort).all(),
         holidays=Holiday.query.order_by(Holiday.hol_date).all(),
         rules=ScheduleRule.query.all(), dow_el=DOW_EL)
