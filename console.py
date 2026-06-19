@@ -56,6 +56,50 @@ def _people_rows():
     return out
 
 
+def _pending_items():
+    try:
+        from schedule import PendingShift, _suggest_masters, _pending_pii_map, _locked_uids
+    except Exception:
+        return []
+    groups = {}
+    for ps in PendingShift.query.order_by(PendingShift.work_date).all():
+        g = groups.get(ps.norm_name)
+        if not g:
+            g = {'norm': ps.norm_name, 'raw': ps.raw_name, 'count': 0,
+                 'hotel_tag': ps.hotel_tag, 'dept': ps.dept_raw, 'employer': ps.employer,
+                 'dmin': ps.work_date, 'dmax': ps.work_date}
+            groups[ps.norm_name] = g
+        g['count'] += 1
+        if ps.work_date:
+            if not g['dmin'] or ps.work_date < g['dmin']: g['dmin'] = ps.work_date
+            if not g['dmax'] or ps.work_date > g['dmax']: g['dmax'] = ps.work_date
+    piimap = _pending_pii_map(); locked = _locked_uids()
+    items = []
+    for g in groups.values():
+        sugg = []
+        for u, sc in _suggest_masters(g['raw'] or g['norm'], limit=5):
+            pp = piimap.get(u.id)
+            sugg.append({'id': u.id, 'name': u.full_name,
+                         'emp_code': (pp.emp_code if pp else None),
+                         'afm': (pp.afm if pp else None),
+                         'locked': u.id in locked, 'score': sc})
+        g['suggestions'] = sugg
+        items.append(g)
+    items.sort(key=lambda x: (-x['count'], x['raw'] or ''))
+    return items
+
+def _dup_rows():
+    try:
+        from payroll import _dup_pairs, _net_summary
+        out = []
+        for a, pa, b, pb, reason in _dup_pairs():
+            out.append({'a': a, 'b': b, 'reason': reason,
+                        'a_sum': _net_summary(a.id), 'b_sum': _net_summary(b.id)})
+        return out
+    except Exception:
+        return []
+
+
 @app.route('/dashboard/people')
 def people_console():
     if not is_admin():
@@ -77,8 +121,11 @@ def people_console():
         dups = len(_dup_pairs())
     except Exception:
         dups = 0
+    pending_items = _pending_items()
+    dup_rows = _dup_rows()
     return render_template('people_console.html', rows=rows, counts=counts,
-                           pend=pend, dups=dups, is_admin=is_admin())
+                           pend=pend, dups=dups, pending_items=pending_items,
+                           dup_rows=dup_rows, is_admin=is_admin())
 
 
 @app.route('/dashboard/people/card/<int:uid>')

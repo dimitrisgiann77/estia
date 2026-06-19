@@ -1965,6 +1965,9 @@ def payroll_merge(uid):
     PPL.log_event(other.id,'merge','Συγχωνεύτηκε στο «%s» (#%d) - αρχειοθετήθηκε' % (keep.full_name or keep.username, keep.id))
     db.session.commit()
     log_activity('payroll_merge', '%s -> %s (βάρδιες %d)' % (other.id, keep.id, moved_sh))
+    back = request.form.get('back')
+    if back:
+        return redirect(back + ('&embed=1' if '?' in back else '?embed=1'))
     return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
 
 
@@ -2037,6 +2040,13 @@ def payroll_scan():
 # ── v12.77 — Πιθανές διπλοεγγραφές (κεντρικά) + dismiss + μήνες ───────────────
 _MONTH_GR = ['', 'Ιαν', 'Φεβ', 'Μαρ', 'Απρ', 'Μάι', 'Ιουν', 'Ιουλ', 'Αυγ', 'Σεπ', 'Οκτ', 'Νοε', 'Δεκ']
 
+def _name_tokens(name):
+    """v12.126 — tokens ονόματος (κρατά λέξεις ΚΑΙ ελληνικά, χωρίς τόνους)."""
+    import unicodedata, re as _re
+    s = unicodedata.normalize('NFD', name or '')
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn').lower()
+    return {t for t in _re.split(r'[^a-zα-ω0-9]+', s) if len(t) >= 3}
+
 def _dup_pairs():
     """Ζεύγη πιθανών διπλών: ίδιο επώνυμο (ή ίδιο ΑΦΜ), ενεργά, μη-απορριφθέντα."""
     import people as PPL
@@ -2066,23 +2076,32 @@ def _dup_pairs():
         for i in range(len(lst)):
             for j in range(i+1, len(lst)):
                 add(lst[i][0], lst[i][1], lst[j][0], lst[j][1], 'Ίδιο επώνυμο')
-    # v12.110 — και ονοματικα διπλα σε ΟΛΟΥΣ τους ενεργους (πιανει schedule-imported χωρις PII)
+    # v12.126 — ονοματικα διπλα: κοινα tokens (επιθετο ΚΑΙ ονομα, ανεξαρτητως σειρας)
     try:
-        import schedule as _S
-        by_sur = defaultdict(list)
+        tokmap = defaultdict(list); utok = {}
         for u in User.query.filter(User.is_active == True).all():
             if getattr(u, 'employment_active', True) is False:
                 continue
-            sur, _f = _S._name_parts(u.full_name or '')
-            if sur:
-                by_sur[sur].append(u)
-        for sur, lst in by_sur.items():
-            if len(lst) < 2:
+            toks = _name_tokens(u.full_name)
+            if not toks:
                 continue
-            for i in range(len(lst)):
-                for j in range(i+1, len(lst)):
-                    if _S._names_likely_same(lst[i].full_name or '', lst[j].full_name or ''):
-                        add(lst[i], None, lst[j], None, 'Παρόμοιο όνομα')
+            utok[u.id] = (u, toks)
+            for t in toks:
+                tokmap[t].append(u.id)
+        checked = set()
+        for t, ids in tokmap.items():
+            if len(ids) < 2:
+                continue
+            for i in range(len(ids)):
+                for j in range(i+1, len(ids)):
+                    a_id, b_id = ids[i], ids[j]
+                    key = (min(a_id, b_id), max(a_id, b_id))
+                    if key in checked:
+                        continue
+                    checked.add(key)
+                    ua, ta = utok[a_id]; ub, tb = utok[b_id]
+                    if len(ta & tb) >= 2:
+                        add(ua, None, ub, None, 'Παρόμοιο όνομα')
     except Exception:
         pass
     return pairs

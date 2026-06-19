@@ -8,7 +8,7 @@
 html[data-theme="dark"] .srch{background:#16202c;border-color:#33475b;}
 .srch input{border:none;outline:none;background:transparent;font:inherit;font-size:15px;width:100%;color:inherit;}
 .tabs{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;}
-.tab{font-size:13px;padding:6px 12px;border-radius:9px;border:1px solid #dbe3ea;background:#fff;color:#475569;cursor:pointer;text-decoration:none;display:inline-block;}
+.tab{font-size:13px;padding:6px 12px;border-radius:9px;border:1px solid #dbe3ea;background:#fff;color:#475569;cursor:pointer;display:inline-block;}
 html[data-theme="dark"] .tab{background:#16202c;color:#cbd5e1;border-color:#33475b;}
 .tab.on{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
 .tab .n{opacity:.7;}
@@ -29,26 +29,34 @@ html[data-theme="dark"] .panel{background:#16202c;border-color:#33475b;}
 .panel .k{color:#64748b;padding:3px 0;} .panel .v{text-align:right;font-weight:600;padding:3px 0;}
 .cbtn{display:flex;align-items:center;gap:7px;justify-content:center;border:1px solid #cdd9e5;background:#fff;color:#185FA5;border-radius:9px;padding:8px 10px;cursor:pointer;font:inherit;font-size:13px;text-decoration:none;}
 html[data-theme="dark"] .cbtn{background:#16202c;color:#7fb2e6;border-color:#33475b;}
-.cbtn.danger{color:#b91c1c;border-color:#f0c4c4;}
+.cbtn.danger{color:#b91c1c;border-color:#f0c4c4;} .cbtn.g{background:#16a34a;color:#fff;border-color:transparent;}
 .empty{padding:30px;text-align:center;color:#94a3b8;}
 .hint{font-size:12px;color:#94a3b8;margin-top:8px;}
+.pcard{background:#fff;border:1px solid #e6ecf2;border-radius:12px;padding:14px;margin-bottom:12px;}
+html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
+.sg{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid #eef2f6;border-radius:10px;margin:5px 0;flex-wrap:wrap;}
+.sg .nm{font-weight:600;} .sc{margin-left:auto;font-size:11px;color:#94a3b8;}
+.meta{font-size:12px;color:#64748b;}
+.srin{width:100%;padding:8px 10px;border:1px solid #dbe3ea;border-radius:9px;font:inherit;margin-top:4px;}
+.dcol{flex:1;min-width:160px;border:1px solid #eef2f6;border-radius:10px;padding:9px;}
 </style></head><body>
 {{ mp.topbar('users-group', 'ΕΣΤΙΑ — Διαχείριση προσωπικού', 'Όλα τα προφίλ σε ένα μέρος — αναζήτηση, φίλτρα, ενέργειες') }}
 <div class="container">
-  <div class="srch">
+  <div class="srch" id="searchbox">
     <i class="ti ti-search" style="font-size:18px;color:#94a3b8;"></i>
     <input id="q" placeholder="Αναζήτηση: όνομα, ΑΦΜ, κωδικός, username…" autofocus oninput="applyFilter()">
   </div>
 
   <div class="tabs">
-    <span class="tab on" data-cat="all" onclick="setTab(this)">Όλοι <span class="n">{{ counts.all }}</span></span>
-    <span class="tab" data-cat="locked" onclick="setTab(this)">🔒 Λογιστήριο <span class="n">{{ counts.locked }}</span></span>
-    <span class="tab" data-cat="staff" onclick="setTab(this)">Management <span class="n">{{ counts.staff }}</span></span>
-    <span class="tab" data-cat="login" onclick="setTab(this)">Λογαριασμοί <span class="n">{{ counts.login }}</span></span>
-    <a class="tab" href="/dashboard/schedule/identify?embed=1">Ασύνδετα <span class="n">{{ pend }}</span></a>
-    <a class="tab" href="/dashboard/payroll/duplicates?embed=1">Διπλά <span class="n">{{ dups }}</span></a>
+    <span class="tab on" data-sec="people" data-cat="all" onclick="setTab(this)">Όλοι <span class="n">{{ counts.all }}</span></span>
+    <span class="tab" data-sec="people" data-cat="locked" onclick="setTab(this)">🔒 Λογιστήριο <span class="n">{{ counts.locked }}</span></span>
+    <span class="tab" data-sec="people" data-cat="staff" onclick="setTab(this)">Management <span class="n">{{ counts.staff }}</span></span>
+    <span class="tab" data-sec="people" data-cat="login" onclick="setTab(this)">Λογαριασμοί <span class="n">{{ counts.login }}</span></span>
+    <span class="tab" data-sec="pending" onclick="setTab(this)">Ασύνδετα <span class="n">{{ pend }}</span></span>
+    <span class="tab" data-sec="dups" onclick="setTab(this)">Διπλά <span class="n">{{ dup_rows|length }}</span></span>
   </div>
 
+  <div id="sec-people">
   <div class="wrap">
     <div class="left">
       <div class="plist" id="plist">
@@ -61,52 +69,113 @@ html[data-theme="dark"] .cbtn{background:#16202c;color:#7fb2e6;border-color:#334
             <div class="pname">{{ r.name }}{% if not r.active %} <span class="cbadge off">ανενεργός</span>{% endif %}</div>
             <div class="psub">{% if r.code %}{{ r.code }} · {% endif %}{% if r.afm %}ΑΦΜ {{ r.afm }} · {% endif %}{{ r.hotel or '—' }}{% if r.dept %} · {{ r.dept }}{% endif %} · {{ r.shifts }} βάρδιες</div>
           </div>
-          {% if r.origin=='locked' %}<span class="cbadge lock">🔒</span>
-          {% elif r.login %}<span class="cbadge login">login</span>
-          {% else %}<span class="cbadge mgmt">Mgmt</span>{% endif %}
+          {% if r.origin=='locked' %}<span class="cbadge lock">🔒</span>{% elif r.login %}<span class="cbadge login">login</span>{% else %}<span class="cbadge mgmt">Mgmt</span>{% endif %}
         </div>
         {% endfor %}
       </div>
       <div class="empty" id="empty" style="display:none;">Κανένα αποτέλεσμα.</div>
       <div class="hint">Κλικ σε άτομο → λεπτομέρειες & ενέργειες δεξιά. Τα 🔒 Λογιστηρίου είναι προστατευμένα.</div>
     </div>
-    <div class="right">
-      <div class="panel" id="panel">
-        <div class="empty"><i class="ti ti-user-search" style="font-size:30px;display:block;margin-bottom:8px;"></i>Διάλεξε άτομο από τη λίστα.</div>
+    <div class="right"><div class="panel" id="panel"><div class="empty"><i class="ti ti-user-search" style="font-size:30px;display:block;margin-bottom:8px;"></i>Διάλεξε άτομο από τη λίστα.</div></div></div>
+  </div>
+  </div>
+
+  <div id="sec-pending" style="display:none;">
+    {% if pending_items %}
+    <div class="pcard" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <div style="flex:1;min-width:200px;font-size:13px;color:#475569;"><b>Γρήγορες κινήσεις:</b> κλείδωσε τα κλειδωμένα στο όνομά τους, μετά επιβεβαίωσε όσα ταιριάζουν 100%.</div>
+      <form method="POST" action="/dashboard/schedule/identify/seed_locked" style="margin:0;" onsubmit="return confirm('Ταυτοποίηση κλειδωμένων (όχι merge);');"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn" type="submit"><i class="ti ti-lock-check"></i> Ταυτοποίηση κλειδωμένων</button></form>
+      <form method="POST" action="/dashboard/schedule/identify/auto" style="margin:0;" onsubmit="return confirm('Σύνδεση όσων ταιριάζουν ΑΚΡΙΒΩΣ (100%);');"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn g" type="submit"><i class="ti ti-checks"></i> Επιβεβαίωση ακριβών</button></form>
+    </div>
+    {% for it in pending_items %}
+    <div class="pcard">
+      <div class="pname">{{ it.raw or it.norm }}</div>
+      <div style="margin:6px 0;">
+        <span class="cbadge mgmt">📅 {{ it.count }} βάρδιες</span>
+        {% if it.dmin %}<span class="cbadge mgmt">{{ it.dmin.strftime('%d/%m/%y') }}–{{ it.dmax.strftime('%d/%m/%y') }}</span>{% endif %}
+        {% if it.hotel_tag %}<span class="cbadge mgmt">🏨 {{ it.hotel_tag }}</span>{% endif %}
+        {% if it.dept %}<span class="cbadge mgmt">{{ it.dept }}</span>{% endif %}
+      </div>
+      {% if it.suggestions %}
+      <div class="meta">Προτεινόμενα προφίλ:</div>
+      {% for s in it.suggestions %}
+      <div class="sg">
+        {% if s.locked %}<span class="cbadge lock">🔒 Λογιστήριο</span>{% else %}<span class="cbadge mgmt">Management</span>{% endif %}
+        <span class="nm">{{ s.name }}</span>
+        <span class="meta">{% if s.emp_code %}Κωδ: <b>{{ s.emp_code }}</b>{% endif %}{% if s.afm %} · ΑΦΜ <b>{{ s.afm }}</b>{% endif %}{% if not s.emp_code and not s.afm %}<i>χωρίς κλειδιά</i>{% endif %}</span>
+        <span class="sc">{{ s.score }}%</span>
+        <form method="POST" action="/dashboard/schedule/identify/link" style="margin:0;"><input type="hidden" name="norm_name" value="{{ it.norm }}"><input type="hidden" name="master_id" value="{{ s.id }}"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button></form>
+      </div>
+      {% endfor %}
+      {% endif %}
+      <details style="margin-top:6px;"><summary style="cursor:pointer;color:var(--accent,#185FA5);font-size:13px;">Χειροκίνητη αναζήτηση (όνομα/ΑΦΜ/κωδικός)</summary>
+        <input class="srin" type="text" placeholder="Πληκτρολόγησε…" oninput="schSearch(this,'{{ it.norm }}')"><div class="srres"></div>
+      </details>
+      <div style="margin-top:8px;border-top:1px dashed #e6ecf2;padding-top:8px;">
+        <form method="POST" action="/dashboard/schedule/identify/dismiss" style="margin:0;display:inline;" onsubmit="return confirm('Διαγραφή όλων των βαρδιών αυτού του ονόματος από τον προθάλαμο;');"><input type="hidden" name="norm_name" value="{{ it.norm }}"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn danger" type="submit"><i class="ti ti-trash"></i> Αγνόησε / σκουπίδι</button></form>
       </div>
     </div>
+    {% endfor %}
+    {% else %}<div class="empty"><i class="ti ti-checks" style="font-size:30px;color:#16a34a;display:block;margin-bottom:8px;"></i>Κανένα όνομα σε αναμονή. 🎉</div>{% endif %}
+  </div>
+
+  <div id="sec-dups" style="display:none;">
+    {% if dup_rows %}
+    {% for d in dup_rows %}
+    <div class="pcard">
+      <div style="margin-bottom:8px;"><span class="cbadge muted">{{ d.reason }}</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="dcol"><div class="pname">{{ d.a.full_name or d.a.username }}</div><div class="meta">Κωδ: {{ d.a_sum.code }} · ΑΦΜ {{ d.a_sum.afm }} · αναθ. {{ d.a_sum.assignments }}</div></div>
+        <div class="dcol"><div class="pname">{{ d.b.full_name or d.b.username }}</div><div class="meta">Κωδ: {{ d.b_sum.code }} · ΑΦΜ {{ d.b_sum.afm }} · αναθ. {{ d.b_sum.assignments }}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <form method="POST" action="/dashboard/payroll/employee/{{ d.a.id }}/merge" style="margin:0;" onsubmit="return confirm('Κράτα «{{ d.a.full_name }}» και ένωσε το άλλο μέσα του;');"><input type="hidden" name="other_id" value="{{ d.b.id }}"><input type="hidden" name="back" value="/dashboard/people?tab=dups"><button class="cbtn g" type="submit"><i class="ti ti-arrows-join"></i> Κράτα: {{ d.a.full_name or d.a.username }}</button></form>
+        <form method="POST" action="/dashboard/payroll/employee/{{ d.b.id }}/merge" style="margin:0;" onsubmit="return confirm('Κράτα «{{ d.b.full_name }}» και ένωσε το άλλο μέσα του;');"><input type="hidden" name="other_id" value="{{ d.a.id }}"><input type="hidden" name="back" value="/dashboard/people?tab=dups"><button class="cbtn g" type="submit"><i class="ti ti-arrows-join"></i> Κράτα: {{ d.b.full_name or d.b.username }}</button></form>
+        <form method="POST" action="/dashboard/payroll/dup/dismiss" style="margin:0;"><input type="hidden" name="a_id" value="{{ d.a.id }}"><input type="hidden" name="b_id" value="{{ d.b.id }}"><input type="hidden" name="back" value="/dashboard/people?tab=dups"><button class="cbtn" type="submit"><i class="ti ti-x"></i> Δεν είναι διπλό</button></form>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}<div class="empty"><i class="ti ti-checks" style="font-size:30px;color:#16a34a;display:block;margin-bottom:8px;"></i>Καμία πιθανή διπλοεγγραφή. 🎉</div>{% endif %}
   </div>
 </div>
 <script>
-var curTab='all', curId=null;
-function setTab(el){curTab=el.getAttribute('data-cat');document.querySelectorAll('.tab').forEach(function(t){if(t.tagName==='SPAN')t.classList.remove('on');});el.classList.add('on');applyFilter();}
+var curTab='all';
+function setTab(el){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  el.classList.add('on');
+  var sec=el.getAttribute('data-sec');
+  document.getElementById('sec-people').style.display=(sec==='people')?'':'none';
+  document.getElementById('sec-pending').style.display=(sec==='pending')?'':'none';
+  document.getElementById('sec-dups').style.display=(sec==='dups')?'':'none';
+  document.getElementById('searchbox').style.display=(sec==='people')?'':'none';
+  if(sec==='people'){curTab=el.getAttribute('data-cat');applyFilter();}
+}
 function applyFilter(){
-  var q=(document.getElementById('q').value||'').toLowerCase().trim();
-  var shown=0;
+  var q=(document.getElementById('q').value||'').toLowerCase().trim();var shown=0;
   document.querySelectorAll('.prow').forEach(function(r){
-    var okTab = curTab==='all' || (curTab==='login' ? r.getAttribute('data-login')==='1' : r.getAttribute('data-cat')===curTab);
-    var okQ = !q || r.getAttribute('data-hay').indexOf(q)>=0;
-    var vis = okTab && okQ; r.style.display=vis?'':'none'; if(vis)shown++;
+    var okTab=curTab==='all'||(curTab==='login'?r.getAttribute('data-login')==='1':r.getAttribute('data-cat')===curTab);
+    var okQ=!q||r.getAttribute('data-hay').indexOf(q)>=0;var vis=okTab&&okQ;r.style.display=vis?'':'none';if(vis)shown++;
   });
   document.getElementById('empty').style.display=shown?'none':'block';
 }
 function openCard(row,id){
-  curId=id;
-  document.querySelectorAll('.prow').forEach(function(r){r.classList.remove('sel');});
-  row.classList.add('sel');
-  var p=document.getElementById('panel'); p.innerHTML='<div class="empty">Φόρτωση…</div>';
+  document.querySelectorAll('.prow').forEach(function(r){r.classList.remove('sel');});row.classList.add('sel');
+  var p=document.getElementById('panel');p.innerHTML='<div class="empty">Φόρτωση…</div>';
   fetch('/dashboard/people/card/'+id).then(function(r){return r.text();}).then(function(h){p.innerHTML=h;});
 }
-function toggleLogin(id){
-  fetch('/dashboard/people/login/'+id,{method:'POST'}).then(function(r){return r.json();}).then(function(j){
-    if(!j.ok){alert(j.msg||'Δεν έγινε.');return;} location.reload();
+function toggleLogin(id){fetch('/dashboard/people/login/'+id,{method:'POST'}).then(function(r){return r.json();}).then(function(j){if(!j.ok){alert(j.msg||'Δεν έγινε.');return;}location.reload();});}
+function delProfile(id,name){if(!confirm('Οριστική διαγραφή «'+name+'»; Δεν αναιρείται.'))return;fetch('/dashboard/people/delete/'+id,{method:'POST'}).then(function(r){return r.json();}).then(function(j){if(!j.ok){alert(j.msg||'Δεν διαγράφηκε.');return;}location.reload();});}
+function schSearch(inp,norm){
+  var box=inp.parentNode.querySelector('.srres');var q=inp.value.trim();if(q.length<2){box.innerHTML='';return;}
+  fetch('/dashboard/schedule/identify/search?q='+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(rows){
+    if(!rows.length){box.innerHTML='<div class="meta" style="padding:6px;">Καμία αντιστοιχία.</div>';return;}
+    var h='';rows.forEach(function(s){
+      h+='<div class="sg">'+(s.locked?'<span class="cbadge lock">🔒 Λογιστήριο</span>':'<span class="cbadge mgmt">Management</span>')+
+      '<span class="nm">'+(s.name||'')+'</span><span class="meta">'+(s.emp_code?('Κωδ '+s.emp_code):'')+(s.afm?(' · ΑΦΜ '+s.afm):'')+'</span>'+
+      '<form method="POST" action="/dashboard/schedule/identify/link" style="margin:0 0 0 auto;"><input type="hidden" name="norm_name" value="'+norm+'"><input type="hidden" name="master_id" value="'+s.id+'"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button></form></div>';
+    });box.innerHTML=h;
   });
 }
-function delProfile(id,name){
-  if(!confirm('Οριστική διαγραφή «'+name+'»; Δεν αναιρείται.'))return;
-  fetch('/dashboard/people/delete/'+id,{method:'POST'}).then(function(r){return r.json();}).then(function(j){
-    if(!j.ok){alert(j.msg||'Δεν διαγράφηκε.');return;} location.reload();
-  });
-}
+(function(){var t=new URLSearchParams(location.search).get('tab');if(t){var el=document.querySelector('.tab[data-sec="'+t+'"]');if(el)setTab(el);}})();
 </script>
 </body></html>

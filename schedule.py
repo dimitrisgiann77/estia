@@ -1582,7 +1582,8 @@ def schedule_identify_link():
         moved = _confirm_link(nm, mid, created_by=session.get('user_id'))
         u = User.query.get(mid)
         log_activity('schedule_identify_link', '%s -> %s (%d βάρδιες)' % (nm, (u.full_name if u else mid), moved))
-    return redirect(url_for('schedule_identify'))
+    _bk = request.form.get('back')
+    return redirect((_bk + ('&embed=1' if '?' in _bk else '?embed=1')) if _bk else url_for('schedule_identify'))
 
 @app.route('/dashboard/schedule/identify/dismiss', methods=['POST'])
 def schedule_identify_dismiss():
@@ -1593,7 +1594,8 @@ def schedule_identify_dismiss():
         n = PendingShift.query.filter_by(norm_name=nm).delete()
         db.session.commit()
         log_activity('schedule_identify_dismiss', '%s (%s)' % (nm, n))
-    return redirect(url_for('schedule_identify'))
+    _bk = request.form.get('back')
+    return redirect((_bk + ('&embed=1' if '?' in _bk else '?embed=1')) if _bk else url_for('schedule_identify'))
 
 @app.route('/dashboard/schedule/identify/search')
 def schedule_identify_search():
@@ -1655,7 +1657,8 @@ def schedule_identify_seed_locked():
     n, skipped = _seed_locked_links(created_by=session.get('user_id'))
     log_activity('schedule_identify_seed_locked', '%d links, %d ασαφη' % (n, skipped))
     # μετα το seed, τρεξε και αυτοματη ταυτοποιηση ακριβων για οσα ηδη ειναι στον προθαλαμο
-    return redirect(url_for('schedule_identify'))
+    _bk = request.form.get('back')
+    return redirect((_bk + ('&embed=1' if '?' in _bk else '?embed=1')) if _bk else url_for('schedule_identify'))
 
 @app.route('/dashboard/schedule/identify/auto', methods=['POST'])
 def schedule_identify_auto():
@@ -1678,7 +1681,8 @@ def schedule_identify_auto():
             _confirm_link(nm, target.id, created_by=session.get('user_id'))
             linked += 1
     log_activity('schedule_identify_auto', '%d ακριβη ταιριασματα' % linked)
-    return redirect(url_for('schedule_identify'))
+    _bk = request.form.get('back')
+    return redirect((_bk + ('&embed=1' if '?' in _bk else '?embed=1')) if _bk else url_for('schedule_identify'))
 
 
 @app.route('/dashboard/schedule/identify/clear_all', methods=['POST'])
