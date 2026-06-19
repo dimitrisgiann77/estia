@@ -734,6 +734,14 @@ def week_grid(hotel_id, dept_id, week_start):
             amap.setdefault((a.user_id, a.work_date.isoformat()), []).append(a)
     _colors = {st.code: st.color for st in ShiftType.query.all()}
     _hotels = {h.id: h.name for h in Hotel.query.all()}
+    _meta = {}
+    if uids:
+        try:
+            from payroll import EmployeePII as _PII
+            for _p in _PII.query.filter(_PII.user_id.in_(uids)).all():
+                _meta[_p.user_id] = {'emp_code': _p.emp_code, 'afm': _p.afm, 'locked': bool(_p.locked)}
+        except Exception:
+            _meta = {}
     rows = []
     for u in users:
         cells = []
@@ -781,7 +789,9 @@ def week_grid(hotel_id, dept_id, week_start):
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
                               'elsewhere': False, 'wh': None, 'note': '', 'n': 0, 'entries': []})
-        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days})
+        _m = _meta.get(u.id) or {}
+        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days,
+                     'emp_code': _m.get('emp_code'), 'afm': _m.get('afm'), 'locked': _m.get('locked', False)})
     return days, rows
 
 def validate_hotel_week(hotel_id, week_start):
@@ -2020,6 +2030,13 @@ def schedule_settings():
             s = ShiftType.query.get(request.form.get('id', type=int))
             if s:
                 s.active = not s.active; db.session.commit()
+        elif act == 'shift_colors':
+            import re as _re
+            for st in ShiftType.query.all():
+                _c = request.form.get('color_%d' % st.id)
+                if _c and _re.match(r'^#[0-9a-fA-F]{6}$', _c):
+                    st.color = _c
+            db.session.commit()
         elif act == 'entry_codes':
             for _key, _field in (('sched_entry_codes', 'entry_code'), ('sched_entry_codes_mgr', 'entry_code_mgr')):
                 codes = request.form.getlist(_field)

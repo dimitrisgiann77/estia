@@ -28,13 +28,18 @@
       <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="rule_toggle"><input type="hidden" name="id" value="{{ r.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργοποίηση' if r.active else 'Ενεργοποίηση' }}</button></form></td></tr>{% endfor %}
   </table></div>
 
-  <div class="card"><h3>Κωδικοί βαρδιών</h3><table>
+  <div class="card"><h3>Κωδικοί βαρδιών</h3>
+    <p style="font-size:13px;color:#64748b;margin:0 0 8px;">Διάλεξε χρώμα ανά κωδικό (φαίνεται στα τσιπ του προγράμματος, στη μηνιαία και στο υπόμνημα). Πάτα «Αποθήκευση χρωμάτων».</p>
+    <form method="POST" id="colorsform"><input type="hidden" name="action" value="shift_colors"></form>
+    <table>
     <tr><th>Κωδικός</th><th>Σημασία</th><th>Χρώμα</th><th>Εργάσιμη;</th><th>Ενεργός</th><th></th></tr>
     {% for s in shift_types %}<tr><td><b>{{ s.code }}</b></td><td>{{ s.label }}</td>
-      <td><span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }}">{{ s.color }}</span></td>
+      <td><span style="display:inline-flex;align-items:center;gap:7px;"><input form="colorsform" type="color" name="color_{{ s.id }}" value="{{ s.color }}" style="width:42px;height:28px;padding:1px;border:1px solid #dbe3ea;border-radius:6px;cursor:pointer;"><span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }}">{{ s.color }}</span></span></td>
       <td>{{ '✓' if s.counts_as_work else '—' }}</td><td>{{ '✓' if s.active else '—' }}</td>
       <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="shift_toggle"><input type="hidden" name="id" value="{{ s.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργ.' if s.active else 'Ενεργ.' }}</button></form></td></tr>{% endfor %}
-  </table></div>
+    </table>
+    <button class="b" type="submit" form="colorsform" style="margin-top:10px;"><i class="ti ti-palette"></i> Αποθήκευση χρωμάτων</button>
+  </div>
   <div class="card"><h3>Επιτρεπτοί κωδικοί στην καταχώρηση (ανά ρόλο)</h3>
     <p style="font-size:13px;color:#64748b;margin:0 0 10px;">Διάλεξε ποιοι κωδικοί εμφανίζονται στο παράθυρο δήλωσης βάρδιας (πρόγραμμα + μηνιαία), ξεχωριστά για Admin και για Managers. Αν δεν τσεκάρεις κανέναν σε μια στήλη, εμφανίζονται όλοι οι ενεργοί για εκείνον τον ρόλο.</p>
     <form method="POST" style="margin:0;"><input type="hidden" name="action" value="entry_codes">

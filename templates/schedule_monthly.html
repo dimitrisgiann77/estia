@@ -37,7 +37,9 @@ td.sel{outline:2px solid var(--accent,#185FA5);outline-offset:-2px;}
 .cell.empty{color:#cbd5e1;background:transparent;}
 td.edit{cursor:pointer;}
 .grand{margin-top:14px;padding:12px 16px;border-radius:12px;background:var(--accent,#185FA5);color:#fff;font-weight:600;display:flex;gap:18px;flex-wrap:wrap;}
-.editor{position:fixed;display:none;background:#fff;border:1px solid #cdd9e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:90;min-width:240px;max-width:300px;}
+.editor{position:fixed;display:none;background:#fff;border:1px solid #cdd9e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:90;min-width:240px;max-width:320px;max-height:calc(100vh - 20px);overflow:auto;}
+.editor h5{cursor:move;user-select:none;display:flex;align-items:center;gap:6px;border-bottom:1px solid #eef2f6;padding-bottom:6px;}
+.editor h5::before{content:"\2630";font-size:12px;opacity:.45;}
 html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
 .editor .codes{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0;}
 .editor .codes button{border:none;color:#fff;border-radius:7px;padding:5px 9px;cursor:pointer;font:inherit;font-size:12px;}
@@ -199,7 +201,7 @@ function mkTime(val,cb){
   var hs=document.createElement('select');
   for(var h=0;h<24;h++){var o=document.createElement('option');var hh=('0'+h).slice(-2);o.value=hh;o.text=hh;hs.appendChild(o);}
   var ms=document.createElement('select');
-  for(var m=0;m<60;m+=5){var o2=document.createElement('option');var mm=('0'+m).slice(-2);o2.value=mm;o2.text=mm;ms.appendChild(o2);}
+  [0,15,30,45].forEach(function(m){var o2=document.createElement('option');var mm=('0'+m).slice(-2);o2.value=mm;o2.text=mm;ms.appendChild(o2);});
   var H=('0'+parseInt(v[0]||'0')).slice(-2), M=('0'+parseInt(v[1]||'0')).slice(-2);
   if(!Array.prototype.some.call(ms.options,function(o){return o.value===M;})){var ox=document.createElement('option');ox.value=M;ox.text=M;ms.appendChild(ox);}
   hs.value=H; ms.value=M;
@@ -288,7 +290,10 @@ function openEd(){
     var _hs=document.getElementById('ed-hotel'); if(_hs){if(_hs.options.length)_hs.options[0].text='● '+(last.getAttribute('data-home')||'έδρα');_hs.value=(last.getAttribute('data-wh')||'');}
   }
   var rc=last.getBoundingClientRect();
-  ed.style.display='block';ed.style.left=Math.min(rc.left,window.innerWidth-280)+'px';ed.style.top=Math.min(rc.bottom+6,window.innerHeight-280)+'px';
+  ed.style.display='block';
+  var ew=ed.offsetWidth||300, eh=ed.offsetHeight||300;
+  ed.style.left=Math.max(8,Math.min(rc.left,window.innerWidth-ew-8))+'px';
+  ed.style.top=Math.max(8,Math.min(rc.bottom+6,window.innerHeight-eh-8))+'px';
 }
 function pick(code,silent){pickedCode=code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
 function segsNow(){if(pickedCode!=='ΕΡΓ'&&pickedCode!=='ΕΩ')return [];return segState.filter(function(s){return s.start&&s.end;});}
@@ -301,6 +306,12 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
 function saveCell(){if(dayMode)saveDay();else apply(pickedCode);}
 function clearCell(){if(dayMode){dayEntries=[];saveDay();}else apply('');}
 document.addEventListener('mousedown',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('td.edit')){ed.style.display='none';clearSel();}});
+(function(){var ed=document.getElementById('editor'),t=document.getElementById('ed-title'),dx=0,dy=0,drag=false;
+  if(!t)return;
+  t.addEventListener('mousedown',function(e){drag=true;var r=ed.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;e.preventDefault();e.stopPropagation();});
+  window.addEventListener('mousemove',function(e){if(!drag)return;ed.style.left=Math.max(0,Math.min(e.clientX-dx,window.innerWidth-ed.offsetWidth))+'px';ed.style.top=Math.max(0,Math.min(e.clientY-dy,window.innerHeight-ed.offsetHeight))+'px';});
+  window.addEventListener('mouseup',function(){drag=false;});
+})();
 </script>
 {% endif %}
 </body></html>
