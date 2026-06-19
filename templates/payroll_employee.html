@@ -73,9 +73,9 @@
   {% if work_history %}
   <div class="card"><h3>Ιστορικό απασχόλησης <span class="muted" style="font-size:12px;font-weight:400;">ανά έτος × ξενοδοχείο (από βάρδιες)</span></h3>
     <table style="width:100%;font-size:13px;border-collapse:collapse;">
-      <tr style="color:#94a3b8;text-align:left;"><th>Έτος</th><th>Ξενοδοχείο</th><th style="text-align:right;">Μέρες</th><th style="text-align:right;">Ώρες</th><th style="text-align:right;">Έξτρα</th></tr>
+      <tr style="color:#94a3b8;text-align:left;"><th>Έτος</th><th>Ξενοδοχείο</th><th>Περίοδος</th><th style="text-align:right;">Μέρες</th><th style="text-align:right;">Ώρες</th><th style="text-align:right;">Έξτρα</th></tr>
       {% for h in work_history %}
-      <tr style="border-top:1px solid #eef2f6;"><td>{{ h.year }}</td><td>{{ h.hotel }}</td><td style="text-align:right;">{{ h.days }}</td><td style="text-align:right;">{{ h.hours }}</td><td style="text-align:right;">{{ h.extra }}</td></tr>
+      <tr style="border-top:1px solid #eef2f6;"><td>{{ h.year }}</td><td>{{ h.hotel }}</td><td>{{ h.period }}</td><td style="text-align:right;">{{ h.days }}</td><td style="text-align:right;">{{ h.hours }}</td><td style="text-align:right;">{{ h.extra }}</td></tr>
       {% endfor %}
     </table>
   </div>

@@ -134,7 +134,7 @@ class ShiftAssignment(db.Model):
     created_at    = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     import_hash   = db.Column(db.String(40), index=True)
-    __table_args__ = (db.UniqueConstraint('user_id', 'work_date', name='uq_user_date'),)
+    # v12.131: επιτρέπονται ΠΟΛΛΕΣ βάρδιες/μέρα (αφαιρέθηκε το unique user_id+work_date)
 
 class NameLink(db.Model):
     """Επιβεβαιωμενη συνδεση ονοματος προγραμματος -> master προφιλ.
@@ -217,6 +217,14 @@ def ensure_schedule_columns():
         _add_col('user', 'home_hotel_id',     'home_hotel_id INTEGER')
         _add_col('user', 'login_enabled',     'login_enabled BOOLEAN')
         _add_col('user', 'employment_active', 'employment_active BOOLEAN')
+        # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
+        try:
+            from sqlalchemy import text as _text
+            if db.engine.dialect.name == 'postgresql':
+                db.session.execute(_text('ALTER TABLE shift_assignment DROP CONSTRAINT IF EXISTS uq_user_date'))
+                db.session.commit()
+        except Exception as _e:
+            db.session.rollback()
 
 
 # ── ΜΗΧΑΝΗ ΩΡΩΝ ───────────────────────────────────────────────────────────────
@@ -714,34 +722,49 @@ def week_grid(hotel_id, dept_id, week_start):
         for a in (ShiftAssignment.query
                   .filter(ShiftAssignment.user_id.in_(uids))
                   .filter(ShiftAssignment.work_date >= days[0], ShiftAssignment.work_date <= days[6]).all()):
-            amap[(a.user_id, a.work_date.isoformat())] = a
+            amap.setdefault((a.user_id, a.work_date.isoformat()), []).append(a)
     rows = []
     for u in users:
         cells = []
         wk_hours = 0.0; wk_extra = 0.0; repo = 0; work_days = 0
         for d in days:
-            a = amap.get((u.id, d.isoformat()))
-            if a:
-                pres = assignment_hours(a)
-                hrs = worked_hours(a)
-                if is_work_code(a.shift_code):
-                    wk_hours += hrs; work_days += 1; wk_extra += extra_hours(pres)
-                elif a.shift_code == 'ΑΝ':
+            alist = amap.get((u.id, d.isoformat())) or []
+            if alist:
+                day_hours = 0.0; day_extra = 0.0; day_work = False; day_repo = False
+                labels = []; first = alist[0]
+                for a in alist:
+                    if is_work_code(a.shift_code):
+                        day_hours += worked_hours(a); day_extra += extra_hours(assignment_hours(a)); day_work = True
+                    elif a.shift_code == 'ΑΝ':
+                        day_repo = True
+                    try:
+                        segs = json.loads(a.segments) if a.segments else []
+                    except Exception:
+                        segs = []
+                    labels.append('\n'.join(f"{s['start']} - {s['end']}" for s in segs) if segs else a.shift_code)
+                if day_work:
+                    wk_hours += day_hours; wk_extra += day_extra; work_days += 1
+                if day_repo:
                     repo += 1
                 try:
-                    segs = json.loads(a.segments) if a.segments else []
+                    fsegs = json.loads(first.segments) if first.segments else []
                 except Exception:
-                    segs = []
-                label = a.shift_code
-                if segs:
-                    label = '\n'.join(f"{s['start']} - {s['end']}" for s in segs)
-                cells.append({'date': d.isoformat(), 'code': a.shift_code, 'segs': segs,
-                              'label': label, 'hours': round(hrs, 1),
-                              'elsewhere': bool(a.work_hotel_id and a.work_hotel_id != hotel_id),
-                              'wh': a.work_hotel_id, 'note': a.note or ''})
+                    fsegs = []
+                _entries = []
+                for a in alist:
+                    try:
+                        _es = json.loads(a.segments) if a.segments else []
+                    except Exception:
+                        _es = []
+                    _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id})
+                cells.append({'date': d.isoformat(), 'code': first.shift_code, 'segs': fsegs,
+                              'label': '\n'.join(labels), 'hours': round(day_hours, 1),
+                              'elsewhere': bool(first.work_hotel_id and first.work_hotel_id != hotel_id),
+                              'wh': first.work_hotel_id, 'note': first.note or '',
+                              'n': len(alist), 'entries': _entries})
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
-                              'elsewhere': False, 'wh': None, 'note': ''})
+                              'elsewhere': False, 'wh': None, 'note': '', 'n': 0, 'entries': []})
         rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days})
     return days, rows
 
@@ -938,17 +961,10 @@ def schedule_cells_bulk():
     for uid, wd in pairs:
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
-        a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
-        if not code:
-            if a:
-                db.session.delete(a)
-        else:
-            if not a:
-                a = ShiftAssignment(user_id=uid, work_date=wd, created_by=user.id)
-                db.session.add(a)
-            a.shift_code = code
-            a.segments = json.dumps(segs, ensure_ascii=False)
-            a.work_hotel_id = _whid
+        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        if code:
+            db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
+                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_whid, created_by=user.id))
         touched.add((uid, monday_of(wd)))
         done += 1
     for uid, ws in touched:
@@ -963,6 +979,58 @@ def schedule_cells_bulk():
             wp.updated_by = user.id
     db.session.commit()
     return jsonify(ok=True, done=done, locked=locked)
+
+@app.route('/dashboard/schedule/day', methods=['POST'])
+def schedule_day():
+    """v12.131 — αποθήκευση ΟΛΗΣ της μέρας ενός εργαζομένου: αντικαθιστά τις εγγραφές
+    με τη λίστα entries (καθεμία: κωδικός + ξενοδοχείο + ώρες). Επιτρέπει πολλές/μέρα."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    try:
+        uid = int(d['user_id'])
+        wd = datetime.strptime(d['date'], '%Y-%m-%d').date()
+    except Exception:
+        return jsonify(ok=False, err='bad'), 400
+    if not week_editable(monday_of(wd), user):
+        return jsonify(ok=False, err='locked', msg='Κλειδωμένη εβδομάδα.'), 423
+    norm = []
+    for e in (d.get('entries') or []):
+        code = (e.get('code') or '').strip()
+        if not code:
+            continue
+        segs = e.get('segments') or []
+        whid = e.get('work_hotel_id'); whid = int(whid) if whid else None
+        if code == 'ΕΡΓ' and not segs:
+            st = ShiftType.query.filter_by(code='ΕΡΓ').first()
+            if st and st.default_start and st.default_end:
+                segs = [{'start': st.default_start, 'end': st.default_end}]
+        if code in ('ΕΡΓ', 'ΕΩ'):
+            ok, msg = _validate_work_code(code, segs)
+            if not ok:
+                return jsonify(ok=False, err='invalid', msg=msg), 400
+        else:
+            segs = []; whid = None
+        norm.append((code, segs, whid))
+    ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+    for code, segs, whid in norm:
+        db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
+            segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+    u = User.query.get(uid)
+    if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+        ws = monday_of(wd)
+        wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws).first()
+        if not wp:
+            wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws, status='draft')
+            db.session.add(wp)
+        if wp.status in ('submitted', 'locked'):
+            wp.status = 'draft'
+        wp.updated_by = user.id
+    db.session.commit()
+    return jsonify(ok=True, n=len(norm))
 
 
 
@@ -1178,18 +1246,26 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
             continue
         days = {}
         hours = extra = 0.0
-        sundays = work_days = repo = hol_worked = 0
+        _wd = set(); _sun = set(); _hol = set(); _repo = set()
         for a in alist:
-            days[a.work_date.day] = a
+            dd = days.setdefault(a.work_date.day, {'entries': [], 'code': '', 'wh': None, 'segs': '[]'})
+            try:
+                _es = json.loads(a.segments) if a.segments else []
+            except Exception:
+                _es = []
+            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id})
+            if not dd['code']:
+                dd['code'] = a.shift_code; dd['wh'] = a.work_hotel_id; dd['segs'] = a.segments or '[]'
             if is_work_code(a.shift_code):
-                pres = assignment_hours(a)
-                hours += worked_hours(a); extra += extra_hours(pres); work_days += 1
+                hours += worked_hours(a); extra += extra_hours(assignment_hours(a))
+                _wd.add(a.work_date)
                 if a.work_date.weekday() == 6:
-                    sundays += 1
+                    _sun.add(a.work_date)
                 if a.work_date in hol:
-                    hol_worked += 1
+                    _hol.add(a.work_date)
             elif a.shift_code == 'ΑΝ':
-                repo += 1
+                _repo.add(a.work_date)
+        sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
         payable = 0.0
         if prof and getattr(prof, 'agreement_amount', None):

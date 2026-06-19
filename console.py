@@ -139,16 +139,20 @@ def _work_history(uid):
     hotels = {h.id: h.name for h in Hotel.query.all()}
     agg = {}
     for a in ShiftAssignment.query.filter_by(user_id=uid).all():
-        if not is_work_code(a.shift_code):
+        if not is_work_code(a.shift_code) or not a.work_date:
             continue
-        yr = a.work_date.year if a.work_date else 0
+        yr = a.work_date.year
         hid = a.work_hotel_id or home
-        d = agg.setdefault((yr, hid), {'days': 0, 'hours': 0.0, 'extra': 0.0})
-        d['days'] += 1; d['hours'] += worked_hours(a); d['extra'] += extra_hours(assignment_hours(a))
+        d = agg.setdefault((yr, hid), {'dates': set(), 'hours': 0.0, 'extra': 0.0, 'frm': None, 'to': None})
+        d['dates'].add(a.work_date)
+        d['hours'] += worked_hours(a); d['extra'] += extra_hours(assignment_hours(a))
+        if not d['frm'] or a.work_date < d['frm']: d['frm'] = a.work_date
+        if not d['to'] or a.work_date > d['to']: d['to'] = a.work_date
     rows = []
     for (yr, hid), d in agg.items():
         rows.append({'year': yr, 'hotel': hotels.get(hid, '—'),
-                     'days': d['days'], 'hours': round(d['hours'], 1), 'extra': round(d['extra'], 1)})
+                     'days': len(d['dates']), 'hours': round(d['hours'], 1), 'extra': round(d['extra'], 1),
+                     'period': (d['frm'].strftime('%d/%m') + '–' + d['to'].strftime('%d/%m')) if d['frm'] else ''})
     rows.sort(key=lambda r: (-r['year'], r['hotel']))
     return rows
 

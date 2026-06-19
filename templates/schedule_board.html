@@ -90,7 +90,7 @@
           <tr>
             <td class="name">{{ r.user.full_name }} {{ lock_badge(r.user) }}</td>
             {% for c in r.cells %}{% set st=shift_lookup.get(c.code) %}
-              <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-edit="{{ '1' if blk.editable else '0' }}" style="{{ ('background:'+st.color+'22;border:1px solid '+st.color+'66;') if st else '' }}">{% if c.elsewhere %}<span class="x">⇄</span>{% endif %}{{ c.label or '+' }}{% if c.code=='ΕΡΓ' and c.hours %}<span class="hh">{{ c.hours }}h</span>{% endif %}</div></td>
+              <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if blk.editable else '0' }}" style="{{ ('background:'+st.color+'22;border:1px solid '+st.color+'66;') if st else '' }}">{% if c.elsewhere %}<span class="x">⇄</span>{% endif %}{{ c.label or '+' }}{% if c.code=='ΕΡΓ' and c.hours %}<span class="hh">{{ c.hours }}h</span>{% endif %}</div></td>
             {% endfor %}
             <td class="tot">{{ r.wk_extra }}</td><td class="tot {{ 'warn' if r.repo<1 }}">{{ r.repo }}</td><td class="tot">{{ r.work_days }}</td>
           </tr>
@@ -118,8 +118,12 @@
 </div>
 
 <div class="editor" id="editor">
-  <h5 id="ed-title">Βάρδια</h5><div class="codes" id="ed-codes"></div>
-  <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον βάρδια</button><div style="margin-top:6px;"><label style="font-size:11px;color:#64748b;display:block;">Ξενοδοχείο εργασίας</label><select id="ed-hotel" style="width:100%;padding:5px;border:1px solid #dbe3ea;border-radius:6px;"><option value="">(έδρα — προεπιλογή)</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div></div>
+  <h5 id="ed-title">Βάρδια</h5>
+  <div id="ed-paint">
+    <div class="codes" id="ed-codes"></div>
+    <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον τμήμα</button><div style="margin-top:6px;"><label style="font-size:11px;color:#64748b;display:block;">Ξενοδοχείο εργασίας</label><select id="ed-hotel" style="width:100%;padding:5px;border:1px solid #dbe3ea;border-radius:6px;"><option value="">(έδρα)</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div></div>
+  </div>
+  <div id="ed-day" style="display:none;"></div>
   <div class="ed-actions"><button class="btn" onclick="clearCell()"><i class="ti ti-trash"></i> Καθάρισε</button><button class="btn pri" onclick="saveCell()">Αποθήκευση</button></div>
 </div>
 
@@ -156,7 +160,8 @@ document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
   el.addEventListener('mouseenter',function(){if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el));});
 });
 window.addEventListener('mouseup',function(){if(!selecting)return;selecting=false;if(curSel.length)openEd();});
-var segState=[];
+var HOTELS_LIST=[{% for h in hotels %}{id:{{h.id}},name:{{ h.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
+var segState=[], dayMode=false, dayEntries=[], dayHome='';
 function mkTime(val,cb){
   var v=(val||'00:00').split(':');
   var wrap=document.createElement('span'); wrap.style.whiteSpace='nowrap';
@@ -172,6 +177,7 @@ function mkTime(val,cb){
   wrap.appendChild(hs);var c=document.createElement('span');c.textContent=':';c.style.margin='0 2px';wrap.appendChild(c);wrap.appendChild(ms);
   return wrap;
 }
+function presenceOf(segs){var t=0;segs.forEach(function(s){var a=(s.start||'0:0').split(':'),b=(s.end||'0:0').split(':');var x=+a[0]*60+ +a[1],y=+b[0]*60+ +b[1];if(y<=x)y+=1440;t+=(y-x)/60;});return t;}
 function renderSegs(){
   var w=document.getElementById('ed-segs'); w.innerHTML='';
   segState.forEach(function(sg,idx){
@@ -184,29 +190,85 @@ function renderSegs(){
   });
 }
 function addSeg(){var last=segState[segState.length-1];segState.push({start:(last?last.end:'07:00'),end:'17:00'});renderSegs();}
-function openEd(){
-  var codes=document.getElementById('ed-codes');codes.innerHTML='';
-  SHIFTS.forEach(function(s){var b=document.createElement('button');b.textContent=s.code;b.style.background=s.color;b.onclick=function(){pick(s.code);};codes.appendChild(b);});
-  var last=curSel[curSel.length-1];
-  var ex=[];try{ex=JSON.parse(last.getAttribute('data-segs')||'[]');}catch(e){}
-  segState = ex.length?ex.map(function(s){return {start:s.start,end:s.end};}):[{start:'07:00',end:'15:30'}];
-  pick(last.getAttribute('data-code')||'ΕΡΓ',true);
-  renderSegs();
-  var _hs=document.getElementById('ed-hotel'); if(_hs){if(_hs.options.length)_hs.options[0].text='● '+(last.getAttribute('data-home')||'έδρα')+' (ανατεθειμένο)';_hs.value=(last.getAttribute('data-wh')||'');}
-  var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
-  ed.style.display='block';ed.style.left=Math.min(rc.left,window.innerWidth-260)+'px';ed.style.top=Math.min(rc.bottom+6,window.innerHeight-220)+'px';
+function mkHotelSel(val){
+  var s=document.createElement('select'); s.style.cssText='padding:4px;border:1px solid #dbe3ea;border-radius:6px;';
+  var o0=document.createElement('option');o0.value='';o0.text='● '+(dayHome||'έδρα');s.appendChild(o0);
+  HOTELS_LIST.forEach(function(h){var o=document.createElement('option');o.value=h.id;o.text=h.name;s.appendChild(o);});
+  s.value=val?String(val):''; return s;
 }
-function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
+function renderEntries(){
+  var w=document.getElementById('ed-day'); w.innerHTML='';
+  dayEntries.forEach(function(en,ei){
+    var blk=document.createElement('div'); blk.style.cssText='border:1px solid #e6ecf2;border-radius:8px;padding:7px;margin-bottom:7px;';
+    var cs=document.createElement('select'); cs.style.cssText='padding:4px;border:1px solid #dbe3ea;border-radius:6px;font-weight:600;';
+    SHIFTS.forEach(function(s){var o=document.createElement('option');o.value=s.code;o.text=s.code;cs.appendChild(o);});
+    cs.value=en.code; cs.onchange=function(){en.code=cs.value; if(en.code!=='ΕΡΓ'&&en.code!=='ΕΩ'){en.segs=[];en.wh=null;} else if(!en.segs.length){en.segs=[{start:'07:00',end:'15:30'}];} renderEntries();};
+    var head=document.createElement('div'); head.style.cssText='display:flex;align-items:center;gap:6px;'; head.appendChild(cs);
+    if(en.code==='ΕΡΓ'||en.code==='ΕΩ'){var hsel=mkHotelSel(en.wh);hsel.onchange=function(){en.wh=hsel.value||null;};head.appendChild(hsel);}
+    var rm=document.createElement('button'); rm.type='button'; rm.textContent='×'; rm.style.cssText='margin-left:auto;border:none;background:#fee2e2;color:#b91c1c;border-radius:6px;cursor:pointer;padding:2px 8px;'; rm.onclick=function(){dayEntries.splice(ei,1);renderEntries();};
+    head.appendChild(rm); blk.appendChild(head);
+    if(en.code==='ΕΡΓ'||en.code==='ΕΩ'){
+      en.segs.forEach(function(sg,si){
+        var row=document.createElement('div'); row.style.cssText='display:flex;align-items:center;gap:4px;margin-top:5px;';
+        row.appendChild(mkTime(sg.start,function(v){en.segs[si].start=v;}));
+        var d=document.createElement('span');d.textContent='–';row.appendChild(d);
+        row.appendChild(mkTime(sg.end,function(v){en.segs[si].end=v;}));
+        if(en.segs.length>1){var sx=document.createElement('button');sx.type='button';sx.textContent='×';sx.style.cssText='border:none;background:#f1f5f9;color:#64748b;border-radius:6px;cursor:pointer;padding:2px 7px;';sx.onclick=function(){en.segs.splice(si,1);renderEntries();};row.appendChild(sx);}
+        blk.appendChild(row);
+      });
+      var addseg=document.createElement('button'); addseg.type='button'; addseg.textContent='+ τμήμα'; addseg.style.cssText='margin-top:5px;border:1px dashed #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;padding:3px 8px;font-size:11px;'; addseg.onclick=function(){en.segs.push({start:'07:00',end:'15:30'});renderEntries();};
+      blk.appendChild(addseg);
+    }
+    w.appendChild(blk);
+  });
+  var add=document.createElement('button'); add.type='button'; add.textContent='+ Προσθήκη βάρδιας'; add.style.cssText='border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:5px 10px;font-size:12px;'; add.onclick=function(){dayEntries.push({code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]});renderEntries();};
+  w.appendChild(add);
+}
+function saveDay(){
+  for(var i=0;i<dayEntries.length;i++){var en=dayEntries[i];
+    if(en.code==='ΕΡΓ'){if(Math.abs(presenceOf(en.segs)-8.5)>0.001){alert('Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}}
+    if(en.code==='ΕΩ'&&!(en.segs&&en.segs.length)){alert('Η ΕΩ χρειάζεται ώρες.');return;}
+  }
+  var c0=curSel[0];
+  var payload={user_id:c0.getAttribute('data-uid'),date:c0.getAttribute('data-date'),entries:dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ')?en.segs:[])};})};
+  fetch('/dashboard/schedule/day',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
+}
+function openEd(){
+  var last=curSel[curSel.length-1]; var ed=document.getElementById('editor');
+  if(curSel.length===1){
+    dayMode=true; dayHome=last.getAttribute('data-home')||'';
+    document.getElementById('ed-paint').style.display='none';
+    document.getElementById('ed-day').style.display='block';
+    document.getElementById('ed-title').textContent='Βάρδιες ημέρας';
+    var es=[];try{es=JSON.parse(last.getAttribute('data-entries')||'[]');}catch(e){}
+    dayEntries = es.length? es.map(function(x){return {code:x.code, wh:(x.wh||null), segs:((x.segs&&x.segs.length)?x.segs.map(function(s){return {start:s.start,end:s.end};}):[])};}) : [{code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]}];
+    renderEntries();
+  } else {
+    dayMode=false;
+    document.getElementById('ed-day').style.display='none';
+    document.getElementById('ed-paint').style.display='block';
+    document.getElementById('ed-title').textContent='Εύρος '+curSel.length+' κελιών';
+    var codes=document.getElementById('ed-codes');codes.innerHTML='';
+    SHIFTS.forEach(function(s){var b=document.createElement('button');b.textContent=s.code;b.style.background=s.color;b.onclick=function(){pick(s.code);};codes.appendChild(b);});
+    var ex=[];try{ex=JSON.parse(last.getAttribute('data-segs')||'[]');}catch(e){}
+    segState = ex.length?ex.map(function(s){return {start:s.start,end:s.end};}):[{start:'07:00',end:'15:30'}];
+    pick(last.getAttribute('data-code')||'ΕΡΓ',true);
+    renderSegs();
+    var _hs=document.getElementById('ed-hotel'); if(_hs){if(_hs.options.length)_hs.options[0].text='● '+(last.getAttribute('data-home')||'έδρα');_hs.value=(last.getAttribute('data-wh')||'');}
+  }
+  var rc=last.getBoundingClientRect();
+  ed.style.display='block';ed.style.left=Math.min(rc.left,window.innerWidth-280)+'px';ed.style.top=Math.min(rc.bottom+6,window.innerHeight-280)+'px';
+}
+function pick(code,silent){pickedCode=code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
 function segsNow(){if(pickedCode!=='ΕΡΓ'&&pickedCode!=='ΕΩ')return [];return segState.filter(function(s){return s.start&&s.end;});}
-function presenceOf(segs){var t=0;segs.forEach(function(s){var a=(s.start||'0:0').split(':'),b=(s.end||'0:0').split(':');var x=+a[0]*60+ +a[1],y=+b[0]*60+ +b[1];if(y<=x)y+=1440;t+=(y-x)/60;});return t;}
 function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(document.getElementById('ed-hotel')||{}).value||null;
   if(code==='ΕΡΓ'&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
 }
-function saveCell(){apply(pickedCode);}
-function clearCell(){apply('');}
+function saveCell(){if(dayMode)saveDay();else apply(pickedCode);}
+function clearCell(){if(dayMode){dayEntries=[];saveDay();}else apply('');}
 document.addEventListener('mousedown',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('.cell')){ed.style.display='none';clearSel();}});
 </script>
 </body></html>

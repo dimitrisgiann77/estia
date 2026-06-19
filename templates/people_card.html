@@ -30,9 +30,9 @@
   <div style="margin-top:14px;">
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">Ιστορικό απασχόλησης</div>
     <table style="width:100%;font-size:12px;border-collapse:collapse;">
-      <tr style="color:#94a3b8;"><td>Έτος</td><td>Ξενοδοχείο</td><td style="text-align:right;">Μέρες</td><td style="text-align:right;">Ώρες</td><td style="text-align:right;">Έξτρα</td></tr>
+      <tr style="color:#94a3b8;"><td>Έτος</td><td>Ξενοδοχείο</td><td>Περίοδος</td><td style="text-align:right;">Μέρες</td><td style="text-align:right;">Ώρες</td><td style="text-align:right;">Έξτρα</td></tr>
       {% for h in history %}
-      <tr style="border-top:1px solid #eef2f6;"><td>{{ h.year }}</td><td>{{ h.hotel }}</td><td style="text-align:right;">{{ h.days }}</td><td style="text-align:right;">{{ h.hours }}</td><td style="text-align:right;">{{ h.extra }}</td></tr>
+      <tr style="border-top:1px solid #eef2f6;"><td>{{ h.year }}</td><td>{{ h.hotel }}</td><td>{{ h.period }}</td><td style="text-align:right;">{{ h.days }}</td><td style="text-align:right;">{{ h.hours }}</td><td style="text-align:right;">{{ h.extra }}</td></tr>
       {% endfor %}
     </table>
   </div>
