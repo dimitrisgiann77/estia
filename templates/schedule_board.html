@@ -195,13 +195,17 @@ function openEd(){
   var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
   ed.style.display='block';ed.style.left=Math.min(rc.left+(window.scrollX||0),window.innerWidth-260)+'px';ed.style.top=(rc.bottom+(window.scrollY||0)+6)+'px';
 }
-function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ')?'block':'none';if(!silent&&code!=='ΕΡΓ')saveCell();}
-function segsNow(){if(pickedCode!=='ΕΡΓ')return [];return segState.filter(function(s){return s.start&&s.end;});}
-function apply(code){if(!curSel.length)return;var uid=curSel[0].getAttribute('data-uid');
+function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
+function segsNow(){if(pickedCode!=='ΕΡΓ'&&pickedCode!=='ΕΩ')return [];return segState.filter(function(s){return s.start&&s.end;});}
+function presenceOf(segs){var t=0;segs.forEach(function(s){var a=(s.start||'0:0').split(':'),b=(s.end||'0:0').split(':');var x=+a[0]*60+ +a[1],y=+b[0]*60+ +b[1];if(y<=x)y+=1440;t+=(y-x)/60;});return t;}
+function apply(code){if(!curSel.length)return;var segs=segsNow();
+  if(code==='ΕΡΓ'&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
+  if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
+  var uid=curSel[0].getAttribute('data-uid');
   var dates=curSel.map(function(c){return c.getAttribute('data-date');});
-  var url,body;if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segsNow()};}
-  else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segsNow()};}
-  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j)location.reload();});
+  var url,body;if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segs};}
+  else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segs};}
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
 }
 function saveCell(){apply(pickedCode);}
 function clearCell(){apply('');}

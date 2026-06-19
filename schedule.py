@@ -269,6 +269,16 @@ def entry_shift_types():
         sts = [s for s in sts if s.code in allow]
     return sts
 
+def _validate_work_code(code, segs):
+    """v12.120 — ΕΡΓ = ΑΚΡΙΒΩΣ 8ω + 30' (8,5 παρουσία)· διαφορετικά → ΕΩ (Έξτρα Ώρες)."""
+    if code == 'ΕΡΓ':
+        pres = segments_hours(segs)
+        if abs(pres - NORMAL_HOURS) > 0.001:
+            return (False, 'Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες χρησιμοποίησε τον κωδικό ΕΩ.')
+    if code == 'ΕΩ' and not segs:
+        return (False, 'Ο κωδικός ΕΩ χρειάζεται ώρες — όρισε βάρδια.')
+    return (True, '')
+
 def parse_cell(v):
     """Κελί Excel -> (shift_code, segments[list], work_hotel_tag).
     Πιστή μεταφορά λογικής ENGINE_v2: τμήματα ΕΡΓ, κωδικοί, cross-hotel tag."""
@@ -286,7 +296,12 @@ def parse_cell(v):
     ranges = _RANGE_RE.findall(s)
     if ranges or 'ΕΡΓ' in up or (tag is not None and s):
         segs = [{'start': f'{int(h1):02d}:{m1}', 'end': f'{int(h2):02d}:{m2}'} for h1, m1, h2, m2 in ranges]
-        return ('ΕΡΓ', segs, tag)
+        if segs:
+            _pres = segments_hours(segs)
+            _code = 'ΕΡΓ' if abs(_pres - NORMAL_HOURS) < 0.001 else 'ΕΩ'
+        else:
+            _code = 'ΕΡΓ'
+        return (_code, segs, tag)
     # κωδικοί χωρίς ώρες (σειρά: ειδικοί πριν τα γενικά)
     for c in ['ΑΣΘ', 'ΑΝΕΥ', 'ΑΡΓ', 'ΕΙΔ', 'ΑΔ', 'ΑΠ', 'ΑΑ', 'ΑΝ']:
         if up.startswith(_acc(c).upper()):
@@ -448,6 +463,13 @@ def seed_schedule():
                                          payroll_note=note, ergani_type=erg, sort=i,
                                          default_start='07:00' if code == 'ΕΡΓ' else None,
                                          default_end='15:30' if code == 'ΕΡΓ' else None))
+        # v12.120 — εξασφάλισε κωδικό ΕΩ (Έξτρα Ώρες) και σε υπάρχουσες βάσεις
+        if not ShiftType.query.filter_by(code='ΕΩ').first():
+            _erg = ShiftType.query.filter_by(code='ΕΡΓ').first()
+            db.session.add(ShiftType(code='ΕΩ', label='Έξτρα Ώρες', color='#f59e0b',
+                counts_as_work=True, payroll_note='ώρες ≠ 8,5 (πάνω/κάτω από ΕΡΓ)',
+                ergani_type='WORK', sort=((_erg.sort if _erg else 0) + 1),
+                default_start='07:00', default_end='17:00', active=True))
         # Departments
         if not Department.query.first():
             for i, (name, en, color, aliases) in enumerate(DEPARTMENTS):
@@ -837,6 +859,10 @@ def schedule_cell():
         st = ShiftType.query.filter_by(code='ΕΡΓ').first()
         if st and st.default_start and st.default_end:
             segs = [{'start': st.default_start, 'end': st.default_end}]
+    if code in ('ΕΡΓ', 'ΕΩ'):
+        _ok, _msg = _validate_work_code(code, segs)
+        if not _ok:
+            return jsonify(ok=False, err='invalid', msg=_msg), 400
     if not a:
         a = ShiftAssignment(user_id=uid, work_date=wd, created_by=user.id)
         db.session.add(a)
@@ -881,6 +907,10 @@ def schedule_cells_bulk():
         st = ShiftType.query.filter_by(code='ΕΡΓ').first()
         if st and st.default_start and st.default_end:
             segs = [{'start': st.default_start, 'end': st.default_end}]
+    if code in ('ΕΡΓ', 'ΕΩ'):
+        _ok, _msg = _validate_work_code(code, segs)
+        if not _ok:
+            return jsonify(ok=False, err='invalid', msg=_msg), 400
     done = 0; locked = 0
     weeks = set()
     for ds in dates:
