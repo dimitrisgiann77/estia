@@ -125,7 +125,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
               {% set a = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
                   {% if can_edit %}data-edit="1"{% endif %} data-uid="{{ x.user.id }}" data-date="{{ dh.iso }}"
-                  data-di="{{ dh.d }}" data-wh="{{ a.work_hotel_id if a and a.work_hotel_id else '' }}" data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
+                  data-di="{{ dh.d }}" data-wh="{{ a.work_hotel_id if a and a.work_hotel_id else '' }}" data-home="{{ g.hotel.name if g.hotel else '' }}" data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
                 {% if a %}<span class="cell" data-c="{{ a.shift_code }}">{{ a.shift_code }}</span>{% else %}<span class="cell empty">·</span>{% endif %}
               </td>
             {% endfor %}
@@ -224,7 +224,7 @@ function openEd(){
   segState = ex.length?ex.map(function(s){return {start:s.start,end:s.end};}):[{start:'07:00',end:'15:30'}];
   pick(last.getAttribute('data-code')||'ΕΡΓ',true);
   renderSegs();
-  var _hs=document.getElementById('ed-hotel'); if(_hs)_hs.value=(last.getAttribute('data-wh')||'');
+  var _hs=document.getElementById('ed-hotel'); if(_hs){if(_hs.options.length)_hs.options[0].text='● '+(last.getAttribute('data-home')||'έδρα')+' (ανατεθειμένο)';_hs.value=(last.getAttribute('data-wh')||'');}
   var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
   ed.style.display='block';ed.style.left=Math.min(rc.left+(window.scrollX||0),window.innerWidth-260)+'px';ed.style.top=(rc.bottom+(window.scrollY||0)+6)+'px';
 }

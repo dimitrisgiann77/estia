@@ -479,8 +479,13 @@ def payroll_employee(uid):
             u2 = User.query.get(p2.user_id)
             if u2 and (u2.employment_active is not False):
                 merge_cands.append(u2)
+    try:
+        from console import _work_history as _wh
+        work_history = _wh(uid)
+    except Exception:
+        work_history = []
     return render_template('payroll_employee.html',
-        u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements,
+        u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, work_history=work_history,
         fin=fin, fin_tot=fin_tot, fin_months=fin_months, month_gr=_MONTH_GR,
         assignments=assignments, events=events, flags=flags,
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
