@@ -771,6 +771,7 @@ def week_grid(hotel_id, dept_id, week_start):
                     _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hotel_id) else None
                     _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
                                      'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
+                                     'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
                                      'color': _colors.get(a.shift_code, '#64748b')})
                 cells.append({'date': d.isoformat(), 'code': first.shift_code, 'segs': fsegs,
                               'label': '\n'.join(labels), 'hours': round(day_hours, 1),

@@ -170,7 +170,7 @@ document.querySelectorAll('.scroll').forEach(function(sc){
   <h5 id="ed-title" style="margin:0 0 5px;font-size:13px;">Βάρδια</h5>
   <div id="ed-paint">
     <div class="codes" id="ed-codes"></div>
-    <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον τμήμα</button><div style="margin-top:6px;"><label style="font-size:11px;color:#64748b;display:block;">Ξενοδοχείο εργασίας</label><select id="ed-hotel" style="width:100%;padding:5px;border:1px solid #dbe3ea;border-radius:6px;"><option value="">(έδρα)</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div></div>
+    <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ σπαστό</button><div style="margin-top:6px;"><label style="font-size:11px;color:#64748b;display:block;">Ξενοδοχείο εργασίας</label><select id="ed-hotel" style="width:100%;padding:5px;border:1px solid #dbe3ea;border-radius:6px;"><option value="">(έδρα)</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div></div>
   </div>
   <div id="ed-day" style="display:none;"></div>
   <div class="acts"><button onclick="clearCell()" style="background:#fee2e2;color:#b91c1c;"><i class="ti ti-trash"></i> Καθάρισε</button><button onclick="saveCell()" style="background:var(--accent,#185FA5);color:#fff;">Αποθήκευση</button></div>
@@ -224,7 +224,7 @@ function addSeg(){var last=segState[segState.length-1];segState.push({start:(las
 function mkHotelSel(val){
   var s=document.createElement('select'); s.style.cssText='padding:4px;border:1px solid #dbe3ea;border-radius:6px;';
   var o0=document.createElement('option');o0.value='';o0.text='● '+(dayHome||'έδρα');s.appendChild(o0);
-  HOTELS_LIST.forEach(function(h){var o=document.createElement('option');o.value=h.id;o.text=h.name;s.appendChild(o);});
+  HOTELS_LIST.forEach(function(h){if(dayHome&&h.name===dayHome)return;var o=document.createElement('option');o.value=h.id;o.text=h.name;s.appendChild(o);});
   s.value=val?String(val):''; return s;
 }
 function renderEntries(){
@@ -247,7 +247,7 @@ function renderEntries(){
         if(en.segs.length>1){var sx=document.createElement('button');sx.type='button';sx.textContent='×';sx.style.cssText='border:none;background:#f1f5f9;color:#64748b;border-radius:6px;cursor:pointer;padding:2px 7px;';sx.onclick=function(){en.segs.splice(si,1);renderEntries();};row.appendChild(sx);}
         blk.appendChild(row);
       });
-      var addseg=document.createElement('button'); addseg.type='button'; addseg.textContent='+ τμήμα'; addseg.style.cssText='margin-top:5px;border:1px dashed #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;padding:3px 8px;font-size:11px;'; addseg.onclick=function(){en.segs.push({start:'07:00',end:'15:30'});renderEntries();};
+      var addseg=document.createElement('button'); addseg.type='button'; addseg.textContent='+ σπαστό'; addseg.style.cssText='margin-top:5px;border:1px dashed #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;padding:3px 8px;font-size:11px;'; addseg.onclick=function(){en.segs.push({start:'07:00',end:'15:30'});renderEntries();};
       blk.appendChild(addseg);
     }
     w.appendChild(blk);
