@@ -241,6 +241,17 @@ def segments_hours(segments):
 def extra_hours(total):
     return round(max(0.0, total - NORMAL_HOURS), 4) if total and total > 0 else 0.0
 
+# v12.118 — Διάλειμμα: 30' αφαιρούνται από τις πληρωτέες ώρες ΜΟΝΟ σε βάρδιες ≥6ω παρουσίας.
+BREAK_HOURS = 0.5
+BREAK_MIN_PRESENCE = 6.0
+def shift_break(presence):
+    return BREAK_HOURS if (presence and presence >= BREAK_MIN_PRESENCE) else 0.0
+def worked_hours(a):
+    """Πληρωτέες ώρες = παρουσία − διάλειμμα (30' αν παρουσία ≥6ω). Σε σπαστή το κενό
+    είναι ήδη εκτός (segments_hours) ΚΑΙ αφαιρείται επιπλέον 30' εφόσον σύνολο ≥6ω."""
+    p = assignment_hours(a)
+    return round(max(0.0, p - shift_break(p)), 4)
+
 def parse_cell(v):
     """Κελί Excel -> (shift_code, segments[list], work_hotel_tag).
     Πιστή μεταφορά λογικής ENGINE_v2: τμήματα ΕΡΓ, κωδικοί, cross-hotel tag."""
@@ -660,13 +671,14 @@ def week_grid(hotel_id, dept_id, week_start):
     rows = []
     for u in users:
         cells = []
-        wk_hours = 0.0; repo = 0; work_days = 0
+        wk_hours = 0.0; wk_extra = 0.0; repo = 0; work_days = 0
         for d in days:
             a = amap.get((u.id, d.isoformat()))
             if a:
-                hrs = assignment_hours(a)
+                pres = assignment_hours(a)
+                hrs = worked_hours(a)
                 if is_work_code(a.shift_code):
-                    wk_hours += hrs; work_days += 1
+                    wk_hours += hrs; work_days += 1; wk_extra += extra_hours(pres)
                 elif a.shift_code == 'ΑΝ':
                     repo += 1
                 try:
@@ -675,7 +687,7 @@ def week_grid(hotel_id, dept_id, week_start):
                     segs = []
                 label = a.shift_code
                 if segs:
-                    label = ' & '.join(f"{s['start']}-{s['end']}" for s in segs)
+                    label = ' & '.join(f"{s['start']} - {s['end']}" for s in segs)
                 cells.append({'date': d.isoformat(), 'code': a.shift_code, 'segs': segs,
                               'label': label, 'hours': round(hrs, 1),
                               'elsewhere': bool(a.work_hotel_id and a.work_hotel_id != hotel_id),
@@ -683,7 +695,7 @@ def week_grid(hotel_id, dept_id, week_start):
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
                               'elsewhere': False, 'note': ''})
-        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'repo': repo, 'work_days': work_days})
+        rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days})
     return days, rows
 
 def validate_hotel_week(hotel_id, week_start):
@@ -828,7 +840,7 @@ def schedule_cell():
             wp.status = 'draft'
         wp.updated_by = user.id
     db.session.commit()
-    hrs = assignment_hours(a)
+    hrs = worked_hours(a)
     return jsonify(ok=True, hours=round(hrs, 1), work=is_work_code(code))
 
 @app.route('/dashboard/schedule/cells_bulk', methods=['POST'])
@@ -1107,8 +1119,8 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
         for a in alist:
             days[a.work_date.day] = a
             if is_work_code(a.shift_code):
-                h = assignment_hours(a)
-                hours += h; extra += extra_hours(h); work_days += 1
+                pres = assignment_hours(a)
+                hours += worked_hours(a); extra += extra_hours(pres); work_days += 1
                 if a.work_date.weekday() == 6:
                     sundays += 1
                 if a.work_date in hol:
