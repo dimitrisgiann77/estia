@@ -35,18 +35,34 @@
       <td>{{ '✓' if s.counts_as_work else '—' }}</td><td>{{ '✓' if s.active else '—' }}</td>
       <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="shift_toggle"><input type="hidden" name="id" value="{{ s.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργ.' if s.active else 'Ενεργ.' }}</button></form></td></tr>{% endfor %}
   </table></div>
-  <div class="card"><h3>Επιτρεπτοί κωδικοί στην καταχώρηση</h3>
-    <p style="font-size:13px;color:#64748b;margin:0 0 10px;">Διάλεξε ποιοι κωδικοί εμφανίζονται στο παράθυρο δήλωσης βάρδιας (πρόγραμμα + μηνιαία). Αν δεν τσεκάρεις κανέναν, εμφανίζονται όλοι οι ενεργοί.</p>
+  <div class="card"><h3>Επιτρεπτοί κωδικοί στην καταχώρηση (ανά ρόλο)</h3>
+    <p style="font-size:13px;color:#64748b;margin:0 0 10px;">Διάλεξε ποιοι κωδικοί εμφανίζονται στο παράθυρο δήλωσης βάρδιας (πρόγραμμα + μηνιαία), ξεχωριστά για Admin και για Managers. Αν δεν τσεκάρεις κανέναν σε μια στήλη, εμφανίζονται όλοι οι ενεργοί για εκείνον τον ρόλο.</p>
     <form method="POST" style="margin:0;"><input type="hidden" name="action" value="entry_codes">
-      <div class="row" style="display:flex;flex-wrap:wrap;gap:10px;">
-      {% for s in shift_types if s.active %}
-        <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #dbe3ea;border-radius:9px;padding:6px 10px;cursor:pointer;">
-          <input type="checkbox" name="entry_code" value="{{ s.code }}" {{ 'checked' if entry_all or (entry_codes and s.code in entry_codes) }}>
-          <span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }};">{{ s.code }}</span> {{ s.label }}
-        </label>
-      {% endfor %}
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <div style="font-weight:700;margin-bottom:6px;">Admin</div>
+          <div class="row" style="display:flex;flex-direction:column;gap:6px;">
+          {% for s in shift_types if s.active %}
+            <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #dbe3ea;border-radius:9px;padding:6px 10px;cursor:pointer;">
+              <input type="checkbox" name="entry_code" value="{{ s.code }}" {{ 'checked' if entry_all or (entry_codes and s.code in entry_codes) }}>
+              <span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }};">{{ s.code }}</span> {{ s.label }}
+            </label>
+          {% endfor %}
+          </div>
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <div style="font-weight:700;margin-bottom:6px;">Managers</div>
+          <div class="row" style="display:flex;flex-direction:column;gap:6px;">
+          {% for s in shift_types if s.active %}
+            <label style="display:inline-flex;align-items:center;gap:6px;border:1px solid #dbe3ea;border-radius:9px;padding:6px 10px;cursor:pointer;">
+              <input type="checkbox" name="entry_code_mgr" value="{{ s.code }}" {{ 'checked' if entry_all_mgr or (entry_codes_mgr and s.code in entry_codes_mgr) }}>
+              <span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }};">{{ s.code }}</span> {{ s.label }}
+            </label>
+          {% endfor %}
+          </div>
+        </div>
       </div>
-      <button class="b" style="margin-top:10px;">Αποθήκευση κωδικών</button>
+      <button class="b" style="margin-top:12px;">Αποθήκευση κωδικών</button>
     </form>
   </div>
 

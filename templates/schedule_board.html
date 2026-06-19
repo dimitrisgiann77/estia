@@ -193,7 +193,7 @@ function openEd(){
   pick(last.getAttribute('data-code')||'ΕΡΓ',true);
   renderSegs();
   var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
-  ed.style.display='block';ed.style.left=Math.min(rc.left+(window.scrollX||0),window.innerWidth-260)+'px';ed.style.top=(rc.bottom+(window.scrollY||0)+6)+'px';
+  ed.style.display='block';ed.style.left=Math.min(rc.left,window.innerWidth-260)+'px';ed.style.top=Math.min(rc.bottom+6,window.innerHeight-220)+'px';
 }
 function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
 function segsNow(){if(pickedCode!=='ΕΡΓ'&&pickedCode!=='ΕΩ')return [];return segState.filter(function(s){return s.start&&s.end;});}

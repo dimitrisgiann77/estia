@@ -253,8 +253,9 @@ def worked_hours(a):
     return round(max(0.0, p - shift_break(p)), 4)
 
 # v12.119 — Επιτρεπτοί κωδικοί καταχώρησης (ρυθμιζόμενο από Πρόγραμμα·Ρυθμίσεις).
-def _entry_codes_setting():
-    row = Setting.query.get('sched_entry_codes')
+def _entry_codes_setting(role='admin'):
+    key = 'sched_entry_codes_mgr' if role == 'manager' else 'sched_entry_codes'
+    row = Setting.query.get(key)
     if row and row.value:
         try:
             vals = [c for c in json.loads(row.value) if c]
@@ -262,9 +263,13 @@ def _entry_codes_setting():
         except Exception:
             pass
     return None  # None = όλοι οι ενεργοί κωδικοί
-def entry_shift_types():
+def _current_entry_role():
+    return 'admin' if is_admin() else 'manager'
+def entry_shift_types(role=None):
+    if role is None:
+        role = _current_entry_role()
     sts = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
-    allow = _entry_codes_setting()
+    allow = _entry_codes_setting(role)
     if allow is not None:
         sts = [s for s in sts if s.code in allow]
     return sts
@@ -419,10 +424,13 @@ def week_deadline(week_start):
     return datetime.combine(d, dtime(hh, mm))
 
 def week_editable(week_start, user=None):
-    """True αν η εβδομάδα είναι ακόμη επεξεργάσιμη (πριν την προθεσμία) ή admin override."""
-    if datetime.now() < week_deadline(week_start):
+    """True αν η εβδομάδα είναι ακόμη επεξεργάσιμη. v12.121: ο admin ΠΑΝΤΑ μπορεί
+    (ιδιοκτήτης)· οι managers δεσμεύονται από την προθεσμία."""
+    if user is None:
+        user = current_user()
+    if user is not None and role_rank(user.role) >= ROLE_RANK['admin']:
         return True
-    if user is not None and role_rank(user.role) >= ROLE_RANK['admin'] and int(get_policy()['allow_admin_override']):
+    if datetime.now() < week_deadline(week_start):
         return True
     return False
 
@@ -1910,17 +1918,19 @@ def schedule_settings():
             if s:
                 s.active = not s.active; db.session.commit()
         elif act == 'entry_codes':
-            codes = request.form.getlist('entry_code')
-            row = Setting.query.get('sched_entry_codes')
-            if not row:
-                row = Setting(key='sched_entry_codes'); db.session.add(row)
-            row.value = json.dumps(codes, ensure_ascii=False)
+            for _key, _field in (('sched_entry_codes', 'entry_code'), ('sched_entry_codes_mgr', 'entry_code_mgr')):
+                codes = request.form.getlist(_field)
+                row = Setting.query.get(_key)
+                if not row:
+                    row = Setting(key=_key); db.session.add(row)
+                row.value = json.dumps(codes, ensure_ascii=False)
             db.session.commit()
         return redirect('/dashboard/schedule/settings?embed=1&ok=1')
-    _allow = _entry_codes_setting()
+    _allow = _entry_codes_setting('admin'); _allow_m = _entry_codes_setting('manager')
     return render_template('schedule_settings.html',
         policy=get_policy(), shift_types=ShiftType.query.order_by(ShiftType.sort).all(),
         entry_codes=_allow, entry_all=(_allow is None),
+        entry_codes_mgr=_allow_m, entry_all_mgr=(_allow_m is None),
         depts=Department.query.order_by(Department.sort).all(),
         holidays=Holiday.query.order_by(Holiday.hol_date).all(),
         rules=ScheduleRule.query.all(), dow_el=DOW_EL)
