@@ -151,7 +151,7 @@ html[data-theme="dark"] .umodal-box .muted { color:#7b8a98; }
                 {% endif %}
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
                   <form method="POST" action="/dashboard/toggle-user/{{ u.id }}"><button type="submit" class="btn" style="background:#fde68a;color:#92400e;font-size:12px;padding:6px 12px;">{{ 'Απενεργοποίηση' if u.is_active else 'Ενεργοποίηση' }}</button></form>
-                  {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('Διαγραφή χρήστη;')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}
+                  {% if u.role != 'masteradmin' %}<form method="POST" action="/dashboard/delete-user/{{ u.id }}" onsubmit="return confirm('ΟΡΙΣΤΙΚΗ διαγραφή χρήστη + των δεδομένων του; Δεν αναιρείται. (Για προσωρινό «εκτός», χρησιμοποίησε Απενεργοποίηση.)')"><button type="submit" class="btn-danger">Διαγραφή</button></form>{% endif %}
                 </div>
               </div>
             </div>

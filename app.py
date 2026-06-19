@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.123'
-APP_BUILD   = '403'
+APP_VERSION = '12.124'
+APP_BUILD   = '404'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.124', 'b': '404', 'date': '19/06/2026', 'time': '04:45', 'title': 'Καθολική Αναζήτηση «τα πάντα» + οριστική διαγραφή χρήστη',
+     'items': ['Η Αναζήτηση (/dashboard/search) ψάχνει πλέον ΟΛΑ τα προφίλ — login users + εργαζόμενους + χωρίς PII — με ετικέτα προέλευσης (🔒 Λογιστήριο / Management / λογαριασμός / ανενεργός) + Κωδικό/ΑΦΜ/ξενοδοχείο, καθώς και ασύνδετα (ταυτοποίηση) και ΟΛΕΣ τις λειτουργίες/σελίδες. Κάθε αποτέλεσμα οδηγεί κατευθείαν εκεί που ενεργείς.',
+               'Στους Χρήστες: η «Διαγραφή» έγινε ΟΡΙΣΤΙΚΗ (πλήρης, με προστασία κλειδωμένων Λογιστηρίου). Για προσωρινό «εκτός» υπάρχει η «Απενεργοποίηση». Λύνει το «έσβησα αλλά μένει στη βάση».']},
     {'v': '12.123', 'b': '403', 'date': '19/06/2026', 'time': '04:10', 'title': 'Χρήστες: καθαρό header + νέος χρήστης εμφανίζεται/κάνει login',
      'items': ['Αφαιρέθηκε το διπλό εσωτερικό header μέσα στη σελίδα Χρηστών (το παρέχει ήδη το πάνω μενού).',
                'Ο νέος χρήστης που δημιουργείς από admin είναι πλέον εγκεκριμένος + ενεργός για login και εμφανίζεται αμέσως στη λίστα. Αν το username υπάρχει ή λείπει κωδικός, βγαίνει σαφές μήνυμα (πριν αποτύγχανε σιωπηλά).']},
@@ -2451,9 +2454,18 @@ def delete_user(user_id):
         return redirect(url_for('login'))
     user = User.query.get(user_id)
     if user and role_rank(user.role) < ROLE_RANK['admin']:
-        user.is_active = False
-        db.session.commit()
-        log_activity('user_delete', user.username)
+        uname = user.username
+        ok = False
+        try:                       # v12.124: ΟΡΙΣΤΙΚΗ διαγραφή (full cascade, προστασία κλειδωμένων)
+            from payroll import _hard_delete_user as _hd
+            ok, _r = _hd(user_id)
+        except Exception:
+            db.session.rollback(); ok = False
+        if not ok:                 # fallback: τουλάχιστον απενεργοποίηση
+            u2 = User.query.get(user_id)
+            if u2:
+                u2.is_active = False; db.session.commit()
+        log_activity('user_delete', uname + (' [οριστική]' if ok else ' [απενεργ.]'))
     return redirect(url_for('users_admin'))
 
 @app.route('/dashboard/approve-user/<int:user_id>', methods=['POST'])

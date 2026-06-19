@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 from flask import request, redirect, url_for, render_template
 from sqlalchemy import text, inspect as sa_inspect
-from app import (app, db, current_user, is_admin, log_activity, User, APP_VERSION, APP_BUILD)
+from app import (app, db, current_user, is_admin, log_activity, User, APP_VERSION, APP_BUILD, role_rank, ROLE_RANK)
 
 
 class ErrorLog(db.Model):
@@ -204,55 +204,93 @@ PAGES = [
     ('Τι νέο','/dashboard/whatsnew'),
 ]
 def do_search(q):
-    res = {'Εργαζόμενοι': [], 'Βλάβες': [], 'Ερωτηματολόγια': [], 'Ξενοδοχεία/Τομείς': [], 'Σελίδες': []}
+    res = {'Προσωπικό': [], 'Ασύνδετα (ταυτοποίηση)': [], 'Βλάβες': [], 'Ερωτηματολόγια': [], 'Ξενοδοχεία/Τομείς': [], 'Λειτουργίες / Σελίδες': []}
     if not q or len(q.strip()) < 2: return res
     qn = _norm(q); ql = q.strip().lower()
-    # employees
+    def hit(*parts):
+        hay = ' '.join(str(p or '') for p in parts)
+        return qn in _norm(hay) or ql in hay.lower()
+    # ── ΠΡΟΣΩΠΙΚΟ: ΟΛΑ τα προφιλ (login users + εργαζομενοι + χωρις PII) με tags ──
     try:
         import payroll as PR
-        seen=set()
-        for pii in PR.EmployeePII.query.all():
-            u = User.query.get(pii.user_id)
-            if not u or u.id in seen: continue
-            hay = '%s %s %s %s' % (_norm(u.full_name), pii.afm or '', pii.emp_code or '', pii.amka or '')
-            if qn in hay or ql in hay.lower():
-                seen.add(u.id)
-                res['Εργαζόμενοι'].append({'label': '%s%s' % (u.full_name or u.username, (' · '+pii.afm) if pii.afm else ''),
-                                          'url': '/dashboard/payroll/employee/%d?embed=1' % u.id})
-            if len(res['Εργαζόμενοι']) >= 40: break
+        piimap = {p.user_id: p for p in PR.EmployeePII.query.all()}
+        locked = {uid for uid, p in piimap.items() if getattr(p, 'locked', False)}
+    except Exception:
+        piimap, locked = {}, set()
+    try:
+        import schedule as SC
+        sh_uids = {r[0] for r in db.session.query(SC.ShiftAssignment.user_id).distinct().all()}
+    except Exception:
+        sh_uids = set()
+    from app import Hotel as _H
+    hotels = {h.id: h.name for h in _H.query.all()}
+    for u in User.query.all():
+        pii = piimap.get(u.id)
+        if not hit(u.full_name, u.username, (pii.afm if pii else ''), (pii.emp_code if pii else ''), (pii.amka if pii else '')):
+            continue
+        has_hr = bool(pii or getattr(u, 'home_hotel_id', None) or getattr(u, 'department_id', None) or u.id in sh_uids)
+        if u.id in locked:
+            tag = '🔒 Λογιστήριο'; url = '/dashboard/payroll/employee/%d?embed=1' % u.id
+        elif getattr(u, 'login_enabled', None) is True or (role_rank(u.role) >= ROLE_RANK['manager']):
+            tag = 'λογαριασμός (login)'; url = ('/dashboard/payroll/employee/%d?embed=1' % u.id) if has_hr else '/dashboard/users?embed=1'
+        elif has_hr:
+            tag = 'Management'; url = '/dashboard/payroll/employee/%d?embed=1' % u.id
+        else:
+            tag = '—'; url = '/dashboard/users?embed=1'
+        if not u.is_active:
+            tag += ' · ανενεργός'
+        extra = []
+        if pii and pii.emp_code: extra.append(pii.emp_code)
+        if pii and pii.afm: extra.append('ΑΦΜ ' + pii.afm)
+        hn = hotels.get(getattr(u, 'home_hotel_id', None))
+        if hn: extra.append(hn)
+        lbl = '%s — %s%s' % (u.full_name or u.username, tag, ((' · ' + ' · '.join(extra)) if extra else ''))
+        res['Προσωπικό'].append({'label': lbl, 'url': url})
+        if len(res['Προσωπικό']) >= 60: break
+    # ── ΑΣΥΝΔΕΤΑ (PendingShift) ──
+    try:
+        import schedule as SC
+        seenp = set()
+        for ps in SC.PendingShift.query.all():
+            nm = ps.norm_name
+            if nm in seenp: continue
+            if hit(ps.raw_name, nm):
+                seenp.add(nm)
+                res['Ασύνδετα (ταυτοποίηση)'].append({'label': (ps.raw_name or nm) + ' — ασύνδετο', 'url': '/dashboard/schedule/identify?embed=1'})
+            if len(res['Ασύνδετα (ταυτοποίηση)']) >= 30: break
     except Exception:
         pass
-    # faults
+    # ── Βλαβες ──
     try:
         import faults as F
-        for ft in F.Fault.query.all():
-            t = '%s %s %s' % (getattr(ft,'title','') or '', getattr(ft,'code','') or '', getattr(ft,'description','') or '')
-            if ql in t.lower():
-                res['Βλάβες'].append({'label': (getattr(ft,'code','') or '') + ' ' + (getattr(ft,'title','') or '')[:60],
-                                      'url': '/dashboard/faults?embed=1'})
+        for ft in F.Fault.query.limit(500).all():
+            if hit(getattr(ft,'title',''), getattr(ft,'code',''), getattr(ft,'description','')):
+                res['Βλάβες'].append({'label': (getattr(ft,'code','') or '') + ' ' + (getattr(ft,'title','') or '')[:60], 'url': '/dashboard/faults?embed=1'})
             if len(res['Βλάβες']) >= 20: break
     except Exception:
         pass
-    # surveys
+    # ── Ερωτηματολογια ──
     try:
         import surveys as S
         for sv in S.Survey.query.all():
-            if ql in (getattr(sv,'title','') or '').lower():
+            if hit(getattr(sv,'title','')):
                 res['Ερωτηματολόγια'].append({'label': sv.title, 'url': '/dashboard/surveys?embed=1'})
     except Exception:
         pass
-    # hotels/areas
+    # ── Ξενοδοχεια ──
+    for hid, hname in hotels.items():
+        if hit(hname):
+            res['Ξενοδοχεία/Τομείς'].append({'label': hname, 'url': '/dashboard/hotels?embed=1'})
+    # ── ΛΕΙΤΟΥΡΓΙΕΣ / ΣΕΛΙΔΕΣ: ολος ο καταλογος μενου ──
     try:
-        from app import Hotel
-        for h in Hotel.query.all():
-            if ql in (h.name or '').lower():
-                res['Ξενοδοχεία/Τομείς'].append({'label': h.name, 'url': '/dashboard/hotels?embed=1'})
+        import menu as MN
+        for code, label, icon, url, master in MN.MENU_CATALOG:
+            if hit(label, code):
+                res['Λειτουργίες / Σελίδες'].append({'label': label, 'url': url + '?embed=1'})
     except Exception:
-        pass
-    # pages
-    for name, url in PAGES:
-        if ql in name.lower() or qn in _norm(name):
-            res['Σελίδες'].append({'label': name, 'url': url + '?embed=1'})
+        for name, url in PAGES:
+            if hit(name):
+                res['Λειτουργίες / Σελίδες'].append({'label': name, 'url': url + '?embed=1'})
     return res
 
 
