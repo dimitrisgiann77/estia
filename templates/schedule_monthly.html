@@ -230,11 +230,11 @@ function mkHotelSel(val){
 function renderEntries(){
   var w=document.getElementById('ed-day'); w.innerHTML='';
   dayEntries.forEach(function(en,ei){
-    var blk=document.createElement('div'); blk.style.cssText='border:1px solid #e6ecf2;border-radius:8px;padding:7px;margin-bottom:7px;';
+    var blk=document.createElement('div'); blk.style.cssText='border:1px solid #dbe3ea;border-radius:9px;padding:9px;margin-bottom:8px;';
     var cs=document.createElement('select'); cs.style.cssText='padding:4px;border:1px solid #dbe3ea;border-radius:6px;font-weight:600;';
     SHIFTS.forEach(function(s){var o=document.createElement('option');o.value=s.code;o.text=s.code;cs.appendChild(o);});
     cs.value=en.code; cs.onchange=function(){en.code=cs.value; if(en.code!=='ΕΡΓ'&&en.code!=='ΕΩ'){en.segs=[];en.wh=null;} else if(!en.segs.length){en.segs=[{start:'07:00',end:'15:30'}];} renderEntries();};
-    var head=document.createElement('div'); head.style.cssText='display:flex;align-items:center;gap:6px;'; head.appendChild(cs);
+    var head=document.createElement('div'); head.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;'; head.appendChild(cs);
     if(en.code==='ΕΡΓ'||en.code==='ΕΩ'){var hsel=mkHotelSel(en.wh);hsel.onchange=function(){en.wh=hsel.value||null;};head.appendChild(hsel);}
     var rm=document.createElement('button'); rm.type='button'; rm.textContent='×'; rm.style.cssText='margin-left:auto;border:none;background:#fee2e2;color:#b91c1c;border-radius:6px;cursor:pointer;padding:2px 8px;'; rm.onclick=function(){dayEntries.splice(ei,1);renderEntries();};
     head.appendChild(rm); blk.appendChild(head);
@@ -252,7 +252,7 @@ function renderEntries(){
     }
     w.appendChild(blk);
   });
-  var add=document.createElement('button'); add.type='button'; add.textContent='+ Προσθήκη βάρδιας'; add.style.cssText='border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:5px 10px;font-size:12px;'; add.onclick=function(){dayEntries.push({code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]});renderEntries();};
+  var add=document.createElement('button'); add.type='button'; add.textContent='+ Προσθήκη βάρδιας'; add.style.cssText='width:100%;border:1px dashed #94a3b8;background:#f8fafc;border-radius:8px;cursor:pointer;padding:7px 10px;font-size:12px;color:#475569;margin-top:2px;'; add.onclick=function(){dayEntries.push({code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]});renderEntries();};
   w.appendChild(add);
 }
 function saveDay(){

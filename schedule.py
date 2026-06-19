@@ -509,6 +509,14 @@ CODE_HOTELNAME = {
     'AST': 'Asterias', 'CNT': 'Central', 'SRG': 'Sergios',
     'PSV': 'Piskopiano', 'IRO': 'Iro', 'PLM': 'Palm',  # v12.52: PLM = Palm Island Suites
 }
+def _hotel_short(name):
+    if not name:
+        return ''
+    nl = name.lower()
+    for _code, _pref in CODE_HOTELNAME.items():
+        if _pref.lower() in nl:
+            return _code
+    return name.split()[0][:4].upper()
 _LABELS = {'τμημα': 'dept', 'ειδικοτητα': 'spec', 'εταιρεια': 'comp', 'υποκ': 'upok',
            'επωνυμο': 'epon', 'ονομα': 'onoma'}
 
@@ -762,7 +770,8 @@ def week_grid(hotel_id, dept_id, week_start):
                     _tm = ' & '.join("%s-%s" % (s.get('start'), s.get('end')) for s in _es) if _es else ''
                     _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hotel_id) else None
                     _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
-                                     'times': _tm, 'hotel': _hn, 'color': _colors.get(a.shift_code, '#64748b')})
+                                     'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
+                                     'color': _colors.get(a.shift_code, '#64748b')})
                 cells.append({'date': d.isoformat(), 'code': first.shift_code, 'segs': fsegs,
                               'label': '\n'.join(labels), 'hours': round(day_hours, 1),
                               'elsewhere': bool(first.work_hotel_id and first.work_hotel_id != hotel_id),
