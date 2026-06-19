@@ -125,7 +125,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
               {% set a = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
                   {% if can_edit %}data-edit="1"{% endif %} data-uid="{{ x.user.id }}" data-date="{{ dh.iso }}"
-                  data-di="{{ dh.d }}" data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
+                  data-di="{{ dh.d }}" data-wh="{{ a.work_hotel_id if a and a.work_hotel_id else '' }}" data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
                 {% if a %}<span class="cell" data-c="{{ a.shift_code }}">{{ a.shift_code }}</span>{% else %}<span class="cell empty">·</span>{% endif %}
               </td>
             {% endfor %}
@@ -169,7 +169,7 @@ document.querySelectorAll('.scroll').forEach(function(sc){
 <div class="editor" id="editor">
   <h5 id="ed-title" style="margin:0 0 2px;font-size:13px;">Βάρδια</h5><div id="ed-range" style="font-size:11px;color:#64748b;margin-bottom:5px;"></div>
   <div class="codes" id="ed-codes"></div>
-  <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον βάρδια</button></div>
+  <div id="ed-segwrap" style="display:none;margin:6px 0;"><div id="ed-segs"></div><button type="button" onclick="addSeg()" style="border:1px dashed #94a3b8;background:#f8fafc;border-radius:7px;cursor:pointer;padding:4px 9px;font:inherit;font-size:12px;margin-top:4px;">+ Επιπλέον βάρδια</button><div style="margin-top:6px;"><label style="font-size:11px;color:#64748b;display:block;">Ξενοδοχείο εργασίας</label><select id="ed-hotel" style="width:100%;padding:5px;border:1px solid #dbe3ea;border-radius:6px;"><option value="">(έδρα — προεπιλογή)</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div></div>
   <div class="acts"><button onclick="clearCell()" style="background:#fee2e2;color:#b91c1c;"><i class="ti ti-trash"></i> Καθάρισε</button><button onclick="saveCell()" style="background:var(--accent,#185FA5);color:#fff;">Αποθήκευση</button></div>
 </div>
 <script>
@@ -224,19 +224,20 @@ function openEd(){
   segState = ex.length?ex.map(function(s){return {start:s.start,end:s.end};}):[{start:'07:00',end:'15:30'}];
   pick(last.getAttribute('data-code')||'ΕΡΓ',true);
   renderSegs();
+  var _hs=document.getElementById('ed-hotel'); if(_hs)_hs.value=(last.getAttribute('data-wh')||'');
   var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
   ed.style.display='block';ed.style.left=Math.min(rc.left+(window.scrollX||0),window.innerWidth-260)+'px';ed.style.top=(rc.bottom+(window.scrollY||0)+6)+'px';
 }
 function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημ. · '):'')+'Κωδικός: '+code;document.getElementById('ed-segwrap').style.display=(code==='ΕΡΓ'||code==='ΕΩ')?'block':'none';if(!silent&&code!=='ΕΡΓ'&&code!=='ΕΩ')saveCell();}
 function segsNow(){if(pickedCode!=='ΕΡΓ'&&pickedCode!=='ΕΩ')return [];return segState.filter(function(s){return s.start&&s.end;});}
 function presenceOf(segs){var t=0;segs.forEach(function(s){var a=(s.start||'0:0').split(':'),b=(s.end||'0:0').split(':');var x=+a[0]*60+ +a[1],y=+b[0]*60+ +b[1];if(y<=x)y+=1440;t+=(y-x)/60;});return t;}
-function apply(code){if(!curSel.length)return;var segs=segsNow();
+function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(document.getElementById('ed-hotel')||{}).value||null;
   if(code==='ΕΡΓ'&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var uid=curSel[0].getAttribute('data-uid');
   var dates=curSel.map(function(c){return c.getAttribute('data-date');});
-  var url,body;if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segs};}
-  else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segs};}
+  var url,body;if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segs,work_hotel_id:wh};}
+  else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segs,work_hotel_id:wh};}
   fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
 }
 function saveCell(){apply(pickedCode);}

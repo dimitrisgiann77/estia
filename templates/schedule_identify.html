@@ -75,7 +75,7 @@ details summary{cursor:pointer;color:var(--accent,#185FA5);font-size:13px;font-w
       <div class="meta" style="margin-top:8px;">Προτεινόμενα προφίλ (εσύ επιβεβαιώνεις):</div>
       {% for s in it.suggestions %}
       <div class="sg">
-        {% if s.locked %}<span class="k lock">🔒 Λογιστήριο</span>{% else %}<span class="k mgmt">Management</span>{% endif %}
+        {% if s.locked %}<span class="k lock">🔒 Οριστικοποιημένο</span>{% else %}<span class="k mgmt">Management</span>{% endif %}
         <span class="nm">{{ s.name }}</span>
         <span class="meta">{% if s.emp_code %}Κωδ: <b>{{ s.emp_code }}</b>{% endif %}{% if s.afm %} · ΑΦΜ: <b>{{ s.afm }}</b>{% endif %}{% if not s.emp_code and not s.afm %}<i>χωρίς κλειδιά</i>{% endif %}</span>
         <span class="sc">{{ s.score }}%</span>
@@ -122,7 +122,7 @@ function schSearch(inp, norm){
       var h='';
       rows.forEach(function(s){
         h+='<div class="sg">'+
-           (s.locked?'<span class="k lock">🔒 Λογιστήριο</span>':'<span class="k mgmt">Management</span>')+
+           (s.locked?'<span class="k lock">🔒 Οριστικοποιημένο</span>':'<span class="k mgmt">Management</span>')+
            '<span class="nm">'+(s.name||'')+'</span>'+
            '<span class="meta">'+(s.emp_code?('Κωδ: <b>'+s.emp_code+'</b>'):'')+(s.afm?(' · ΑΦΜ: <b>'+s.afm+'</b>'):'')+'</span>'+
            '<form method="POST" action="/dashboard/schedule/identify/link'+(EMBED?'?embed=1':'')+'" style="margin:0 0 0 auto;">'+

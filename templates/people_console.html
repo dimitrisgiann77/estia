@@ -49,7 +49,7 @@ html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
 
   <div class="tabs">
     <span class="tab on" data-sec="people" data-cat="all" onclick="setTab(this)">Όλοι <span class="n">{{ counts.all }}</span></span>
-    <span class="tab" data-sec="people" data-cat="locked" onclick="setTab(this)">🔒 Λογιστήριο <span class="n">{{ counts.locked }}</span></span>
+    <span class="tab" data-sec="people" data-cat="locked" onclick="setTab(this)">🔒 Οριστικοποιημένο <span class="n">{{ counts.locked }}</span></span>
     <span class="tab" data-sec="people" data-cat="staff" onclick="setTab(this)">Management <span class="n">{{ counts.staff }}</span></span>
     <span class="tab" data-sec="people" data-cat="login" onclick="setTab(this)">Λογαριασμοί <span class="n">{{ counts.login }}</span></span>
     <span class="tab" data-sec="pending" onclick="setTab(this)">Ασύνδετα <span class="n">{{ pend }}</span></span>
@@ -100,7 +100,7 @@ html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
       <div class="meta">Προτεινόμενα προφίλ:</div>
       {% for s in it.suggestions %}
       <div class="sg">
-        {% if s.locked %}<span class="cbadge lock">🔒 Λογιστήριο</span>{% else %}<span class="cbadge mgmt">Management</span>{% endif %}
+        {% if s.locked %}<span class="cbadge lock">🔒 Οριστικοποιημένο</span>{% else %}<span class="cbadge mgmt">Management</span>{% endif %}
         <span class="nm">{{ s.name }}</span>
         <span class="meta">{% if s.emp_code %}Κωδ: <b>{{ s.emp_code }}</b>{% endif %}{% if s.afm %} · ΑΦΜ <b>{{ s.afm }}</b>{% endif %}{% if not s.emp_code and not s.afm %}<i>χωρίς κλειδιά</i>{% endif %}</span>
         <span class="sc">{{ s.score }}%</span>
@@ -170,7 +170,7 @@ function schSearch(inp,norm){
   fetch('/dashboard/schedule/identify/search?q='+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(rows){
     if(!rows.length){box.innerHTML='<div class="meta" style="padding:6px;">Καμία αντιστοιχία.</div>';return;}
     var h='';rows.forEach(function(s){
-      h+='<div class="sg">'+(s.locked?'<span class="cbadge lock">🔒 Λογιστήριο</span>':'<span class="cbadge mgmt">Management</span>')+
+      h+='<div class="sg">'+(s.locked?'<span class="cbadge lock">🔒 Οριστικοποιημένο</span>':'<span class="cbadge mgmt">Management</span>')+
       '<span class="nm">'+(s.name||'')+'</span><span class="meta">'+(s.emp_code?('Κωδ '+s.emp_code):'')+(s.afm?(' · ΑΦΜ '+s.afm):'')+'</span>'+
       '<form method="POST" action="/dashboard/schedule/identify/link" style="margin:0 0 0 auto;"><input type="hidden" name="norm_name" value="'+norm+'"><input type="hidden" name="master_id" value="'+s.id+'"><input type="hidden" name="back" value="/dashboard/people?tab=pending"><button class="cbtn g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button></form></div>';
     });box.innerHTML=h;

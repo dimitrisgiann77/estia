@@ -738,10 +738,10 @@ def week_grid(hotel_id, dept_id, week_start):
                 cells.append({'date': d.isoformat(), 'code': a.shift_code, 'segs': segs,
                               'label': label, 'hours': round(hrs, 1),
                               'elsewhere': bool(a.work_hotel_id and a.work_hotel_id != hotel_id),
-                              'note': a.note or ''})
+                              'wh': a.work_hotel_id, 'note': a.note or ''})
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
-                              'elsewhere': False, 'note': ''})
+                              'elsewhere': False, 'wh': None, 'note': ''})
         rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days})
     return days, rows
 
@@ -856,7 +856,7 @@ def schedule_cell():
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     note = (d.get('note') or '')[:200]
-    whid = d.get('work_hotel_id')
+    whid = d.get('work_hotel_id'); whid = int(whid) if whid else None
     a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
     if not code:
         if a:
@@ -911,6 +911,7 @@ def schedule_cells_bulk():
         return jsonify(ok=False, err='bad'), 400
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
+    _whid = d.get('work_hotel_id'); _whid = int(_whid) if _whid else None
     if code == 'ΕΡΓ' and not segs:
         st = ShiftType.query.filter_by(code='ΕΡΓ').first()
         if st and st.default_start and st.default_end:
@@ -938,6 +939,7 @@ def schedule_cells_bulk():
                 db.session.add(a)
             a.shift_code = code
             a.segments = json.dumps(segs, ensure_ascii=False)
+            a.work_hotel_id = _whid
         weeks.add(monday_of(wd))
         done += 1
     # WeekPlan -> draft για τις επηρεασμενες εβδομαδες (οπως το single)

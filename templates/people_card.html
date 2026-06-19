@@ -10,7 +10,7 @@
   </div>
 
   <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;">
-    {% if u.locked %}<span class="cbadge lock">🔒 Λογιστήριο</span>
+    {% if u.locked %}<span class="cbadge lock">🔒 Οριστικοποιημένο</span>
     {% elif u.login %}<span class="cbadge login">λογαριασμός</span>
     {% else %}<span class="cbadge mgmt">Management</span>{% endif %}
     {% if u.login %}<span class="cbadge ok">login ✓</span>{% else %}<span class="cbadge muted">χωρίς login</span>{% endif %}
@@ -25,6 +25,18 @@
     <tr><td class="k">Τμήμα</td><td class="v">{{ u.dept or '—' }}</td></tr>
     <tr><td class="k">Βάρδιες</td><td class="v">{{ u.shifts }}</td></tr>
   </table>
+
+  {% if history %}
+  <div style="margin-top:14px;">
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">Ιστορικό απασχόλησης</div>
+    <table style="width:100%;font-size:12px;border-collapse:collapse;">
+      <tr style="color:#94a3b8;"><td>Έτος</td><td>Ξενοδοχείο</td><td style="text-align:right;">Μέρες</td><td style="text-align:right;">Ώρες</td><td style="text-align:right;">Έξτρα</td></tr>
+      {% for h in history %}
+      <tr style="border-top:1px solid #eef2f6;"><td>{{ h.year }}</td><td>{{ h.hotel }}</td><td style="text-align:right;">{{ h.days }}</td><td style="text-align:right;">{{ h.hours }}</td><td style="text-align:right;">{{ h.extra }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
 
   <div style="margin-top:14px;display:flex;flex-direction:column;gap:7px;">
     <a class="cbtn" href="/dashboard/payroll/employee/{{ u.id }}?embed=1"><i class="ti ti-id"></i> Πλήρης καρτέλα</a>

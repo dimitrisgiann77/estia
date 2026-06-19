@@ -128,6 +128,31 @@ def people_console():
                            dup_rows=dup_rows, is_admin=is_admin())
 
 
+def _work_history(uid):
+    """v12.127 — ιστορικό απασχόλησης ανά έτος × ξενοδοχείο (από βάρδιες). hotel = work_hotel ή home."""
+    try:
+        from schedule import ShiftAssignment, is_work_code, assignment_hours, worked_hours, extra_hours
+    except Exception:
+        return []
+    u = User.query.get(uid)
+    home = getattr(u, 'home_hotel_id', None) if u else None
+    hotels = {h.id: h.name for h in Hotel.query.all()}
+    agg = {}
+    for a in ShiftAssignment.query.filter_by(user_id=uid).all():
+        if not is_work_code(a.shift_code):
+            continue
+        yr = a.work_date.year if a.work_date else 0
+        hid = a.work_hotel_id or home
+        d = agg.setdefault((yr, hid), {'days': 0, 'hours': 0.0, 'extra': 0.0})
+        d['days'] += 1; d['hours'] += worked_hours(a); d['extra'] += extra_hours(assignment_hours(a))
+    rows = []
+    for (yr, hid), d in agg.items():
+        rows.append({'year': yr, 'hotel': hotels.get(hid, '—'),
+                     'days': d['days'], 'hours': round(d['hours'], 1), 'extra': round(d['extra'], 1)})
+    rows.sort(key=lambda r: (-r['year'], r['hotel']))
+    return rows
+
+
 @app.route('/dashboard/people/card/<int:uid>')
 def people_card(uid):
     if not is_admin():
@@ -151,7 +176,7 @@ def people_card(uid):
         'dept': depts.get(getattr(u, 'department_id', None)),
         'shifts': shifts.get(u.id, 0),
     }
-    return render_template('people_card.html', u=info)
+    return render_template('people_card.html', u=info, history=_work_history(uid))
 
 
 @app.route('/dashboard/people/login/<int:uid>', methods=['POST'])

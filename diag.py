@@ -230,7 +230,7 @@ def do_search(q):
             continue
         has_hr = bool(pii or getattr(u, 'home_hotel_id', None) or getattr(u, 'department_id', None) or u.id in sh_uids)
         if u.id in locked:
-            tag = '🔒 Λογιστήριο'; url = '/dashboard/payroll/employee/%d?embed=1' % u.id
+            tag = '🔒 Οριστικοποιημένο'; url = '/dashboard/payroll/employee/%d?embed=1' % u.id
         elif getattr(u, 'login_enabled', None) is True or (role_rank(u.role) >= ROLE_RANK['manager']):
             tag = 'λογαριασμός (login)'; url = ('/dashboard/payroll/employee/%d?embed=1' % u.id) if has_hr else '/dashboard/users?embed=1'
         elif has_hr:
