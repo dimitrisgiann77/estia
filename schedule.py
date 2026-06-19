@@ -1226,6 +1226,105 @@ def schedule_monthly_pdf():
     return Response(out, mimetype='application/pdf',
         headers={'Content-Disposition': 'attachment; filename=%s' % fn})
 
+# ── v12.116 — ΕΠΟΠΤΕΙΑ ΠΡΟΓΡΑΜΜΑΤΟΣ (τι κάνουν οι managers, μηνιαία) ───────────
+def _oversight_weeks(year, month):
+    import calendar as _cal
+    ndays = _cal.monthrange(year, month)[1]
+    first = date(year, month, 1); last = date(year, month, ndays)
+    w = monday_of(first); weeks = []
+    while w <= last:
+        weeks.append(w); w = w + timedelta(days=7)
+    return weeks
+
+
+def _oversight_data(year, month):
+    weeks = _oversight_weeks(year, month)
+    wkmin, wkmax = weeks[0], weeks[-1]
+    umap = {u.id: u for u in User.query.all()}
+    def uname(uid): 
+        u = umap.get(uid); return (u.full_name if u else '—')
+    # WeekPlans + Submissions στο εύρος
+    wps = WeekPlan.query.filter(WeekPlan.week_start >= wkmin, WeekPlan.week_start <= wkmax).all()
+    subs = (ScheduleSubmission.query
+            .filter(ScheduleSubmission.week_start >= wkmin, ScheduleSubmission.week_start <= wkmax).all())
+    wp_idx = {}
+    for wp in wps:
+        wp_idx[(wp.hotel_id, wp.department_id, wp.week_start)] = wp
+    sub_idx = {}
+    for s in subs:
+        k = (s.hotel_id, s.week_start)
+        if k not in sub_idx or (s.version or 0) > (sub_idx[k].version or 0):
+            sub_idx[k] = s
+    STAT = {'draft': ('Πρόχειρο', '#fde68a', '#92400e'),
+            'submitted': ('Υποβλήθηκε', '#bbf7d0', '#166534'),
+            'locked': ('Κλειδώθηκε', '#bfdbfe', '#1e40af')}
+    # ── BY HOTEL ──
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    by_hotel = []
+    for h in hotels:
+        depts = _depts_present(h.id)
+        rows = []
+        done = total = 0
+        for d in depts:
+            cells = []
+            for wk in weeks:
+                wp = wp_idx.get((h.id, d.id, wk))
+                total += 1
+                st = wp.status if wp else None
+                if st in ('submitted', 'locked'): done += 1
+                cells.append({'wk': wk, 'status': st,
+                              'label': (STAT.get(st, ('—', '#f1f5f9', '#94a3b8'))[0] if st else '—'),
+                              'bg': (STAT.get(st, ('', '#f8fafc', ''))[1] if st else '#f8fafc'),
+                              'fg': (STAT.get(st, ('', '', '#94a3b8'))[2] if st else '#94a3b8'),
+                              'by': (uname(wp.updated_by) if wp and wp.updated_by else ''),
+                              'when': (wp.updated_at.strftime('%d/%m %H:%M') if wp and wp.updated_at else '')})
+            rows.append({'dept': d, 'cells': cells})
+        sub_cells = []
+        for wk in weeks:
+            s = sub_idx.get((h.id, wk))
+            sub_cells.append({'wk': wk, 'sub': s,
+                              'by': (uname(s.submitted_by) if s and s.submitted_by else ''),
+                              'when': (s.submitted_at.strftime('%d/%m %H:%M') if s and s.submitted_at else ''),
+                              'ver': (s.version if s else None), 'sid': (s.id if s else None)})
+        by_hotel.append({'hotel': h, 'depts': depts, 'rows': rows, 'subs': sub_cells,
+                         'done': done, 'total': total})
+    # ── BY MANAGER ── (όποιος έχει δραστηριότητα στην περίοδο)
+    actor_ids = set([wp.updated_by for wp in wps if wp.updated_by] +
+                    [s.submitted_by for s in subs if s.submitted_by])
+    mgr = []
+    for uid in actor_ids:
+        u = umap.get(uid)
+        if not u:
+            continue
+        my_wp = [wp for wp in wps if wp.updated_by == uid]
+        my_sub = [s for s in subs if s.submitted_by == uid]
+        hotel_ids = set([wp.hotel_id for wp in my_wp] + [s.hotel_id for s in my_sub])
+        hotel_names = ', '.join(sorted({(Hotel.query.get(hid).name if Hotel.query.get(hid) else '—') for hid in hotel_ids}))
+        times = [wp.updated_at for wp in my_wp if wp.updated_at] + [s.submitted_at for s in my_sub if s.submitted_at]
+        last = max(times) if times else None
+        sub_list = sorted(my_sub, key=lambda s: s.submitted_at or datetime.min, reverse=True)
+        mgr.append({'user': u, 'role': u.role, 'n_wp': len(my_wp), 'n_sub': len(my_sub),
+                    'hotels': hotel_names, 'last': (last.strftime('%d/%m/%Y %H:%M') if last else '—'),
+                    'subs': sub_list})
+    mgr.sort(key=lambda m: (-(m['n_sub'] + m['n_wp']), m['user'].full_name or ''))
+    return {'weeks': weeks, 'by_hotel': by_hotel, 'by_manager': mgr}
+
+
+@app.route('/dashboard/schedule/oversight')
+def schedule_oversight():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    year = request.args.get('year', type=int) or date.today().year
+    month = request.args.get('month', type=int) or date.today().month
+    view = request.args.get('view') or 'hotel'
+    data = _oversight_data(year, month)
+    return render_template('schedule_oversight.html', data=data, year=year, month=month,
+        view=view, months=MONTHS_EL, years=list(range(date.today().year - 2, date.today().year + 2)),
+        is_admin=is_admin())
+
+
+
+
 
 
 # ── IMPORT page (upload workbook) ─────────────────────────────────────────────
