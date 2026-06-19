@@ -1,0 +1,179 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μηνιαία συγκεντρωτική', theme.primary) }}
+<style>
+.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 13px;border-radius:9px;cursor:pointer;font:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.b.x{background:#fff;color:#185FA5;border:1px solid #cdd9e5;}
+.b.gr{background:#16794a;} .b.rd{background:#b91c1c;}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.filters label{font-size:12px;color:#64748b;display:block;margin-bottom:3px;}
+.filters select{padding:7px 9px;border:1px solid #dbe3ea;border-radius:9px;font:inherit;background:#fff;}
+html[data-theme="dark"] .filters select{background:#16202c;color:#e2e8f0;border-color:#33475b;}
+.seg{display:inline-flex;border:1px solid #cdd9e5;border-radius:9px;overflow:hidden;}
+.seg a{padding:7px 14px;font-size:13px;text-decoration:none;color:#475569;background:#fff;}
+.seg a.on{background:var(--accent,#185FA5);color:#fff;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{border:1px solid #e6ecf2;padding:5px 8px;text-align:center;}
+html[data-theme="dark"] th,html[data-theme="dark"] td{border-color:#2b3a4a;}
+th{background:#f1f5f9;color:#334155;font-weight:600;}
+html[data-theme="dark"] th{background:#1c2937;color:#cbd5e1;}
+td.name{text-align:left;white-space:nowrap;font-weight:600;}
+tr.sub td{background:#eef4fb;font-weight:700;}
+html[data-theme="dark"] tr.sub td{background:#15293c;}
+.hotelhead{margin:18px 0 6px;font-size:16px;font-weight:700;color:var(--accent,#185FA5);}
+.tot{font-weight:700;background:#f8fafc;}
+html[data-theme="dark"] .tot{background:#16202c;}
+.scroll{overflow-x:auto;}
+.gtable td.day{min-width:34px;padding:2px;font-size:11px;}
+.gtable th.day{min-width:34px;font-size:10px;padding:2px;}
+.we{background:#fef6f0;} html[data-theme="dark"] .we{background:#2a2018;}
+.hol{background:#fdeaea;} html[data-theme="dark"] .hol{background:#3a1f1f;}
+.cell{cursor:default;border-radius:4px;padding:2px 3px;font-size:10.5px;color:#fff;display:block;min-height:15px;}
+.cell.empty{color:#cbd5e1;background:transparent;}
+td.edit{cursor:pointer;}
+.grand{margin-top:14px;padding:12px 16px;border-radius:12px;background:var(--accent,#185FA5);color:#fff;font-weight:600;display:flex;gap:18px;flex-wrap:wrap;}
+.editor{position:absolute;display:none;background:#fff;border:1px solid #cdd9e5;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px;z-index:50;min-width:220px;}
+html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
+.editor .codes{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0;}
+.editor .codes button{border:none;color:#fff;border-radius:7px;padding:5px 9px;cursor:pointer;font:inherit;font-size:12px;}
+.editor .times{display:none;gap:6px;align-items:center;margin:6px 0;}
+.editor .times input{padding:4px;border:1px solid #dbe3ea;border-radius:6px;}
+.editor .acts{display:flex;gap:6px;justify-content:space-between;margin-top:8px;}
+.editor .acts button{border:none;border-radius:7px;padding:6px 10px;cursor:pointer;font:inherit;}
+.legend{margin-top:12px;font-size:12px;color:#64748b;display:flex;gap:14px;flex-wrap:wrap;}
+.legend .dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+.empty-st{text-align:center;color:#64748b;padding:40px;}
+</style></head><body>
+{{ mp.topbar('calendar-stats', 'ΕΣΤΙΑ — Μηνιαία συγκεντρωτική κατάσταση', 'Σύνολα ωρών/ρεπό/εργάσιμων ανά εργαζόμενο & ξενοδοχείο — για μεροκάματα') }}
+<div class="container">
+
+  <form method="GET" class="card filters" id="ff">
+    <div><label>Μήνας</label>
+      <select name="month" onchange="document.getElementById('ff').submit()">
+        {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==month }}>{{ months[m] }}</option>{% endfor %}
+      </select></div>
+    <div><label>Έτος</label>
+      <select name="year" onchange="document.getElementById('ff').submit()">
+        {% for y in years %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}
+      </select></div>
+    <div><label>Ξενοδοχείο</label>
+      <select name="hotel_id" onchange="document.getElementById('ff').submit()">
+        <option value="0">Όλα</option>
+        {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}
+      </select></div>
+    <div><label>Τμήμα</label>
+      <select name="dept" onchange="document.getElementById('ff').submit()">
+        <option value="0">Όλα</option>
+        {% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==dept_id }}>{{ d.name }}</option>{% endfor %}
+      </select></div>
+    <input type="hidden" name="view" value="{{ view }}">
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+      <div class="seg">
+        <a href="?year={{ year }}&month={{ month }}&hotel_id={{ hotel_id }}&dept={{ dept_id }}&view=summary{{ '&embed=1' if request.args.get('embed') }}" class="{{ 'on' if view!='grid' }}">Σύνοψη</a>
+        <a href="?year={{ year }}&month={{ month }}&hotel_id={{ hotel_id }}&dept={{ dept_id }}&view=grid{{ '&embed=1' if request.args.get('embed') }}" class="{{ 'on' if view=='grid' }}">Αναλυτικό</a>
+      </div>
+      <a class="b gr" href="/dashboard/schedule/monthly.xlsx?year={{ year }}&month={{ month }}&hotel_id={{ hotel_id }}&dept={{ dept_id }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+      <a class="b rd" href="/dashboard/schedule/monthly.pdf?year={{ year }}&month={{ month }}&hotel_id={{ hotel_id }}&dept={{ dept_id }}"><i class="ti ti-file-type-pdf"></i> PDF</a>
+    </div>
+  </form>
+
+  {% if not data.groups %}
+    <div class="card empty-st"><i class="ti ti-calendar-off" style="font-size:34px;display:block;margin-bottom:8px;"></i>
+      Καμία βάρδια για {{ months[month] }} {{ year }} με αυτά τα φίλτρα.</div>
+  {% elif view != 'grid' %}
+    {# ───────── ΣΥΝΟΨΗ ───────── #}
+    <div class="card">
+    {% for g in data.groups %}
+      <div class="hotelhead">🏨 {{ g.hotel.name if g.hotel else '— (χωρίς ξενοδοχείο)' }} <span style="font-size:13px;color:#64748b;font-weight:400;">· {{ g.subtotal.count }} άτομα</span></div>
+      <div class="scroll"><table>
+        <thead><tr><th class="name" style="text-align:left;">Εργαζόμενος</th><th>Τμήμα</th><th>Ώρες</th><th>Έξτρα ώρες</th><th>Κυριακές</th><th>Εργάσιμες</th><th>Ρεπό</th><th>Πληρωτέο*</th></tr></thead>
+        <tbody>
+        {% for x in g.rows %}
+          <tr><td class="name">{{ x.user.full_name }}</td>
+            <td>{{ deptmap.get(x.user.department_id,'') }}</td>
+            <td>{{ x.hours }}</td><td>{{ x.extra }}</td><td>{{ x.sundays }}</td>
+            <td>{{ x.work_days }}</td><td>{{ x.repo }}</td>
+            <td>{{ '%.2f'|format(x.payable) if x.payable else '—' }}</td></tr>
+        {% endfor %}
+          <tr class="sub"><td class="name">Σύνολο</td><td></td>
+            <td>{{ g.subtotal.hours }}</td><td>{{ g.subtotal.extra }}</td><td>{{ g.subtotal.sundays }}</td>
+            <td>{{ g.subtotal.work_days }}</td><td>{{ g.subtotal.repo }}</td>
+            <td>{{ '%.2f'|format(g.subtotal.payable) if g.subtotal.payable else '—' }}</td></tr>
+        </tbody>
+      </table></div>
+    {% endfor %}
+    </div>
+  {% else %}
+    {# ───────── ΑΝΑΛΥΤΙΚΟ GRID (επεξεργάσιμο) ───────── #}
+    {% if can_edit %}<div class="card" style="font-size:13px;color:#475569;"><i class="ti ti-pencil"></i> Κάνε κλικ σε ένα κελί για να αλλάξεις τη βάρδια. Οι αλλαγές αποθηκεύονται αυτόματα (κλειδωμένες εβδομάδες δεν αλλάζουν).</div>{% endif %}
+    {% for g in data.groups %}
+      <div class="card">
+      <div class="hotelhead">🏨 {{ g.hotel.name if g.hotel else '— (χωρίς ξενοδοχείο)' }}</div>
+      <div class="scroll"><table class="gtable">
+        <thead><tr><th class="name" style="text-align:left;position:sticky;left:0;background:#f1f5f9;">Εργαζόμενος</th>
+          {% for dh in day_hdr %}<th class="day {{ 'hol' if dh.hol else ('we' if dh.we) }}">{{ dh.d }}<br>{{ dh.wd }}</th>{% endfor %}
+          <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th></tr></thead>
+        <tbody>
+        {% for x in g.rows %}
+          <tr><td class="name" style="position:sticky;left:0;background:#fff;">{{ x.user.full_name }}</td>
+            {% for dh in day_hdr %}
+              {% set a = x.days.get(dh.d) %}
+              <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
+                  {% if can_edit %}data-edit="1"{% endif %} data-uid="{{ x.user.id }}" data-date="{{ dh.iso }}"
+                  data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
+                {% if a %}<span class="cell" data-c="{{ a.shift_code }}">{{ a.shift_code }}</span>{% else %}<span class="cell empty">·</span>{% endif %}
+              </td>
+            {% endfor %}
+            <td class="tot">{{ x.hours }}</td><td class="tot">{{ x.extra }}</td><td class="tot">{{ x.sundays }}</td>
+            <td class="tot">{{ x.work_days }}</td><td class="tot">{{ x.repo }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if data.groups %}
+  <div class="grand">
+    <span>ΓΕΝΙΚΟ ΣΥΝΟΛΟ ({{ months[month] }} {{ year }})</span>
+    <span>Ώρες: {{ data.grand.hours }}</span>
+    <span>Έξτρα: {{ data.grand.extra }}</span>
+    <span>Κυριακές: {{ data.grand.sundays }}</span>
+    <span>Εργάσιμες: {{ data.grand.work_days }}</span>
+    <span>Ρεπό: {{ data.grand.repo }}</span>
+    <span>Άτομα: {{ data.grand.count }}</span>
+  </div>
+  {% endif %}
+
+  <div class="legend">{% for st in shift_types %}<span><span class="dot" style="background:{{ st.color }}"></span>{{ st.code }} — {{ st.label }}</span>{% endfor %}</div>
+  <p style="font-size:11px;color:#94a3b8;margin-top:8px;">* Πληρωτέο = εκτίμηση βάσει συμφωνίας/ημερομισθίου από το μητρώο (όπου υπάρχει).</p>
+</div>
+
+{% if view=='grid' and can_edit %}
+<div class="editor" id="editor">
+  <h5 id="ed-title" style="margin:0 0 4px;font-size:13px;">Βάρδια</h5>
+  <div class="codes" id="ed-codes"></div>
+  <div class="times" id="ed-times"><input type="time" id="ed-start" value="07:00"> – <input type="time" id="ed-end" value="15:30"></div>
+  <div class="acts"><button onclick="clearCell()" style="background:#fee2e2;color:#b91c1c;"><i class="ti ti-trash"></i> Καθάρισε</button><button onclick="saveCell()" style="background:var(--accent,#185FA5);color:#fff;">Αποθήκευση</button></div>
+</div>
+<script>
+var SHIFTS={{ shift_types_json|safe }}, COLORS={}; SHIFTS.forEach(function(s){COLORS[s.code]=s.color;});
+document.querySelectorAll('.cell[data-c]').forEach(function(c){var col=COLORS[c.getAttribute('data-c')];if(col)c.style.background=col;});
+var cur=null, pickedCode='ΕΡΓ';
+function openEditor(el){ if(el.getAttribute('data-edit')!=='1')return; cur=el;
+  var codes=document.getElementById('ed-codes'); codes.innerHTML='';
+  SHIFTS.forEach(function(s){var b=document.createElement('button');b.textContent=s.code;b.style.background=s.color;b.onclick=function(){pick(s.code);};codes.appendChild(b);});
+  pick(el.getAttribute('data-code')||'ΕΡΓ',true);
+  var segs=[];try{segs=JSON.parse(el.getAttribute('data-segs')||'[]');}catch(e){}
+  if(segs.length){document.getElementById('ed-start').value=segs[0].start;document.getElementById('ed-end').value=segs[0].end;}
+  var rc=el.getBoundingClientRect(),ed=document.getElementById('editor');
+  ed.style.display='block';ed.style.left=Math.min(rc.left+window.scrollX,window.innerWidth-240)+'px';ed.style.top=(rc.bottom+window.scrollY+6)+'px'; }
+function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent='Κωδικός: '+code;document.getElementById('ed-times').style.display=(code==='ΕΡΓ')?'flex':'none';if(!silent&&code!=='ΕΡΓ')saveCell();}
+function payload(){var segs=[];if(pickedCode==='ΕΡΓ')segs=[{start:document.getElementById('ed-start').value,end:document.getElementById('ed-end').value}];return {user_id:cur.getAttribute('data-uid'),date:cur.getAttribute('data-date'),code:pickedCode,segments:segs};}
+function post(b){return fetch('/dashboard/schedule/cell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα — δεν αλλάζει.');return null;}return r.json();});}
+function saveCell(){if(cur)post(payload()).then(function(j){if(j)location.reload();});}
+function clearCell(){if(cur)post({user_id:cur.getAttribute('data-uid'),date:cur.getAttribute('data-date'),code:''}).then(function(j){if(j!==null)location.reload();});}
+document.querySelectorAll('td.edit').forEach(function(td){td.addEventListener('click',function(){openEditor(td);});});
+document.addEventListener('click',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('td.edit'))ed.style.display='none';});
+</script>
+{% endif %}
+</body></html>

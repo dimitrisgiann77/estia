@@ -1013,6 +1013,221 @@ def schedule_export():
         headers={'Content-Disposition': f'attachment; filename={fn}'})
 
 
+# ── v12.115 — ΜΗΝΙΑΙΑ ΣΥΓΚΕΝΤΡΩΤΙΚΗ ΚΑΤΑΣΤΑΣΗ (για μεροκάματα) ────────────────
+def _monthly_rows(year, month, hotel_id=None, dept_id=None):
+    """Ανά εργαζόμενο (home hotel, ΟΛΕΣ οι ώρες μαζί): ώρες/έξτρα/Κυριακές/εργάσιμες/ρεπό
+    + ημερολόγιο μήνα (day->assignment). Group ανά home hotel + υποσύνολα + γενικό σύνολο."""
+    import calendar as _cal
+    ndays = _cal.monthrange(year, month)[1]
+    start = date(year, month, 1)
+    end = date(year + (month // 12), (month % 12) + 1, 1)
+    hol = {h.hol_date for h in Holiday.query.all()}
+    assigns = (ShiftAssignment.query
+               .filter(ShiftAssignment.work_date >= start, ShiftAssignment.work_date < end).all())
+    by_user = {}
+    for a in assigns:
+        by_user.setdefault(a.user_id, []).append(a)
+    rows = []
+    for uid, alist in by_user.items():
+        u = User.query.get(uid)
+        if not u or not u.is_active:
+            continue
+        hh = getattr(u, 'home_hotel_id', None)
+        if hotel_id and hh != hotel_id:
+            continue
+        if dept_id and getattr(u, 'department_id', None) != dept_id:
+            continue
+        days = {}
+        hours = extra = 0.0
+        sundays = work_days = repo = hol_worked = 0
+        for a in alist:
+            days[a.work_date.day] = a
+            if is_work_code(a.shift_code):
+                h = assignment_hours(a)
+                hours += h; extra += extra_hours(h); work_days += 1
+                if a.work_date.weekday() == 6:
+                    sundays += 1
+                if a.work_date in hol:
+                    hol_worked += 1
+            elif a.shift_code == 'ΑΝ':
+                repo += 1
+        prof = EmploymentProfile.query.filter_by(user_id=uid).first()
+        payable = 0.0
+        if prof and getattr(prof, 'agreement_amount', None):
+            if getattr(prof, 'agreement_type', None) == 'Management':
+                payable = round(prof.agreement_amount, 2)
+            else:
+                payable = round((getattr(prof, 'day_wage', 0) or 0) * work_days + extra_wage(prof, extra), 2)
+        rows.append({'user': u, 'hotel_id': hh, 'days': days,
+                     'hours': round(hours, 1), 'extra': round(extra, 1),
+                     'sundays': sundays, 'holidays': hol_worked,
+                     'work_days': work_days, 'repo': repo, 'payable': payable})
+    rows.sort(key=lambda r: (r['user'].full_name or ''))
+    hotels_by_id = {h.id: h for h in Hotel.query.all()}
+    groups = {}
+    for r in rows:
+        groups.setdefault(r['hotel_id'], []).append(r)
+    def _sub(rs):
+        return {'hours': round(sum(x['hours'] for x in rs), 1),
+                'extra': round(sum(x['extra'] for x in rs), 1),
+                'sundays': sum(x['sundays'] for x in rs),
+                'holidays': sum(x['holidays'] for x in rs),
+                'work_days': sum(x['work_days'] for x in rs),
+                'repo': sum(x['repo'] for x in rs),
+                'payable': round(sum(x['payable'] for x in rs), 2),
+                'count': len(rs)}
+    out = []
+    for hid, rs in sorted(groups.items(),
+                          key=lambda kv: (hotels_by_id.get(kv[0]).name if hotels_by_id.get(kv[0]) else 'zzz')):
+        out.append({'hotel': hotels_by_id.get(hid), 'rows': rs, 'subtotal': _sub(rs)})
+    return {'groups': out, 'grand': _sub(rows), 'ndays': ndays}
+
+
+def _monthly_args():
+    year = request.args.get('year', type=int) or date.today().year
+    month = request.args.get('month', type=int) or date.today().month
+    hotel_id = request.args.get('hotel_id', type=int) or 0
+    dept_id = request.args.get('dept', type=int) or 0
+    return year, month, hotel_id, dept_id
+
+
+@app.route('/dashboard/schedule/monthly')
+def schedule_monthly():
+    if not _auth() or not (is_admin() or is_accountant()):
+        return redirect(url_for('login'))
+    user = current_user()
+    year, month, hotel_id, dept_id = _monthly_args()
+    view = request.args.get('view') or 'summary'
+    data = _monthly_rows(year, month, hotel_id or None, dept_id or None)
+    hotels = allowed_hotels(user) or Hotel.query.order_by(Hotel.name).all()
+    depts = Department.query.order_by(Department.name).all()
+    deptmap = {d.id: d.name for d in depts}
+    hol = {h.hol_date for h in Holiday.query.all()}
+    WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
+    day_hdr = []
+    for d in range(1, data['ndays'] + 1):
+        dt = date(year, month, d)
+        day_hdr.append({'d': d, 'wd': WD[dt.weekday()], 'we': dt.weekday() >= 5,
+                        'hol': dt in hol, 'iso': dt.isoformat()})
+    shift_types = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
+    return render_template('schedule_monthly.html', data=data, year=year, month=month,
+        hotel_id=hotel_id, dept_id=dept_id, view=view, hotels=hotels, depts=depts, deptmap=deptmap,
+        months=MONTHS_EL, day_hdr=day_hdr, ndays=data['ndays'],
+        can_edit=(can_edit_schedule() and is_admin()),
+        shift_types=shift_types,
+        shift_types_json=json.dumps([{'code': s.code, 'color': s.color} for s in shift_types], ensure_ascii=False),
+        years=list(range(date.today().year - 2, date.today().year + 2)),
+        is_admin=is_admin())
+
+
+@app.route('/dashboard/schedule/monthly.xlsx')
+def schedule_monthly_xlsx():
+    if not _auth() or not (is_admin() or is_accountant()):
+        return redirect(url_for('login'))
+    import openpyxl, io
+    from openpyxl.styles import Font, PatternFill
+    year, month, hotel_id, dept_id = _monthly_args()
+    data = _monthly_rows(year, month, hotel_id or None, dept_id or None)
+    deptmap = {d.id: d.name for d in Department.query.all()}
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Μηνιαία'
+    navy = PatternFill('solid', fgColor='193847')
+    def boldrow(size=11):
+        for c in range(1, 10):
+            ws.cell(row=ws.max_row, column=c).font = Font(bold=True, size=size)
+    ws.append(['Εστία — Μηνιαία συγκεντρωτική · %s %d' % (MONTHS_EL[month], year)])
+    ws['A1'].font = Font(bold=True, size=14, color='193847')
+    ws.append([])
+    ws.append(['Ξενοδοχείο', 'Ονοματεπώνυμο', 'Τμήμα', 'Ώρες', 'Έξτρα ώρες',
+               'Κυριακές', 'Εργάσιμες', 'Ρεπό', 'Πληρωτέο'])
+    for c in range(1, 10):
+        cc = ws.cell(row=ws.max_row, column=c); cc.font = Font(bold=True, color='FFFFFF'); cc.fill = navy
+    for g in data['groups']:
+        hn = g['hotel'].name if g['hotel'] else '— (χωρίς ξενοδοχείο)'
+        for x in g['rows']:
+            ws.append([hn, x['user'].full_name, deptmap.get(getattr(x['user'], 'department_id', None), ''),
+                       x['hours'], x['extra'], x['sundays'], x['work_days'], x['repo'], x['payable']])
+        s = g['subtotal']
+        ws.append(['Σύνολο · %s' % hn, '', '', s['hours'], s['extra'], s['sundays'],
+                   s['work_days'], s['repo'], s['payable']]); boldrow()
+    gd = data['grand']
+    ws.append(['ΓΕΝΙΚΟ ΣΥΝΟΛΟ', '', '', gd['hours'], gd['extra'], gd['sundays'],
+               gd['work_days'], gd['repo'], gd['payable']]); boldrow(12)
+    widths = [26, 30, 18, 9, 11, 10, 11, 8, 12]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    fn = 'estia_monthly_%d_%02d.xlsx' % (year, month)
+    return Response(bio.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=%s' % fn})
+
+
+@app.route('/dashboard/schedule/monthly.pdf')
+def schedule_monthly_pdf():
+    if not _auth() or not (is_admin() or is_accountant()):
+        return redirect(url_for('login'))
+    from fpdf import FPDF
+    year, month, hotel_id, dept_id = _monthly_args()
+    data = _monthly_rows(year, month, hotel_id or None, dept_id or None)
+    deptmap = {d.id: d.name for d in Department.query.all()}
+    NAVY = (25, 56, 71); GREY = (120, 120, 120)
+    pdf = FPDF(orientation='L', unit='mm', format='A4'); pdf.set_auto_page_break(True, margin=12)
+    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.add_page()
+    try:
+        pdf.image(os.path.join(BASE_DIR, 'static', 'img', 'logo.png'), x=12, y=9, h=13)
+    except Exception:
+        pass
+    pdf.set_xy(30, 10); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'Εστία — Μηνιαία συγκεντρωτική κατάσταση', ln=1)
+    pdf.set_x(30); pdf.set_font('dv', '', 10); pdf.set_text_color(*GREY)
+    pdf.cell(0, 6, '%s %d · Εκτύπωση: %s' % (MONTHS_EL[month], year, date.today().strftime('%d/%m/%Y')), ln=1)
+    pdf.ln(5)
+    headers = ['Ονοματεπώνυμο', 'Τμήμα', 'Ώρες', 'Έξτρα', 'Κυρ.', 'Εργάσ.', 'Ρεπό', 'Πληρωτέο']
+    widths = [82, 55, 24, 24, 20, 24, 18, 30]
+    def hdr():
+        pdf.set_font('dv', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*NAVY)
+        for h, w in zip(headers, widths):
+            pdf.cell(w, 8, h, border=0, fill=True, align='L')
+        pdf.ln(8)
+    for g in data['groups']:
+        hn = g['hotel'].name if g['hotel'] else '— (χωρίς ξενοδοχείο)'
+        pdf.set_font('dv', 'B', 11); pdf.set_text_color(*NAVY)
+        pdf.cell(0, 8, hn, ln=1)
+        hdr()
+        fill = False
+        for x in g['rows']:
+            pdf.set_fill_color(243, 247, 250) if fill else pdf.set_fill_color(255, 255, 255)
+            pdf.set_font('dv', '', 8.5); pdf.set_text_color(40, 40, 40)
+            vals = [x['user'].full_name, deptmap.get(getattr(x['user'], 'department_id', None), ''),
+                    x['hours'], x['extra'], x['sundays'], x['work_days'], x['repo'], x['payable']]
+            for val, w in zip(vals, widths):
+                s = str(val)
+                while s and pdf.get_string_width(s) > w - 2 and len(s) > 3:
+                    s = s[:-2]
+                pdf.cell(w, 7, s, border=0, fill=True, align='L')
+            pdf.ln(7); fill = not fill
+        s = g['subtotal']
+        pdf.set_font('dv', 'B', 9); pdf.set_text_color(*NAVY); pdf.set_fill_color(225, 235, 245)
+        sub = ['Σύνολο · %s' % hn, '', s['hours'], s['extra'], s['sundays'], s['work_days'], s['repo'], s['payable']]
+        for val, w in zip(sub, widths):
+            ss = str(val)
+            while ss and pdf.get_string_width(ss) > w - 2 and len(ss) > 3:
+                ss = ss[:-2]
+            pdf.cell(w, 7, ss, border=0, fill=True, align='L')
+        pdf.ln(10)
+    gd = data['grand']
+    pdf.set_font('dv', 'B', 11); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ: %s ώρες · %s έξτρα · %s Κυρ. · %s εργάσιμες · %s ρεπό · %s €'
+             % (gd['hours'], gd['extra'], gd['sundays'], gd['work_days'], gd['repo'], gd['payable']), ln=1)
+    out = bytes(pdf.output())
+    fn = 'estia_monthly_%d_%02d.pdf' % (year, month)
+    return Response(out, mimetype='application/pdf',
+        headers={'Content-Disposition': 'attachment; filename=%s' % fn})
+
+
+
 # ── IMPORT page (upload workbook) ─────────────────────────────────────────────
 @app.route('/dashboard/schedule/import', methods=['GET', 'POST'])
 def schedule_import():
