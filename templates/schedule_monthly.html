@@ -22,7 +22,13 @@ html[data-theme="dark"] tr.sub td{background:#15293c;}
 .hotelhead{margin:18px 0 6px;font-size:16px;font-weight:700;color:var(--accent,#185FA5);}
 .tot{font-weight:700;background:#f8fafc;}
 html[data-theme="dark"] .tot{background:#16202c;}
-.scroll{overflow-x:auto;}
+.scroll{overflow-x:auto;cursor:grab;}
+.scroll.drag{cursor:grabbing;user-select:none;}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle;}
+.tag.lock{background:#e7f0fb;color:#185FA5;} .tag.mgmt{background:#eef2f6;color:#64748b;} .tag.afm{background:#f1f5f9;color:#475569;}
+html[data-theme="dark"] .tag.afm{background:#1c2937;color:#cbd5e1;}
+td.sel{outline:2px solid var(--accent,#185FA5);outline-offset:-2px;}
+.container{max-width:none !important;}
 .gtable td.day{min-width:34px;padding:2px;font-size:11px;}
 .gtable th.day{min-width:34px;font-size:10px;padding:2px;}
 .we{background:#fef6f0;} html[data-theme="dark"] .we{background:#2a2018;}
@@ -88,7 +94,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
         <thead><tr><th class="name" style="text-align:left;">Εργαζόμενος</th><th>Τμήμα</th><th>Ώρες</th><th>Έξτρα ώρες</th><th>Κυριακές</th><th>Εργάσιμες</th><th>Ρεπό</th><th>Πληρωτέο*</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
-          <tr><td class="name">{{ x.user.full_name }}</td>
+          <tr><td class="name">{{ x.user.full_name }}{% if x.locked %}<span class="tag lock">🔒 {{ x.emp_code or 'Λογ.' }}</span>{% elif x.emp_code %}<span class="tag mgmt">{{ x.emp_code }}</span>{% else %}<span class="tag mgmt">Mgmt</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</td>
             <td>{{ deptmap.get(x.user.department_id,'') }}</td>
             <td>{{ x.hours }}</td><td>{{ x.extra }}</td><td>{{ x.sundays }}</td>
             <td>{{ x.work_days }}</td><td>{{ x.repo }}</td>
@@ -114,12 +120,12 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
           <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
-          <tr><td class="name" style="position:sticky;left:0;background:#fff;">{{ x.user.full_name }}</td>
+          <tr><td class="name" style="position:sticky;left:0;background:#fff;">{{ x.user.full_name }}{% if x.emp_code %} <span class="tag {{ 'lock' if x.locked else 'mgmt' }}">{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<br><span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</td>
             {% for dh in day_hdr %}
               {% set a = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
                   {% if can_edit %}data-edit="1"{% endif %} data-uid="{{ x.user.id }}" data-date="{{ dh.iso }}"
-                  data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
+                  data-di="{{ dh.d }}" data-code="{{ a.shift_code if a else '' }}" data-segs='{{ a.segments if a and a.segments else "[]" }}'>
                 {% if a %}<span class="cell" data-c="{{ a.shift_code }}">{{ a.shift_code }}</span>{% else %}<span class="cell empty">·</span>{% endif %}
               </td>
             {% endfor %}
@@ -148,9 +154,20 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
   <p style="font-size:11px;color:#94a3b8;margin-top:8px;">* Πληρωτέο = εκτίμηση βάσει συμφωνίας/ημερομισθίου από το μητρώο (όπου υπάρχει).</p>
 </div>
 
+<script>
+document.querySelectorAll('.scroll').forEach(function(sc){
+  var down=false,sx,sl;
+  sc.addEventListener('mousedown',function(e){
+    if(e.target.closest('td.edit')||e.target.closest('a')||e.target.closest('button')||e.target.closest('select'))return;
+    down=true;sc.classList.add('drag');sx=e.pageX;sl=sc.scrollLeft;
+  });
+  window.addEventListener('mouseup',function(){down=false;sc.classList.remove('drag');});
+  sc.addEventListener('mousemove',function(e){if(!down)return;e.preventDefault();sc.scrollLeft=sl-(e.pageX-sx);});
+});
+</script>
 {% if view=='grid' and can_edit %}
 <div class="editor" id="editor">
-  <h5 id="ed-title" style="margin:0 0 4px;font-size:13px;">Βάρδια</h5>
+  <h5 id="ed-title" style="margin:0 0 2px;font-size:13px;">Βάρδια</h5><div id="ed-range" style="font-size:11px;color:#64748b;margin-bottom:5px;"></div>
   <div class="codes" id="ed-codes"></div>
   <div class="times" id="ed-times"><input type="time" id="ed-start" value="07:00"> – <input type="time" id="ed-end" value="15:30"></div>
   <div class="acts"><button onclick="clearCell()" style="background:#fee2e2;color:#b91c1c;"><i class="ti ti-trash"></i> Καθάρισε</button><button onclick="saveCell()" style="background:var(--accent,#185FA5);color:#fff;">Αποθήκευση</button></div>
@@ -158,22 +175,46 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
 <script>
 var SHIFTS={{ shift_types_json|safe }}, COLORS={}; SHIFTS.forEach(function(s){COLORS[s.code]=s.color;});
 document.querySelectorAll('.cell[data-c]').forEach(function(c){var col=COLORS[c.getAttribute('data-c')];if(col)c.style.background=col;});
-var cur=null, pickedCode='ΕΡΓ';
-function openEditor(el){ if(el.getAttribute('data-edit')!=='1')return; cur=el;
-  var codes=document.getElementById('ed-codes'); codes.innerHTML='';
+var pickedCode='ΕΡΓ', curSel=[];
+var cells=Array.prototype.slice.call(document.querySelectorAll('td.edit'));
+var selecting=false, selUid=null, anchorDi=null;
+function rowCells(uid){return cells.filter(function(c){return c.getAttribute('data-uid')===uid;});}
+function clearSel(){curSel.forEach(function(c){c.classList.remove('sel');});curSel=[];}
+function markRange(uid,a,b){clearSel();var lo=Math.min(a,b),hi=Math.max(a,b);
+  rowCells(uid).forEach(function(c){var di=parseInt(c.getAttribute('data-di'));if(di>=lo&&di<=hi){c.classList.add('sel');curSel.push(c);}});
+  curSel.sort(function(p,q){return parseInt(p.getAttribute('data-di'))-parseInt(q.getAttribute('data-di'));});}
+cells.forEach(function(td){
+  td.addEventListener('mousedown',function(e){e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);});
+  td.addEventListener('mouseenter',function(){if(selecting&&td.getAttribute('data-uid')===selUid)markRange(selUid,anchorDi,parseInt(td.getAttribute('data-di')));});
+});
+window.addEventListener('mouseup',function(){if(!selecting)return;selecting=false;if(curSel.length)openEd();});
+function openEd(){
+  var codes=document.getElementById('ed-codes');codes.innerHTML='';
   SHIFTS.forEach(function(s){var b=document.createElement('button');b.textContent=s.code;b.style.background=s.color;b.onclick=function(){pick(s.code);};codes.appendChild(b);});
-  pick(el.getAttribute('data-code')||'ΕΡΓ',true);
-  var segs=[];try{segs=JSON.parse(el.getAttribute('data-segs')||'[]');}catch(e){}
+  var last=curSel[curSel.length-1];
+  pick(last.getAttribute('data-code')||'ΕΡΓ',true);
+  var segs=[];try{segs=JSON.parse(last.getAttribute('data-segs')||'[]');}catch(e){}
   if(segs.length){document.getElementById('ed-start').value=segs[0].start;document.getElementById('ed-end').value=segs[0].end;}
-  var rc=el.getBoundingClientRect(),ed=document.getElementById('editor');
-  ed.style.display='block';ed.style.left=Math.min(rc.left+window.scrollX,window.innerWidth-240)+'px';ed.style.top=(rc.bottom+window.scrollY+6)+'px'; }
+  var rc=last.getBoundingClientRect(),ed=document.getElementById('editor');
+  ed.style.display='block';ed.style.left=Math.min(rc.left+window.scrollX,window.innerWidth-240)+'px';ed.style.top=(rc.bottom+window.scrollY+6)+'px';
+  document.getElementById('ed-range').textContent=(curSel.length>1?('Εύρος '+curSel.length+' ημερών — εφαρμογή σε όλες'):'1 ημέρα');
+}
 function pick(code,silent){pickedCode=code;document.getElementById('ed-title').textContent='Κωδικός: '+code;document.getElementById('ed-times').style.display=(code==='ΕΡΓ')?'flex':'none';if(!silent&&code!=='ΕΡΓ')saveCell();}
-function payload(){var segs=[];if(pickedCode==='ΕΡΓ')segs=[{start:document.getElementById('ed-start').value,end:document.getElementById('ed-end').value}];return {user_id:cur.getAttribute('data-uid'),date:cur.getAttribute('data-date'),code:pickedCode,segments:segs};}
-function post(b){return fetch('/dashboard/schedule/cell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα — δεν αλλάζει.');return null;}return r.json();});}
-function saveCell(){if(cur)post(payload()).then(function(j){if(j)location.reload();});}
-function clearCell(){if(cur)post({user_id:cur.getAttribute('data-uid'),date:cur.getAttribute('data-date'),code:''}).then(function(j){if(j!==null)location.reload();});}
-document.querySelectorAll('td.edit').forEach(function(td){td.addEventListener('click',function(){openEditor(td);});});
-document.addEventListener('click',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('td.edit'))ed.style.display='none';});
+function segsNow(){return pickedCode==='ΕΡΓ'?[{start:document.getElementById('ed-start').value,end:document.getElementById('ed-end').value}]:[];}
+function apply(code){
+  if(!curSel.length)return;
+  var uid=curSel[0].getAttribute('data-uid');
+  var dates=curSel.map(function(c){return c.getAttribute('data-date');});
+  var url,body;
+  if(dates.length>1){url='/dashboard/schedule/cells_bulk';body={user_id:uid,dates:dates,code:code,segments:segsNow()};}
+  else{url='/dashboard/schedule/cell';body={user_id:uid,date:dates[0],code:code,segments:segsNow()};}
+  fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα — δεν αλλάζει.');return null;}return r.json();})
+    .then(function(j){if(j)location.reload();});
+}
+function saveCell(){apply(pickedCode);}
+function clearCell(){apply('');}
+document.addEventListener('mousedown',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('td.edit')){ed.style.display='none';clearSel();}});
 </script>
 {% endif %}
 </body></html>

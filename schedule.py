@@ -831,6 +831,65 @@ def schedule_cell():
     hrs = assignment_hours(a)
     return jsonify(ok=True, hours=round(hrs, 1), work=is_work_code(code))
 
+@app.route('/dashboard/schedule/cells_bulk', methods=['POST'])
+def schedule_cells_bulk():
+    """v12.117 — μαζική εφαρμογη βαρδιας σε ευρος ημερων ενος εργαζομενου
+    (drag-select στο μηνιαιο grid). Ιδιος ελεγχος/λογικη με το /schedule/cell."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    try:
+        uid = int(d['user_id'])
+        dates = d.get('dates') or []
+    except Exception:
+        return jsonify(ok=False, err='bad'), 400
+    code = (d.get('code') or '').strip()
+    segs = d.get('segments') or []
+    if code == 'ΕΡΓ' and not segs:
+        st = ShiftType.query.filter_by(code='ΕΡΓ').first()
+        if st and st.default_start and st.default_end:
+            segs = [{'start': st.default_start, 'end': st.default_end}]
+    done = 0; locked = 0
+    weeks = set()
+    for ds in dates:
+        try:
+            wd = datetime.strptime(ds, '%Y-%m-%d').date()
+        except Exception:
+            continue
+        if not week_editable(monday_of(wd), user):
+            locked += 1; continue
+        a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
+        if not code:
+            if a:
+                db.session.delete(a)
+        else:
+            if not a:
+                a = ShiftAssignment(user_id=uid, work_date=wd, created_by=user.id)
+                db.session.add(a)
+            a.shift_code = code
+            a.segments = json.dumps(segs, ensure_ascii=False)
+        weeks.add(monday_of(wd))
+        done += 1
+    # WeekPlan -> draft για τις επηρεασμενες εβδομαδες (οπως το single)
+    u = User.query.get(uid)
+    if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+        for ws in weeks:
+            wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id,
+                                          week_start=ws).first()
+            if not wp:
+                wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id,
+                              week_start=ws, status='draft')
+                db.session.add(wp)
+            if wp.status in ('submitted', 'locked'):
+                wp.status = 'draft'
+            wp.updated_by = user.id
+    db.session.commit()
+    return jsonify(ok=True, done=done, locked=locked)
+
+
 
 # ── Αντιγραφή προηγούμενης εβδομάδας ──────────────────────────────────────────
 @app.route('/dashboard/schedule/copyprev', methods=['POST'])
@@ -1022,6 +1081,11 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
     start = date(year, month, 1)
     end = date(year + (month // 12), (month % 12) + 1, 1)
     hol = {h.hol_date for h in Holiday.query.all()}
+    try:
+        from payroll import EmployeePII as _PII
+        piimap = {p.user_id: p for p in _PII.query.all()}
+    except Exception:
+        piimap = {}
     assigns = (ShiftAssignment.query
                .filter(ShiftAssignment.work_date >= start, ShiftAssignment.work_date < end).all())
     by_user = {}
@@ -1058,7 +1122,11 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                 payable = round(prof.agreement_amount, 2)
             else:
                 payable = round((getattr(prof, 'day_wage', 0) or 0) * work_days + extra_wage(prof, extra), 2)
+        _pp = piimap.get(uid)
         rows.append({'user': u, 'hotel_id': hh, 'days': days,
+                     'emp_code': (_pp.emp_code if _pp else None),
+                     'afm': (_pp.afm if _pp else None),
+                     'locked': (bool(_pp.locked) if _pp else False),
                      'hours': round(hours, 1), 'extra': round(extra, 1),
                      'sundays': sundays, 'holidays': hol_worked,
                      'work_days': work_days, 'repo': repo, 'payable': payable})
