@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.144'
-APP_BUILD   = '425'
+APP_VERSION = '12.145'
+APP_BUILD   = '426'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.145', 'b': '426', 'date': '20/06/2026', 'time': '16:45', 'title': 'Auto-refresh σε νέα έκδοση (deploy)',
+     'items': ['Η εφαρμογή ελέγχει κάθε λεπτό αν ανέβηκε νέα έκδοση (endpoint /version).',
+               'Όταν αλλάξει η έκδοση: αν ΔΕΝ συμπληρώνεις φόρμα, ανανεώνεται αυτόματα το περιεχόμενο (κρατά τη θέση σου, φέρνει φρέσκα δεδομένα)· αν συμπληρώνεις (αξιολόγηση/πρόγραμμα), εμφανίζεται διακριτικό banner «Ανανέωση» για να μη χαθούν δεδομένα.']},
     {'v': '12.144', 'b': '425', 'date': '20/06/2026', 'time': '16:20', 'title': 'Αξιολόγηση — διόρθωση διπλών προτύπων (race) + αυτόματος καθαρισμός',
      'items': ['Διορθώθηκε η αιτία διπλών προτύπων F&B: ο seeder έτρεχε σε 2 workers ταυτόχρονα.',
                'Τώρα είναι self-healing: στο boot καθαρίζει τα αχρησιμοποίητα διπλά (κρατά το παλαιότερο) και δημιουργεί μόνο αν λείπουν. Τα προσαρμοσμένα/χρησιμοποιημένα πρότυπα μένουν άθικτα.']},
@@ -755,6 +758,11 @@ CHANGELOG = [
 @app.context_processor
 def inject_version():
     return {'app_version': APP_VERSION, 'app_build': APP_BUILD}
+
+@app.route('/version')
+def app_version_json():
+    """Ελαφρύ endpoint για auto-refresh όταν αλλάζει η έκδοση (deploy)."""
+    return {'version': APP_VERSION, 'build': APP_BUILD}
 
 # v12.12 — Dark mode παντού: αυτόματη ένεση του theme snippet σε ΚΑΘΕ HTML σελίδα
 # (εξαιρούνται login/register που έχουν δικό τους σκούρο design, και όσες το έχουν ήδη).

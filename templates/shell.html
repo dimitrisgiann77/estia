@@ -515,6 +515,32 @@ applyWs(_ws);
 var first=document.querySelector('#side .item[data-ws~="'+_ws+'"]');
 if(!first) first=document.querySelector('#side .item');
 if(first) go(first.getAttribute('data-url'), first);
+
+// ── Auto-refresh σε νέα έκδοση (deploy) ──
+var APP_BUILD='{{ app_build }}';
+function _isEditing(){
+  try{ var p=frame.contentWindow.location.pathname||''; return /\/(evaluations\/(new|[0-9]+\/edit)|schedule)/.test(p); }catch(e){ return false; }
+}
+function _showUpdate(nb){
+  if(document.getElementById('updbar')) return;
+  var bar=document.createElement('div'); bar.id='updbar';
+  bar.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#185FA5;color:#fff;padding:10px 16px;border-radius:11px;box-shadow:0 8px 26px rgba(0,0,0,.28);z-index:9999;display:flex;gap:12px;align-items:center;font-size:13px;';
+  var msg=document.createElement('span'); msg.textContent='🔄 Νέα έκδοση (build '+nb+') '+(_isEditing()?'— ανανέωσε όταν είσαι έτοιμος':'— ανανεώθηκε');
+  bar.appendChild(msg);
+  var b=document.createElement('button'); b.textContent='Ανανέωση'; b.style.cssText='background:#fff;color:#185FA5;border:none;border-radius:7px;padding:6px 12px;font-weight:700;cursor:pointer;';
+  b.onclick=function(){ location.reload(); };
+  bar.appendChild(b);
+  var x=document.createElement('button'); x.textContent='✕'; x.title='Κλείσιμο'; x.style.cssText='background:transparent;color:#cfe1f5;border:none;cursor:pointer;font-size:14px;';
+  x.onclick=function(){ bar.remove(); };
+  bar.appendChild(x);
+  document.body.appendChild(bar);
+  if(!_isEditing()){ try{ frame.src=frame.src; }catch(e){} var ft=document.querySelector('.foot-r span'); if(ft) ft.textContent='build '+nb; }
+}
+setInterval(function(){
+  fetch('/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.build&&String(d.build)!==String(APP_BUILD)){ var nb=d.build; APP_BUILD=nb; _showUpdate(nb); }
+  }).catch(function(){});
+}, 60000);
 </script>
 </body>
 </html>
