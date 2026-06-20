@@ -463,11 +463,19 @@ def evaluation_edit(eid):
     if ev.status in APPROVED_STATES and not is_admin():
         return redirect(url_for('evaluation_view', eid=ev.id) + '?embed=1')
     tmpl = ev.template or EvalTemplate.query.filter_by(is_active=True).first()
+    # επιτρέπεται αλλαγή φύλλου κριτηρίων όσο ΔΕΝ είναι εγκεκριμένο
+    ovr = request.values.get('template_id', type=int)
+    if ovr and ev.status not in APPROVED_STATES:
+        _nt = EvalTemplate.query.filter_by(id=ovr, is_active=True).first()
+        if _nt:
+            tmpl = _nt
     if request.method == 'POST':
         return _save_evaluation(ev, tmpl)
     scores = {s.criterion_id: s for s in ev.scores}
     _u = current_user(); _hs = allowed_hotels(_u) if _u else []
-    return render_template('evaluation_form.html', ev=ev, tmpl=tmpl, templates=None,
+    _tpls = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all() \
+            if ev.status not in APPROVED_STATES else None
+    return render_template('evaluation_form.html', ev=ev, tmpl=tmpl, templates=_tpls,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
                            scores=scores, goals=sorted(ev.goals, key=lambda g: g.id),
                            periods=_active_periods(), today=date.today(), form_hotels=_hs)

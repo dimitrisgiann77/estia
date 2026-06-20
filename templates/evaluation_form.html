@@ -84,7 +84,7 @@
       {% endif %}
     </div>
     <div class="ef-info" id="emp-info"></div>
-    {% if not ev and templates and templates|length>1 %}
+    {% if templates and templates|length>1 %}
     <div class="ef-tpl" style="margin-top:12px;">
       <span style="font-size:12px;font-weight:700;color:#64748b;">Φύλλο κριτηρίων:</span>
       <select id="tplsel" onchange="tplChange(this.value)">
@@ -165,11 +165,12 @@ function filterTpls(){
   }
   if(curHidden&&firstVisible){tplChange(firstVisible.value);}
 }
+var FORM_BASE='{{ ('/dashboard/evaluations/%d/edit'%ev.id) if ev else '/dashboard/evaluations/new' }}';
 function tplChange(tid){
   var emp=(document.getElementById('emp')||{}).value||'';
   var per=(document.getElementById('periodsel')||{}).value||'';
   var hf=(document.getElementById('hotelfilter')||{}).value||'';
-  var u='/dashboard/evaluations/new?embed=1&template_id='+tid;
+  var u=FORM_BASE+'?embed=1&template_id='+tid;
   if(emp)u+='&employee_id='+emp;
   if(per)u+='&period_id='+per;
   if(hf)u+='&hotelf='+hf;
