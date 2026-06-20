@@ -212,29 +212,45 @@ def _seed_one_tpl(name, scope, rows):
         db.session.add(EvalCriterion(template_id=t.id, grp=g, label=lab, weight=w, sort=i, max_score=10))
     return True
 
+def _norm_tpl_name(x):
+    import unicodedata, re
+    x = unicodedata.normalize('NFKC', x or '')
+    x = x.replace('\u2014', '-').replace('\u2013', '-')  # em/en dash -> hyphen
+    x = re.sub(r'\s+', ' ', x).strip().lower()
+    return x
+
 def ensure_eval_dept_templates():
-    """Seed προτύπων τμημάτων F&B (Kitchen/Service) — self-healing:
-    1) καθαρίζει ΑΧΡΗΣΙΜΟΠΟΙΗΤΑ διπλά (race 2 gunicorn workers), κρατά το παλαιότερο·
-    2) δημιουργεί ΜΟΝΟ αν δεν υπάρχει κανένα. Idempotent & ανθεκτικό σε re-boot."""
+    """Seed προτύπων τμημάτων F&B (Kitchen/Service) — self-healing & bulletproof:
+    1) dedupe με ΚΑΝΟΝΙΚΟΠΟΙΗΜΕΝΟ όνομα (πιάνει διαφορές παύλας/κενών), κρατά min id, σβήνει ΑΧΡΗΣΙΜΟΠΟΙΗΤΑ·
+    2) δημιουργεί ΜΟΝΟ αν λείπει. Idempotent."""
     try:
       with app.app_context():
         db.create_all()
-        made = []; cleaned = 0
-        for name, scope, rows in [('F&B — Κουζίνα (Kitchen)', 'Kitchen', _TPL_KITCHEN),
-                                  ('F&B — Σέρβις (Service)', 'Service', _TPL_SERVICE)]:
-            existing = EvalTemplate.query.filter_by(name=name).order_by(EvalTemplate.id).all()
-            if len(existing) > 1:
-                for dup in existing[1:]:
-                    if Evaluation.query.filter_by(template_id=dup.id).count() == 0:
-                        db.session.delete(dup); cleaned += 1
-                db.session.commit()
-            elif not existing:
+        specs = [('F&B — Κουζίνα (Kitchen)', 'Kitchen', _TPL_KITCHEN),
+                 ('F&B — Σέρβις (Service)', 'Service', _TPL_SERVICE)]
+        target_norms = {_norm_tpl_name(n) for n, _s, _r in specs}
+        groups = {}
+        for t in EvalTemplate.query.all():
+            nn = _norm_tpl_name(t.name)
+            if nn in target_norms:
+                groups.setdefault(nn, []).append(t)
+        cleaned = 0
+        for nn, ts in groups.items():
+            ts.sort(key=lambda x: x.id)
+            for dup in ts[1:]:
+                if Evaluation.query.filter_by(template_id=dup.id).count() == 0:
+                    db.session.delete(dup); cleaned += 1
+        if cleaned:
+            db.session.commit()
+            print('[evaluations] καθαρίστηκαν %d διπλά πρότυπα' % cleaned)
+        made = []
+        for name, scope, rows in specs:
+            nn = _norm_tpl_name(name)
+            if not any(_norm_tpl_name(t.name) == nn for t in EvalTemplate.query.all()):
                 if _seed_one_tpl(name, scope, rows):
                     db.session.commit(); made.append(scope)
         if made:
             print('[evaluations] seeded πρότυπα τμημάτων: %s' % ', '.join(made))
-        if cleaned:
-            print('[evaluations] καθαρίστηκαν %d διπλά πρότυπα (race)' % cleaned)
     except Exception as e:
         db.session.rollback(); print('[evaluations] dept templates seed skipped:', e)
 
