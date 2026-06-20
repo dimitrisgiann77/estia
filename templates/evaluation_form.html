@@ -54,7 +54,7 @@
       <div class="ef-f"><label>Εργαζόμενος *</label>
         <select name="employee_id" id="emp" onchange="fillEmp()" required>
           <option value="">— Επιλογή —</option>
-          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-spec="{{ e.specialty }}">{{ e.name }}</option>{% endfor %}
+          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-hotelid="{{ e.hotel_id or '' }}" data-spec="{{ e.specialty }}">{{ e.name }}</option>{% endfor %}
         </select>
       </div>
       {% if periods %}
@@ -74,9 +74,10 @@
     {% if not ev and templates and templates|length>1 %}
     <div class="ef-tpl" style="margin-top:12px;">
       <span style="font-size:12px;font-weight:700;color:#64748b;">Φύλλο κριτηρίων:</span>
-      <select onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value">
-        {% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}</option>{% endfor %}
+      <select id="tplsel" onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value">
+        {% for t in templates %}<option value="{{ t.id }}" data-hotelid="{{ t.hotel_id or '' }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}{{ ' · '+t.hotel.name if t.hotel }}</option>{% endfor %}
       </select>
+      <span class="muted" style="font-size:11px;margin-left:6px;">(φιλτράρεται με βάση το ξενοδοχείο του εργαζομένου)</span>
     </div>
     {% endif %}
   </div>
@@ -131,7 +132,22 @@ function fillEmp(){
   if(!o||!o.value){i.classList.remove('show');return;}
   var p=[];if(o.dataset.dep)p.push('Τμήμα: <b>'+o.dataset.dep+'</b>');if(o.dataset.hotel)p.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');if(o.dataset.spec)p.push('Ειδικότητα: '+o.dataset.spec);
   i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+p.join(' · ');i.classList.add('show');
+  filterTpls();
 }
+function filterTpls(){
+  var sel=document.getElementById('tplsel'); if(!sel)return;
+  var emp=document.getElementById('emp'); var eo=emp?emp.options[emp.selectedIndex]:null;
+  var hid=eo?(eo.dataset.hotelid||''):'';
+  var firstVisible=null, curHidden=false;
+  for(var k=0;k<sel.options.length;k++){var op=sel.options[k];var th=op.dataset.hotelid||'';
+    var show=(!hid)||(th==='')||(th===hid);
+    op.hidden=!show; op.disabled=!show;
+    if(show&&firstVisible===null)firstVisible=op;
+    if(!show&&op.selected)curHidden=true;
+  }
+  if(curHidden&&firstVisible){location.href='/dashboard/evaluations/new?embed=1&template_id='+firstVisible.value;}
+}
+document.addEventListener('DOMContentLoaded',filterTpls);
 function calc(){
   var num=0,den=0,n=0,tot=document.querySelectorAll('.sc').length;
   document.querySelectorAll('.sc').forEach(function(el){

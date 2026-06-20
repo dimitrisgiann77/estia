@@ -3,9 +3,18 @@
 <style>.ev-band{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
 .ev-pct{font-weight:700;font-size:14px;}
 .act a,.act button{font-size:12px;text-decoration:none;color:#475569;background:none;border:none;cursor:pointer;padding:3px 5px;}
-.act a:hover{color:var(--mp-brand);}</style></head><body>
+.act a:hover{color:var(--mp-brand);}
+.ev-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.ev-filters .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
+.ev-filters input,.ev-filters select{padding:8px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:9px;background:var(--card,#fff);color:inherit;}
+.ev-filters input:focus,.ev-filters select:focus{outline:2px solid var(--mp-brand,#185FA5);outline-offset:0;border-color:transparent;}
+table tbody tr:hover td{background:rgba(24,95,165,.05);}
+table tbody tr:nth-child(even) td{background:rgba(15,23,42,.015);}
+html[data-theme="dark"] table tbody tr:hover td{background:rgba(96,165,250,.09);}
+html[data-theme="dark"] table tbody tr:nth-child(even) td{background:rgba(255,255,255,.02);}
+.ev-band{box-shadow:inset 0 0 0 1px rgba(0,0,0,.04);}</style></head><body>
 {{ mp.topbar('star', 'Αξιολόγηση Προσωπικού', 'Αξιολογήσεις εργαζομένων — HR', 'Νέα αξιολόγηση', '/dashboard/evaluations/new?embed=1') }}
-<div style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/new?embed=1" style="background:#16a34a;font-weight:600;"><i class="ti ti-plus"></i> Νέα αξιολόγηση</a> {% if is_admin %}<a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a> <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#475569;"><i class="ti ti-template"></i> Πρότυπα</a> <a class="btn" href="/dashboard/evaluations/periods?embed=1" style="background:#475569;"><i class="ti ti-calendar-event"></i> Περίοδοι</a> {% endif %}<a class="btn" href="/dashboard/evaluations/pending?embed=1" style="background:#b45309;"><i class="ti ti-clock-exclamation"></i> Εκκρεμείς</a></div>
+<div class="ev-actions" style="max-width:1240px;margin:0 auto;padding:14px 24px 0;"><a class="btn" href="/dashboard/evaluations/new?embed=1" style="background:#16a34a;font-weight:600;"><i class="ti ti-plus"></i> Νέα αξιολόγηση</a> {% if is_admin %}<a class="btn" href="/dashboard/evaluations/stats?embed=1" style="background:#0f766e;"><i class="ti ti-chart-bar"></i> Στατιστικά</a> <a class="btn" href="/dashboard/evaluations/templates?embed=1" style="background:#475569;"><i class="ti ti-template"></i> Πρότυπα</a> <a class="btn" href="/dashboard/evaluations/periods?embed=1" style="background:#475569;"><i class="ti ti-calendar-event"></i> Περίοδοι</a> {% endif %}<a class="btn" href="/dashboard/evaluations/pending?embed=1" style="background:#b45309;"><i class="ti ti-clock-exclamation"></i> Εκκρεμείς</a></div>
 <div class="container">
   {% set total = items|length %}
   {% set exc = items|selectattr('band','equalto','Εξαιρετική')|list|length %}
@@ -13,7 +22,7 @@
   {% set att = items|selectattr('band','equalto','Χρειάζεται προσοχή')|list|length %}
   {{ mp.kpis([{'n':total,'label':'Αξιολογήσεις'},{'n':submitted_n,'label':'Προς έγκριση','color':'#b45309','href':'/dashboard/evaluations?embed=1&band='},{'n':exc,'label':'Εξαιρετικές','color':'#16a34a'},{'n':att,'label':'Χρειάζονται προσοχή','color':'#dc2626'}]) }}
 
-  <div class="card">
+  <div class="card ev-filters">
     <form class="filters" method="GET" action="/dashboard/evaluations">
       <input type="hidden" name="embed" value="1">
       <input type="text" name="q" value="{{ q }}" placeholder="Αναζήτηση υπαλλήλου...">
@@ -42,7 +51,7 @@
         <td class="act">{% if is_admin %}<form method="POST" action="/dashboard/evaluations/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή αξιολόγησης {{ e.code }};');"><button type="submit" title="Διαγραφή" style="color:#dc2626;"><i class="ti ti-trash"></i></button></form>{% endif %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="10" style="text-align:center;color:#9aa7ad;padding:26px;">Καμία αξιολόγηση ακόμα. <a href="/dashboard/evaluations/new?embed=1">Νέα αξιολόγηση →</a></td></tr>
+      <tr><td colspan="10" style="text-align:center;color:#9aa7ad;padding:34px;"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px;opacity:.5;"></i>Καμία αξιολόγηση ακόμα. <a href="/dashboard/evaluations/new?embed=1" style="font-weight:600;">+ Νέα αξιολόγηση</a></td></tr>
       {% endfor %}
       </tbody>
     </table>

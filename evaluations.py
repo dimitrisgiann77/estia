@@ -15,8 +15,10 @@ class EvalTemplate(db.Model):
     scope      = db.Column(db.String(40), default='general')   # 'general' | dept-key (Φ2 variants)
     scale_max  = db.Column(db.Integer, default=10)
     is_active  = db.Column(db.Boolean, default=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'))   # null = όλα τα ξενοδοχεία
     version    = db.Column(db.Integer, default=1)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    hotel      = db.relationship('Hotel')
     criteria   = db.relationship('EvalCriterion', backref='template',
                                  order_by='EvalCriterion.sort', cascade='all, delete-orphan')
 
@@ -225,6 +227,15 @@ def ensure_eval_dept_templates():
             print('[evaluations] seeded πρότυπα τμημάτων: %s' % ', '.join(made))
     except Exception as e:
         db.session.rollback(); print('[evaluations] dept templates seed skipped:', e)
+
+def ensure_eval_columns():
+    """v12.141 — auto-migration: eval_template.hotel_id (ανάθεση σε ξενοδοχείο)."""
+    try:
+      with app.app_context():
+        from app import _add_col
+        _add_col('eval_template', 'hotel_id', 'hotel_id INTEGER')
+    except Exception as e:
+        print('[evaluations] ensure_eval_columns skipped:', e)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -662,7 +673,9 @@ def eval_templates():
         wsum = round(sum(c.weight or 0 for c in t.criteria), 3)
         used = Evaluation.query.filter_by(template_id=t.id).count()
         rows.append({'t': t, 'n': len(t.criteria), 'wsum': wsum, 'used': used})
-    return render_template('eval_templates.html', rows=rows)
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    return render_template('eval_templates.html', rows=rows, hotels=hotels,
+                           ok=request.args.get('ok'), err=request.args.get('err'))
 
 @app.route('/dashboard/evaluations/templates/<int:tid>', methods=['GET', 'POST'])
 def eval_template_edit(tid):
@@ -673,6 +686,7 @@ def eval_template_edit(tid):
         fm = request.form
         t.name = (fm.get('name') or t.name).strip()[:80]
         t.scope = (fm.get('scope') or 'general').strip()[:40]
+        _hid = fm.get('hotel_id', type=int); t.hotel_id = _hid or None
         try: t.scale_max = max(1, int(fm.get('scale_max') or 10))
         except ValueError: pass
         # update existing criteria
@@ -700,8 +714,9 @@ def eval_template_edit(tid):
         return redirect(url_for('eval_template_edit', tid=t.id) + '?embed=1&ok=1')
     wsum = round(sum(c.weight or 0 for c in t.criteria), 3)
     used_ids = {c.id for c in t.criteria if _criterion_used(c.id)}
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     return render_template('eval_template_edit.html', t=t, criteria=t.criteria, wsum=wsum,
-                           used_ids=used_ids, ok=request.args.get('ok'))
+                           used_ids=used_ids, ok=request.args.get('ok'), hotels=hotels)
 
 @app.route('/dashboard/evaluations/templates/<int:tid>/clone', methods=['POST'])
 def eval_template_clone(tid):
@@ -710,7 +725,9 @@ def eval_template_clone(tid):
     src = EvalTemplate.query.get_or_404(tid)
     name = (request.form.get('name') or (src.name + ' (αντίγραφο)')).strip()[:80]
     scope = (request.form.get('scope') or 'general').strip()[:40]
-    nt = EvalTemplate(name=name, scope=scope, scale_max=src.scale_max, is_active=True)
+    _hid = request.form.get('hotel_id', type=int)
+    nt = EvalTemplate(name=name, scope=scope, scale_max=src.scale_max, is_active=True,
+                      hotel_id=(_hid if _hid else src.hotel_id))
     db.session.add(nt); db.session.flush()
     for c in src.criteria:
         db.session.add(EvalCriterion(template_id=nt.id, grp=c.grp, label=c.label, weight=c.weight, sort=c.sort, max_score=c.max_score))
@@ -725,6 +742,19 @@ def eval_template_toggle(tid):
     t = EvalTemplate.query.get_or_404(tid)
     t.is_active = not bool(t.is_active); db.session.commit()
     return redirect(url_for('eval_templates') + '?embed=1')
+
+@app.route('/dashboard/evaluations/templates/<int:tid>/delete', methods=['POST'])
+def eval_template_delete(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    t = EvalTemplate.query.get_or_404(tid)
+    used = Evaluation.query.filter_by(template_id=tid).count()
+    if used:
+        return redirect(url_for('eval_templates') + '?embed=1&err=used')
+    name = t.name
+    db.session.delete(t); db.session.commit()
+    log_activity('eval_template_delete', name)
+    return redirect(url_for('eval_templates') + '?embed=1&ok=del')
 
 # ── Φ2: Group roll-up matrix (κριτήρια × υπάλληλοι ανά τμήμα/περίοδο) ──────────
 def _group_data(dept_id, year, period, mode):

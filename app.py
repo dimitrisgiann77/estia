@@ -331,11 +331,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.140'
-APP_BUILD   = '421'
+APP_VERSION = '12.141'
+APP_BUILD   = '422'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.141', 'b': '422', 'date': '20/06/2026', 'time': '14:40', 'title': 'Αξιολόγηση — διαγραφή προτύπου, ανάθεση σε ξενοδοχείο, polish λίστας',
+     'items': ['Οριστική διαγραφή προτύπου (μπλοκάρεται αν χρησιμοποιείται σε αξιολογήσεις — τότε κάνε το «ανενεργό»).',
+               'Ανάθεση προτύπου σε ξενοδοχείο: κάθε ξενοδοχείο μπορεί να έχει τα δικά του πρότυπα (νέα στήλη eval_template.hotel_id). Στη φόρμα νέας αξιολόγησης ο επιλογέας προτύπου φιλτράρεται με βάση το ξενοδοχείο του εργαζομένου (+ κοινά πρότυπα «Όλα»).',
+               'Στήλη «Ξενοδοχείο» στα Πρότυπα + dropdown ανάθεσης στην επεξεργασία/κλωνοποίηση.',
+               'Polish κεντρικής σελίδας αξιολογήσεων (hover/zebra, focus φίλτρων, μπάρα ενεργειών, κενή κατάσταση).']},
     {'v': '12.140', 'b': '421', 'date': '20/06/2026', 'time': '14:00', 'title': 'Αξιολόγηση — κουμπί «Νέα αξιολόγηση» + πρότυπα F&B Κουζίνα/Σέρβις',
      'items': ['Εμφανές πράσινο κουμπί «Νέα αξιολόγηση» στη λίστα αξιολογήσεων (πέρα από το πάνω κουμπί).',
                'Δύο νέα πρότυπα-variants από τα reference 2026: «F&B — Κουζίνα» (25 κριτήρια) & «F&B — Σέρβις» (30 κριτήρια), σταθμίσεις που αθροίζουν 100%. Επιλέγονται από τον επιλογέα προτύπου στη φόρμα.']},
@@ -3833,6 +3838,7 @@ console  = _try_import('console')
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 if evaluations:
+    evaluations.ensure_eval_columns()  # auto-migration ΠΡΩΤΑ: eval_template.hotel_id (πριν από οποιοδήποτε query)
     evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
     evaluations.ensure_eval_dept_templates()  # seed προτύπων τμημάτων F&B (Kitchen/Service)
     evaluations._seed_menu_evals()    # one-time: 'evals' στο menu_vis (manager on)

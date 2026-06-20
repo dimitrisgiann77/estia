@@ -2,14 +2,17 @@
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Πρότυπα Αξιολόγησης', theme.primary if theme else '#193847') }}</head><body>
 {{ mp.topbar('template', 'Πρότυπα Αξιολόγησης', 'Φύλλα κριτηρίων — κοινό & variants ανά τμήμα') }}
 <div class="container">
+  {% if ok=='del' %}<div class="card" style="background:#dcfce7;color:#166534;padding:9px 12px;margin-bottom:10px;">✓ Το πρότυπο διαγράφηκε.</div>{% endif %}
+  {% if err=='used' %}<div class="card" style="background:#fee2e2;color:#b91c1c;padding:9px 12px;margin-bottom:10px;">⛔ Δεν διαγράφεται: χρησιμοποιείται σε υπάρχουσες αξιολογήσεις. (Μπορείς να το κάνεις «ανενεργό».)</div>{% endif %}
   <div class="card">
     <p class="muted" style="font-size:13px;margin-bottom:10px;">Κάθε πρότυπο = ένα «φύλλο» κριτηρίων με βάρη. Φτιάξε <b>variant</b> (αντίγραφο) και προσάρμοσέ το ανά τμήμα (προσθήκη κριτηρίων / αλλαγή βαρών). Στη φόρμα νέας αξιολόγησης διαλέγεις ποιο πρότυπο θα χρησιμοποιήσεις.</p>
     <table data-nocopy>
-      <thead><tr><th>Πρότυπο</th><th>Πεδίο</th><th>Κριτήρια</th><th>Σύνολο βαρών</th><th>Χρήσεις</th><th>Κατάσταση</th><th></th></tr></thead>
+      <thead><tr><th>Πρότυπο</th><th>Ξενοδοχείο</th><th>Πεδίο</th><th>Κριτήρια</th><th>Σύνολο βαρών</th><th>Χρήσεις</th><th>Κατάσταση</th><th></th></tr></thead>
       <tbody>
       {% for r in rows %}
       <tr>
         <td><a class="code" href="/dashboard/evaluations/templates/{{ r.t.id }}?embed=1"><b>{{ r.t.name }}</b></a></td>
+        <td>{% if r.t.hotel %}<span class="badge" style="background:#eef2f6;color:#475569;">{{ r.t.hotel.name }}</span>{% else %}<span class="muted" style="font-size:12px;">Όλα</span>{% endif %}</td>
         <td>{{ 'Κοινό' if r.t.scope=='general' else r.t.scope }}</td>
         <td>{{ r.n }}</td>
         <td><b style="color:{{ '#16a34a' if (r.wsum>0.999 and r.wsum<1.001) else '#dc2626' }};">{{ '%.3f'|format(r.wsum) }}</b>{% if not (r.wsum>0.999 and r.wsum<1.001) %} <span class="muted" style="font-size:11px;">(≠1.0)</span>{% endif %}</td>
@@ -19,6 +22,7 @@
           <a class="btn" href="/dashboard/evaluations/templates/{{ r.t.id }}?embed=1" style="padding:5px 10px;"><i class="ti ti-edit"></i></a>
           <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/clone" style="display:inline;"><input type="hidden" name="name" value="{{ r.t.name }} (variant)"><button class="btn" type="submit" style="padding:5px 10px;background:#0f766e;" title="Δημιουργία variant"><i class="ti ti-copy"></i></button></form>
           <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/toggle" style="display:inline;"><button class="btn" type="submit" style="padding:5px 10px;background:#64748b;" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>
+          {% if r.used==0 %}<form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/delete" style="display:inline;" onsubmit="return confirm('Οριστική διαγραφή του προτύπου «{{ r.t.name }}»; Δεν αναιρείται.');"><button class="btn" type="submit" style="padding:5px 10px;background:#dc2626;" title="Οριστική διαγραφή"><i class="ti ti-trash"></i></button></form>{% else %}<button class="btn" type="button" disabled style="padding:5px 10px;background:#e2e8f0;color:#94a3b8;cursor:not-allowed;" title="Χρησιμοποιείται — δεν διαγράφεται"><i class="ti ti-trash"></i></button>{% endif %}
         </td>
       </tr>
       {% endfor %}

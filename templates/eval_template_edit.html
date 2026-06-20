@@ -16,6 +16,7 @@
     <div class="filters">
       <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Όνομα</label><input type="text" name="name" value="{{ t.name }}" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;min-width:240px;"></div>
       <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Πεδίο (τμήμα ή «general»)</label><input type="text" name="scope" value="{{ t.scope }}" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;"></div>
+      <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Ξενοδοχείο</label><select name="hotel_id" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;"><option value="">Όλα τα ξενοδοχεία</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if t.hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}</select></div>
       <div><label style="font-size:11px;color:#94a3b8;font-weight:700;display:block;">Μέγ. κλίμακα</label><input type="number" name="scale_max" value="{{ t.scale_max }}" min="1" max="100" style="padding:8px;border:1px solid #d6eef3;border-radius:8px;width:90px;"></div>
     </div>
   </div>
