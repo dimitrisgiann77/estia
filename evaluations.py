@@ -432,10 +432,13 @@ def evaluation_new():
         return _save_evaluation(None, tmpl)
     templates = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all()
     _u = current_user(); _hs = allowed_hotels(_u) if _u else []
+    sel_emp = request.args.get('employee_id', type=int)
+    sel_period = request.args.get('period_id', type=int)
+    sel_hotelf = request.args.get('hotelf', type=int)
     return render_template('evaluation_form.html', ev=None, tmpl=tmpl, templates=templates,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
                            scores={}, goals=[], periods=_active_periods(), today=date.today(),
-                           form_hotels=_hs)
+                           form_hotels=_hs, sel_emp=sel_emp, sel_period=sel_period, sel_hotelf=sel_hotelf)
 
 @app.route('/dashboard/evaluations/<int:eid>')
 def evaluation_view(eid):
@@ -458,6 +461,8 @@ def evaluation_edit(eid):
     ev = Evaluation.query.get_or_404(eid)
     if not _hid_ok(ev.hotel_id):
         return redirect(url_for('evaluations_list') + '?embed=1')
+    if ev.status in APPROVED_STATES and not is_admin():
+        return redirect(url_for('evaluation_view', eid=ev.id) + '?embed=1')
     tmpl = ev.template or EvalTemplate.query.filter_by(is_active=True).first()
     if request.method == 'POST':
         return _save_evaluation(ev, tmpl)

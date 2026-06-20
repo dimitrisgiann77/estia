@@ -57,24 +57,23 @@
   <div class="ef-card">
     <div class="ef-meta">
       {% if form_hotels and form_hotels|length>1 %}
-      <div class="ef-f"><label>Ξενοδοχείο (φίλτρο)</label>
+      <div class="ef-f"><label>Ξενοδοχείο</label>
         <select id="hotelfilter" onchange="filterEmp()">
-          <option value="">Όλα τα δικά μου</option>
-          {% for h in form_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
+          {% for h in form_hotels %}<option value="{{ h.id }}" {{ 'selected' if sel_hotelf==h.id }}>{{ h.name }}</option>{% endfor %}
         </select>
       </div>
       {% endif %}
       <div class="ef-f"><label>Εργαζόμενος *</label>
         <select name="employee_id" id="emp" onchange="fillEmp()" required>
           <option value="">— Επιλογή —</option>
-          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-hotelid="{{ e.hotel_id or '' }}" data-afm="{{ e.afm }}" data-empcode="{{ e.emp_code }}">{{ e.name }}</option>{% endfor %}
+          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if (ev and ev.employee_id==e.id) or (not ev and sel_emp==e.id) }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-hotelid="{{ e.hotel_id or '' }}" data-afm="{{ e.afm }}" data-empcode="{{ e.emp_code }}">{{ e.name }}</option>{% endfor %}
         </select>
       </div>
       {% if periods %}
       <div class="ef-f"><label>Περίοδος αξιολόγησης *</label>
-        <select name="period_id" required>
+        <select name="period_id" id="periodsel" required>
           <option value="">— Επιλογή —</option>
-          {% for pr in periods %}<option value="{{ pr.id }}" {{ 'selected' if ev and ev.period_label==pr.label }}>{{ pr.name }}{{ ' - '+pr.ref_date.strftime('%d/%m/%Y') if pr.ref_date }}</option>{% endfor %}
+          {% for pr in periods %}<option value="{{ pr.id }}" {{ 'selected' if (ev and ev.period_label==pr.label) or (not ev and sel_period==pr.id) }}>{{ pr.name }}{{ ' - '+pr.ref_date.strftime('%d/%m/%Y') if pr.ref_date }}</option>{% endfor %}
         </select>
       </div>
       {% else %}
@@ -87,7 +86,7 @@
     {% if not ev and templates and templates|length>1 %}
     <div class="ef-tpl" style="margin-top:12px;">
       <span style="font-size:12px;font-weight:700;color:#64748b;">Φύλλο κριτηρίων:</span>
-      <select id="tplsel" onchange="location.href='/dashboard/evaluations/new?embed=1&template_id='+this.value">
+      <select id="tplsel" onchange="tplChange(this.value)">
         {% for t in templates %}<option value="{{ t.id }}" data-hotelid="{{ t.hotel_id or '' }}" {{ 'selected' if tmpl and t.id==tmpl.id }}>{{ t.name }}{{ ' · '+t.scope if t.scope!='general' }}{{ ' · '+t.hotel.name if t.hotel }}</option>{% endfor %}
       </select>
       <span class="muted" style="font-size:11px;margin-left:6px;">(φιλτράρεται με βάση το ξενοδοχείο του εργαζομένου)</span>
@@ -146,6 +145,7 @@ function fillEmp(){
   if(!o||!o.value){i.classList.remove('show');return;}
   var p=[];
   p.push('Τμήμα: <b>'+(o.dataset.dep?o.dataset.dep:'— χωρίς τμήμα —')+'</b>');
+  if(o.dataset.hotel)p.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');
   if(o.dataset.empcode)p.push('Κωδ.: <b>#'+o.dataset.empcode+'</b>');
   if(o.dataset.afm)p.push('ΑΦΜ: <b>'+o.dataset.afm+'</b>');
   i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+p.join(' · ');i.classList.add('show');
@@ -162,7 +162,17 @@ function filterTpls(){
     if(show&&firstVisible===null)firstVisible=op;
     if(!show&&op.selected)curHidden=true;
   }
-  if(curHidden&&firstVisible){location.href='/dashboard/evaluations/new?embed=1&template_id='+firstVisible.value;}
+  if(curHidden&&firstVisible){tplChange(firstVisible.value);}
+}
+function tplChange(tid){
+  var emp=(document.getElementById('emp')||{}).value||'';
+  var per=(document.getElementById('periodsel')||{}).value||'';
+  var hf=(document.getElementById('hotelfilter')||{}).value||'';
+  var u='/dashboard/evaluations/new?embed=1&template_id='+tid;
+  if(emp)u+='&employee_id='+emp;
+  if(per)u+='&period_id='+per;
+  if(hf)u+='&hotelf='+hf;
+  location.href=u;
 }
 document.addEventListener('DOMContentLoaded',filterTpls);
 function calc(){
