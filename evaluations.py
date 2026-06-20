@@ -869,6 +869,142 @@ def eval_template_delete(tid):
     log_activity('eval_template_delete', name)
     return redirect(url_for('eval_templates') + '?embed=1&ok=del')
 
+
+@app.route('/dashboard/evaluations/templates/<int:tid>/export.pdf')
+def eval_template_pdf(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    t = EvalTemplate.query.get_or_404(tid)
+    import os
+    from app import BASE_DIR
+    from fpdf import FPDF
+    from fpdf.fonts import FontFace
+    NAVY = (25, 56, 71); GREY = (120, 130, 140); LIGHT = (238, 243, 246); GROUP = (225, 235, 245)
+    pdf = FPDF(orientation='P', unit='mm', format='A4'); pdf.set_auto_page_break(True, margin=16)
+    pdf.add_page()
+    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    # ── Header band ──
+    pdf.set_fill_color(*NAVY); pdf.rect(0, 0, 210, 26, style='F')
+    pdf.set_xy(14, 6); pdf.set_text_color(255, 255, 255); pdf.set_font('dv', 'B', 17); pdf.cell(0, 9, 'CONDIAN HOTELS', ln=1)
+    pdf.set_x(14); pdf.set_font('dv', '', 10.5); pdf.set_text_color(205, 222, 238); pdf.cell(0, 6, 'Έντυπο Αξιολόγησης Εργαζομένου', ln=1)
+    pdf.set_y(32)
+    # ── Title + subtitle ──
+    pdf.set_text_color(*NAVY); pdf.set_font('dv', 'B', 13.5); pdf.set_x(14); pdf.cell(0, 8, t.name, ln=1)
+    sub = 'Πεδίο: %s    ·    Ξενοδοχείο: %s    ·    Κλίμακα: 1–%d' % (
+        ('Κοινό' if t.scope == 'general' else t.scope), (t.hotel.name if t.hotel else 'Όλα'), t.scale_max or 10)
+    pdf.set_x(14); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY); pdf.cell(0, 6, sub, ln=1)
+    pdf.ln(4)
+    # ── Meta blank fields (2 columns) ──
+    fields = ['ΞΕΝΟΔΟΧΕΙΑΚΗ ΜΟΝΑΔΑ', 'ΟΝΟΜΑΤΕΠΩΝΥΜΟ', 'ΤΜΗΜΑ', 'ΠΕΡΙΟΔΟΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΑΞΙΟΛΟΓΗΣΗΣ', 'ΑΞΙΟΛΟΓΗΤΗΣ']
+    colw = 89; gap = 4; x0 = 14; y = pdf.get_y()
+    for idx, f in enumerate(fields):
+        col = idx % 2; rrow = idx // 2
+        x = x0 + col * (colw + gap); yy = y + rrow * 11
+        pdf.set_xy(x, yy); pdf.set_font('dv', 'B', 7.5); pdf.set_text_color(*GREY); pdf.cell(colw, 4, f)
+        pdf.set_xy(x, yy + 4); pdf.set_draw_color(190, 200, 210); pdf.set_line_width(0.2); pdf.cell(colw, 6, '', border='B')
+    pdf.set_y(y + ((len(fields) + 1) // 2) * 11 + 4)
+    # ── Criteria table ──
+    pdf.set_font('dv', '', 8.8); pdf.set_text_color(30, 30, 30); pdf.set_fill_color(255, 255, 255)
+    head = FontFace(emphasis='BOLD', color=(255, 255, 255), fill_color=NAVY)
+    grp = FontFace(emphasis='BOLD', color=NAVY, fill_color=GROUP)
+    with pdf.table(width=182, col_widths=(9, 42, 11, 13, 30),
+                   text_align=('CENTER', 'LEFT', 'CENTER', 'CENTER', 'LEFT'),
+                   line_height=6.5, headings_style=head,
+                   cell_fill_color=(244, 247, 249), cell_fill_mode='ROWS') as table:
+        table.row(('Α/Α', 'ΚΡΙΤΗΡΙΟ', 'Συντ.', 'Βαθμός', 'Σχόλιο'))
+        i = 1; lastg = None
+        for c in t.criteria:
+            if c.grp and c.grp != lastg:
+                gr = table.row(); gr.cell(c.grp, colspan=5, style=grp); lastg = c.grp
+            rr = table.row()
+            rr.cell(str(i)); rr.cell(c.label or '')
+            rr.cell('%d%%' % round((c.weight or 0) * 100)); rr.cell(''); rr.cell('')
+            i += 1
+    pdf.ln(3)
+    wsum = round(sum(c.weight or 0 for c in t.criteria), 3)
+    pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.set_x(14)
+    pdf.cell(0, 7, 'Σύνολο βαρών: %d%%    ·    Κριτήρια: %d' % (round(wsum * 100), len(t.criteria)), ln=1)
+    pdf.ln(2)
+    for lab in ['ΒΑΘΜΟΛΟΓΙΑ %', 'ΑΞΙΟΛΟΓΗΣΗ', 'ΓΕΝΙΚΟ ΣΧΟΛΙΟ']:
+        pdf.set_x(14); pdf.set_font('dv', 'B', 8.5); pdf.set_text_color(*GREY); pdf.cell(42, 7, lab, 0, 0)
+        pdf.set_draw_color(190, 200, 210); pdf.cell(140, 7, '', border='B', ln=1)
+    log_activity('eval_template_pdf', t.name)
+    out = pdf.output()
+    return Response(bytes(out), mimetype='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename=template-%d.pdf' % t.id})
+
+
+@app.route('/dashboard/evaluations/templates/<int:tid>/export.xlsx')
+def eval_template_xlsx(tid):
+    if not _auth():
+        return redirect(url_for('login'))
+    t = EvalTemplate.query.get_or_404(tid)
+    import io, openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    NAVY = '193847'; LIGHT = 'EEF3F6'; GROUP = 'E1EBF5'; GREY = '78828C'
+    thin = Side(style='thin', color='D0D9E2'); border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Πρότυπο'
+    ws.sheet_view.showGridLines = False
+    ws.column_dimensions['A'].width = 6; ws.column_dimensions['B'].width = 58
+    ws.column_dimensions['C'].width = 13; ws.column_dimensions['D'].width = 13; ws.column_dimensions['E'].width = 34
+    ws.merge_cells('A1:E1'); ws['A1'] = 'CONDIAN HOTELS'
+    ws['A1'].font = Font(bold=True, size=16, color='FFFFFF'); ws['A1'].fill = PatternFill('solid', fgColor=NAVY)
+    ws['A1'].alignment = Alignment(horizontal='left', vertical='center', indent=1); ws.row_dimensions[1].height = 28
+    ws.merge_cells('A2:E2'); ws['A2'] = 'Έντυπο Αξιολόγησης Εργαζομένου'; ws['A2'].font = Font(bold=True, size=11, color=NAVY)
+    ws.merge_cells('A3:E3'); ws['A3'] = t.name; ws['A3'].font = Font(bold=True, size=13, color=NAVY)
+    ws.merge_cells('A4:E4')
+    ws['A4'] = 'Πεδίο: %s   ·   Ξενοδοχείο: %s   ·   Κλίμακα: 1–%d' % (
+        ('Κοινό' if t.scope == 'general' else t.scope), (t.hotel.name if t.hotel else 'Όλα'), t.scale_max or 10)
+    ws['A4'].font = Font(size=9, color=GREY)
+    r = 6
+    for k in ['ΞΕΝΟΔΟΧΕΙΑΚΗ ΜΟΝΑΔΑ', 'ΟΝΟΜΑΤΕΠΩΝΥΜΟ', 'ΤΜΗΜΑ', 'ΠΕΡΙΟΔΟΣ', 'ΗΜΕΡΟΜΗΝΙΑ ΑΞΙΟΛΟΓΗΣΗΣ', 'ΑΞΙΟΛΟΓΗΤΗΣ']:
+        ws.cell(r, 1, k).font = Font(bold=True, size=8, color=GREY)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+        ws.cell(r, 2).border = Border(bottom=thin); r += 1
+    r += 1
+    hdr = ['Α/Α', 'ΚΡΙΤΗΡΙΟ', 'ΣΥΝΤΕΛΕΣΤΗΣ', 'ΒΑΘΜΟΛΟΓΙΑ', 'ΣΧΟΛΙΟ']
+    for j, h in enumerate(hdr):
+        c = ws.cell(r, j + 1, h); c.font = Font(bold=True, color='FFFFFF', size=10)
+        c.fill = PatternFill('solid', fgColor=NAVY); c.alignment = Alignment(horizontal='center', vertical='center'); c.border = border
+    ws.row_dimensions[r].height = 20; r += 1
+    i = 1; lastg = None; zebra = False
+    for crit in t.criteria:
+        if crit.grp and crit.grp != lastg:
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+            gc = ws.cell(r, 1, crit.grp); gc.font = Font(bold=True, color=NAVY, size=9)
+            gc.fill = PatternFill('solid', fgColor=GROUP); gc.alignment = Alignment(horizontal='left', indent=1)
+            for cc in range(1, 6):
+                ws.cell(r, cc).border = border
+            lastg = crit.grp; r += 1; zebra = False
+        fill = PatternFill('solid', fgColor=LIGHT) if zebra else None
+        vals = [i, crit.label, round((crit.weight or 0), 4), None, None]
+        for j, v in enumerate(vals):
+            c = ws.cell(r, j + 1, v); c.border = border
+            if fill:
+                c.fill = fill
+            if j == 0:
+                c.alignment = Alignment(horizontal='center')
+            elif j == 1:
+                c.alignment = Alignment(horizontal='left', wrap_text=True, vertical='center')
+            elif j == 2:
+                c.alignment = Alignment(horizontal='center'); c.number_format = '0%'
+            else:
+                c.alignment = Alignment(horizontal='center')
+        i += 1; r += 1; zebra = not zebra
+    r += 1
+    wsum = round(sum(c.weight or 0 for c in t.criteria), 4)
+    ws.cell(r, 2, 'ΣΥΝΟΛΟ ΒΑΡΩΝ').font = Font(bold=True, color=NAVY)
+    sc = ws.cell(r, 3, wsum); sc.number_format = '0%'; sc.font = Font(bold=True, color=NAVY); sc.alignment = Alignment(horizontal='center'); r += 2
+    for lab in ['ΒΑΘΜΟΛΟΓΙΑ %', 'ΑΞΙΟΛΟΓΗΣΗ', 'ΓΕΝΙΚΟ ΣΧΟΛΙΟ']:
+        ws.cell(r, 2, lab).font = Font(bold=True, size=9, color=GREY)
+        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=5)
+        ws.cell(r, 3).border = Border(bottom=thin); r += 1
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    log_activity('eval_template_xlsx', t.name)
+    return Response(buf.read(), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': 'attachment; filename=template-%d.xlsx' % t.id})
+
 # ── Φ2: Group roll-up matrix (κριτήρια × υπάλληλοι ανά τμήμα/περίοδο) ──────────
 def _group_data(dept_id, year, period, mode):
     hotels_m, deps_m = _maps()

@@ -19,6 +19,8 @@
         <td>{{ r.used }}</td>
         <td>{% if r.t.is_active %}<span class="badge" style="background:#dcfce7;color:#16a34a;">ενεργό</span>{% else %}<span class="badge" style="background:#f1f5f9;color:#64748b;">ανενεργό</span>{% endif %}</td>
         <td style="white-space:nowrap;">
+          <a class="btn" href="/dashboard/evaluations/templates/{{ r.t.id }}/export.pdf" title="Έντυπο PDF" style="padding:5px 10px;background:#b91c1c;"><i class="ti ti-file-type-pdf"></i></a>
+          <a class="btn" href="/dashboard/evaluations/templates/{{ r.t.id }}/export.xlsx" title="Έντυπο Excel" style="padding:5px 10px;background:#0f766e;"><i class="ti ti-file-spreadsheet"></i></a>
           <a class="btn" href="/dashboard/evaluations/templates/{{ r.t.id }}?embed=1" style="padding:5px 10px;"><i class="ti ti-edit"></i></a>
           <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/clone" style="display:inline;"><input type="hidden" name="name" value="{{ r.t.name }} (variant)"><button class="btn" type="submit" style="padding:5px 10px;background:#0f766e;" title="Δημιουργία variant"><i class="ti ti-copy"></i></button></form>
           <form method="POST" action="/dashboard/evaluations/templates/{{ r.t.id }}/toggle" style="display:inline;"><button class="btn" type="submit" style="padding:5px 10px;background:#64748b;" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>
