@@ -574,8 +574,7 @@ def evaluation_delete(eid):
         return redirect(url_for('login'))
     ev = Evaluation.query.get_or_404(eid)
     user = current_user(); uid = user.id if user else None
-    not_approved = ev.status not in APPROVED_STATES
-    allowed = (is_admin() and not_approved) or (ev.evaluator_id == uid and ev.status == 'draft' and _hid_ok(ev.hotel_id))
+    allowed = is_admin() or (ev.evaluator_id == uid and ev.status == 'draft' and _hid_ok(ev.hotel_id))
     if not allowed:
         return redirect(url_for('evaluations_list') + '?embed=1')
     db.session.delete(ev); db.session.commit()
