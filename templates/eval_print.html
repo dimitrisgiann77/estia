@@ -97,12 +97,18 @@
   </div>
 </div>
 <script>
+function _sendEv(to){
+  var b=to?('to='+encodeURIComponent(to)):'';
+  return fetch('/dashboard/evaluations/{{ ev.id }}/email',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b}).then(function(r){return r.json();});
+}
 function emailEv(){
-  var to=prompt('Email παραλήπτη:'); if(!to)return;
-  fetch('/dashboard/evaluations/{{ ev.id }}/email',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'to='+encodeURIComponent(to)})
-    .then(function(r){return r.json();})
-    .then(function(j){ alert(j&&j.ok?'Στάλθηκε στο '+to:('Αποτυχία αποστολής'+(j&&j.msg?': '+j.msg:''))); })
-    .catch(function(){ alert('Σφάλμα αποστολής.'); });
+  _sendEv('').then(function(j){
+    if(j&&j.ok){ alert('Στάλθηκε στο '+j.to); return; }
+    if(j&&j.msg==='no-email'){
+      var to=prompt('Το προφίλ του εργαζομένου δεν έχει email. Δώσε email παραλήπτη:'); if(!to)return;
+      _sendEv(to).then(function(j2){ alert(j2&&j2.ok?'Στάλθηκε στο '+j2.to:('Αποτυχία'+(j2&&j2.msg?': '+j2.msg:''))); });
+    } else { alert('Αποτυχία αποστολής'+(j&&j.msg?': '+j.msg:'')); }
+  }).catch(function(){ alert('Σφάλμα αποστολής.'); });
 }
 </script>
 </body></html>

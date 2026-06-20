@@ -331,11 +331,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.156'
-APP_BUILD   = '437'
+APP_VERSION = '12.157'
+APP_BUILD   = '438'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.157', 'b': '438', 'date': '20/06/2026', 'time': '22:30', 'title': 'Αξιολόγηση — email με PDF συνημμένο, νέο PDF/Excel, tags & στήλη Status, στατιστικά managers',
+     'items': ['Email: στέλνει το PDF ως ΣΥΝΗΜΜΕΝΟ (όνομα = ο κωδικός εγγράφου)· παραλήπτης αντλείται από το προφίλ του εργαζομένου (αλλιώς ρωτά).',
+               'PDF export ξαναχτίστηκε (header+logo, πίνακας με ομάδες/zebra, βαθμοί, σύνολο). Excel export βελτιωμένο.',
+               'Λίστα: Τμήμα/Ερωτηματολόγιο/Ξενοδοχείο(+κωδικός)/Περίοδος ως tags· νέα ξεχωριστή στήλη «Κατάσταση» (status) δίπλα στη «Βαθμίδα».',
+               'Στατιστικά τμήματος/ξενοδοχείου διαθέσιμα και στους managers (scoped στα ανατεθειμένα ξενοδοχεία).']},
     {'v': '12.156', 'b': '437', 'date': '20/06/2026', 'time': '21:40', 'title': 'Αξιολόγηση — προβολή με logo + κουμπιά Εκτύπωση/PDF/Excel/Email',
      'items': ['Στο pop-up προβολής: κουμπιά πάνω — Εκτύπωση, PDF, Excel, Email (αποστολή του εντύπου σε email παραλήπτη μέσω της υπάρχουσας υποδομής).',
                'Εμφανίζεται το logo της εταιρείας στο έντυπο (από Εμφάνιση → logo, αλλιώς το προεπιλεγμένο).']},
@@ -1266,30 +1271,41 @@ def _graph_token():
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.loads(r.read().decode())['access_token']
 
-def _send_graph(subject, html, recips):
+def _send_graph(subject, html, recips, attachments=None):
     token = _graph_token()
     payload = {'message': {'subject': subject, 'body': {'contentType': 'HTML', 'content': html},
                'toRecipients': [{'emailAddress': {'address': a}} for a in recips]}, 'saveToSentItems': True}
+    if attachments:
+        import base64 as _b64
+        payload['message']['attachments'] = [
+            {'@odata.type': '#microsoft.graph.fileAttachment', 'name': fn,
+             'contentType': mt, 'contentBytes': _b64.b64encode(b).decode()} for fn, b, mt in attachments]
     req = urllib.request.Request('https://graph.microsoft.com/v1.0/users/' + GRAPH_SENDER + '/sendMail',
         data=json.dumps(payload).encode(),
         headers={'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.status in (200, 202)
 
-def _send_smtp(subject, html, recips):
+def _send_smtp(subject, html, recips, attachments=None):
     msg = MIMEMultipart(); msg['From'] = EMAIL_FROM; msg['To'] = ', '.join(recips); msg['Subject'] = subject
     msg.attach(MIMEText(html, 'html', 'utf-8'))
+    if attachments:
+        from email.mime.application import MIMEApplication
+        for fn, b, mt in attachments:
+            part = MIMEApplication(b, _subtype=(mt.split('/')[-1] if '/' in mt else 'octet-stream'))
+            part.add_header('Content-Disposition', 'attachment', filename=fn)
+            msg.attach(part)
     sv = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT); sv.login(EMAIL_FROM, EMAIL_PASSWORD)
     sv.sendmail(EMAIL_FROM, recips, msg.as_string()); sv.quit()
     return True
 
-def send_email(subject, html, recips=None):
+def send_email(subject, html, recips=None, attachments=None):
     recips = recips or EMAIL_TO_LIST
     via = 'graph' if GRAPH_CLIENT_ID else ('smtp' if EMAIL_PASSWORD else 'none')
     ok = False
     if via != 'none':
         try:
-            ok = _send_graph(subject, html, recips) if via == 'graph' else _send_smtp(subject, html, recips)
+            ok = _send_graph(subject, html, recips, attachments) if via == 'graph' else _send_smtp(subject, html, recips, attachments)
         except Exception as e:
             print('email error (' + via + '):', e); ok = False
     try:

@@ -425,7 +425,8 @@ def evaluations_list():
                            periods=periods, f_hotel=f_hotel, f_band=f_band, f_period=f_period, q=q,
                            band_color=BAND_COLOR, dept_name=_dept_name, st_label=ST_LABEL, st_color=ST_COLOR,
                            submitted_n=submitted_n, is_admin=is_admin(),
-                           me_id=(current_user().id if current_user() else None))
+                           me_id=(current_user().id if current_user() else None),
+                           hotel_code=_hotel_code)
 
 @app.route('/dashboard/evaluations/new', methods=['GET', 'POST'])
 def evaluation_new():
@@ -518,13 +519,27 @@ def evaluation_email(eid):
     if not _hid_ok(ev.hotel_id):
         return jsonify(ok=False, msg='forbidden'), 403
     to = (request.values.get('to') or '').strip()
-    if not to or '@' not in to:
+    if not to:
+        to = ((ev.employee.email or '').strip() if ev.employee else '')
+    if not to:
+        return jsonify(ok=False, msg='no-email'), 200   # δεν υπάρχει email στο προφίλ → ο client ζητά χειροκίνητα
+    if '@' not in to:
         return jsonify(ok=False, msg='Μη έγκυρο email'), 400
     from app import send_email
-    subj = 'Αξιολόγηση %s — %s' % (ev.code or '', (ev.employee.full_name if ev.employee else ''))
-    ok = send_email(subj, _eval_email_html(ev), [to])
+    name = ev.employee.full_name if ev.employee else ''
+    subj = 'Αξιολόγηση εργαζομένου — %s (%s)' % (name, ev.code or '')
+    body = ('<p style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;">Καλημέρα,</p>'
+            '<p style="font-family:Arial,sans-serif;font-size:14px;color:#1e293b;">Επισυνάπτεται η αξιολόγηση '
+            '<b>%s</b> για τον/την <b>%s</b>.</p>'
+            '<p style="font-family:Arial,sans-serif;font-size:13px;color:#64748b;">CONDIAN HOTELS</p>') % (ev.code or '', name)
+    fn = '%s.pdf' % (ev.code or ('evaluation-%d' % ev.id))
+    try:
+        pdf = _eval_pdf_bytes(ev)
+        ok = send_email(subj, body, [to], attachments=[(fn, pdf, 'application/pdf')])
+    except Exception as e:
+        print('eval email error:', e); ok = False
     log_activity('evaluation_email', '%s -> %s' % (ev.code, to))
-    return jsonify(ok=bool(ok))
+    return jsonify(ok=bool(ok), to=to)
 
 @app.route('/dashboard/evaluations/<int:eid>/edit', methods=['GET', 'POST'])
 def evaluation_edit(eid):
@@ -697,6 +712,77 @@ def evaluation_export(eid):
                     headers={'Content-Disposition': 'attachment; filename=' + fname})
 
 
+def _eval_pdf_bytes(ev):
+    """Παράγει το PDF έντυπο της αξιολόγησης (ωραίος πίνακας + logo + βαθμοί). Επιστρέφει bytes."""
+    import os
+    from app import BASE_DIR
+    from fpdf import FPDF
+    from fpdf.fonts import FontFace
+    NAVY = (25, 56, 71); GREY = (120, 130, 140); GROUP = (225, 235, 245); ZEB = (244, 247, 249)
+    smap = {s.criterion_id: s for s in ev.scores}
+    pdf = FPDF(orientation='P', unit='mm', format='A4'); pdf.set_auto_page_break(True, margin=16)
+    pdf.add_page()
+    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.set_fill_color(*NAVY); pdf.rect(0, 0, 210, 26, style='F')
+    try:
+        pdf.image(os.path.join(BASE_DIR, 'static', 'img', 'logo.png'), x=14, y=5, h=16)
+        _tx = 38
+    except Exception:
+        _tx = 14
+    pdf.set_xy(_tx, 6); pdf.set_text_color(255, 255, 255); pdf.set_font('dv', 'B', 16); pdf.cell(0, 8, 'CONDIAN HOTELS', ln=1)
+    pdf.set_x(_tx); pdf.set_font('dv', '', 10); pdf.set_text_color(205, 222, 238)
+    pdf.cell(0, 6, 'Έντυπο Αξιολόγησης Εργαζομένου · ' + (ev.code or ''), ln=1)
+    pdf.set_y(32)
+    pdf.set_text_color(*NAVY); pdf.set_font('dv', 'B', 13); pdf.set_x(14)
+    pdf.cell(0, 8, (ev.employee.full_name if ev.employee else '—'), ln=1)
+    pdf.set_x(14); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
+    _subt = (ev.template.name if ev.template else '')
+    if ev.template and ev.template.scope and ev.template.scope != 'general':
+        _subt += ' · ' + ev.template.scope
+    pdf.cell(0, 6, _subt, ln=1); pdf.ln(2)
+    meta = [('Ξενοδοχείο', ev.hotel.name if ev.hotel else '—'),
+            ('Τμήμα', _dept_name(ev.department_id) or '—'),
+            ('Περίοδος', ev.period_label or '—'),
+            ('Ημ/νία', (ev.updated_at or ev.created_at).strftime('%d/%m/%Y') if (ev.updated_at or ev.created_at) else '—'),
+            ('Αξιολογητής', ev.evaluator.full_name if ev.evaluator else '—'),
+            ('Κωδικός', ev.code or '—')]
+    for k, v in meta:
+        pdf.set_x(14); pdf.set_font('dv', 'B', 8); pdf.set_text_color(*GREY); pdf.cell(32, 5.5, k, 0, 0)
+        pdf.set_font('dv', '', 9.5); pdf.set_text_color(40, 40, 40); pdf.multi_cell(0, 5.5, str(v))
+    pdf.ln(2)
+    pdf.set_font('dv', '', 8.8); pdf.set_text_color(30, 30, 30); pdf.set_fill_color(255, 255, 255)
+    head = FontFace(emphasis='BOLD', color=(255, 255, 255), fill_color=NAVY)
+    grp = FontFace(emphasis='BOLD', color=NAVY, fill_color=GROUP)
+    with pdf.table(width=182, col_widths=(8, 40, 11, 13, 30),
+                   text_align=('CENTER', 'LEFT', 'CENTER', 'CENTER', 'LEFT'),
+                   line_height=6.2, headings_style=head,
+                   cell_fill_color=ZEB, cell_fill_mode='ROWS') as table:
+        table.row(('Α/Α', 'ΚΡΙΤΗΡΙΟ', 'Συντ.', 'Βαθμός', 'Σχόλιο'))
+        i = 1; lastg = None
+        for c in (ev.template.criteria if ev.template else []):
+            if c.grp and c.grp != lastg:
+                gr = table.row(); gr.cell(c.grp, colspan=5, style=grp); lastg = c.grp
+            sv = smap.get(c.id)
+            val = ('%g' % sv.score) if (sv and sv.score is not None) else '–'
+            rr = table.row()
+            rr.cell(str(i)); rr.cell(c.label or ''); rr.cell('%d%%' % round((c.weight or 0) * 100))
+            rr.cell('%s/%d' % (val, c.max_score or 10)); rr.cell(sv.comment if sv and sv.comment else '')
+            i += 1
+    pdf.ln(3); pdf.set_font('dv', 'B', 12); pdf.set_text_color(*NAVY); pdf.set_x(14)
+    pdf.cell(0, 8, 'Βαθμολογία: %s%%    ·    %s' % (
+        ('%.1f' % ev.score_pct) if ev.score_pct is not None else '—', ev.band or '—'), ln=1)
+    if ev.goals:
+        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.set_x(14); pdf.cell(0, 6, 'Στόχοι:', ln=1)
+        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40)
+        for g in sorted(ev.goals, key=lambda x: x.id):
+            pdf.set_x(14); pdf.multi_cell(0, 5.5, ('☑ ' if g.done else '☐ ') + g.text)
+    if ev.general_comment:
+        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.set_x(14); pdf.cell(0, 6, 'Γενικό σχόλιο:', ln=1)
+        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40); pdf.set_x(14); pdf.multi_cell(0, 5.5, ev.general_comment)
+    return bytes(pdf.output())
+
+
 @app.route('/dashboard/evaluations/<int:eid>/export.pdf')
 def evaluation_export_pdf(eid):
     if not _auth_eval():
@@ -704,58 +790,9 @@ def evaluation_export_pdf(eid):
     ev = Evaluation.query.get_or_404(eid)
     if not _hid_ok(ev.hotel_id):
         return redirect(url_for('evaluations_list') + '?embed=1')
-    import os
-    from app import BASE_DIR
-    from fpdf import FPDF
-    NAVY = (25, 56, 71); GREY = (100, 116, 139)
-    smap = {s.criterion_id: s for s in ev.scores}
-    emp = ev.employee
-    pdf = FPDF(orientation='P', unit='mm', format='A4'); pdf.set_auto_page_break(True, margin=14)
-    pdf.add_page()
-    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
-    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
-    pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY); pdf.cell(0, 9, 'CONDIAN HOTELS', ln=1)
-    pdf.set_font('dv', 'B', 11); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Έντυπο Αξιολόγησης Εργαζομένου', ln=1)
-    pdf.ln(2)
-    meta = [('ΞΕΝΟΔΟΧΕΙΟ', ev.hotel.name if ev.hotel else '—'),
-            ('ΟΝΟΜΑΤΕΠΩΝΥΜΟ', emp.full_name if emp else '—'),
-            ('ΤΜΗΜΑ', _dept_name(ev.department_id) or '—'),
-            ('ΠΕΡΙΟΔΟΣ', ('%s %s' % (ev.period_label or '', ev.year or '')).strip()),
-            ('ΗΜ/ΝΙΑ', ev.eval_date.strftime('%d/%m/%Y') if ev.eval_date else '—'),
-            ('ΑΞΙΟΛΟΓΗΤΗΣ', ev.evaluator.full_name if ev.evaluator else '—'),
-            ('ΚΩΔΙΚΟΣ', ev.code or '—')]
-    for k, v in meta:
-        pdf.set_font('dv', '', 10); pdf.set_text_color(40, 40, 40)
-        pdf.set_x(pdf.l_margin)
-        pdf.multi_cell(0, 6, '%s:  %s' % (k, v))
-    pdf.ln(2)
-    pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 7, 'Κριτήρια', ln=1)
-    i = 1
-    for crit in (ev.template.criteria if ev.template else []):
-        sc = smap.get(crit.id)
-        val = ('%g' % sc.score) if (sc and sc.score is not None) else '–'
-        pdf.set_font('dv', '', 9); pdf.set_text_color(20, 20, 20)
-        line = '%d. %s   [Βαθμός: %s/%d · Συντ. %d%%]' % (i, crit.label, val, crit.max_score or 10, round((crit.weight or 0) * 100))
-        if sc and sc.comment:
-            line += '  — ' + sc.comment
-        pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, line)
-        i += 1
-    pdf.ln(3)
-    pdf.set_font('dv', 'B', 12); pdf.set_text_color(*NAVY)
-    pdf.cell(0, 8, 'Βαθμολογία: %s%%    ·    %s' % (
-        ('%.1f' % ev.score_pct) if ev.score_pct is not None else '—', ev.band or '—'), ln=1)
-    if ev.goals:
-        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Στόχοι:', ln=1)
-        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40)
-        for g in sorted(ev.goals, key=lambda x: x.id):
-            pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, ('☑ ' if g.done else '☐ ') + g.text)
-    if ev.general_comment:
-        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Γενικό σχόλιο:', ln=1)
-        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40); pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, ev.general_comment)
     log_activity('evaluation_export_pdf', ev.code)
-    out = pdf.output()
-    return Response(bytes(out), mimetype='application/pdf',
-                    headers={'Content-Disposition': 'attachment; filename=evaluation-%s.pdf' % (ev.code or ev.id)})
+    return Response(_eval_pdf_bytes(ev), mimetype='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename=%s.pdf' % (ev.code or ev.id)})
 
 # ── Φ2: Στατιστικά ────────────────────────────────────────────────────────────
 def latest_finalized():
@@ -790,7 +827,7 @@ def _avg(vals):
 
 @app.route('/dashboard/evaluations/stats')
 def evaluations_stats():
-    if not _auth():
+    if not _auth_eval():
         return redirect(url_for('login'))
     mode = request.args.get('mode', 'snapshot')
     if mode not in ('snapshot', 'current'): mode = 'snapshot'
@@ -799,6 +836,9 @@ def evaluations_stats():
     f_hotel = request.args.get('hotel_id', type=int)
     hotels_m, deps_m = _maps()
     evs = latest_finalized()
+    _hs = _scope_hids()
+    if _hs is not None:
+        evs = [e for e in evs if e.hotel_id in _hs]
     if f_year:   evs = [e for e in evs if e.year == f_year]
     if f_period: evs = [e for e in evs if e.period_label == f_period]
     if f_hotel:
