@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.159'
-APP_BUILD   = '440'
+APP_VERSION = '12.160'
+APP_BUILD   = '441'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.160', 'b': '441', 'date': '20/06/2026', 'time': '23:30', 'title': 'Αξιολόγηση — κατάργηση snapshot/τρέχον + Roadmap auto-ενημέρωση ανά έκδοση',
+     'items': ['Αφαιρέθηκε το πεδίο «Snapshot/Τρέχον» στα στατιστικά — πάντα τα στοιχεία της στιγμής της αξιολόγησης. (Για εργαζόμενο σε >1 τμήμα → διπλή αξιολόγηση, στο roadmap.)',
+               'Το Roadmap (/dashboard/roadmap) δείχνει πλέον αυτόματα ενότητα «Πρόσφατα υλοποιήθηκαν» από τις εκδόσεις — ενημερώνεται μόνο του σε κάθε νέα version.']},
     {'v': '12.159', 'b': '440', 'date': '20/06/2026', 'time': '23:05', 'title': 'Αξιολόγηση — admin διαγράφει και εγκεκριμένες',
      'items': ['Admin/masteradmin μπορεί πλέον να διαγράψει οποιαδήποτε αξιολόγηση, ακόμη και εγκεκριμένη. (Ο αξιολογητής μόνο το δικό του πρόχειρο.)']},
     {'v': '12.158', 'b': '439', 'date': '20/06/2026', 'time': '22:50', 'title': 'Αξιολόγηση — λίστα: μόνο hotel code + πίνακας μέσα στην κάρτα',
@@ -2775,6 +2778,8 @@ ROADMAP = [
         {'t': 'Μισθοδοσία — μηχανή Management+Λογιστήριο + import Epsilon (Φ2)', 's': 'progress'},
         {'t': 'Μισθοδοσία — εκκαθαριστικά PDF, reporting, πρόβλεψη (Φ3+)', 's': 'planned'},
         {'t': 'Αξιολόγηση προσωπικού (πάνω στα ερωτηματολόγια)', 's': 'planned'},
+        {'t': 'Αξιολόγηση: διπλή αξιολόγηση για εργαζόμενο σε >1 τμήμα ανά περίοδο (π.χ. Φεβ-Μαρ Συντήρηση, Απρ-Νοε Κουζίνα)', 's': 'planned'},
+        {'t': 'Αξιολόγηση: τράπεζα ερωτήσεων + σύνθεση ερωτηματολογίου με drag&drop (βάρος ανά φύλλο)', 's': 'idea'},
     ]},
     {'area': 'Guest experience / Υποδοχή', 'items': [
         {'t': 'Ερωτηματολόγια (builder, δημόσιος σύνδεσμος, NPS)', 's': 'done'},
@@ -2806,7 +2811,7 @@ def roadmap_page():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     return render_template('roadmap.html', roadmap=ROADMAP, status=ROADMAP_STATUS,
-                           cur_version=APP_VERSION, cur_build=APP_BUILD)
+                           recent=CHANGELOG[:12], cur_version=APP_VERSION, cur_build=APP_BUILD)
 
 # ── v12.46 — Βοήθεια: FAQ + Επίλυση προβλημάτων (admin items κρυφά από non-admin) ──
 FAQ_ITEMS = [

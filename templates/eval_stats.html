@@ -16,14 +16,12 @@
 
   <div class="card">
     <form class="filters" method="GET" action="/dashboard/evaluations/stats" id="ff">
-      <input type="hidden" name="embed" value="1"><input type="hidden" name="mode" value="{{ mode }}" id="modef">
-      <span class="seg"><a href="#" onclick="setMode('snapshot');return false;" class="{{ 'on' if mode=='snapshot' }}">Snapshot (όπως τότε)</a><a href="#" onclick="setMode('current');return false;" class="{{ 'on' if mode=='current' }}">Τρέχον (Μητρώο)</a></span>
+      <input type="hidden" name="embed" value="1">
       <select name="year" onchange="ff.submit()"><option value="">Όλα τα έτη</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if y==f_year }}>{{ y }}</option>{% endfor %}</select>
       <select name="period" onchange="ff.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==f_period }}>{{ p }}</option>{% endfor %}</select>
       <select name="hotel_id" onchange="ff.submit()"><option value="">Όλα τα ξενοδοχεία</option>{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==f_hotel }}>{{ h.name }}</option>{% endfor %}</select>
     </form>
-    <a class="btn" href="/dashboard/evaluations/group?embed=1&mode={{ mode }}" style="margin-top:8px;background:#475569;"><i class="ti ti-users-group"></i> Group matrix ανά τμήμα</a>
-    <div class="muted" style="font-size:12px;margin-top:8px;">Ομαδοποίηση: <b>{{ 'Snapshot — τμήμα/ξενοδοχείο τη στιγμή της αξιολόγησης' if mode=='snapshot' else 'Τρέχον — σημερινό τμήμα/ξενοδοχείο από το Μητρώο' }}</b></div>
+    <a class="btn" href="/dashboard/evaluations/group?embed=1" style="margin-top:8px;background:#475569;"><i class="ti ti-users-group"></i> Group matrix ανά τμήμα</a>
   </div>
 
   <div class="two">
@@ -62,5 +60,4 @@
     </div>
   </div>
 </div>
-<script>function setMode(m){document.getElementById('modef').value=m;document.getElementById('ff').submit();}</script>
 </body></html>

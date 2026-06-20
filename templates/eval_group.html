@@ -14,12 +14,11 @@
 <div class="container">
   <div class="card">
     <form class="filters" method="GET" action="/dashboard/evaluations/group" id="gf">
-      <input type="hidden" name="embed" value="1"><input type="hidden" name="mode" value="{{ mode }}">
+      <input type="hidden" name="embed" value="1">
       <select name="department_id" onchange="gf.submit()">{% for d in depts %}<option value="{{ d.id }}" {{ 'selected' if d.id==dept_id }}>{{ d.name }}</option>{% endfor %}</select>
       <select name="year" onchange="gf.submit()"><option value="">Όλα τα έτη</option>{% for y in years %}<option value="{{ y }}" {{ 'selected' if y==year }}>{{ y }}</option>{% endfor %}</select>
       <select name="period" onchange="gf.submit()"><option value="">Όλες οι περίοδοι</option>{% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==period }}>{{ p }}</option>{% endfor %}</select>
-      <select name="mode" onchange="gf.submit()"><option value="snapshot" {{ 'selected' if mode=='snapshot' }}>Snapshot</option><option value="current" {{ 'selected' if mode=='current' }}>Τρέχον</option></select>
-      <a class="btn" href="/dashboard/evaluations/group/export.xlsx?department_id={{ dept_id or '' }}&year={{ year or '' }}&period={{ period }}&mode={{ mode }}" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+      <a class="btn" href="/dashboard/evaluations/group/export.xlsx?department_id={{ dept_id or '' }}&year={{ year or '' }}&period={{ period }}" style="background:#0f766e;"><i class="ti ti-file-spreadsheet"></i> Excel</a>
     </form>
   </div>
 

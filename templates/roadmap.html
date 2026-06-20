@@ -14,6 +14,17 @@
       {% for key,(label,bg,fg) in status.items() %}<span class="pill" style="background:{{ bg }};color:{{ fg }};">{{ label }}</span>{% endfor %}
     </div>
     <p style="font-size:12.5px;color:#64748b;margin-top:0;">Έχεις ιδέα ή βρήκες πρόβλημα; Στείλε μας <a href="/feedback?embed=1">feedback</a> — μας βοηθάει να προτεραιοποιήσουμε.</p>
+    {% if recent %}
+    <div class="area">
+      <h3><i class="ti ti-sparkles"></i> Πρόσφατα υλοποιήθηκαν <span style="font-weight:400;color:#94a3b8;font-size:12px;">(αυτόματα από τις εκδόσεις)</span></h3>
+      {% for c in recent %}
+      <div class="rm-item">
+        <span class="pill" style="background:#dcfce7;color:#166534;">v{{ c.v }}</span>
+        <span class="txt">{{ c.title }} <span style="color:#9aa7ad;font-size:11.5px;">· {{ c.date }}</span></span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% for grp in roadmap %}
     <div class="area">
       <h3><i class="ti ti-folder"></i> {{ grp.area }}</h3>

@@ -828,8 +828,7 @@ def _avg(vals):
 def evaluations_stats():
     if not _auth_eval():
         return redirect(url_for('login'))
-    mode = request.args.get('mode', 'snapshot')
-    if mode not in ('snapshot', 'current'): mode = 'snapshot'
+    mode = 'snapshot'  # κατάργηση επιλογής snapshot/τρέχον — πάντα τα στοιχεία της στιγμής αξιολόγησης
     f_year = request.args.get('year', type=int)
     f_period = (request.args.get('period') or '').strip()
     f_hotel = request.args.get('hotel_id', type=int)
@@ -1174,7 +1173,7 @@ def _group_data(dept_id, year, period, mode):
 def evaluations_group():
     if not _auth():
         return redirect(url_for('login'))
-    mode = request.args.get('mode', 'snapshot')
+    mode = 'snapshot'
     if mode not in ('snapshot', 'current'): mode = 'snapshot'
     dept_id = request.args.get('department_id', type=int)
     year = request.args.get('year', type=int)
@@ -1200,7 +1199,7 @@ def evaluations_group():
 def evaluations_group_export():
     if not _auth():
         return redirect(url_for('login'))
-    mode = request.args.get('mode', 'snapshot')
+    mode = 'snapshot'
     dept_id = request.args.get('department_id', type=int)
     year = request.args.get('year', type=int)
     period = (request.args.get('period') or '').strip()
