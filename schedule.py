@@ -86,6 +86,14 @@ class Department(db.Model):
     active    = db.Column(db.Boolean, default=True)
     sort      = db.Column(db.Integer, default=0)
 
+class HotelDepartment(db.Model):
+    """v12.166 — ποια (κοινά) τμήματα έχει κάθε ξενοδοχείο. Single source· προσθετικό.
+    Κενό για ένα ξενοδοχείο = (fallback) όλα τα ενεργά τμήματα."""
+    id            = db.Column(db.Integer, primary_key=True)
+    hotel_id      = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
+    __table_args__ = (db.UniqueConstraint('hotel_id', 'department_id', name='uq_hotel_dept'),)
+
 class ShiftType(db.Model):
     id            = db.Column(db.Integer, primary_key=True)
     code          = db.Column(db.String(12), unique=True, nullable=False)

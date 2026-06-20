@@ -20,12 +20,30 @@
   .otag{font-size:9.5px;border-radius:6px;padding:1px 6px;background:#eef2f6;color:#475569;}
   .otag.h{background:#193847;color:#fff;font-weight:700;}
   .ohint{font-size:12px;color:#64748b;margin:0 0 12px;}
+  .dchip2.on{outline:2px solid var(--accent,#185FA5);outline-offset:-1px;font-weight:600;}
 </style></head><body>
 {{ mp.topbar('sitemap', 'ΕΣΤΙΑ — Οργανόγραμμα', 'Σύρε εργαζόμενο σε τμήμα → ανατίθεται τμήμα + ξενοδοχείο') }}
 <div class="container">
   <p class="ohint"><i class="ti ti-info-circle"></i> Διάλεξε ξενοδοχείο, σύρε άτομα από το «Διαθέσιμο προσωπικό» πάνω σε ένα τμήμα — του ανατίθεται αυτόματα <b>τμήμα + ξενοδοχείο</b>. Σύρε πίσω στη λίστα για να το βγάλεις από το ξενοδοχείο.</p>
   <div class="otabs">
     {% for h in hotels %}<a class="otab {{ 'on' if h.id==sel }}" href="/dashboard/org?hotel_id={{ h.id }}&embed=1">{{ hcodes.get(h.id) or '' }} · {{ h.name }}</a>{% endfor %}
+  </div>
+
+  <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-building-cog"></i> Τμήματα αυτού του ξενοδοχείου</b>
+      {% if not configured %}<span class="muted" style="font-size:11.5px;">(δεν έχει οριστεί — φαίνονται όλα· πάτησε ένα τμήμα για να ξεκινήσεις τη ρύθμιση)</span>{% endif %}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+      {% for d in active_depts %}
+      <span class="dchip2 {{ 'on' if d.id in enabled_ids }}" onclick="toggleDept({{ d.id }}, this)" data-id="{{ d.id }}"
+            style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid {{ d.color }}66;background:{{ d.color }}1a;user-select:none;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ d.color }};margin-right:5px;"></span>{{ d.name }}
+        <span class="chk" style="margin-left:5px;">{{ '✓' if d.id in enabled_ids else '+' }}</span>
+      </span>
+      {% endfor %}
+      <span onclick="newDept()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέο τμήμα</span>
+    </div>
   </div>
 
   <div class="olayout">
@@ -43,7 +61,7 @@
     </div>
 
     <div class="oboard">
-      {% for d in depts %}
+      {% for d in columns %}
       <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
         <h4><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span></h4>
         {% for c in (bydept.get(d.id) or []) %}
@@ -84,6 +102,20 @@ function filt(){
   document.querySelectorAll('#poollist .ocard').forEach(function(c){
     c.style.display = (!q || (c.dataset.name||'').indexOf(q)>=0) ? '' : 'none';
   });
+}
+var SELHOTEL={{ sel }};
+function toggleDept(did, el){
+  var on=!el.classList.contains('on');
+  fetch('/dashboard/org/dept/toggle',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({hotel_id:SELHOTEL, department_id:did, on:on})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); });
+}
+function newDept(){
+  var name=prompt('Όνομα νέου τμήματος:'); if(!name)return;
+  var color=prompt('Χρώμα (hex, π.χ. #ef4444):','#64748b')||'#64748b';
+  fetch('/dashboard/org/dept/create',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name, color:color, hotel_id:SELHOTEL})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν δημιουργήθηκε'+(j&&j.msg?': '+j.msg:'')); });
 }
 </script>
 </body></html>

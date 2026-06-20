@@ -227,6 +227,15 @@ def _hotel_codes():
     except Exception:
         return {}
 
+def _hotel_dept_ids(hid):
+    """Σύνολο department_id που έχει το ξενοδοχείο. Κενό → None (=fallback: όλα τα ενεργά)."""
+    try:
+        from schedule import HotelDepartment
+        ids = {hd.department_id for hd in HotelDepartment.query.filter_by(hotel_id=hid).all()}
+        return ids or None
+    except Exception:
+        return None
+
 @app.route('/dashboard/org')
 def org_console():
     if not is_admin():
@@ -235,7 +244,8 @@ def org_console():
     piimap = _pii_map()
     hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     sel = request.args.get('hotel_id', type=int) or (hotels[0].id if hotels else None)
-    depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
+    active_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
+    dmap = {d.id: d for d in Department.query.all()}   # active+inactive (για ασφαλή εμφάνιση)
     hcodes = _hotel_codes()
 
     def card(u):
@@ -245,17 +255,74 @@ def org_console():
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     allu = User.query.filter(User.is_active == True).order_by(User.full_name).all()
-    bydept = {}     # dept_id (or 0) -> [cards] για το επιλεγμένο ξενοδοχείο
+    bydept = {}     # dept_id (ή 0=Χωρίς τμήμα) -> [cards] για το επιλεγμένο ξενοδοχείο
     pool = []       # όσοι ΔΕΝ είναι στο επιλεγμένο ξενοδοχείο
     for u in allu:
         if getattr(u, 'employment_active', None) is False:
             continue
         if getattr(u, 'home_hotel_id', None) == sel:
-            bydept.setdefault(getattr(u, 'department_id', None) or 0, []).append(card(u))
+            did = getattr(u, 'department_id', None)
+            key = did if (did and did in dmap) else 0   # άγνωστο/διαγραμμένο τμήμα → Χωρίς τμήμα
+            bydept.setdefault(key, []).append(card(u))
         else:
             pool.append(card(u))
-    return render_template('org.html', hotels=hotels, sel=sel, depts=depts,
-                           bydept=bydept, pool=pool, hcodes=hcodes)
+    # στήλες = ενεργοποιημένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί) + όσα έχουν άτομα
+    enabled = _hotel_dept_ids(sel)
+    base_ids = enabled if enabled is not None else {d.id for d in active_depts}
+    people_ids = {k for k in bydept.keys() if k != 0}
+    col_ids = base_ids | people_ids
+    columns = [dmap[i] for i in col_ids if i in dmap]
+    columns.sort(key=lambda d: (d.sort or 0, d.name or ''))
+    # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
+    enabled_set = enabled or set()
+    available = [d for d in active_depts if d.id not in enabled_set]
+    return render_template('org.html', hotels=hotels, sel=sel, columns=columns,
+                           bydept=bydept, pool=pool, hcodes=hcodes,
+                           active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
+                           configured=(enabled is not None))
+
+@app.route('/dashboard/org/dept/create', methods=['POST'])
+def org_dept_create():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department, HotelDepartment
+    d = request.json or {}
+    name = (d.get('name') or '').strip()[:60]
+    color = (d.get('color') or '#64748b').strip()[:9]
+    hid = d.get('hotel_id'); hid = int(hid) if hid else None
+    if not name:
+        return jsonify(ok=False, msg='Όνομα;'), 400
+    dep = Department.query.filter(db.func.lower(Department.name) == name.lower()).first()
+    if not dep:
+        mx = db.session.query(db.func.max(Department.sort)).scalar() or 0
+        dep = Department(name=name, name_en=name, color=color, active=True, sort=mx + 1)
+        db.session.add(dep); db.session.flush()
+    # ενεργοποίηση στο τρέχον ξενοδοχείο
+    if hid and not HotelDepartment.query.filter_by(hotel_id=hid, department_id=dep.id).first():
+        db.session.add(HotelDepartment(hotel_id=hid, department_id=dep.id))
+    db.session.commit()
+    log_activity('org_dept_create', '%s @hotel %s' % (name, hid))
+    return jsonify(ok=True, id=dep.id)
+
+@app.route('/dashboard/org/dept/toggle', methods=['POST'])
+def org_dept_toggle():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import HotelDepartment
+    d = request.json or {}
+    try:
+        hid = int(d['hotel_id']); did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    on = bool(d.get('on'))
+    row = HotelDepartment.query.filter_by(hotel_id=hid, department_id=did).first()
+    if on and not row:
+        db.session.add(HotelDepartment(hotel_id=hid, department_id=did))
+    elif (not on) and row:
+        db.session.delete(row)
+    db.session.commit()
+    log_activity('org_dept_toggle', 'hotel=%s dept=%s on=%s' % (hid, did, on))
+    return jsonify(ok=True)
 
 @app.route('/dashboard/org/assign', methods=['POST'])
 def org_assign():
