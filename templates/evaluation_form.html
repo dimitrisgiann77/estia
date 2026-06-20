@@ -53,6 +53,7 @@
 {{ mp.topbar('star', (('Επεξεργασία ' + ev.code) if ev else 'Νέα Αξιολόγηση'), 'HR — Αξιολόγηση εργαζομένου') }}
 <div class="efx">
 <form method="POST" id="ev-form" action="{{ ('/dashboard/evaluations/%d/edit'%ev.id) if ev else '/dashboard/evaluations/new' }}">
+  <input type="hidden" name="template_id" value="{{ tmpl.id if tmpl else '' }}">
 
   <div class="ef-card">
     <div class="ef-meta">

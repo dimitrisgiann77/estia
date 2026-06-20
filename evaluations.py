@@ -318,12 +318,11 @@ def _hotel_code(hid):
     return s[:3] or 'XXX'
 
 def _gen_code(ev):
-    """Μορφή κωδικού: ΕΤΟΣ-HOTELCODE-DEADLINE(ddmmyyyy)-SUBMISSIONID(0000)."""
+    """Μορφή κωδικού: ΕΤΟΣ-HOTELCODE-DEADLINE(ddmmyyyy). (Χωρίς αύξοντα — tracking μέσω εγγραφής/εργαζομένου.)"""
     yr = ev.year or date.today().year
     hc = _hotel_code(ev.hotel_id)
     dl = ev.eval_date.strftime('%d%m%Y') if ev.eval_date else ''
-    sid = '%04d' % (ev.id or 0)
-    return '-'.join([p for p in [str(yr), hc, dl, sid] if p])
+    return '-'.join([p for p in [str(yr), hc, dl] if p])
 
 def _dept_name(did):
     if not did: return ''
@@ -424,7 +423,7 @@ def evaluations_list():
 def evaluation_new():
     if not _auth_eval():
         return redirect(url_for('login'))
-    tid = request.args.get('template_id', type=int)
+    tid = request.values.get('template_id', type=int)
     tmpl = (EvalTemplate.query.filter_by(id=tid, is_active=True).first() if tid else None) \
            or EvalTemplate.query.filter_by(is_active=True, scope='general').order_by(EvalTemplate.id).first() \
            or EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.id).first()

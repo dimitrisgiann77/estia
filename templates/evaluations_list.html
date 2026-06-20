@@ -42,10 +42,10 @@ html[data-theme="dark"] table tbody tr:nth-child(even) td{background:rgba(255,25
         <td><a class="code" href="/dashboard/evaluations/{{ e.id }}?embed=1">{{ e.code }}</a>{% if e.version and e.version>1 %} <span class="muted">v{{ e.version }}</span>{% endif %}</td>
         <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a> {{ lock_badge(e.employee) if e.employee }}</td>
         <td>{{ dept_name(e.department_id) }}</td>
-        <td class="muted" style="font-size:12px;">{{ e.template.name if e.template else '—' }}</td>
+        <td style="font-size:12px;">{% if e.template %}{{ e.template.name }}{% if e.template.scope and e.template.scope!='general' %} <span class="badge" style="background:#eef2f6;color:#475569;">{{ e.template.scope }}</span>{% else %} <span class="muted">· Γενικό</span>{% endif %}{% else %}—{% endif %}</td>
         <td>{{ e.hotel.name if e.hotel else '—' }}</td>
-        <td>{{ e.period_label }} {{ e.year or '' }}</td>
-        <td class="muted">{{ e.eval_date.strftime('%d/%m/%Y') if e.eval_date else '—' }}</td>
+        <td>{{ e.period_label }}</td>
+        <td class="muted">{{ (e.updated_at or e.created_at).strftime('%d/%m/%Y') if (e.updated_at or e.created_at) else '—' }}</td>
         <td class="ev-pct">{{ '%.0f%%'|format(e.score_pct) if e.score_pct is not none else '—' }}</td>
         <td>{% set bc = band_color.get(e.band, ('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ e.band or '—' }}</span>{% set sc=st_color.get(e.status,('#f1f5f9','#64748b')) %}<span class="badge" style="background:{{ sc[0] }};color:{{ sc[1] }};margin-left:4px;">{{ st_label.get(e.status, e.status) }}</span></td>
         <td class="act"><a href="/dashboard/evaluations/{{ e.id }}?embed=1" title="Προβολή"><i class="ti ti-eye"></i></a>{% if e.status not in ['approved','finalized'] or is_admin %}<a href="/dashboard/evaluations/{{ e.id }}/edit?embed=1" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}<a href="/dashboard/evaluations/{{ e.id }}/export.xlsx" title="Excel"><i class="ti ti-file-spreadsheet"></i></a><a href="/dashboard/evaluations/{{ e.id }}/export.pdf" title="PDF"><i class="ti ti-file-type-pdf"></i></a></td>
