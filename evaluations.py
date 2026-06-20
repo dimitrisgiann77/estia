@@ -470,10 +470,61 @@ def evaluation_print(eid):
     if not _hid_ok(ev.hotel_id):
         return redirect(url_for('evaluations_list') + '?embed=1')
     smap = {s.criterion_id: s for s in ev.scores}
+    try:
+        from app import get_theme
+        _logo = (get_theme() or {}).get('logo') or '/static/img/logo.png'
+    except Exception:
+        _logo = '/static/img/logo.png'
     return render_template('eval_print.html', ev=ev, smap=smap,
                            criteria=(ev.template.criteria if ev.template else []),
                            dept_name=_dept_name, band_color=BAND_COLOR,
-                           goals=sorted(ev.goals, key=lambda g: g.id))
+                           goals=sorted(ev.goals, key=lambda g: g.id), logo=_logo)
+
+
+def _eval_email_html(ev):
+    smap = {s.criterion_id: s for s in ev.scores}
+    rows = ''
+    for i, c in enumerate(ev.template.criteria if ev.template else [], 1):
+        sv = smap.get(c.id); val = (('%g' % sv.score) if (sv and sv.score is not None) else '—')
+        rows += ('<tr><td style="padding:5px 8px;border-bottom:1px solid #e5eaef;">%d. %s</td>'
+                 '<td style="padding:5px 8px;border-bottom:1px solid #e5eaef;text-align:center;color:#64748b;">%d%%</td>'
+                 '<td style="padding:5px 8px;border-bottom:1px solid #e5eaef;text-align:center;font-weight:700;">%s</td></tr>'
+                 ) % (i, c.label, round((c.weight or 0) * 100), val)
+    return ('<div style="font-family:Arial,sans-serif;color:#1e293b;max-width:680px;">'
+            '<div style="background:#193847;color:#fff;padding:16px 20px;border-radius:10px 10px 0 0;">'
+            '<div style="font-size:18px;font-weight:700;">CONDIAN HOTELS</div>'
+            '<div style="font-size:12px;color:#cfe1f5;">Έντυπο Αξιολόγησης Εργαζομένου · %s</div></div>'
+            '<div style="border:1px solid #e5eaef;border-top:none;border-radius:0 0 10px 10px;padding:16px 20px;">'
+            '<p style="font-size:15px;font-weight:700;margin:0 0 4px;">%s</p>'
+            '<p style="font-size:13px;color:#64748b;margin:0 0 12px;">%s · Τμήμα: %s · %s · Περίοδος: %s</p>'
+            '<table style="width:100%%;border-collapse:collapse;font-size:13px;"><thead><tr>'
+            '<th style="text-align:left;background:#f1f5f9;padding:6px 8px;">Κριτήριο</th>'
+            '<th style="background:#f1f5f9;padding:6px 8px;">Συντ.</th>'
+            '<th style="background:#f1f5f9;padding:6px 8px;">Βαθμός</th></tr></thead><tbody>%s</tbody></table>'
+            '<p style="font-size:16px;font-weight:800;color:#193847;margin:14px 0 0;">Βαθμολογία: %s%%  ·  %s</p>'
+            '%s</div></div>') % (
+        ev.code or '', (ev.employee.full_name if ev.employee else '—'),
+        (ev.hotel.name if ev.hotel else '—'), (_dept_name(ev.department_id) or '—'),
+        (ev.evaluator.full_name if ev.evaluator else '—'), (ev.period_label or '—'),
+        rows, (('%.1f' % ev.score_pct) if ev.score_pct is not None else '—'), (ev.band or '—'),
+        ('<p style="font-size:13px;color:#334155;margin:10px 0 0;"><b>Γενικό σχόλιο:</b> %s</p>' % ev.general_comment) if ev.general_comment else '')
+
+
+@app.route('/dashboard/evaluations/<int:eid>/email', methods=['POST'])
+def evaluation_email(eid):
+    if not _auth_eval():
+        return jsonify(ok=False), 401
+    ev = Evaluation.query.get_or_404(eid)
+    if not _hid_ok(ev.hotel_id):
+        return jsonify(ok=False, msg='forbidden'), 403
+    to = (request.values.get('to') or '').strip()
+    if not to or '@' not in to:
+        return jsonify(ok=False, msg='Μη έγκυρο email'), 400
+    from app import send_email
+    subj = 'Αξιολόγηση %s — %s' % (ev.code or '', (ev.employee.full_name if ev.employee else ''))
+    ok = send_email(subj, _eval_email_html(ev), [to])
+    log_activity('evaluation_email', '%s -> %s' % (ev.code, to))
+    return jsonify(ok=bool(ok))
 
 @app.route('/dashboard/evaluations/<int:eid>/edit', methods=['GET', 'POST'])
 def evaluation_edit(eid):

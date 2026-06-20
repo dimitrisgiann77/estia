@@ -33,15 +33,24 @@
   .goal{font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);}
   .gc{font-size:12.5px;color:#334155;background:var(--light);border:1px solid var(--line);border-radius:9px;padding:10px 12px;white-space:pre-wrap;}
   .toolbar{max-width:880px;margin:14px auto 0;display:flex;justify-content:flex-end;gap:8px;}
-  .pbtn{background:var(--navy);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  .pbtn{background:var(--navy);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;text-decoration:none;}
+  .pbtn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line);}
   @media print{ body{background:#fff;} .toolbar{display:none;} .sheet{box-shadow:none;margin:0;border-radius:0;max-width:100%;} }
 </style></head><body>
 {% set bc = band_color.get(ev.band, ('#f1f5f9','#64748b')) %}
-<div class="toolbar"><button class="pbtn" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση</button></div>
+<div class="toolbar">
+  <button class="pbtn ghost" onclick="emailEv()"><i class="ti ti-mail"></i> Email</button>
+  <a class="pbtn ghost" href="/dashboard/evaluations/{{ ev.id }}/export.xlsx"><i class="ti ti-file-spreadsheet"></i> Excel</a>
+  <a class="pbtn ghost" href="/dashboard/evaluations/{{ ev.id }}/export.pdf"><i class="ti ti-file-type-pdf"></i> PDF</a>
+  <button class="pbtn" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση</button>
+</div>
 <div class="sheet">
-  <div class="band">
-    <h1>CONDIAN HOTELS</h1>
-    <p>Έντυπο Αξιολόγησης Εργαζομένου · {{ ev.code }}</p>
+  <div class="band" style="display:flex;align-items:center;gap:16px;">
+    {% if logo %}<img src="{{ logo }}" alt="logo" style="height:46px;width:auto;background:#fff;border-radius:7px;padding:4px;">{% endif %}
+    <div>
+      <h1>CONDIAN HOTELS</h1>
+      <p>Έντυπο Αξιολόγησης Εργαζομένου · {{ ev.code }}</p>
+    </div>
   </div>
   <div class="body">
     <div class="ttl">{{ ev.employee.full_name if ev.employee else '—' }}</div>
@@ -87,4 +96,13 @@
     {% endif %}
   </div>
 </div>
+<script>
+function emailEv(){
+  var to=prompt('Email παραλήπτη:'); if(!to)return;
+  fetch('/dashboard/evaluations/{{ ev.id }}/email',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'to='+encodeURIComponent(to)})
+    .then(function(r){return r.json();})
+    .then(function(j){ alert(j&&j.ok?'Στάλθηκε στο '+to:('Αποτυχία αποστολής'+(j&&j.msg?': '+j.msg:''))); })
+    .catch(function(){ alert('Σφάλμα αποστολής.'); });
+}
+</script>
 </body></html>
