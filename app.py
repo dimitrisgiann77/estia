@@ -331,11 +331,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.164'
-APP_BUILD   = '445'
+APP_VERSION = '12.165'
+APP_BUILD   = '446'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.165', 'b': '446', 'date': '21/06/2026', 'time': '01:30', 'title': 'Διακυβέρνηση: επεκτείνεται σε ΟΛΑ τα modules (owner-screens, διπλή επιβεβαίωση)',
+     'items': ['Οι αρχές «μία πηγή αλήθειας» & impact-first ισχύουν για ΟΛΗ την πλατφόρμα (Βλάβες/Πελάτες/κ.λπ.). Κάθε οντότητα = ένα owner-screen για edit· αλλού read ή βοηθός με ΙΔΙΟ endpoint. Δομικές αλλαγές = ρητή εντολή + διπλή επιβεβαίωση. Πλήρες contract: 03_REFERENCE/ΑΡΧΕΣ_ΑΡΧΙΤΕΚΤΟΝΙΚΗΣ.md.']},
     {'v': '12.164', 'b': '445', 'date': '21/06/2026', 'time': '01:00', 'title': 'Roadmap: Διασφαλίσεις & Διακυβέρνηση (single source of truth, impact-first)',
      'items': ['Προστέθηκε ενότητα roadmap «Διασφαλίσεις & Διακυβέρνηση»: impact-note πριν από δομικές αλλαγές, ΜΙΑ πηγή αλήθειας (People=User, link με user_id, καμία παράλληλη βάση), τεστ backup-restore, πειθαρχία migrations, indexes/απόδοση, CSRF, αυτόματα smoke-tests.']},
     {'v': '12.163', 'b': '444', 'date': '21/06/2026', 'time': '00:35', 'title': 'Fix: το Οργανόγραμμα στο μενού + auto-εμφάνιση νέων στοιχείων μενού',
@@ -2812,6 +2814,8 @@ ROADMAP = [
     {'area': 'Διασφαλίσεις & Διακυβέρνηση (καθώς μεγαλώνει)', 'items': [
         {'t': 'Διαδικασία: Impact-note + εντοπισμός conflicts ΠΡΙΝ από κάθε δομική/κοινή αλλαγή — προχωράμε μόνο με ρητή έγκριση', 's': 'progress'},
         {'t': 'ΜΙΑ πηγή αλήθειας: People=User (μητρώο), τα πάντα linkάρουν με user_id· καμία παράλληλη βάση· Χάρτης Κυριότητας Δεδομένων', 's': 'progress'},
+        {'t': 'ΙΣΧΥΕΙ ΣΕ ΟΛΑ ΤΑ MODULES (Βλάβες/Πελάτες/κ.λπ.): owner-screen ανά οντότητα (edit από ΕΝΑ σημείο, αλλού read/βοηθός με ΙΔΙΟ endpoint)· διπλή επιβεβαίωση για δομικές αλλαγές', 's': 'progress'},
+        {'t': 'Συνέπεια: ένα state-machine ανά record, κανόνες διαγραφής/εξάρτησης, ένας generator κωδικών/domain, permissions matrix σε ένα σημείο', 's': 'planned'},
         {'t': 'Backups: τεστ ΠΡΑΓΜΑΤΙΚΗΣ επαναφοράς + backup πριν από migrations/μαζικές διαγραφές', 's': 'planned'},
         {'t': 'Migrations: τεστ σε αντίγραφο προϋπάρχουσας βάσης πριν deploy (αργότερα: Alembic)', 's': 'planned'},
         {'t': 'Απόδοση: indexes + pagination + eager loading στις βαριές λίστες', 's': 'planned'},
