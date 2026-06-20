@@ -13,10 +13,10 @@
   </div>
   <div class="card">
     <table>
-      <thead><tr><th>Εργαζόμενος</th><th>Τμήμα</th><th>Ειδικότητα</th><th>Ξενοδοχείο</th><th></th></tr></thead>
+      <thead><tr><th>Εργαζόμενος</th><th>Τμήμα</th><th>Ξενοδοχείο</th><th></th></tr></thead>
       <tbody>
       {% for e in pend %}
-      <tr><td><b>{{ e.name }}</b></td><td>{{ e.department or '—' }}</td><td class="muted">{{ e.specialty or '—' }}</td><td>{{ e.hotel or '—' }}</td>
+      <tr><td><b>{{ e.name }}</b></td><td>{{ e.department or '—' }}</td><td>{{ e.hotel or '—' }}</td>
         <td><a class="btn" href="/dashboard/evaluations/new?embed=1" style="padding:5px 12px;"><i class="ti ti-plus"></i> Αξιολόγηση</a></td></tr>
       {% else %}
       <tr><td colspan="5" style="text-align:center;color:#16a34a;padding:24px;"><i class="ti ti-circle-check"></i> Όλοι αξιολογήθηκαν για {{ year }}{{ ' · '+f_period if f_period }}.</td></tr>

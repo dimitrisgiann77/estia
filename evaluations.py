@@ -281,10 +281,28 @@ def compute_pct(scores_map, criteria):
     if den <= 0: return None
     return round(num / den * 100, 1)
 
+def _hotel_code(hid):
+    h = Hotel.query.get(hid) if hid else None
+    if not h:
+        return 'XXX'
+    try:
+        from schedule import _hotel_short
+        c = _hotel_short(h.name)
+        if c:
+            return c
+    except Exception:
+        pass
+    import re
+    s = re.sub(r'[^A-Z0-9]', '', (h.name or '').upper())
+    return s[:3] or 'XXX'
+
 def _gen_code(ev):
+    """Μορφή κωδικού: ΕΤΟΣ-HOTELCODE-DEADLINE(ddmmyyyy)-SUBMISSIONID(0000)."""
     yr = ev.year or date.today().year
-    seq = Evaluation.query.filter_by(year=yr).count() + 1
-    return 'EVAL-%d-%04d' % (yr, seq)
+    hc = _hotel_code(ev.hotel_id)
+    dl = ev.eval_date.strftime('%d%m%Y') if ev.eval_date else ''
+    sid = '%04d' % (ev.id or 0)
+    return '-'.join([p for p in [str(yr), hc, dl, sid] if p])
 
 def _dept_name(did):
     if not did: return ''
