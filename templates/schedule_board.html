@@ -2,8 +2,12 @@
 <!DOCTYPE html><html lang="el"><head>
 {{ mp.head('Πρόγραμμα Εργασίας', theme.primary) }}
 <style>
-  .sched-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
-  .sched-toolbar select,.sched-toolbar input{padding:7px 9px;border:1px solid var(--bd,#dbe3ea);border-radius:9px;background:var(--card,#fff);color:inherit;}
+  .sched-toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:12px 14px;background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+  .sched-toolbar select,.sched-toolbar input{padding:7px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:9px;background:var(--card,#fff);color:inherit;font-size:13px;}
+  .fgrp{display:flex;flex-direction:column;gap:4px;}
+  .flab{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#94a3b8;display:flex;align-items:center;gap:4px;}
+  .fsep{align-self:stretch;width:1px;background:var(--bd,#e2e8f0);margin:0 2px;}
+  .deptbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
   .wk-nav{display:flex;align-items:center;gap:6px;}
   .wk-nav a,.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:9px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;cursor:pointer;font-size:13px;}
   .btn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
@@ -29,6 +33,13 @@
   html[data-theme="dark"] .shchip .hb{background:#3a2e12;color:#fbbf24;}
   .cell[data-edit="1"]{user-select:none;} .cell.sel{outline:2px solid #185FA5;outline-offset:-1px;}
   .tot{font-weight:700;} td.warn{color:#dc2626;}
+  table.grid tbody tr:hover td:not(.name){background:rgba(24,95,165,.04);}
+  html[data-theme="dark"] table.grid tbody tr:hover td:not(.name){background:rgba(96,165,250,.08);}
+  .cell:hover{box-shadow:inset 0 0 0 1px rgba(24,95,165,.25);}
+  .deptsec h4{padding-bottom:4px;border-bottom:1px solid var(--bd,#eef2f6);}
+  .wkcard{padding:14px 16px;}
+  .legend{padding:8px 10px;background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:10px;}
+
   .editor{position:fixed;z-index:90;background:var(--card,#fff);border:1px solid var(--bd,#cbd5e1);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:12px;width:300px;display:none;max-height:calc(100vh - 20px);overflow:auto;}
   .editor h5{margin:-4px -4px 8px;font-size:12px;color:#475569;cursor:move;user-select:none;display:flex;align-items:center;gap:6px;padding:4px 4px 7px;border-bottom:1px solid var(--bd,#eef2f6);}
   .editor h5::before{content:"\2630";font-size:12px;opacity:.45;} .codes{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;} .codes button{border:none;border-radius:7px;padding:5px 8px;color:#fff;cursor:pointer;font-size:11px;}
@@ -47,31 +58,42 @@
 
   <form class="sched-toolbar" method="GET" action="/dashboard/schedule">
     <input type="hidden" name="embed" value="1">
-    <select name="hotel_id" onchange="this.form.submit()">
-      {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}
-    </select>
-    <span class="wk-nav">
-      <a href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ prev_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-left"></i></a>
-      <input type="date" name="week" value="{{ week_start_iso }}" onchange="this.form.submit()">
-      <a href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ next_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-right"></i></a>
-    </span>
-    <label style="font-size:13px;">Εβδομάδες:
-      <select name="weeks" onchange="this.form.submit()">{% for n in [1,2,3,4,6,8,12] %}{% if n<=horizon %}<option value="{{ n }}" {{ 'selected' if n==weeks }}>{{ n }}</option>{% endif %}{% endfor %}</select>
-    </label>
-    <span class="wk-nav" style="margin-left:4px;">
-      <a title="Προηγ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&month={{ prev_month }}&year={{ prev_year }}&embed=1"><i class="ti ti-chevron-left"></i></a>
-      <select name="month" onchange="this.form.submit()" title="Δες όλον τον μήνα">
-        {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==sel_month }}>{{ month_el[m] }}</option>{% endfor %}
+    <div class="fgrp">
+      <span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
+      <select name="hotel_id" onchange="this.form.submit()">
+        {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}
       </select>
-      <input type="number" name="year" value="{{ sel_year }}" style="width:72px;" onchange="this.form.submit()">
-      <a title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
-    </span>
-    <a class="btn" href="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Προσωπικό</a>
+    </div>
+    <div class="fgrp">
+      <span class="flab"><i class="ti ti-calendar"></i> Εβδομάδα</span>
+      <span class="wk-nav">
+        <a title="Προηγ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ prev_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-left"></i></a>
+        <input type="date" name="week" value="{{ week_start_iso }}" onchange="this.form.submit()">
+        <a title="Επόμ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ next_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+      </span>
+    </div>
+    <div class="fgrp">
+      <span class="flab">Πλήθος εβδ.</span>
+      <select name="weeks" onchange="this.form.submit()">{% for n in [1,2,3,4,6,8,12] %}{% if n<=horizon %}<option value="{{ n }}" {{ 'selected' if n==weeks }}>{{ n }}</option>{% endif %}{% endfor %}</select>
+    </div>
+    <div class="fsep"></div>
+    <div class="fgrp">
+      <span class="flab"><i class="ti ti-calendar-month"></i> Μετάβαση σε μήνα</span>
+      <span class="wk-nav">
+        <a title="Προηγ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&month={{ prev_month }}&year={{ prev_year }}&embed=1"><i class="ti ti-chevron-left"></i></a>
+        <select name="month" onchange="this.form.submit()" title="Δες όλον τον μήνα">
+          {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m==sel_month }}>{{ month_el[m] }}</option>{% endfor %}
+        </select>
+        <input type="number" name="year" value="{{ sel_year }}" style="width:72px;" onchange="this.form.submit()">
+        <a title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+      </span>
+    </div>
+    <a class="btn pri" href="/dashboard/schedule/staff?embed=1" style="margin-left:auto;align-self:flex-end;"><i class="ti ti-users-plus"></i> Προσωπικό</a>
   </form>
 
-  <div>
-    <span style="font-size:12px;color:#64748b;">Τμήματα:</span>
-    <div class="deptchips" id="deptchips">
+  <div class="deptbar">
+    <span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
+    <div class="deptchips" id="deptchips" style="margin:0;">
       <span class="dchip on" data-dept="all" onclick="toggleAll()">Όλα</span>
       {% for d in dept_list %}<span class="dchip on" data-dept="{{ d.id }}" onclick="toggleDept('{{ d.id }}')" style="border-left:4px solid {{ d.color }};">{{ d.name }}</span>{% endfor %}
     </div>

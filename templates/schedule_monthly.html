@@ -182,17 +182,24 @@ var SHIFTS={{ shift_types_json|safe }}, COLORS={}; SHIFTS.forEach(function(s){CO
 document.querySelectorAll('.cell[data-c]').forEach(function(c){var col=COLORS[c.getAttribute('data-c')];if(col)c.style.background=col;});
 var pickedCode='ΕΡΓ', curSel=[];
 var cells=Array.prototype.slice.call(document.querySelectorAll('td.edit'));
-var selecting=false, selUid=null, anchorDi=null;
+var selecting=false, selUid=null, anchorDi=null, ctrlPending=false;
 function rowCells(uid){return cells.filter(function(c){return c.getAttribute('data-uid')===uid;});}
 function clearSel(){curSel.forEach(function(c){c.classList.remove('sel');});curSel=[];}
 function markRange(uid,a,b){clearSel();var lo=Math.min(a,b),hi=Math.max(a,b);
   rowCells(uid).forEach(function(c){var di=parseInt(c.getAttribute('data-di'));if(di>=lo&&di<=hi){c.classList.add('sel');curSel.push(c);}});
   curSel.sort(function(p,q){return parseInt(p.getAttribute('data-di'))-parseInt(q.getAttribute('data-di'));});}
+function toggleCell(td){var i=curSel.indexOf(td);if(i>=0){td.classList.remove('sel');curSel.splice(i,1);}else{td.classList.add('sel');curSel.push(td);}}
 cells.forEach(function(td){
-  td.addEventListener('mousedown',function(e){e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);});
+  td.addEventListener('mousedown',function(e){
+    if(e.ctrlKey||e.metaKey){e.preventDefault();toggleCell(td);ctrlPending=true;return;}
+    e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);
+  });
   td.addEventListener('mouseenter',function(){if(selecting&&td.getAttribute('data-uid')===selUid)markRange(selUid,anchorDi,parseInt(td.getAttribute('data-di')));});
 });
-window.addEventListener('mouseup',function(){if(!selecting)return;selecting=false;if(curSel.length)openEd();});
+window.addEventListener('mouseup',function(){
+  if(ctrlPending){ctrlPending=false;if(curSel.length)openEd();return;}
+  if(!selecting)return;selecting=false;if(curSel.length)openEd();
+});
 var HOTELS_LIST=[{% for h in hotels %}{id:{{h.id}},name:{{ h.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
 var segState=[], dayMode=false, dayEntries=[], dayHome='';
 function mkTime(val,cb){
