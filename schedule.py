@@ -1059,6 +1059,61 @@ def schedule_day():
     return jsonify(ok=True, n=len(norm))
 
 
+@app.route('/dashboard/schedule/paste_cells', methods=['POST'])
+def schedule_paste_cells():
+    """v12.138 — Επικόλληση (Ctrl+V): γράφει την ίδια λίστα entries σε ΠΟΛΛΑ κελιά
+    (user_id+date). Σέβεται κλειδωμένες εβδομάδες (τις προσπερνά)."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    norm = []
+    for e in (d.get('entries') or []):
+        code = (e.get('code') or '').strip()
+        if not code:
+            continue
+        segs = e.get('segments') or e.get('segs') or []
+        whid = e.get('work_hotel_id') or e.get('wh'); whid = int(whid) if whid else None
+        if code in ('ΕΡΓ', 'ΕΩ'):
+            ok, msg = _validate_work_code(code, segs)
+            if not ok:
+                return jsonify(ok=False, err='invalid', msg=msg), 400
+        else:
+            segs = []; whid = None
+        norm.append((code, segs, whid))
+    done = 0; locked = 0
+    touched_wp = set()
+    for c in (d.get('cells') or []):
+        try:
+            uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        if not week_editable(monday_of(wd), user):
+            locked += 1; continue
+        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        for code, segs, whid in norm:
+            db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
+                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+        u = User.query.get(uid)
+        if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+            ws = monday_of(wd)
+            key = (u.home_hotel_id, u.department_id, ws)
+            if key not in touched_wp:
+                touched_wp.add(key)
+                wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws).first()
+                if not wp:
+                    wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws, status='draft')
+                    db.session.add(wp)
+                if wp.status in ('submitted', 'locked'):
+                    wp.status = 'draft'
+                wp.updated_by = user.id
+        done += 1
+    db.session.commit()
+    return jsonify(ok=True, done=done, locked=locked)
+
+
 
 # ── Αντιγραφή προηγούμενης εβδομάδας ──────────────────────────────────────────
 @app.route('/dashboard/schedule/copyprev', methods=['POST'])
@@ -1255,6 +1310,8 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
         piimap = {p.user_id: p for p in _PII.query.all()}
     except Exception:
         piimap = {}
+    _colors = {st.code: st.color for st in ShiftType.query.all()}
+    _hotels = {h.id: h.name for h in Hotel.query.all()}
     assigns = (ShiftAssignment.query
                .filter(ShiftAssignment.work_date >= start, ShiftAssignment.work_date < end).all())
     by_user = {}
@@ -1279,7 +1336,12 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                 _es = json.loads(a.segments) if a.segments else []
             except Exception:
                 _es = []
-            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id})
+            _tm = ' & '.join("%s - %s" % (x.get('start'), x.get('end')) for x in _es) if _es else ''
+            _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hh) else None
+            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
+                                  'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
+                                  'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
+                                  'color': _colors.get(a.shift_code, '#64748b')})
             if not dd['code']:
                 dd['code'] = a.shift_code; dd['wh'] = a.work_hotel_id; dd['segs'] = a.segments or '[]'
             if is_work_code(a.shift_code):
