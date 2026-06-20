@@ -30,6 +30,11 @@
 .crit-comment{margin-top:8px;width:100%;font-size:13px;padding:8px 11px;border:1px solid #e2ecf2;border-radius:9px;background:#fbfdfe;color:#334155;}
 .crit-comment::placeholder{color:#b8c4cc;}
 .goal-in{width:100%;padding:10px 12px;border:1.5px solid #d6e4ec;border-radius:10px;font-size:14px;background:#f8fbfd;margin-bottom:8px;}
+.qs{display:flex;flex-wrap:wrap;gap:4px;margin-top:9px;}
+.qs button{min-width:30px;height:30px;border:1.5px solid #d6e4ec;background:#f8fbfd;border-radius:8px;font-size:13px;font-weight:700;color:#475569;cursor:pointer;padding:0 4px;transition:.1s;}
+.qs button:hover{border-color:var(--mp-brand);}
+.qs button.on{background:var(--mp-brand);color:#fff;border-color:transparent;}
+.qs .qclr{color:#b91c1c;border-color:#f0d0d0;background:#fdf5f5;}
 .ef-bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #e2ecf2;box-shadow:0 -4px 16px rgba(15,40,55,.06);padding:12px 18px;z-index:50;}
 .ef-bar-in{max-width:920px;margin:0 auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
 .ef-prog{flex:1;min-width:120px;}
@@ -51,6 +56,14 @@
 
   <div class="ef-card">
     <div class="ef-meta">
+      {% if form_hotels and form_hotels|length>1 %}
+      <div class="ef-f"><label>Ξενοδοχείο (φίλτρο)</label>
+        <select id="hotelfilter" onchange="filterEmp()">
+          <option value="">Όλα τα δικά μου</option>
+          {% for h in form_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
+        </select>
+      </div>
+      {% endif %}
       <div class="ef-f"><label>Εργαζόμενος *</label>
         <select name="employee_id" id="emp" onchange="fillEmp()" required>
           <option value="">— Επιλογή —</option>
@@ -95,6 +108,7 @@
             <span class="mx">/{{ c.max_score or 10 }}</span>
           </div>
         </div>
+        <div class="qs" data-target="score_{{ c.id }}" data-max="{{ c.max_score or 10 }}"></div>
         <input class="crit-comment" type="text" name="comment_{{ c.id }}" value="{{ scores[c.id].comment if scores.get(c.id) else '' }}" placeholder="Σχόλιο (προαιρετικό)">
       </div>
     {% endfor %}
@@ -165,6 +179,27 @@ function calc(){
   be.textContent=band;be.style.background=bg;be.style.color=col;
 }
 function addGoal(){var i=document.createElement('input');i.type='text';i.name='goal_text';i.className='goal-in';i.placeholder='στόχος / ενέργεια...';document.getElementById('goal-list').appendChild(i);i.focus();}
-document.addEventListener('DOMContentLoaded',function(){fillEmp();calc();});
+function filterEmp(){
+  var hf=document.getElementById('hotelfilter'); if(!hf)return;
+  var hv=hf.value, emp=document.getElementById('emp');
+  for(var i=0;i<emp.options.length;i++){var o=emp.options[i]; if(!o.value)continue;
+    var oh=o.dataset.hotelid||''; var show=(!hv)||(oh===hv); o.hidden=!show; o.disabled=!show;
+    if(!show&&o.selected){emp.value='';}
+  }
+  fillEmp();
+}
+function syncQs(box,inp){var val=inp.value===''?null:parseFloat(inp.value);box.querySelectorAll('button[data-v]').forEach(function(b){b.classList.toggle('on',val!==null&&parseFloat(b.dataset.v)===val);});}
+document.querySelectorAll('.qs').forEach(function(box){
+  var max=parseInt(box.dataset.max)||10;
+  var inp=document.querySelector('[name="'+box.dataset.target+'"]');
+  if(!inp)return;
+  for(var v=1;v<=max;v++){(function(v){var b=document.createElement('button');b.type='button';b.setAttribute('data-v',v);b.textContent=v;
+    b.onclick=function(){inp.value=v;calc();syncQs(box,inp);};box.appendChild(b);})(v);}
+  var clr=document.createElement('button');clr.type='button';clr.className='qclr';clr.textContent='✕';clr.title='Καθαρισμός';
+  clr.onclick=function(){inp.value='';calc();syncQs(box,inp);};box.appendChild(clr);
+  inp.addEventListener('input',function(){syncQs(box,inp);});
+  syncQs(box,inp);
+});
+document.addEventListener('DOMContentLoaded',function(){filterEmp();fillEmp();calc();});
 </script>
 </body></html>

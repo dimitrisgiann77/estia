@@ -377,9 +377,11 @@ def evaluation_new():
     if request.method == 'POST' and tmpl:
         return _save_evaluation(None, tmpl)
     templates = EvalTemplate.query.filter_by(is_active=True).order_by(EvalTemplate.scope, EvalTemplate.name).all()
+    _u = current_user(); _hs = allowed_hotels(_u) if _u else []
     return render_template('evaluation_form.html', ev=None, tmpl=tmpl, templates=templates,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores={}, goals=[], periods=_active_periods(), today=date.today())
+                           scores={}, goals=[], periods=_active_periods(), today=date.today(),
+                           form_hotels=_hs)
 
 @app.route('/dashboard/evaluations/<int:eid>')
 def evaluation_view(eid):
@@ -406,9 +408,11 @@ def evaluation_edit(eid):
     if request.method == 'POST':
         return _save_evaluation(ev, tmpl)
     scores = {s.criterion_id: s for s in ev.scores}
+    _u = current_user(); _hs = allowed_hotels(_u) if _u else []
     return render_template('evaluation_form.html', ev=ev, tmpl=tmpl, templates=None,
                            criteria=tmpl.criteria if tmpl else [], employees=_employees(),
-                           scores=scores, goals=sorted(ev.goals, key=lambda g: g.id), periods=_active_periods(), today=date.today())
+                           scores=scores, goals=sorted(ev.goals, key=lambda g: g.id),
+                           periods=_active_periods(), today=date.today(), form_hotels=_hs)
 
 @app.route('/dashboard/evaluations/<int:eid>/delete', methods=['POST'])
 def evaluation_delete(eid):
@@ -547,6 +551,67 @@ def evaluation_export(eid):
     return Response(buf.read(),
                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition': 'attachment; filename=' + fname})
+
+
+@app.route('/dashboard/evaluations/<int:eid>/export.pdf')
+def evaluation_export_pdf(eid):
+    if not _auth_eval():
+        return redirect(url_for('login'))
+    ev = Evaluation.query.get_or_404(eid)
+    if not _hid_ok(ev.hotel_id):
+        return redirect(url_for('evaluations_list') + '?embed=1')
+    import os
+    from app import BASE_DIR
+    from fpdf import FPDF
+    NAVY = (25, 56, 71); GREY = (100, 116, 139)
+    smap = {s.criterion_id: s for s in ev.scores}
+    emp = ev.employee
+    pdf = FPDF(orientation='P', unit='mm', format='A4'); pdf.set_auto_page_break(True, margin=14)
+    pdf.add_page()
+    pdf.add_font('dv', '', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE_DIR, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY); pdf.cell(0, 9, 'CONDIAN HOTELS', ln=1)
+    pdf.set_font('dv', 'B', 11); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Έντυπο Αξιολόγησης Εργαζομένου', ln=1)
+    pdf.ln(2)
+    meta = [('ΞΕΝΟΔΟΧΕΙΟ', ev.hotel.name if ev.hotel else '—'),
+            ('ΟΝΟΜΑΤΕΠΩΝΥΜΟ', emp.full_name if emp else '—'),
+            ('ΤΜΗΜΑ', _dept_name(ev.department_id) or '—'),
+            ('ΠΕΡΙΟΔΟΣ', ('%s %s' % (ev.period_label or '', ev.year or '')).strip()),
+            ('ΗΜ/ΝΙΑ', ev.eval_date.strftime('%d/%m/%Y') if ev.eval_date else '—'),
+            ('ΑΞΙΟΛΟΓΗΤΗΣ', ev.evaluator.full_name if ev.evaluator else '—'),
+            ('ΚΩΔΙΚΟΣ', ev.code or '—')]
+    for k, v in meta:
+        pdf.set_font('dv', '', 10); pdf.set_text_color(40, 40, 40)
+        pdf.set_x(pdf.l_margin)
+        pdf.multi_cell(0, 6, '%s:  %s' % (k, v))
+    pdf.ln(2)
+    pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 7, 'Κριτήρια', ln=1)
+    i = 1
+    for crit in (ev.template.criteria if ev.template else []):
+        sc = smap.get(crit.id)
+        val = ('%g' % sc.score) if (sc and sc.score is not None) else '–'
+        pdf.set_font('dv', '', 9); pdf.set_text_color(20, 20, 20)
+        line = '%d. %s   [Βαθμός: %s/%d · Συντ. %d%%]' % (i, crit.label, val, crit.max_score or 10, round((crit.weight or 0) * 100))
+        if sc and sc.comment:
+            line += '  — ' + sc.comment
+        pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, line)
+        i += 1
+    pdf.ln(3)
+    pdf.set_font('dv', 'B', 12); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'Βαθμολογία: %s%%    ·    %s' % (
+        ('%.1f' % ev.score_pct) if ev.score_pct is not None else '—', ev.band or '—'), ln=1)
+    if ev.goals:
+        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Στόχοι:', ln=1)
+        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40)
+        for g in sorted(ev.goals, key=lambda x: x.id):
+            pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, ('☑ ' if g.done else '☐ ') + g.text)
+    if ev.general_comment:
+        pdf.ln(1); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY); pdf.cell(0, 6, 'Γενικό σχόλιο:', ln=1)
+        pdf.set_font('dv', '', 9); pdf.set_text_color(40, 40, 40); pdf.set_x(pdf.l_margin); pdf.multi_cell(0, 5.5, ev.general_comment)
+    log_activity('evaluation_export_pdf', ev.code)
+    out = pdf.output()
+    return Response(bytes(out), mimetype='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename=evaluation-%s.pdf' % (ev.code or ev.id)})
 
 # ── Φ2: Στατιστικά ────────────────────────────────────────────────────────────
 def latest_finalized():
