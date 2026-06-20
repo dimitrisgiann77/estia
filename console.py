@@ -217,3 +217,72 @@ def people_delete(uid):
 
 
 print('console module loaded (Διαχείριση προσωπικού)')
+
+
+# ── v12.162 — Οργανόγραμμα (HR console, drag&drop): ανάθεση τμήμα+ξενοδοχείο μαζί ──
+def _hotel_codes():
+    try:
+        from schedule import _hotel_short
+        return {h.id: _hotel_short(h.name) for h in Hotel.query.all()}
+    except Exception:
+        return {}
+
+@app.route('/dashboard/org')
+def org_console():
+    if not is_admin():
+        return redirect(url_for('login'))
+    from schedule import Department
+    piimap = _pii_map()
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    sel = request.args.get('hotel_id', type=int) or (hotels[0].id if hotels else None)
+    depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
+    hcodes = _hotel_codes()
+
+    def card(u):
+        pii = piimap.get(u.id)
+        return {'id': u.id, 'name': u.full_name or u.username,
+                'code': (pii.emp_code if pii else None),
+                'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
+
+    allu = User.query.filter(User.is_active == True).order_by(User.full_name).all()
+    bydept = {}     # dept_id (or 0) -> [cards] για το επιλεγμένο ξενοδοχείο
+    pool = []       # όσοι ΔΕΝ είναι στο επιλεγμένο ξενοδοχείο
+    for u in allu:
+        if getattr(u, 'employment_active', None) is False:
+            continue
+        if getattr(u, 'home_hotel_id', None) == sel:
+            bydept.setdefault(getattr(u, 'department_id', None) or 0, []).append(card(u))
+        else:
+            pool.append(card(u))
+    return render_template('org.html', hotels=hotels, sel=sel, depts=depts,
+                           bydept=bydept, pool=pool, hcodes=hcodes)
+
+@app.route('/dashboard/org/assign', methods=['POST'])
+def org_assign():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    d = request.json or {}
+    try:
+        u = User.query.get(int(d['user_id']))
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    if not u:
+        return jsonify(ok=False, msg='not found'), 404
+    hid = d.get('hotel_id'); did = d.get('department_id')
+    hid = int(hid) if hid else None
+    did = int(did) if did else None
+    old_h, old_d = getattr(u, 'home_hotel_id', None), getattr(u, 'department_id', None)
+    u.home_hotel_id = hid
+    u.department_id = did
+    # ιστορικό (ProfileEvent)
+    try:
+        import people
+        from schedule import Department
+        hn = (Hotel.query.get(hid).name if hid else '—')
+        dn = (Department.query.get(did).name if did else '—')
+        people.log_event(u.id, 'org_assign', 'Ανάθεση: %s / %s' % (hn, dn))
+    except Exception:
+        pass
+    db.session.commit()
+    log_activity('org_assign', '#%d -> hotel=%s dept=%s' % (u.id, hid, did))
+    return jsonify(ok=True)

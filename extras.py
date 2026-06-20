@@ -31,6 +31,7 @@ MENU_REG = [
     {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
     {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'evals',        'label': 'Αξιολόγηση προσωπικού','icon': 'ti-star',            'url': '/dashboard/evaluations','ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
+    {'k': 'org',          'label': 'Οργανόγραμμα',       'icon': 'ti-sitemap',         'url': '/dashboard/org',        'ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'whatsnew',     'label': 'Τι νέο',              'icon': 'ti-sparkles',         'url': '/dashboard/whatsnew','ws': 'operations admin',   'group': 'Ενημέρωση'},
     {'k': 'info',         'label': 'Ενημέρωση (Αναζήτηση/Roadmap/FAQ)', 'icon': 'ti-info-circle', 'url': '/dashboard/search', 'ws': 'operations admin', 'group': 'Ενημέρωση'},
 ]
