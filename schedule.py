@@ -2171,8 +2171,9 @@ def schedule_staff():
         elif act == 'edit':
             u = User.query.get(request.form.get('user_id', type=int))
             if u:
-                u.department_id = request.form.get('department_id', type=int) or None
-                u.home_hotel_id = request.form.get('home_hotel_id', type=int) or None
+                import people  # v12.169 — μέσω helper (ένα write-path + ιστορικό)
+                people.assign_user_org(u, request.form.get('home_hotel_id', type=int) or None,
+                                       request.form.get('department_id', type=int) or None)
                 u.employer = (request.form.get('employer') or '')[:120] or None
                 u.login_enabled = bool(request.form.get('login_enabled'))
                 db.session.commit()

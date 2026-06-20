@@ -363,18 +363,9 @@ def org_assign():
     hid = d.get('hotel_id'); did = d.get('department_id')
     hid = int(hid) if hid else None
     did = int(did) if did else None
-    old_h, old_d = getattr(u, 'home_hotel_id', None), getattr(u, 'department_id', None)
-    u.home_hotel_id = hid
-    u.department_id = did
-    # ιστορικό (ProfileEvent)
-    try:
-        import people
-        from schedule import Department
-        hn = (Hotel.query.get(hid).name if hid else '—')
-        dn = (Department.query.get(did).name if did else '—')
-        people.log_event(u.id, 'org_assign', 'Ανάθεση: %s / %s' % (hn, dn))
-    except Exception:
-        pass
+    # v12.169 — ΕΝΑ write-path (helper) με ιστορικό
+    import people
+    people.assign_user_org(u, hid, did, actor_id=(current_user().id if current_user() else None))
     db.session.commit()
     log_activity('org_assign', '#%d -> hotel=%s dept=%s' % (u.id, hid, did))
     return jsonify(ok=True)

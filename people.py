@@ -83,6 +83,32 @@ def log_event(entity_id, event, detail='', entity_type='employee', actor_id=None
                                 event=event, detail=(detail or '')[:2000], actor_id=actor_id))
 
 
+def assign_user_org(user, hotel_id=None, dept_id=None, actor_id=None, reason=''):
+    """v12.169 — ΤΟ ΜΟΝΟ σημείο εγγραφής δομικών πεδίων ανάθεσης (home_hotel_id/department_id).
+    Καλείται ΜΟΝΟ από owner-screens (Οργανόγραμμα + παλιά edit-route προγράμματος).
+    Κρατά ιστορικό (ProfileEvent) όταν υπάρχει αλλαγή. ΔΕΝ κάνει commit — ο caller το κάνει."""
+    if not user:
+        return False
+    hid = int(hotel_id) if hotel_id else None
+    did = int(dept_id) if dept_id else None
+    old_h = getattr(user, 'home_hotel_id', None)
+    old_d = getattr(user, 'department_id', None)
+    if old_h == hid and old_d == did:
+        return False
+    user.home_hotel_id = hid
+    user.department_id = did
+    try:
+        from app import Hotel
+        from schedule import Department
+        hn = (Hotel.query.get(hid).name if hid else '—')
+        dn = (Department.query.get(did).name if did else '—')
+    except Exception:
+        hn, dn = (hid or '—'), (did or '—')
+    detail = 'Ανάθεση: %s / %s%s' % (hn, dn, (' · %s' % reason if reason else ''))
+    log_event(user.id, 'org_assign', detail, actor_id=actor_id)
+    return True
+
+
 def add_flag(entity_id, flag_type, severity='warn', detail='', entity_type='employee'):
     ex = (AttentionFlag.query
           .filter_by(entity_type=entity_type, entity_id=entity_id, flag_type=flag_type, resolved=False)
