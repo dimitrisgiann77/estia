@@ -226,6 +226,9 @@ def ensure_eval_dept_templates():
     try:
       with app.app_context():
         db.create_all()
+        from app import Setting
+        if Setting.query.get('eval_dept_templates_done'):
+            return  # έγινε ήδη μία φορά — μην ξαναγγίζεις ποτέ τα πρότυπα
         specs = [('F&B — Κουζίνα (Kitchen)', 'Kitchen', _TPL_KITCHEN),
                  ('F&B — Σέρβις (Service)', 'Service', _TPL_SERVICE)]
         target_norms = {_norm_tpl_name(n) for n, _s, _r in specs}
@@ -251,6 +254,8 @@ def ensure_eval_dept_templates():
                     db.session.commit(); made.append(scope)
         if made:
             print('[evaluations] seeded πρότυπα τμημάτων: %s' % ', '.join(made))
+        db.session.add(Setting(key='eval_dept_templates_done', value='1')); db.session.commit()
+        print('[evaluations] dept templates: σφραγίστηκε (δεν ξαναγγίζεται)')
     except Exception as e:
         db.session.rollback(); print('[evaluations] dept templates seed skipped:', e)
 
