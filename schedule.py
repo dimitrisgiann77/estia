@@ -775,7 +775,7 @@ def week_grid(hotel_id, dept_id, week_start):
                         _es = json.loads(a.segments) if a.segments else []
                     except Exception:
                         _es = []
-                    _tm = ' & '.join("%s-%s" % (s.get('start'), s.get('end')) for s in _es) if _es else ''
+                    _tm = ' & '.join("%s - %s" % (s.get('start'), s.get('end')) for s in _es) if _es else ''
                     _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hotel_id) else None
                     _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
                                      'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',

@@ -22,7 +22,8 @@
   .cell.empty{color:#cbd5e1;} .cell .hh{font-size:9px;opacity:.7;display:block;margin-top:1px;} .cell .x{font-size:8px;color:#e11d48;font-weight:700;}
 .shchip{display:block;font-size:10px;border-radius:5px;padding:3px 6px;margin:2px 0;color:#1e293b;line-height:1.25;text-align:center;}
   html[data-theme="dark"] .shchip{color:#e2e8f0;}
-  .shchip .ctop{display:block;} .shchip .cd{font-weight:700;} .shchip .dh{font-weight:600;opacity:.75;margin-left:4px;}
+  .shchip .ctop{display:block;white-space:nowrap;} .shchip .cd{font-weight:700;margin-right:3px;}
+  .shchip .cmid{display:block;font-weight:600;opacity:.75;font-size:9px;margin-top:1px;}
   .shchip .cbot{display:block;font-size:9px;opacity:.9;margin-top:1px;white-space:nowrap;}
   .shchip .hb{font-size:9px;font-weight:700;color:#b45309;display:inline-block;margin-left:4px;background:#fef3c7;border-radius:4px;padding:0 4px;vertical-align:middle;}
   html[data-theme="dark"] .shchip .hb{background:#3a2e12;color:#fbbf24;}
@@ -102,7 +103,7 @@
           <tr>
             <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for c in r.cells %}{% set st=shift_lookup.get(c.code) %}
-              <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if blk.editable else '0' }}" >{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span>{% if en.hours %}<span class="dh">{{ en.hours }}h</span>{% endif %}</span>{% if en.times or en.hotel_short %}<span class="cbot">{% if en.times %}{{ en.times }}{% endif %}{% if en.hotel_short %}<span class="hb">{{ en.hotel_short }}</span>{% endif %}</span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
+              <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if blk.editable else '0' }}" >{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span>{% if en.times %}{{ en.times }}{% endif %}</span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
             {% endfor %}
             <td class="tot">{{ r.wk_extra }}</td><td class="tot {{ 'warn' if r.repo<1 }}">{{ r.repo }}</td><td class="tot">{{ r.work_days }}</td>
           </tr>
