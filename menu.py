@@ -22,6 +22,7 @@ MENU_CATALOG = [
     ('areas_dash',  'Πίνακας τομέων',         'ti-map-pin',          '/areas/dashboard',             False),
     ('surveys',     'Ερωτηματολόγια',         'ti-clipboard-check',  '/dashboard/surveys',           False),
     ('people',      'Διαχείριση προσωπικού',  'ti-users-group',      '/dashboard/people',            False),
+    ('org',         'Οργανόγραμμα',           'ti-sitemap',          '/dashboard/org',               False),
     ('pay_mitroo',  'Μητρώο εργαζομένων',     'ti-cash',             '/dashboard/payroll',           False),
     ('evals',       'Αξιολόγηση προσωπικού',  'ti-star',             '/dashboard/evaluations',       False),
     ('pay_grid',    'Μαζική επεξεργασία',     'ti-table',            '/dashboard/payroll/grid',      False),
@@ -67,7 +68,7 @@ DEFAULT_LAYOUT = [
     {'title': 'Επισκόπηση', 'items': ['dashboard']},
     {'title': 'Συντήρηση', 'items': ['today', 'pools', 'water', 'areas_rec', 'fault_submit', 'faults_board', 'pools_dash', 'water_dash', 'areas_dash', 'records', 'coverage']},
     {'title': 'Υποδοχή', 'items': ['surveys']},
-    {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['people', 'pay_mitroo', 'evals', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff', 'sched_identify', 'sched_imported', 'sched_monthly', 'sched_oversight']},
+    {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff', 'sched_identify', 'sched_imported', 'sched_monthly', 'sched_oversight']},
     {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},
     {'title': 'Διαχείριση συστήματος', 'items': ['users', 'menu_roles', 'menu_builder', 'activity', 'feedback_adm', 'hotels', 'areas_admin', 'templates', 'fault_set', 'fault_cat', 'email', 'theme', 'ai']},
     {'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'whatsnew', 'feedback']},
@@ -98,15 +99,22 @@ def _inject_menu_custom():
     if not layout or not is_admin():
         return {'menu_custom': False, 'menu_groups': []}
     groups = []
+    present = set()
     for g in layout:
         items = []
         for iid in g.get('items', []):
             it = CAT.get(iid)
             if not it: continue
+            present.add(iid)
             if it['master'] and not master: continue
             items.append(it)
         if items:
             groups.append({'title': g.get('title', ''), 'items': items})
+    # auto-sync: νέα στοιχεία καταλόγου που λείπουν από το αποθηκευμένο layout → εμφανίζονται μόνα τους
+    extra = [CAT[k] for k in CAT
+             if k not in present and not (CAT[k]['master'] and not master)]
+    if extra:
+        groups.append({'title': '🆕 Νέα', 'items': extra})
     return {'menu_custom': True, 'menu_groups': groups}
 
 
