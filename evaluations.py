@@ -213,18 +213,28 @@ def _seed_one_tpl(name, scope, rows):
     return True
 
 def ensure_eval_dept_templates():
-    """Seed προτύπων τμημάτων F&B (Kitchen/Service) από reference — idempotent (ανά όνομα)."""
+    """Seed προτύπων τμημάτων F&B (Kitchen/Service) — self-healing:
+    1) καθαρίζει ΑΧΡΗΣΙΜΟΠΟΙΗΤΑ διπλά (race 2 gunicorn workers), κρατά το παλαιότερο·
+    2) δημιουργεί ΜΟΝΟ αν δεν υπάρχει κανένα. Idempotent & ανθεκτικό σε re-boot."""
     try:
       with app.app_context():
         db.create_all()
-        made = []
-        if _seed_one_tpl('F&B — Κουζίνα (Kitchen)', 'Kitchen', _TPL_KITCHEN):
-            made.append('Kitchen')
-        if _seed_one_tpl('F&B — Σέρβις (Service)', 'Service', _TPL_SERVICE):
-            made.append('Service')
+        made = []; cleaned = 0
+        for name, scope, rows in [('F&B — Κουζίνα (Kitchen)', 'Kitchen', _TPL_KITCHEN),
+                                  ('F&B — Σέρβις (Service)', 'Service', _TPL_SERVICE)]:
+            existing = EvalTemplate.query.filter_by(name=name).order_by(EvalTemplate.id).all()
+            if len(existing) > 1:
+                for dup in existing[1:]:
+                    if Evaluation.query.filter_by(template_id=dup.id).count() == 0:
+                        db.session.delete(dup); cleaned += 1
+                db.session.commit()
+            elif not existing:
+                if _seed_one_tpl(name, scope, rows):
+                    db.session.commit(); made.append(scope)
         if made:
-            db.session.commit()
             print('[evaluations] seeded πρότυπα τμημάτων: %s' % ', '.join(made))
+        if cleaned:
+            print('[evaluations] καθαρίστηκαν %d διπλά πρότυπα (race)' % cleaned)
     except Exception as e:
         db.session.rollback(); print('[evaluations] dept templates seed skipped:', e)
 
