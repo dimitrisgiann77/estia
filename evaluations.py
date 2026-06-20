@@ -294,11 +294,13 @@ def _employees():
     except Exception:
         deps = {}
     hotels = {h.id: h.name for h in Hotel.query.all()}
-    spec = {}
+    spec = {}; ecode = {}; eafm = {}
     try:
         from payroll import EmployeePII
         for p in EmployeePII.query.all():
             spec[p.user_id] = getattr(p, 'ergani_specialty', None)
+            ecode[p.user_id] = getattr(p, 'emp_code', None)
+            eafm[p.user_id] = getattr(p, 'afm', None)
     except Exception:
         pass
     hids = _scope_hids()
@@ -313,7 +315,9 @@ def _employees():
                     'department': deps.get(getattr(u, 'department_id', None), ''),
                     'hotel_id': getattr(u, 'home_hotel_id', None),
                     'hotel': hotels.get(getattr(u, 'home_hotel_id', None), ''),
-                    'specialty': spec.get(u.id, '') or ''})
+                    'specialty': spec.get(u.id, '') or '',
+                    'emp_code': ecode.get(u.id, '') or '',
+                    'afm': eafm.get(u.id, '') or ''})
     return out
 
 def _auth():

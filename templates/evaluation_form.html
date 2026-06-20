@@ -67,7 +67,7 @@
       <div class="ef-f"><label>Εργαζόμενος *</label>
         <select name="employee_id" id="emp" onchange="fillEmp()" required>
           <option value="">— Επιλογή —</option>
-          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-hotelid="{{ e.hotel_id or '' }}" data-spec="{{ e.specialty }}">{{ e.name }}</option>{% endfor %}
+          {% for e in employees %}<option value="{{ e.id }}" {{ 'selected' if ev and ev.employee_id==e.id }} data-dep="{{ e.department }}" data-hotel="{{ e.hotel }}" data-hotelid="{{ e.hotel_id or '' }}" data-afm="{{ e.afm }}" data-empcode="{{ e.emp_code }}">{{ e.name }}</option>{% endfor %}
         </select>
       </div>
       {% if periods %}
@@ -144,7 +144,10 @@
 function fillEmp(){
   var s=document.getElementById('emp'),o=s.options[s.selectedIndex],i=document.getElementById('emp-info');
   if(!o||!o.value){i.classList.remove('show');return;}
-  var p=[];if(o.dataset.dep)p.push('Τμήμα: <b>'+o.dataset.dep+'</b>');if(o.dataset.hotel)p.push('Ξενοδοχείο: <b>'+o.dataset.hotel+'</b>');if(o.dataset.spec)p.push('Ειδικότητα: '+o.dataset.spec);
+  var p=[];
+  p.push('Τμήμα: <b>'+(o.dataset.dep?o.dataset.dep:'— χωρίς τμήμα —')+'</b>');
+  if(o.dataset.empcode)p.push('Κωδ.: <b>#'+o.dataset.empcode+'</b>');
+  if(o.dataset.afm)p.push('ΑΦΜ: <b>'+o.dataset.afm+'</b>');
   i.innerHTML='<i class="ti ti-info-circle"></i> Αξιολογείς για: '+p.join(' · ');i.classList.add('show');
   filterTpls();
 }
