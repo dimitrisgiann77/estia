@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.139'
-APP_BUILD   = '420'
+APP_VERSION = '12.140'
+APP_BUILD   = '421'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.140', 'b': '421', 'date': '20/06/2026', 'time': '14:00', 'title': 'Αξιολόγηση — κουμπί «Νέα αξιολόγηση» + πρότυπα F&B Κουζίνα/Σέρβις',
+     'items': ['Εμφανές πράσινο κουμπί «Νέα αξιολόγηση» στη λίστα αξιολογήσεων (πέρα από το πάνω κουμπί).',
+               'Δύο νέα πρότυπα-variants από τα reference 2026: «F&B — Κουζίνα» (25 κριτήρια) & «F&B — Σέρβις» (30 κριτήρια), σταθμίσεις που αθροίζουν 100%. Επιλέγονται από τον επιλογέα προτύπου στη φόρμα.']},
     {'v': '12.139', 'b': '420', 'date': '20/06/2026', 'time': '13:10', 'title': 'Πρόγραμμα — ενιαία φόρμα βάρδιας για ένα ΚΑΙ για πολλά κελιά',
      'items': ['Η φόρμα καταχώρησης είναι πλέον ΙΔΙΑ είτε επιλέξεις ένα κελί είτε πολλά: η πλήρης φόρμα (πολλαπλές βάρδιες, +Προσθήκη, ξενοδοχείο εργασίας, σπαστό).',
                'Στην αποθήκευση γράφει ΟΛΕΣ τις βάρδιες σε όλα τα επιλεγμένα κελιά μαζί (μέσω paste_cells, σέβεται κλειδώματα).',
@@ -3831,6 +3834,7 @@ init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 if evaluations:
     evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
+    evaluations.ensure_eval_dept_templates()  # seed προτύπων τμημάτων F&B (Kitchen/Service)
     evaluations._seed_menu_evals()    # one-time: 'evals' στο menu_vis (manager on)
 seed_team()
 if faults:   faults.seed_faults()
