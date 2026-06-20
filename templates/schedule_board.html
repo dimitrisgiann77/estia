@@ -77,6 +77,8 @@
     </div>
   </div>
 
+  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος κελιών · <b>Ctrl+κλικ</b> (Cmd σε Mac) για επιλογή πολλών κουτιών (ημέρες/άτομα) ακόμη κι από διαφορετικά τμήματα.</p>
+
   {% set qs=request.args %}
   {% if qs.get('ok')=='submitted' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκε στο λογιστήριο.</div>{% endif %}
   {% if qs.get('ok')=='copied' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-copy"></i> Αντιγράφηκε η προηγούμενη εβδομάδα.</div>{% endif %}
@@ -164,16 +166,23 @@ function toggleDept(id){ var s=curSel(); var i=s.indexOf(id); if(i>=0)s.splice(i
 function toggleAll(){ localStorage.removeItem(HKEY); applyDeptFilter(); }
 applyDeptFilter();
 // ── Cell editor (drag-select εύρους ημερών ανά γραμμή) ──
-var curSel=[], selecting=false, anchor=null;
+var curSel=[], selecting=false, anchor=null, ctrlPending=false;
 function _pos(el){var td=el.parentNode,tr=td.parentNode,tb=tr.parentNode;return {tb:tb,r:Array.prototype.indexOf.call(tb.children,tr),c:Array.prototype.indexOf.call(tr.children,td)};}
 function clearSel(){ curSel.forEach(function(c){c.classList.remove('sel');}); curSel=[]; }
 function markRect(a,b){ clearSel(); var r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r),c0=Math.min(a.c,b.c),c1=Math.max(a.c,b.c);
   a.tb.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){var p=_pos(el);if(p.r>=r0&&p.r<=r1&&p.c>=c0&&p.c<=c1){el.classList.add('sel');curSel.push(el);}}); }
+function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);}}
 document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
-  el.addEventListener('mousedown',function(e){e.preventDefault();anchor=_pos(el);selecting=true;markRect(anchor,anchor);});
+  el.addEventListener('mousedown',function(e){
+    if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
+    e.preventDefault();anchor=_pos(el);selecting=true;markRect(anchor,anchor);
+  });
   el.addEventListener('mouseenter',function(){if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el));});
 });
-window.addEventListener('mouseup',function(){if(!selecting)return;selecting=false;if(curSel.length)openEd();});
+window.addEventListener('mouseup',function(){
+  if(ctrlPending){ctrlPending=false;if(curSel.length)openEd();return;}
+  if(!selecting)return;selecting=false;if(curSel.length)openEd();
+});
 var HOTELS_LIST=[{% for h in hotels %}{id:{{h.id}},name:{{ h.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
 var segState=[], dayMode=false, dayEntries=[], dayHome='';
 function mkTime(val,cb){
