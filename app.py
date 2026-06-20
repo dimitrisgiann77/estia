@@ -331,11 +331,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.149'
-APP_BUILD   = '430'
+APP_VERSION = '12.150'
+APP_BUILD   = '431'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.150', 'b': '431', 'date': '20/06/2026', 'time': '18:50', 'title': 'Αξιολόγηση — τέλος αυτόματης δημιουργίας προτύπων',
+     'items': ['Η εφαρμογή ΔΕΝ δημιουργεί πλέον αυτόματα πρότυπα F&B σε κάθε εκκίνηση. Τα reference μπήκαν μία φορά· από εδώ και πέρα τα πρότυπα τα φτιάχνεις/επεξεργάζεσαι εσύ. (Το βασικό CONDIAN seed μένει μόνο για εντελώς άδεια βάση.)']},
     {'v': '12.149', 'b': '430', 'date': '20/06/2026', 'time': '18:30', 'title': 'Αξιολόγηση — «σφραγίδα» προτύπων (το auto-seed σταματά οριστικά)',
      'items': ['Ο μηχανισμός που φύτευε/καθάριζε τα πρότυπα F&B τρέχει πλέον ΜΙΑ τελευταία φορά και μετά σφραγίζεται (Setting eval_dept_templates_done) — δεν ξαναγγίζει ποτέ τα πρότυπα σε επόμενα deploys. Τα πρότυπα είναι πλέον 100% στον έλεγχό σου.']},
     {'v': '12.148', 'b': '429', 'date': '20/06/2026', 'time': '18:10', 'title': 'Πρότυπα Αξιολόγησης — εξαγωγή σε έντυπο PDF & Excel (παρουσίασης)',
@@ -3865,8 +3867,9 @@ init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 if evaluations:
     evaluations.ensure_eval_columns()  # auto-migration ΠΡΩΤΑ: eval_template.hotel_id (πριν από οποιοδήποτε query)
-    evaluations.ensure_eval_setup()   # seed προτύπου αξιολόγησης
-    evaluations.ensure_eval_dept_templates()  # seed προτύπων τμημάτων F&B (Kitchen/Service)
+    evaluations.ensure_eval_setup()   # seed ΜΟΝΟ του βασικού προτύπου CONDIAN σε ΑΔΕΙΑ βάση (one-time)
+    # ΣΗΜ.: ΔΕΝ καλείται πλέον ensure_eval_dept_templates() — τα F&B templates μπήκαν μία φορά (reference)
+    #       και πλέον τα διαχειρίζεται ο χρήστης. Η εφαρμογή δεν δημιουργεί/πειράζει πρότυπα αυτόματα.
     evaluations._seed_menu_evals()    # one-time: 'evals' στο menu_vis (manager on)
 seed_team()
 if faults:   faults.seed_faults()
