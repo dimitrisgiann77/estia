@@ -487,6 +487,11 @@ if(window.matchMedia){ try{ matchMedia('(prefers-color-scheme:dark)').addEventLi
 </script>
 <script>
 var frame=document.getElementById('frame');
+frame.addEventListener('load',function(){
+  try{ var u=frame.contentWindow.location.pathname+frame.contentWindow.location.search;
+    if(u && u.indexOf('/login')<0 && u!=='/' ) localStorage.setItem('estia_last_url', u);
+  }catch(e){}
+});
 function go(url,el){
   frame.src=url;
   document.querySelectorAll('.item').forEach(function(i){i.classList.remove('active');});
@@ -514,7 +519,9 @@ if(_ws!=='operations' && !document.querySelector('.apps .hbtn[data-ws="'+_ws+'"]
 applyWs(_ws);
 var first=document.querySelector('#side .item[data-ws~="'+_ws+'"]');
 if(!first) first=document.querySelector('#side .item');
-if(first) go(first.getAttribute('data-url'), first);
+var _last=null; try{ _last=localStorage.getItem('estia_last_url'); }catch(e){}
+if(_last){ frame.src=_last; }
+else if(first){ go(first.getAttribute('data-url'), first); }
 
 // ── Auto-refresh σε νέα έκδοση (deploy) ──
 var APP_BUILD='{{ app_build }}';

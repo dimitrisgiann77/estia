@@ -318,11 +318,19 @@ def _hotel_code(hid):
     return s[:3] or 'XXX'
 
 def _gen_code(ev):
-    """Μορφή κωδικού: ΕΤΟΣ-HOTELCODE-DEADLINE(ddmmyyyy). (Χωρίς αύξοντα — tracking μέσω εγγραφής/εργαζομένου.)"""
+    """Μορφή κωδικού: ΕΤΟΣ-HOTELCODE-DEADLINE(ddmmyyyy)-ΚΩΔΕΡΓ."""
     yr = ev.year or date.today().year
     hc = _hotel_code(ev.hotel_id)
     dl = ev.eval_date.strftime('%d%m%Y') if ev.eval_date else ''
-    return '-'.join([p for p in [str(yr), hc, dl] if p])
+    ec = ''
+    try:
+        from payroll import EmployeePII as _PII
+        _pp = _PII.query.filter_by(user_id=ev.employee_id).first()
+        if _pp and _pp.emp_code:
+            ec = str(_pp.emp_code).strip()
+    except Exception:
+        ec = ''
+    return '-'.join([p for p in [str(yr), hc, dl, ec] if p])
 
 def _dept_name(did):
     if not did: return ''
@@ -453,6 +461,20 @@ def evaluation_view(eid):
                            goals=sorted(ev.goals, key=lambda g: g.id), is_admin=is_admin(),
                            criteria=ev.template.criteria if ev.template else [])
 
+
+@app.route('/dashboard/evaluations/<int:eid>/print')
+def evaluation_print(eid):
+    if not _auth_eval():
+        return redirect(url_for('login'))
+    ev = Evaluation.query.get_or_404(eid)
+    if not _hid_ok(ev.hotel_id):
+        return redirect(url_for('evaluations_list') + '?embed=1')
+    smap = {s.criterion_id: s for s in ev.scores}
+    return render_template('eval_print.html', ev=ev, smap=smap,
+                           criteria=(ev.template.criteria if ev.template else []),
+                           dept_name=_dept_name, band_color=BAND_COLOR,
+                           goals=sorted(ev.goals, key=lambda g: g.id))
+
 @app.route('/dashboard/evaluations/<int:eid>/edit', methods=['GET', 'POST'])
 def evaluation_edit(eid):
     if not _auth_eval():
@@ -486,7 +508,8 @@ def evaluation_delete(eid):
         return redirect(url_for('login'))
     ev = Evaluation.query.get_or_404(eid)
     user = current_user(); uid = user.id if user else None
-    allowed = is_admin() or (ev.evaluator_id == uid and ev.status == 'draft' and _hid_ok(ev.hotel_id))
+    not_approved = ev.status not in APPROVED_STATES
+    allowed = (is_admin() and not_approved) or (ev.evaluator_id == uid and ev.status == 'draft' and _hid_ok(ev.hotel_id))
     if not allowed:
         return redirect(url_for('evaluations_list') + '?embed=1')
     db.session.delete(ev); db.session.commit()

@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Αξιολόγηση {{ ev.code }}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
+<style>
+  :root{--navy:#193847;--grey:#78828c;--line:#e2e8f0;--light:#f4f7f9;--group:#e1ebf5;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1e293b;background:#eef2f5;}
+  .sheet{max-width:880px;margin:18px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 6px 24px rgba(15,40,55,.10);}
+  .band{background:var(--navy);color:#fff;padding:18px 26px;}
+  .band h1{margin:0;font-size:20px;letter-spacing:.5px;}
+  .band p{margin:3px 0 0;font-size:12.5px;color:#cfe1f5;}
+  .body{padding:22px 26px 30px;}
+  .ttl{font-size:17px;font-weight:700;color:var(--navy);margin:0 0 2px;}
+  .sub{font-size:12.5px;color:var(--grey);margin:0 0 16px;}
+  .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 26px;margin-bottom:18px;}
+  .meta .f{font-size:13px;display:flex;gap:6px;border-bottom:1px solid var(--line);padding:4px 0;}
+  .meta .f b{color:var(--grey);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;min-width:128px;display:inline-block;align-self:center;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{background:var(--navy);color:#fff;font-weight:600;padding:8px 9px;text-align:left;font-size:12px;}
+  thead th.c{text-align:center;}
+  tbody td{padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:nth-child(even) td{background:var(--light);}
+  td.c{text-align:center;}
+  tr.grp td{background:var(--group);color:var(--navy);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;}
+  .sc{font-weight:700;}
+  .sc.h{color:#15803d;} .sc.m{color:#b45309;} .sc.l{color:#dc2626;}
+  .tots{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:18px 0 6px;}
+  .totbox{background:var(--light);border:1px solid var(--line);border-radius:10px;padding:10px 16px;}
+  .totbox .n{font-size:24px;font-weight:800;color:var(--navy);line-height:1;}
+  .totbox .l{font-size:10.5px;color:var(--grey);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+  .bandtag{display:inline-block;padding:5px 14px;border-radius:20px;font-weight:700;font-size:13px;}
+  .sect{font-size:13px;font-weight:700;color:var(--navy);margin:18px 0 6px;}
+  .goal{font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--line);}
+  .gc{font-size:12.5px;color:#334155;background:var(--light);border:1px solid var(--line);border-radius:9px;padding:10px 12px;white-space:pre-wrap;}
+  .toolbar{max-width:880px;margin:14px auto 0;display:flex;justify-content:flex-end;gap:8px;}
+  .pbtn{background:var(--navy);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  @media print{ body{background:#fff;} .toolbar{display:none;} .sheet{box-shadow:none;margin:0;border-radius:0;max-width:100%;} }
+</style></head><body>
+{% set bc = band_color.get(ev.band, ('#f1f5f9','#64748b')) %}
+<div class="toolbar"><button class="pbtn" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση</button></div>
+<div class="sheet">
+  <div class="band">
+    <h1>CONDIAN HOTELS</h1>
+    <p>Έντυπο Αξιολόγησης Εργαζομένου · {{ ev.code }}</p>
+  </div>
+  <div class="body">
+    <div class="ttl">{{ ev.employee.full_name if ev.employee else '—' }}</div>
+    <div class="sub">{{ ev.template.name if ev.template else '' }}{% if ev.template and ev.template.scope and ev.template.scope!='general' %} · {{ ev.template.scope }}{% endif %}</div>
+    <div class="meta">
+      <div class="f"><b>Ξενοδοχείο</b><span>{{ ev.hotel.name if ev.hotel else '—' }}</span></div>
+      <div class="f"><b>Τμήμα</b><span>{{ dept_name(ev.department_id) or '—' }}</span></div>
+      <div class="f"><b>Περίοδος</b><span>{{ ev.period_label or '—' }}</span></div>
+      <div class="f"><b>Ημ/νία</b><span>{{ (ev.updated_at or ev.created_at).strftime('%d/%m/%Y') if (ev.updated_at or ev.created_at) else '—' }}</span></div>
+      <div class="f"><b>Αξιολογητής</b><span>{{ ev.evaluator.full_name if ev.evaluator else '—' }}</span></div>
+      <div class="f"><b>Κωδικός</b><span>{{ ev.code }}</span></div>
+    </div>
+    <table>
+      <thead><tr><th class="c" style="width:34px;">Α/Α</th><th>Κριτήριο</th><th class="c" style="width:60px;">Συντ.</th><th class="c" style="width:70px;">Βαθμός</th><th style="width:34%;">Σχόλιο</th></tr></thead>
+      <tbody>
+        {% set ns = namespace(g='', i=0) %}
+        {% for c in criteria %}
+          {% if c.grp and c.grp != ns.g %}<tr class="grp"><td colspan="5">{{ c.grp }}</td></tr>{% set ns.g = c.grp %}{% endif %}
+          {% set ns.i = ns.i + 1 %}
+          {% set sv = smap.get(c.id) %}
+          {% set val = sv.score if sv and sv.score is not none else None %}
+          <tr>
+            <td class="c">{{ ns.i }}</td>
+            <td>{{ c.label }}</td>
+            <td class="c">{{ '%d%%'|format((c.weight or 0)*100) }}</td>
+            <td class="c sc {{ 'h' if (val is not none and val>=8) else ('m' if (val is not none and val>=6) else ('l' if val is not none else '')) }}">{{ ('%g'|format(val)) if val is not none else '—' }}<span style="color:#b8c4cc;font-weight:400;">/{{ c.max_score or 10 }}</span></td>
+            <td>{{ sv.comment if sv and sv.comment else '' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="tots">
+      <div class="totbox"><div class="n">{{ '%.1f%%'|format(ev.score_pct) if ev.score_pct is not none else '—' }}</div><div class="l">Βαθμολογία</div></div>
+      <span class="bandtag" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ ev.band or '—' }}</span>
+    </div>
+    {% if goals %}
+    <div class="sect">Στόχοι & ενέργειες βελτίωσης</div>
+    {% for g in goals %}<div class="goal">{{ '☑' if g.done else '☐' }} {{ g.text }}</div>{% endfor %}
+    {% endif %}
+    {% if ev.general_comment %}
+    <div class="sect">Γενικό σχόλιο</div>
+    <div class="gc">{{ ev.general_comment }}</div>
+    {% endif %}
+  </div>
+</div>
+</body></html>
