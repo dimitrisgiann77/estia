@@ -100,6 +100,26 @@ def _dup_rows():
         return []
 
 
+def _org_conflicts():
+    """v12.170 — διαφωνίες οργανογράμματος↔Epsilon (import_hotel_id ≠ home_hotel_id)."""
+    out = []
+    try:
+        hotels = {h.id: h.name for h in Hotel.query.all()}
+        piimap = _pii_map()
+        q = (User.query.filter(User.import_hotel_id != None,
+                               User.import_hotel_id != User.home_hotel_id)
+             .order_by(User.full_name).all())
+        for u in q:
+            pii = piimap.get(u.id)
+            out.append({'id': u.id, 'name': u.full_name or u.username,
+                        'code': (pii.emp_code if pii else None),
+                        'org_hotel': hotels.get(getattr(u, 'home_hotel_id', None), '—'),
+                        'eps_hotel': hotels.get(getattr(u, 'import_hotel_id', None), '—')})
+    except Exception:
+        pass
+    return out
+
+
 @app.route('/dashboard/people')
 def people_console():
     if not is_admin():
@@ -123,9 +143,10 @@ def people_console():
         dups = 0
     pending_items = _pending_items()
     dup_rows = _dup_rows()
+    conflicts = _org_conflicts()
     return render_template('people_console.html', rows=rows, counts=counts,
                            pend=pend, dups=dups, pending_items=pending_items,
-                           dup_rows=dup_rows, is_admin=is_admin())
+                           dup_rows=dup_rows, conflicts=conflicts, is_admin=is_admin())
 
 
 def _work_history(uid):
@@ -214,6 +235,31 @@ def people_delete(uid):
     except Exception as e:
         db.session.rollback()
         return jsonify(ok=False, msg=str(e)[:140])
+
+
+@app.route('/dashboard/people/conflict/<int:uid>/keep', methods=['POST'])
+def people_conflict_keep(uid):
+    if not is_admin():
+        return ('', 403)
+    u = User.query.get(uid)
+    if u and hasattr(u, 'import_hotel_id'):
+        u.import_hotel_id = None; db.session.commit()
+        log_activity('org_conflict_keep', str(uid))
+    return jsonify(ok=True)
+
+@app.route('/dashboard/people/conflict/<int:uid>/accept', methods=['POST'])
+def people_conflict_accept(uid):
+    if not is_admin():
+        return ('', 403)
+    u = User.query.get(uid)
+    if u and getattr(u, 'import_hotel_id', None):
+        import people
+        people.assign_user_org(u, u.import_hotel_id, getattr(u, 'department_id', None),
+                               actor_id=(current_user().id if current_user() else None),
+                               reason='Epsilon (αποδοχή διαφωνίας)')
+        u.import_hotel_id = None; db.session.commit()
+        log_activity('org_conflict_accept', str(uid))
+    return jsonify(ok=True)
 
 
 print('console module loaded (Διαχείριση προσωπικού)')

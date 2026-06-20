@@ -331,11 +331,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.169'
-APP_BUILD   = '450'
+APP_VERSION = '12.170'
+APP_BUILD   = '451'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.170', 'b': '451', 'date': '21/06/2026', 'time': '06:00', 'title': 'Οργανόγραμμα νικά: το Epsilon γίνεται «πρόταση» + πίνακας διαφωνιών',
+     'items': ['Το import (Epsilon) σταματά να αλλάζει το ξενοδοχείο όποιου υπάρχει ήδη — βάζει ξενοδοχείο μόνο σε νέους/κενούς. Αν διαφωνεί, καταγράφει την πρότασή του αντί να την επιβάλλει (τα ΑΦΜ/ΑΜΚΑ/επίσημα συμπληρώνονται κανονικά).', 'Νέα καρτέλα «⚠ Διαφωνίες» στη Διαχείριση Προσωπικού: όπου το Epsilon λέει άλλο ξενοδοχείο, με κουμπιά «Κράτα οργανόγραμμα» / «Δέξου Epsilon».', 'Ειδοποίηση στην κορυφή (admin) όσο υπάρχουν ασυμφώνητες διαφωνίες, με σύνδεσμο στη λίστα.', 'Ροή νέου εργαζομένου = συνδυασμός: χειροκίνητα (υπάρχει στο «Πρόγραμμα·Προσωπικό») για άμεση πρόσβαση + περιοδικό Epsilon που ταιριάζει & συμπληρώνει τα επίσημα.']},
     {'v': '12.169', 'b': '450', 'date': '21/06/2026', 'time': '05:00', 'title': 'Οργανόγραμμα: ένα σημείο για τις αλλαγές ανάθεσης (+ ιστορικό)',
      'items': ['Όλες οι αλλαγές ξενοδοχείου/τμήματος ενός εργαζομένου περνάνε πλέον από ΕΝΑ σημείο, ώστε να γίνονται με τον ίδιο τρόπο παντού και να καταγράφεται πάντα ποιος/πότε άλλαξε τι (ιστορικό προφίλ).', 'Διακριτική διόρθωση: η παλιά οθόνη επεξεργασίας του Προγράμματος έγραφε τα ίδια πεδία χωρίς ιστορικό — τώρα περνάει κι αυτή από το ίδιο σημείο.', 'Καμία ορατή αλλαγή — εσωτερική τάξη/θεμέλιο. Επόμενο (αφού αποφασιστεί πώς μπαίνει νέος εργαζόμενος): πίνακας διαφωνιών Οργανόγραμμα↔Epsilon.']},
     {'v': '12.168', 'b': '449', 'date': '21/06/2026', 'time': '04:15', 'title': 'Οργανόγραμμα: φωτογραφία προφίλ + ο υπεύθυνος φαίνεται στο Πρόγραμμα',
@@ -830,6 +832,18 @@ CHANGELOG = [
 def inject_version():
     return {'app_version': APP_VERSION, 'app_build': APP_BUILD}
 
+@app.context_processor
+def inject_org_conflicts():
+    """v12.170 — μετρητής διαφωνιών οργανογράμματος↔Epsilon (banner, admin-only)."""
+    try:
+        if not is_admin():
+            return {'org_conflicts': 0}
+        n = User.query.filter(User.import_hotel_id != None,
+                              User.import_hotel_id != User.home_hotel_id).count()
+        return {'org_conflicts': n}
+    except Exception:
+        return {'org_conflicts': 0}
+
 @app.route('/version')
 def app_version_json():
     """Ελαφρύ endpoint για auto-refresh όταν αλλάζει η έκδοση (deploy)."""
@@ -1048,6 +1062,7 @@ class User(db.Model):
     employer          = db.Column(db.String(120))
     subunit           = db.Column(db.String(20))
     home_hotel_id     = db.Column(db.Integer)
+    import_hotel_id   = db.Column(db.Integer)   # v12.170 — πρόταση Epsilon (πίνακας διαφωνιών)
     login_enabled     = db.Column(db.Boolean)
     employment_active = db.Column(db.Boolean)
     is_active  = db.Column(db.Boolean, default=True)
@@ -2802,7 +2817,7 @@ ROADMAP = [
         {'t': 'Αξιολόγηση προσωπικού (πάνω στα ερωτηματολόγια)', 's': 'planned'},
         {'t': 'Αξιολόγηση: διπλή αξιολόγηση για εργαζόμενο σε >1 τμήμα ανά περίοδο (π.χ. Φεβ-Μαρ Συντήρηση, Απρ-Νοε Κουζίνα)', 's': 'planned'},
         {'t': 'Αξιολόγηση: τράπεζα ερωτήσεων + σύνθεση ερωτηματολογίου με drag&drop (βάρος ανά φύλλο)', 's': 'idea'},
-        {'t': 'Οργανόγραμμα — κονσόλα HR: ανάθεση τμήμα+ξενοδοχείο (✓), τμήματα ανά ξενοδοχείο (✓), υπεύθυνος ανά τμήμα (✓), φωτό προφίλ (✓), ΕΝΑ write-path assign_user_org +ιστορικό (✓)· επόμενα: ΑΠΟΦΑΣΗ πώς μπαίνει νέος εργαζόμενος (import-μόνο-νέοι/χειροκίνητα), μετά πίνακας διαφωνιών Epsilon + popup μέχρι admin· ΜΕΛΕΤΗ δικαιωμάτων υπευθύνου, λωρίδα Διεύθυνσης, διπλό ιστορικό', 's': 'progress'},
+        {'t': 'Οργανόγραμμα — κονσόλα HR: ανάθεση (✓), τμήματα ανά ξεν. (✓), υπεύθυνος (✓), φωτό (✓), ΕΝΑ write-path +ιστορικό (✓), import seed-only + πίνακας διαφωνιών Epsilon + banner (✓), ροή νέου=συνδυασμός (✓)· επόμενα: ΜΕΛΕΤΗ δικαιωμάτων/login υπευθύνου, λωρίδα Διεύθυνσης, κονσόλα-κάρτα μέσα στο οργανόγραμμα, διπλό ιστορικό', 's': 'progress'},
     ]},
     {'area': 'Guest experience / Υποδοχή', 'items': [
         {'t': 'Ερωτηματολόγια (builder, δημόσιος σύνδεσμος, NPS)', 's': 'done'},
@@ -3755,6 +3770,7 @@ def ensure_columns():
     _add_col('user', 'employer', 'employer VARCHAR(120)')
     _add_col('user', 'subunit', 'subunit VARCHAR(20)')
     _add_col('user', 'home_hotel_id', 'home_hotel_id INTEGER')
+    _add_col('user', 'import_hotel_id', 'import_hotel_id INTEGER')  # v12.170
     _add_col('user', 'login_enabled', 'login_enabled BOOLEAN')
     _add_col('user', 'employment_active', 'employment_active BOOLEAN')
 

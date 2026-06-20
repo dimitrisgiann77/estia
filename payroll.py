@@ -759,11 +759,25 @@ def _create_locked_employee(row):
     db.session.add(u); db.session.flush()
     return u
 
+def _seed_or_conflict_hotel(u, hid):
+    """v12.170 — Οργανόγραμμα νικά: το import γράφει ξενοδοχείο ΜΟΝΟ σε κενό (seed).
+    Αν διαφωνεί με υπάρχον → πρόταση στο import_hotel_id (πίνακας διαφωνιών). Συμφωνία → clear."""
+    if not hid:
+        return
+    cur = getattr(u, 'home_hotel_id', None)
+    if not cur:
+        u.home_hotel_id = hid
+        if hasattr(u, 'import_hotel_id'): u.import_hotel_id = None
+    elif cur != hid:
+        if hasattr(u, 'import_hotel_id'): u.import_hotel_id = hid
+    else:
+        if hasattr(u, 'import_hotel_id'): u.import_hotel_id = None
+
 def _apply_epsilon_identity(u, row, comp=None, cost_center=None):
     """Ταυτότητα από Epsilon (αλήθεια): ξενοδοχείο + PII + κλείδωμα."""
     hotel = _hotel_from_epsilon(row, comp)
     if hotel:
-        u.home_hotel_id = hotel.id
+        _seed_or_conflict_hotel(u, hotel.id)
     pii = EmployeePII.query.filter_by(user_id=u.id).first()
     if not pii:
         pii = EmployeePII(user_id=u.id); db.session.add(pii)
@@ -1308,7 +1322,7 @@ def sync_master_workbook(wb):
             if full: u.full_name = full[:100]
             h = _hotel_by_code(g(r, 'hotel'))
             if h:
-                u.home_hotel_id = h.id
+                _seed_or_conflict_hotel(u, h.id)
             sv = g(r, 'status')
             if sv and hasattr(u, 'employment_active'):
                 u.employment_active = ('ανενεργ' not in _norm(sv))

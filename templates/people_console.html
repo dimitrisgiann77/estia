@@ -54,6 +54,7 @@ html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
     <span class="tab" data-sec="people" data-cat="login" onclick="setTab(this)">Λογαριασμοί <span class="n">{{ counts.login }}</span></span>
     <span class="tab" data-sec="pending" onclick="setTab(this)">Ασύνδετα <span class="n">{{ pend }}</span></span>
     <span class="tab" data-sec="dups" onclick="setTab(this)">Διπλά <span class="n">{{ dup_rows|length }}</span></span>
+    <span class="tab" data-sec="conflicts" onclick="setTab(this)">⚠ Διαφωνίες <span class="n">{{ conflicts|length }}</span></span>
   </div>
 
   <div id="sec-people">
@@ -137,6 +138,25 @@ html[data-theme="dark"] .pcard{background:#16202c;border-color:#33475b;}
     {% endfor %}
     {% else %}<div class="empty"><i class="ti ti-checks" style="font-size:30px;color:#16a34a;display:block;margin-bottom:8px;"></i>Καμία πιθανή διπλοεγγραφή. 🎉</div>{% endif %}
   </div>
+
+  <div id="sec-conflicts" style="display:none;">
+    {% if conflicts %}
+    <div class="pcard" style="font-size:13px;color:#475569;margin-bottom:4px;"><b>Διαφωνίες οργανογράμματος ↔ Epsilon.</b> Το import πρότεινε άλλο ξενοδοχείο από ό,τι έχεις στο οργανόγραμμα. Κράτα τη δική σου επιλογή ή δέξου την πρόταση του Epsilon.</div>
+    {% for c in conflicts %}
+    <div class="pcard" id="cf-{{ c.id }}">
+      <div class="pname">{{ c.name }}{% if c.code %} <span class="meta">· Κωδ {{ c.code }}</span>{% endif %}</div>
+      <div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;">
+        <span class="cbadge mgmt">Οργανόγραμμα: <b>{{ c.org_hotel }}</b></span>
+        <span class="cbadge muted">Epsilon: <b>{{ c.eps_hotel }}</b></span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="cbtn g" onclick="conflictKeep({{ c.id }})"><i class="ti ti-shield-check"></i> Κράτα οργανόγραμμα ({{ c.org_hotel }})</button>
+        <button class="cbtn" onclick="conflictAccept({{ c.id }})"><i class="ti ti-download"></i> Δέξου Epsilon ({{ c.eps_hotel }})</button>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}<div class="empty"><i class="ti ti-checks" style="font-size:30px;color:#16a34a;display:block;margin-bottom:8px;"></i>Καμία διαφωνία. 🎉</div>{% endif %}
+  </div>
 </div>
 <script>
 var curTab='all';
@@ -147,6 +167,7 @@ function setTab(el){
   document.getElementById('sec-people').style.display=(sec==='people')?'':'none';
   document.getElementById('sec-pending').style.display=(sec==='pending')?'':'none';
   document.getElementById('sec-dups').style.display=(sec==='dups')?'':'none';
+  document.getElementById('sec-conflicts').style.display=(sec==='conflicts')?'':'none';
   document.getElementById('searchbox').style.display=(sec==='people')?'':'none';
   if(sec==='people'){curTab=el.getAttribute('data-cat');applyFilter();}
 }
@@ -176,6 +197,8 @@ function schSearch(inp,norm){
     });box.innerHTML=h;
   });
 }
+function conflictKeep(id){fetch('/dashboard/people/conflict/'+id+'/keep',{method:'POST'}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){var e=document.getElementById('cf-'+id);if(e)e.remove();}else alert('Δεν έγινε.');});}
+function conflictAccept(id){fetch('/dashboard/people/conflict/'+id+'/accept',{method:'POST'}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){var e=document.getElementById('cf-'+id);if(e)e.remove();}else alert('Δεν έγινε.');});}
 (function(){var t=new URLSearchParams(location.search).get('tab');if(t){var el=document.querySelector('.tab[data-sec="'+t+'"]');if(el)setTab(el);}})();
 </script>
 </body></html>
