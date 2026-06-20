@@ -85,6 +85,7 @@ class Department(db.Model):
     aliases   = db.Column(db.Text)            # JSON list κανονικοποιημένων aliases
     active    = db.Column(db.Boolean, default=True)
     sort      = db.Column(db.Integer, default=0)
+    is_leadership = db.Column(db.Boolean, default=False)   # v12.171 — λωρίδα Διεύθυνσης
 
 class HotelDepartment(db.Model):
     """v12.166 — ποια (κοινά) τμήματα έχει κάθε ξενοδοχείο. Single source· προσθετικό.
@@ -227,6 +228,7 @@ def ensure_schedule_columns():
         _add_col('user', 'login_enabled',     'login_enabled BOOLEAN')
         _add_col('user', 'employment_active', 'employment_active BOOLEAN')
         _add_col('hotel_department', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.167
+        _add_col('department', 'is_leadership', 'is_leadership BOOLEAN')  # v12.171
         # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
         try:
             from sqlalchemy import text as _text

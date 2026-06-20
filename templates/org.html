@@ -31,6 +31,13 @@
   .rbadge{font-size:9px;border-radius:6px;padding:1px 6px;background:#ede9fe;color:#6d28d9;font-weight:700;text-transform:capitalize;}
   .ohint{font-size:12px;color:#64748b;margin:0 0 12px;}
   .dchip2.on{outline:2px solid var(--accent,#185FA5);outline-offset:-1px;font-weight:600;}
+  .olead{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:14px;}
+  .olead-col{border-color:#fcd9a8;background:#fffaf2;}
+  html[data-theme="dark"] .olead-col{background:#2a2418;border-color:#5a4a2a;}
+  .olead-ttl{font-size:12px;font-weight:700;color:#b45309;display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+  .crown{margin-left:6px;cursor:pointer;color:#cbd5e1;font-size:13px;}
+  .crown:hover{color:#b45309;}
+  .crown.demote{color:#b45309;}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
@@ -59,6 +66,18 @@
 </div>
 {% endmacro %}
 
+{% macro suprow(d, sp) %}
+<div class="osup">
+  {% if sp %}
+    {% if sp.avatar %}<img class="av" src="{{ sp.avatar }}" alt="" title="Υπεύθυνος τμήματος">{% else %}<span class="av" title="Υπεύθυνος τμήματος">{{ initials(sp.name) }}</span>{% endif %}
+    <span class="lbl">{{ sp.name }}</span>
+    <span class="ed" onclick='openSup({{ d.id }}, {{ d.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-pencil"></i></span>
+  {% else %}
+    <span class="add" onclick='openSup({{ d.id }}, {{ d.name|tojson }})'><i class="ti ti-user-plus"></i> Υπεύθυνος</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
 <div class="container">
   <p class="ohint"><i class="ti ti-info-circle"></i> Διάλεξε ξενοδοχείο, σύρε άτομα από το «Διαθέσιμο προσωπικό» πάνω σε ένα τμήμα — του ανατίθεται αυτόματα <b>τμήμα + ξενοδοχείο</b>. Σύρε πίσω στη λίστα για να το βγάλεις από το ξενοδοχείο. Όρισε <b>υπεύθυνο</b> σε κάθε τμήμα.</p>
   <div class="otabs">
@@ -82,6 +101,20 @@
     </div>
   </div>
 
+  {% if lead_cols %}
+  <div class="olead-ttl"><i class="ti ti-crown"></i> Διεύθυνση / Προϊστάμενοι</div>
+  <div class="olead">
+    {% for d in lead_cols %}
+    <div class="ocol olead-col" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
+      <div class="oacc" style="background:{{ d.color }};"></div>
+      <h4><i class="ti ti-crown" style="color:#b45309;"></i> {{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown demote" onclick="toggleLead({{ d.id }}, false)" title="Αφαίρεση από Διεύθυνση"><i class="ti ti-arrow-down"></i></span></h4>
+      {{ suprow(d, supmap.get(d.id)) }}
+      {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="olayout">
     <div class="opool" id="pool" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,'','')">
       <h3><i class="ti ti-users"></i> Διαθέσιμο προσωπικό <span class="cnt" style="margin-left:auto;">{{ pool|length }}</span></h3>
@@ -95,17 +128,8 @@
       {% for d in columns %}
       <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
         <div class="oacc" style="background:{{ d.color }};"></div>
-        <h4><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span></h4>
-        {% set sp = supmap.get(d.id) %}
-        <div class="osup">
-          {% if sp %}
-            {% if sp.avatar %}<img class="av" src="{{ sp.avatar }}" alt="" title="Υπεύθυνος τμήματος">{% else %}<span class="av" title="Υπεύθυνος τμήματος">{{ initials(sp.name) }}</span>{% endif %}
-            <span class="lbl">{{ sp.name }}</span>
-            <span class="ed" onclick='openSup({{ d.id }}, {{ d.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-pencil"></i></span>
-          {% else %}
-            <span class="add" onclick='openSup({{ d.id }}, {{ d.name|tojson }})'><i class="ti ti-user-plus"></i> Υπεύθυνος</span>
-          {% endif %}
-        </div>
+        <h4><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown" onclick="toggleLead({{ d.id }}, true)" title="Όρισε ως Διεύθυνση"><i class="ti ti-crown"></i></span></h4>
+        {{ suprow(d, supmap.get(d.id)) }}
         {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
       {% endfor %}
@@ -163,6 +187,11 @@ function newDept(){
   fetch('/dashboard/org/dept/create',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({name:name, color:color, hotel_id:SELHOTEL})})
     .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν δημιουργήθηκε'+(j&&j.msg?': '+j.msg:'')); });
+}
+function toggleLead(did, on){
+  fetch('/dashboard/org/dept/leadership',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({department_id:did, on:on})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); });
 }
 var SUPCAND={{ sup_candidates|tojson }};
 var CURSUP={{ cursup|tojson }};

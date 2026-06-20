@@ -323,6 +323,9 @@ def org_console():
     col_ids = base_ids | people_ids
     columns = [dmap[i] for i in col_ids if i in dmap]
     columns.sort(key=lambda d: (d.sort or 0, d.name or ''))
+    # v12.171 — λωρίδα Διεύθυνσης (όσα τμήματα είναι μαρκαρισμένα is_leadership)
+    lead_cols = [d for d in columns if getattr(d, 'is_leadership', False)]
+    columns = [d for d in columns if not getattr(d, 'is_leadership', False)]
     # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
     enabled_set = enabled or set()
     available = [d for d in active_depts if d.id not in enabled_set]
@@ -350,7 +353,7 @@ def org_console():
                            bydept=bydept, pool=pool, hcodes=hcodes,
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
                            configured=(enabled is not None),
-                           supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
+                           lead_cols=lead_cols, supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])
 def org_dept_create():
@@ -435,4 +438,23 @@ def org_supervisor():
     row.supervisor_user_id = uid
     db.session.commit()
     log_activity('org_supervisor', 'hotel=%s dept=%s sup=%s' % (hid, did, uid))
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/dept/leadership', methods=['POST'])
+def org_dept_leadership():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department
+    d = request.json or {}
+    try:
+        did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    dep = Department.query.get(did)
+    if not dep:
+        return jsonify(ok=False, msg='not found'), 404
+    dep.is_leadership = bool(d.get('on'))
+    db.session.commit()
+    log_activity('org_dept_leadership', 'dept=%s on=%s' % (did, dep.is_leadership))
     return jsonify(ok=True)
