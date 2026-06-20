@@ -839,12 +839,25 @@ def _depts_present(hotel_id):
         return Department.query.filter_by(active=True).order_by(Department.sort).all()
     return Department.query.filter(Department.id.in_(ids)).order_by(Department.sort, Department.name).all()
 
+def _dept_supervisors(hotel_id):
+    """v12.168 — {dept_id: όνομα υπευθύνου} ανά ξενοδοχείο, από HotelDepartment (owner=οργανόγραμμα)."""
+    out = {}
+    if not hotel_id:
+        return out
+    for hd in HotelDepartment.query.filter_by(hotel_id=hotel_id).all():
+        if hd.supervisor_user_id:
+            u = User.query.get(hd.supervisor_user_id)
+            if u:
+                out[hd.department_id] = u.full_name or u.username
+    return out
+
 def _build_block(hotel_id, dept_list, week_start, user):
     days = [week_start + timedelta(days=i) for i in range(7)]
     deptgrids = []
+    sup = _dept_supervisors(hotel_id)
     for d in dept_list:
         _, rows = week_grid(hotel_id, d.id, week_start)
-        deptgrids.append({'dept': d, 'rows': rows})
+        deptgrids.append({'dept': d, 'rows': rows, 'supervisor': sup.get(d.id)})
     sub = None
     if hotel_id:
         sub = (ScheduleSubmission.query.filter_by(hotel_id=hotel_id, week_start=week_start)

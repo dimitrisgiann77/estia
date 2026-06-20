@@ -255,6 +255,7 @@ def org_console():
                 'afm': (pii.afm if pii else None),
                 'role': u.role,
                 'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
+                'avatar': getattr(u, 'avatar', None),
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     allu = User.query.filter(User.is_active == True).order_by(User.full_name).all()
@@ -290,7 +291,8 @@ def org_console():
             if su:
                 sp = piimap.get(su.id)
                 supmap[hd.department_id] = {'id': su.id, 'name': su.full_name or su.username,
-                                            'code': (sp.emp_code if sp else None)}
+                                            'code': (sp.emp_code if sp else None),
+                                            'avatar': getattr(su, 'avatar', None)}
                 cursup[hd.department_id] = su.id
     # υποψήφιοι υπεύθυνοι = προσωπικό του ξενοδοχείου + managers/admin
     cand = {}

@@ -20,6 +20,7 @@
   .osup .ed{cursor:pointer;color:#94a3b8;margin-left:auto;}
   .av{width:23px;height:23px;border-radius:50%;background:var(--accent,#185FA5);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0;letter-spacing:.3px;}
   .av.sm{width:20px;height:20px;font-size:9px;}
+  img.av{object-fit:cover;padding:0;}
   .ocard{display:flex;gap:8px;align-items:flex-start;background:var(--soft,#f8fafc);border:1px solid var(--bd,#e7eef2);border-radius:9px;padding:7px 9px;margin-bottom:6px;cursor:grab;font-size:12.5px;}
   .ocard:active{cursor:grabbing;}
   .ocard .body{flex:1;min-width:0;}
@@ -46,7 +47,7 @@
 
 {% macro pcard(c, showh=false) %}
 <div class="ocard" draggable="true" ondragstart="drag(event)" data-uid="{{ c.id }}" data-name="{{ (c.name or '')|lower }}">
-  <span class="av sm">{{ initials(c.name) }}</span>
+  {% if c.avatar %}<img class="av sm" src="{{ c.avatar }}" alt="">{% else %}<span class="av sm">{{ initials(c.name) }}</span>{% endif %}
   <div class="body">
     <div class="nm">{{ c.name }}</div>
     <div class="meta">
@@ -98,7 +99,7 @@
         {% set sp = supmap.get(d.id) %}
         <div class="osup">
           {% if sp %}
-            <span class="av" title="Υπεύθυνος τμήματος">{{ initials(sp.name) }}</span>
+            {% if sp.avatar %}<img class="av" src="{{ sp.avatar }}" alt="" title="Υπεύθυνος τμήματος">{% else %}<span class="av" title="Υπεύθυνος τμήματος">{{ initials(sp.name) }}</span>{% endif %}
             <span class="lbl">{{ sp.name }}</span>
             <span class="ed" onclick='openSup({{ d.id }}, {{ d.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-pencil"></i></span>
           {% else %}
