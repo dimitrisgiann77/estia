@@ -417,7 +417,8 @@ def evaluations_list():
     return render_template('evaluations_list.html', items=items, hotels=hotels,
                            periods=periods, f_hotel=f_hotel, f_band=f_band, f_period=f_period, q=q,
                            band_color=BAND_COLOR, dept_name=_dept_name, st_label=ST_LABEL, st_color=ST_COLOR,
-                           submitted_n=submitted_n, is_admin=is_admin())
+                           submitted_n=submitted_n, is_admin=is_admin(),
+                           me_id=(current_user().id if current_user() else None))
 
 @app.route('/dashboard/evaluations/new', methods=['GET', 'POST'])
 def evaluation_new():
@@ -469,9 +470,13 @@ def evaluation_edit(eid):
 
 @app.route('/dashboard/evaluations/<int:eid>/delete', methods=['POST'])
 def evaluation_delete(eid):
-    if not _auth():
+    if not _auth_eval():
         return redirect(url_for('login'))
     ev = Evaluation.query.get_or_404(eid)
+    user = current_user(); uid = user.id if user else None
+    allowed = is_admin() or (ev.evaluator_id == uid and ev.status == 'draft' and _hid_ok(ev.hotel_id))
+    if not allowed:
+        return redirect(url_for('evaluations_list') + '?embed=1')
     db.session.delete(ev); db.session.commit()
     log_activity('evaluation_delete', '#%d' % eid)
     return redirect(url_for('evaluations_list') + '?embed=1')

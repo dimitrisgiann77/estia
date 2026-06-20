@@ -35,23 +35,24 @@ html[data-theme="dark"] table tbody tr:nth-child(even) td{background:rgba(255,25
 
   <div class="card">
     <table>
-      <thead><tr><th>Κωδικός</th><th>Υπάλληλος</th><th>Τμήμα</th><th>Ξενοδοχείο</th><th>Περίοδος</th><th>Ημ/νία</th><th>Βαθμός</th><th>Βαθμίδα</th><th></th><th></th></tr></thead>
+      <thead><tr><th>Κωδικός</th><th>Υπάλληλος</th><th>Τμήμα</th><th>Ερωτηματολόγιο</th><th>Ξενοδοχείο</th><th>Περίοδος</th><th>Ημ/νία</th><th>Βαθμός</th><th>Βαθμίδα</th><th></th><th></th></tr></thead>
       <tbody>
       {% for e in items %}
       <tr>
         <td><a class="code" href="/dashboard/evaluations/{{ e.id }}?embed=1">{{ e.code }}</a>{% if e.version and e.version>1 %} <span class="muted">v{{ e.version }}</span>{% endif %}</td>
         <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a> {{ lock_badge(e.employee) if e.employee }}</td>
         <td>{{ dept_name(e.department_id) }}</td>
+        <td class="muted" style="font-size:12px;">{{ e.template.name if e.template else '—' }}</td>
         <td>{{ e.hotel.name if e.hotel else '—' }}</td>
         <td>{{ e.period_label }} {{ e.year or '' }}</td>
         <td class="muted">{{ e.eval_date.strftime('%d/%m/%Y') if e.eval_date else '—' }}</td>
         <td class="ev-pct">{{ '%.0f%%'|format(e.score_pct) if e.score_pct is not none else '—' }}</td>
         <td>{% set bc = band_color.get(e.band, ('#f1f5f9','#64748b')) %}<span class="ev-band" style="background:{{ bc[0] }};color:{{ bc[1] }};">{{ e.band or '—' }}</span>{% set sc=st_color.get(e.status,('#f1f5f9','#64748b')) %}<span class="badge" style="background:{{ sc[0] }};color:{{ sc[1] }};margin-left:4px;">{{ st_label.get(e.status, e.status) }}</span></td>
         <td class="act"><a href="/dashboard/evaluations/{{ e.id }}?embed=1" title="Προβολή"><i class="ti ti-eye"></i></a><a href="/dashboard/evaluations/{{ e.id }}/edit?embed=1" title="Επεξεργασία"><i class="ti ti-edit"></i></a><a href="/dashboard/evaluations/{{ e.id }}/export.xlsx" title="Excel"><i class="ti ti-file-spreadsheet"></i></a><a href="/dashboard/evaluations/{{ e.id }}/export.pdf" title="PDF"><i class="ti ti-file-type-pdf"></i></a></td>
-        <td class="act">{% if is_admin %}<form method="POST" action="/dashboard/evaluations/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή αξιολόγησης {{ e.code }};');"><button type="submit" title="Διαγραφή" style="color:#dc2626;"><i class="ti ti-trash"></i></button></form>{% endif %}</td>
+        <td class="act">{% if is_admin or (e.evaluator_id==me_id and e.status=='draft') %}<form method="POST" action="/dashboard/evaluations/{{ e.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή αξιολόγησης {{ e.code }};');"><button type="submit" title="Διαγραφή" style="color:#dc2626;"><i class="ti ti-trash"></i></button></form>{% endif %}</td>
       </tr>
       {% else %}
-      <tr><td colspan="10" style="text-align:center;color:#9aa7ad;padding:34px;"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px;opacity:.5;"></i>Καμία αξιολόγηση ακόμα. <a href="/dashboard/evaluations/new?embed=1" style="font-weight:600;">+ Νέα αξιολόγηση</a></td></tr>
+      <tr><td colspan="11" style="text-align:center;color:#9aa7ad;padding:34px;"><i class="ti ti-clipboard-list" style="font-size:32px;display:block;margin-bottom:8px;opacity:.5;"></i>Καμία αξιολόγηση ακόμα. <a href="/dashboard/evaluations/new?embed=1" style="font-weight:600;">+ Νέα αξιολόγηση</a></td></tr>
       {% endfor %}
       </tbody>
     </table>
