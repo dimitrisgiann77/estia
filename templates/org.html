@@ -8,23 +8,58 @@
   .opool{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;position:sticky;top:8px;max-height:calc(100vh - 90px);overflow:auto;}
   .opool h3{margin:0 0 8px;font-size:13px;color:var(--navy,#193847);display:flex;align-items:center;gap:6px;}
   .ofilter{width:100%;padding:8px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;margin-bottom:8px;font-size:13px;background:var(--card,#fff);color:inherit;}
-  .oboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
-  .ocol{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:10px;min-height:80px;}
-  .ocol h4{margin:0 0 8px;font-size:12.5px;display:flex;align-items:center;gap:7px;}
-  .ocol .cnt{margin-left:auto;font-size:11px;color:#94a3b8;font-weight:600;}
+  .oboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+  .ocol{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:10px;min-height:90px;overflow:hidden;}
+  .oacc{height:4px;border-radius:4px;margin:-10px -10px 9px;}
+  .ocol h4{margin:0;font-size:12.5px;display:flex;align-items:center;gap:7px;}
+  .ocol .cnt{margin-left:auto;font-size:11px;color:#94a3b8;font-weight:700;background:var(--soft,#f1f5f9);border-radius:20px;padding:1px 8px;}
   .ocol.over,.opool.over{outline:2px dashed var(--accent,#185FA5);outline-offset:-3px;background:rgba(24,95,165,.05);}
-  .ocard{background:var(--soft,#f8fafc);border:1px solid var(--bd,#e7eef2);border-radius:9px;padding:7px 9px;margin-bottom:6px;cursor:grab;font-size:12.5px;}
+  .osup{display:flex;align-items:center;gap:6px;margin:7px 0 9px;font-size:11px;min-height:22px;}
+  .osup .lbl{color:#475569;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .osup .add{cursor:pointer;color:var(--accent,#185FA5);font-weight:600;display:inline-flex;align-items:center;gap:3px;user-select:none;}
+  .osup .ed{cursor:pointer;color:#94a3b8;margin-left:auto;}
+  .av{width:23px;height:23px;border-radius:50%;background:var(--accent,#185FA5);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;flex-shrink:0;letter-spacing:.3px;}
+  .av.sm{width:20px;height:20px;font-size:9px;}
+  .ocard{display:flex;gap:8px;align-items:flex-start;background:var(--soft,#f8fafc);border:1px solid var(--bd,#e7eef2);border-radius:9px;padding:7px 9px;margin-bottom:6px;cursor:grab;font-size:12.5px;}
   .ocard:active{cursor:grabbing;}
-  .ocard .nm{font-weight:600;}
-  .ocard .meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;}
+  .ocard .body{flex:1;min-width:0;}
+  .ocard .nm{font-weight:600;line-height:1.25;}
+  .ocard .meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px;align-items:center;}
   .otag{font-size:9.5px;border-radius:6px;padding:1px 6px;background:#eef2f6;color:#475569;}
   .otag.h{background:#193847;color:#fff;font-weight:700;}
+  .rbadge{font-size:9px;border-radius:6px;padding:1px 6px;background:#ede9fe;color:#6d28d9;font-weight:700;text-transform:capitalize;}
   .ohint{font-size:12px;color:#64748b;margin:0 0 12px;}
   .dchip2.on{outline:2px solid var(--accent,#185FA5);outline-offset:-1px;font-weight:600;}
+  .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
+  .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
+  .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
+  .omodal .sub{font-size:12px;color:#64748b;margin:0 0 6px;}
+  .osel{width:100%;padding:9px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;margin:10px 0;font-size:13px;background:var(--card,#fff);color:inherit;}
+  .obtns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+  .obtn{padding:8px 14px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+  .obtn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
+  .obtn.gho{color:#b91c1c;border-color:#fecaca;}
 </style></head><body>
 {{ mp.topbar('sitemap', 'ΕΣΤΙΑ — Οργανόγραμμα', 'Σύρε εργαζόμενο σε τμήμα → ανατίθεται τμήμα + ξενοδοχείο') }}
+
+{% macro initials(name) %}{% set p = (name or '?').split() %}{{ ((p[0][:1] if p else '?') ~ (p[1][:1] if p|length>1 else ''))|upper }}{% endmacro %}
+
+{% macro pcard(c, showh=false) %}
+<div class="ocard" draggable="true" ondragstart="drag(event)" data-uid="{{ c.id }}" data-name="{{ (c.name or '')|lower }}">
+  <span class="av sm">{{ initials(c.name) }}</span>
+  <div class="body">
+    <div class="nm">{{ c.name }}</div>
+    <div class="meta">
+      {% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}
+      {% if c.mgr %}<span class="rbadge">{{ c.role }}</span>{% endif %}
+      {% if showh and c.hcode %}<span class="otag h">{{ c.hcode }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
 <div class="container">
-  <p class="ohint"><i class="ti ti-info-circle"></i> Διάλεξε ξενοδοχείο, σύρε άτομα από το «Διαθέσιμο προσωπικό» πάνω σε ένα τμήμα — του ανατίθεται αυτόματα <b>τμήμα + ξενοδοχείο</b>. Σύρε πίσω στη λίστα για να το βγάλεις από το ξενοδοχείο.</p>
+  <p class="ohint"><i class="ti ti-info-circle"></i> Διάλεξε ξενοδοχείο, σύρε άτομα από το «Διαθέσιμο προσωπικό» πάνω σε ένα τμήμα — του ανατίθεται αυτόματα <b>τμήμα + ξενοδοχείο</b>. Σύρε πίσω στη λίστα για να το βγάλεις από το ξενοδοχείο. Όρισε <b>υπεύθυνο</b> σε κάθε τμήμα.</p>
   <div class="otabs">
     {% for h in hotels %}<a class="otab {{ 'on' if h.id==sel }}" href="/dashboard/org?hotel_id={{ h.id }}&embed=1">{{ hcodes.get(h.id) or '' }} · {{ h.name }}</a>{% endfor %}
   </div>
@@ -51,39 +86,50 @@
       <h3><i class="ti ti-users"></i> Διαθέσιμο προσωπικό <span class="cnt" style="margin-left:auto;">{{ pool|length }}</span></h3>
       <input class="ofilter" id="pf" placeholder="Αναζήτηση..." oninput="filt()">
       <div id="poollist">
-        {% for c in pool %}
-        <div class="ocard" draggable="true" ondragstart="drag(event)" data-uid="{{ c.id }}" data-name="{{ (c.name or '')|lower }}">
-          <div class="nm">{{ c.name }}</div>
-          <div class="meta">{% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}{% if c.hcode %}<span class="otag h">{{ c.hcode }}</span>{% endif %}</div>
-        </div>
-        {% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
+        {% for c in pool %}{{ pcard(c, true) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
       </div>
     </div>
 
     <div class="oboard">
       {% for d in columns %}
       <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
+        <div class="oacc" style="background:{{ d.color }};"></div>
         <h4><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span></h4>
-        {% for c in (bydept.get(d.id) or []) %}
-        <div class="ocard" draggable="true" ondragstart="drag(event)" data-uid="{{ c.id }}" data-name="{{ (c.name or '')|lower }}">
-          <div class="nm">{{ c.name }}</div>
-          <div class="meta">{% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}</div>
+        {% set sp = supmap.get(d.id) %}
+        <div class="osup">
+          {% if sp %}
+            <span class="av" title="Υπεύθυνος τμήματος">{{ initials(sp.name) }}</span>
+            <span class="lbl">{{ sp.name }}</span>
+            <span class="ed" onclick='openSup({{ d.id }}, {{ d.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-pencil"></i></span>
+          {% else %}
+            <span class="add" onclick='openSup({{ d.id }}, {{ d.name|tojson }})'><i class="ti ti-user-plus"></i> Υπεύθυνος</span>
+          {% endif %}
         </div>
-        {% endfor %}
+        {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
       {% endfor %}
       <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
+        <div class="oacc" style="background:#cbd5e1;"></div>
         <h4><i class="ti ti-help-circle" style="color:#94a3b8;"></i> Χωρίς τμήμα<span class="cnt">{{ (bydept.get(0)|length) if bydept.get(0) else 0 }}</span></h4>
-        {% for c in (bydept.get(0) or []) %}
-        <div class="ocard" draggable="true" ondragstart="drag(event)" data-uid="{{ c.id }}" data-name="{{ (c.name or '')|lower }}">
-          <div class="nm">{{ c.name }}</div>
-          <div class="meta">{% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}</div>
-        </div>
-        {% endfor %}
+        {% for c in (bydept.get(0) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
     </div>
   </div>
 </div>
+
+<div class="omodal" id="supModal">
+  <div class="box">
+    <h3><i class="ti ti-user-star"></i> Ορισμός υπευθύνου</h3>
+    <p class="sub" id="supTitle">Τμήμα</p>
+    <select class="osel" id="supSel"></select>
+    <div class="obtns">
+      <button class="obtn gho" onclick="clearSup()">Καθαρισμός</button>
+      <button class="obtn" onclick="closeSup()">Άκυρο</button>
+      <button class="obtn pri" onclick="saveSup()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
 <script>
 function drag(e){ e.dataTransfer.setData('uid', e.target.closest('.ocard').dataset.uid); }
 function allowDrop(e){ e.preventDefault(); e.currentTarget.classList.add('over'); }
@@ -117,5 +163,26 @@ function newDept(){
     body:JSON.stringify({name:name, color:color, hotel_id:SELHOTEL})})
     .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν δημιουργήθηκε'+(j&&j.msg?': '+j.msg:'')); });
 }
+var SUPCAND={{ sup_candidates|tojson }};
+var CURSUP={{ cursup|tojson }};
+var supDept=null;
+function openSup(did, dname){
+  supDept=did;
+  document.getElementById('supTitle').textContent='Τμήμα: '+dname;
+  var sel=document.getElementById('supSel');
+  sel.innerHTML='<option value="">— κανένας —</option>';
+  SUPCAND.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  sel.value = (CURSUP[did]!=null ? String(CURSUP[did]) : '');
+  document.getElementById('supModal').style.display='flex';
+}
+function closeSup(){ document.getElementById('supModal').style.display='none'; }
+function _saveSup(uid){
+  fetch('/dashboard/org/supervisor',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({hotel_id:SELHOTEL, department_id:supDept, user_id:(uid||'')})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); });
+}
+function saveSup(){ _saveSup(document.getElementById('supSel').value); }
+function clearSup(){ _saveSup(''); }
+document.getElementById('supModal').addEventListener('click', function(e){ if(e.target===this) closeSup(); });
 </script>
 </body></html>

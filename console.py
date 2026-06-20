@@ -252,6 +252,9 @@ def org_console():
         pii = piimap.get(u.id)
         return {'id': u.id, 'name': u.full_name or u.username,
                 'code': (pii.emp_code if pii else None),
+                'afm': (pii.afm if pii else None),
+                'role': u.role,
+                'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     allu = User.query.filter(User.is_active == True).order_by(User.full_name).all()
@@ -276,10 +279,30 @@ def org_console():
     # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
     enabled_set = enabled or set()
     available = [d for d in active_depts if d.id not in enabled_set]
+    # v12.167 — supervisors ανά τμήμα (owner-screen = οργανόγραμμα)
+    from schedule import HotelDepartment
+    umap = {u.id: u for u in allu}
+    supmap = {}      # dept_id -> {id,name,code}
+    cursup = {}      # dept_id -> user_id (για το JS)
+    for hd in HotelDepartment.query.filter_by(hotel_id=sel).all():
+        if hd.supervisor_user_id:
+            su = umap.get(hd.supervisor_user_id) or User.query.get(hd.supervisor_user_id)
+            if su:
+                sp = piimap.get(su.id)
+                supmap[hd.department_id] = {'id': su.id, 'name': su.full_name or su.username,
+                                            'code': (sp.emp_code if sp else None)}
+                cursup[hd.department_id] = su.id
+    # υποψήφιοι υπεύθυνοι = προσωπικό του ξενοδοχείου + managers/admin
+    cand = {}
+    for u in allu:
+        if getattr(u, 'home_hotel_id', None) == sel or role_rank(u.role) >= ROLE_RANK['manager']:
+            cand[u.id] = {'id': u.id, 'name': u.full_name or u.username}
+    sup_candidates = sorted(cand.values(), key=lambda x: (x['name'] or ''))
     return render_template('org.html', hotels=hotels, sel=sel, columns=columns,
                            bydept=bydept, pool=pool, hcodes=hcodes,
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
-                           configured=(enabled is not None))
+                           configured=(enabled is not None),
+                           supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])
 def org_dept_create():
@@ -352,4 +375,25 @@ def org_assign():
         pass
     db.session.commit()
     log_activity('org_assign', '#%d -> hotel=%s dept=%s' % (u.id, hid, did))
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/supervisor', methods=['POST'])
+def org_supervisor():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import HotelDepartment
+    d = request.json or {}
+    try:
+        hid = int(d['hotel_id']); did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    uid = d.get('user_id'); uid = int(uid) if uid else None
+    row = HotelDepartment.query.filter_by(hotel_id=hid, department_id=did).first()
+    if not row:
+        row = HotelDepartment(hotel_id=hid, department_id=did)   # ορισμός υπευθύνου ενεργοποιεί και το τμήμα
+        db.session.add(row)
+    row.supervisor_user_id = uid
+    db.session.commit()
+    log_activity('org_supervisor', 'hotel=%s dept=%s sup=%s' % (hid, did, uid))
     return jsonify(ok=True)

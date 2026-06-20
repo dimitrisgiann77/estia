@@ -92,6 +92,7 @@ class HotelDepartment(db.Model):
     id            = db.Column(db.Integer, primary_key=True)
     hotel_id      = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('department.id'), nullable=False)
+    supervisor_user_id = db.Column(db.Integer)   # v12.167 soft FK -> user.id· owner-screen=οργανόγραμμα
     __table_args__ = (db.UniqueConstraint('hotel_id', 'department_id', name='uq_hotel_dept'),)
 
 class ShiftType(db.Model):
@@ -225,6 +226,7 @@ def ensure_schedule_columns():
         _add_col('user', 'home_hotel_id',     'home_hotel_id INTEGER')
         _add_col('user', 'login_enabled',     'login_enabled BOOLEAN')
         _add_col('user', 'employment_active', 'employment_active BOOLEAN')
+        _add_col('hotel_department', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.167
         # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
         try:
             from sqlalchemy import text as _text
@@ -825,11 +827,14 @@ def validate_hotel_week(hotel_id, week_start):
 
 # ── ROUTE: Board (multi-week + πολλαπλά τμήματα δυναμικά) ──────────────────────
 def _depts_present(hotel_id):
-    """Τμήματα που έχουν εργαζόμενους στο ξενοδοχείο (για chips)."""
+    """v12.167 — Τμήματα του ξενοδοχείου = ό,τι ορίζει το οργανόγραμμα (HotelDepartment)
+    ∪ όσα έχουν ήδη άτομα. Κενά ρυθμισμένα τμήματα εμφανίζονται. Fallback: όλα τα ενεργά."""
     if not hotel_id:
         return Department.query.filter_by(active=True).order_by(Department.sort).all()
-    ids = {u.department_id for u in User.query.filter(User.is_active == True,
-            User.home_hotel_id == hotel_id, User.department_id != None).all()}
+    configured = {hd.department_id for hd in HotelDepartment.query.filter_by(hotel_id=hotel_id).all()}
+    present = {u.department_id for u in User.query.filter(User.is_active == True,
+               User.home_hotel_id == hotel_id, User.department_id != None).all()}
+    ids = configured | present
     if not ids:
         return Department.query.filter_by(active=True).order_by(Department.sort).all()
     return Department.query.filter(Department.id.in_(ids)).order_by(Department.sort, Department.name).all()
