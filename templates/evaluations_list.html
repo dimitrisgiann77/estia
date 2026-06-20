@@ -49,7 +49,8 @@ table tbody td{padding:10px;vertical-align:middle;}
   </div>
 
   <div class="card">
-    <table>
+    <div style="overflow-x:auto;">
+    <table style="min-width:920px;">
       <thead><tr><th>Κωδικός</th><th>Υπάλληλος</th><th>Τμήμα</th><th>Ερωτηματολόγιο</th><th>Ξενοδοχείο</th><th>Περίοδος</th><th>Ημ/νία</th><th>Βαθμός</th><th>Βαθμίδα</th><th>Κατάσταση</th><th></th></tr></thead>
       <tbody>
       {% for e in items %}
@@ -58,7 +59,7 @@ table tbody td{padding:10px;vertical-align:middle;}
         <td><a class="code" href="/dashboard/evaluations/employee/{{ e.employee_id }}?embed=1">{{ e.employee.full_name if e.employee else '—' }}</a> {{ lock_badge(e.employee) if e.employee }}</td>
         <td>{% if e.department_id %}<span class="tg">{{ dept_name(e.department_id) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if e.template %}<span class="tg">{{ e.template.name }}</span> <span class="tg lite">{{ e.template.scope if e.template.scope and e.template.scope!='general' else 'Γενικό' }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td>{% if e.hotel %}<span class="tg code">{{ hotel_code(e.hotel_id) }}</span> <span class="tg">{{ e.hotel.name }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if e.hotel %}<span class="tg code" title="{{ e.hotel.name }}">{{ hotel_code(e.hotel_id) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td>{% if e.period_label %}<span class="tg">{{ e.period_label }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
         <td class="muted">{{ (e.updated_at or e.created_at).strftime('%d/%m/%Y') if (e.updated_at or e.created_at) else '—' }}</td>
         <td class="ev-pct">{{ '%.0f%%'|format(e.score_pct) if e.score_pct is not none else '—' }}</td>
@@ -71,6 +72,7 @@ table tbody td{padding:10px;vertical-align:middle;}
       {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 <div id="evm" class="evm" onclick="if(event.target===this)closeEv()">
