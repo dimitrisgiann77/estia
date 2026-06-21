@@ -326,6 +326,19 @@ def org_console():
     # v12.171 — λωρίδα Διεύθυνσης (όσα τμήματα είναι μαρκαρισμένα is_leadership)
     lead_cols = [d for d in columns if getattr(d, 'is_leadership', False)]
     columns = [d for d in columns if not getattr(d, 'is_leadership', False)]
+    # v12.176 — ομαδοποίηση τμημάτων σε master groups
+    from schedule import DepartmentGroup
+    all_groups = DepartmentGroup.query.filter_by(active=True).order_by(DepartmentGroup.sort, DepartmentGroup.name).all()
+    gmap = {g.id: g for g in all_groups}
+    bucket = {}
+    ungrouped = []
+    for dcol in columns:
+        gid = getattr(dcol, 'group_id', None)
+        if gid and gid in gmap:
+            bucket.setdefault(gid, []).append(dcol)
+        else:
+            ungrouped.append(dcol)
+    grouped = [{'group': g, 'cols': bucket[g.id]} for g in all_groups if g.id in bucket]
     # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
     enabled_set = enabled or set()
     available = [d for d in active_depts if d.id not in enabled_set]
@@ -353,7 +366,8 @@ def org_console():
                            bydept=bydept, pool=pool, hcodes=hcodes,
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
                            configured=(enabled is not None),
-                           lead_cols=lead_cols, supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
+                           lead_cols=lead_cols, grouped=grouped, ungrouped=ungrouped, all_groups=all_groups,
+                           supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])
 def org_dept_create():
@@ -529,4 +543,76 @@ def org_dept_reorder():
             pass
     db.session.commit()
     log_activity('org_dept_reorder', '%d depts' % len(order))
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/group/save', methods=['POST'])
+def org_group_save():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import DepartmentGroup
+    d = request.json or {}
+    gid = d.get('group_id'); gid = int(gid) if gid else None
+    name = (d.get('name') or '').strip()[:60]
+    color = (d.get('color') or '').strip()[:9]
+    if gid:
+        g = DepartmentGroup.query.get(gid)
+        if not g:
+            return jsonify(ok=False, msg='not found'), 404
+        if name:
+            g.name = name
+        if color:
+            g.color = color
+    else:
+        if not name:
+            return jsonify(ok=False, msg='Όνομα;'), 400
+        g = DepartmentGroup.query.filter(db.func.lower(DepartmentGroup.name) == name.lower(), DepartmentGroup.active == True).first()
+        if not g:
+            mx = db.session.query(db.func.max(DepartmentGroup.sort)).scalar() or 0
+            g = DepartmentGroup(name=name, name_en=name, color=color or '#64748b', active=True, sort=mx + 1)
+            db.session.add(g)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify(ok=False, msg='Υπάρχει ήδη ομάδα με αυτό το όνομα.'), 400
+    log_activity('org_group_save', '%s' % (g.id))
+    return jsonify(ok=True, id=g.id, name=g.name, color=g.color)
+
+@app.route('/dashboard/org/group/delete', methods=['POST'])
+def org_group_delete():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import DepartmentGroup, Department
+    d = request.json or {}
+    try:
+        gid = int(d['group_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    g = DepartmentGroup.query.get(gid)
+    if not g:
+        return jsonify(ok=False, msg='not found'), 404
+    for dep in Department.query.filter(Department.group_id == gid).all():
+        dep.group_id = None
+    g.active = False
+    db.session.commit()
+    log_activity('org_group_delete', str(gid))
+    return jsonify(ok=True)
+
+@app.route('/dashboard/org/dept/setgroup', methods=['POST'])
+def org_dept_setgroup():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department
+    d = request.json or {}
+    try:
+        did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    dep = Department.query.get(did)
+    if not dep:
+        return jsonify(ok=False, msg='not found'), 404
+    gid = d.get('group_id'); dep.group_id = int(gid) if gid else None
+    db.session.commit()
+    log_activity('org_dept_setgroup', 'dept=%s group=%s' % (did, dep.group_id))
     return jsonify(ok=True)

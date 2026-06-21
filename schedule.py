@@ -77,6 +77,15 @@ def monday_of(d):
 
 
 # ── ΜΟΝΤΕΛΑ ───────────────────────────────────────────────────────────────────
+class DepartmentGroup(db.Model):
+    """v12.176 — master group τμημάτων (Κουζίνες/F&B/Όροφοι...). Single source· adjustable."""
+    id      = db.Column(db.Integer, primary_key=True)
+    name    = db.Column(db.String(60), unique=True, nullable=False)
+    name_en = db.Column(db.String(60))
+    color   = db.Column(db.String(9), default='#64748b')
+    active  = db.Column(db.Boolean, default=True)
+    sort    = db.Column(db.Integer, default=0)
+
 class Department(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     name      = db.Column(db.String(60), unique=True, nullable=False)
@@ -86,6 +95,7 @@ class Department(db.Model):
     active    = db.Column(db.Boolean, default=True)
     sort      = db.Column(db.Integer, default=0)
     is_leadership = db.Column(db.Boolean, default=False)   # v12.171 — λωρίδα Διεύθυνσης
+    group_id  = db.Column(db.Integer)   # v12.176 soft FK -> department_group.id
 
 class HotelDepartment(db.Model):
     """v12.166 — ποια (κοινά) τμήματα έχει κάθε ξενοδοχείο. Single source· προσθετικό.
@@ -229,6 +239,7 @@ def ensure_schedule_columns():
         _add_col('user', 'employment_active', 'employment_active BOOLEAN')
         _add_col('hotel_department', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.167
         _add_col('department', 'is_leadership', 'is_leadership BOOLEAN')  # v12.171
+        _add_col('department', 'group_id', 'group_id INTEGER')  # v12.176
         # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
         try:
             from sqlalchemy import text as _text
