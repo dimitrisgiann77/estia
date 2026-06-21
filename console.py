@@ -407,7 +407,7 @@ def org_console():
 
 @app.route('/dashboard/org/chart')
 def org_chart():
-    """v12.185 — Κλασική (δεντρική) όψη οργανογράμματος, read-only. Ξεν.→Ομάδες→Τμήματα→Θέσεις→Άτομα."""
+    """v12.186 — Κλασική (δεντρική) όψη οργανογράμματος, read-only. Polished: avatars + κάρτες υπευθύνων."""
     if not is_admin():
         return redirect(url_for('login'))
     from schedule import Department, DepartmentGroup, HotelDepartment, JobPosition
@@ -416,6 +416,16 @@ def org_chart():
     hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     sel = request.args.get('hotel_id', type=int) or (hotels[0].id if hotels else None)
     hotel = Hotel.query.get(sel) if sel else None
+
+    _AVC = ['#0f766e', '#7c3aed', '#0284c7', '#16a34a', '#db2777', '#ca8a04',
+            '#dc2626', '#2563eb', '#9333ea', '#0891b2', '#ea580c', '#4f46e5']
+    def _avatar(u):
+        name = (u.full_name or u.username or '?').strip()
+        parts = [p for p in name.replace('.', ' ').replace('-', ' ').split() if p]
+        ini = (parts[0][:1] + parts[1][:1]) if len(parts) >= 2 else name[:2]
+        color = _AVC[sum(ord(ch) for ch in name) % len(_AVC)]
+        return {'name': name, 'avatar': getattr(u, 'avatar', None), 'initials': ini.upper(), 'color': color}
+
     posmap = {}
     try:
         from payroll import MgmtAssignment
@@ -442,7 +452,8 @@ def org_chart():
         return {'id': u.id, 'name': u.full_name or u.username,
                 'code': (pii.emp_code if pii else None),
                 'role': u.role, 'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
-                'pos': (jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id))}
+                'pos': (jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id)),
+                'av': _avatar(u)}
 
     bydept = {}
     for u in User.query.filter(User.is_active == True).order_by(User.full_name).all():
@@ -459,13 +470,13 @@ def org_chart():
     _gs = {g.supervisor_user_id for g in all_groups if getattr(g, 'supervisor_user_id', None)}
     if _gs:
         for su in User.query.filter(User.id.in_(_gs)).all():
-            gsup[su.id] = su.full_name or su.username
+            gsup[su.id] = _avatar(su)
     dsup = {}
     for hd in HotelDepartment.query.filter_by(hotel_id=sel).all():
         if hd.supervisor_user_id:
             su = User.query.get(hd.supervisor_user_id)
             if su:
-                dsup[hd.department_id] = su.full_name or su.username
+                dsup[hd.department_id] = _avatar(su)
 
     cols = [dmap[i] for i in base_ids if i in dmap and getattr(dmap[i], 'active', True)]
     lead = [d for d in cols if getattr(d, 'is_leadership', False)]
@@ -497,17 +508,19 @@ def org_chart():
         return {'type': 'dept', 'id': d.id, 'name': d.name, 'color': d.color or '#64748b',
                 'sup': dsup.get(d.id), 'count': len(ppl), 'positions': positions, 'lead': is_lead}
 
-    def group_node(g):
-        kids = [group_node(c) for c in children_of.get(g.id, [])]
+    def group_node(g, depth=0):
+        kids = [group_node(c, depth + 1) for c in children_of.get(g.id, [])]
         kids = [k for k in kids if k]
         depts = [dept_node(d) for d in dept_by_group.get(g.id, [])]
         if not kids and not depts:
             return None
+        dn = len(depts) + sum(k['depts_n'] for k in kids)
+        pn = sum(d['count'] for d in depts) + sum(k['people_n'] for k in kids)
         return {'type': 'group', 'id': g.id, 'name': g.name, 'color': g.color or '#185FA5',
-                'sup': gsup.get(getattr(g, 'supervisor_user_id', None)),
-                'children': kids, 'depts': depts}
+                'sup': gsup.get(getattr(g, 'supervisor_user_id', None)), 'depth': depth,
+                'children': kids, 'depts': depts, 'depts_n': dn, 'people_n': pn}
 
-    roots = [group_node(g) for g in children_of.get(0, [])]
+    roots = [group_node(g, 0) for g in children_of.get(0, [])]
     roots = [r for r in roots if r]
     lead_nodes = [dept_node(d, True) for d in lead]
     ungrouped_nodes = [dept_node(d) for d in ungrouped]
@@ -516,7 +529,9 @@ def org_chart():
                                 'sup': None, 'count': len(bydept[0]),
                                 'positions': [{'name': None, 'people': bydept[0]}], 'lead': False})
     total = sum(len(v) for v in bydept.values())
+    total_depts = len(lead_nodes) + len(ungrouped_nodes) + sum(r['depts_n'] for r in roots)
     return render_template('org_chart.html', hotels=hotels, sel=sel, hotel=hotel,
+                           hcode=hcodes.get(sel), total_depts=total_depts,
                            roots=roots, lead_nodes=lead_nodes, ungrouped_nodes=ungrouped_nodes, total=total)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])

@@ -1,66 +1,94 @@
 {% import '_monitoring.html' as mp %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Κλασικό οργανόγραμμα', theme.primary if theme else '#193847') }}
 <style>
-  .chcard{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:14px;margin-bottom:16px;}
-  .htabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
-  .htab{font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;font-weight:600;}
-  .htab.on{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
   .sbtn{cursor:pointer;font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
   .sbtn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
-  .chartwrap{overflow-x:auto;padding:10px 4px 18px;}
-  /* ── κλασικό δέντρο (nested ul connectors) ── */
-  .orgtree{padding-top:0;}
-  .orgtree, .orgtree ul{position:relative;text-align:center;list-style:none;margin:0;padding:0;}
-  .orgtree ul{padding-top:22px;}
-  .orgtree li{display:inline-block;vertical-align:top;text-align:center;list-style:none;position:relative;padding:22px 8px 0 8px;}
-  .orgtree li::before, .orgtree li::after{content:'';position:absolute;top:0;right:50%;border-top:2px solid var(--bd,#cbd5e1);width:50%;height:22px;}
-  .orgtree li::after{right:auto;left:50%;border-left:2px solid var(--bd,#cbd5e1);}
-  .orgtree li:only-child::after, .orgtree li:only-child::before{display:none;}
-  .orgtree li:only-child{padding-top:0;}
-  .orgtree li:first-child::before, .orgtree li:last-child::after{border:0 none;}
-  .orgtree li:last-child::before{border-right:2px solid var(--bd,#cbd5e1);border-radius:0 7px 0 0;}
-  .orgtree li:first-child::after{border-radius:7px 0 0 0;}
-  .orgtree ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid var(--bd,#cbd5e1);height:22px;}
-  .orgtree > li{padding-top:0;}
-  .onode{display:inline-block;min-width:138px;max-width:230px;padding:8px 11px;border:1px solid var(--bd,#e2e8f0);border-top-width:3px;border-radius:10px;background:var(--card,#fff);text-align:left;box-shadow:0 1px 3px rgba(15,23,42,.06);white-space:normal;}
-  .onode .ntype{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:700;}
-  .onode .nttl{font-weight:700;font-size:13px;color:var(--navy,#193847);line-height:1.25;}
-  .onode .nsup{font-size:11px;color:var(--accent,#185FA5);margin-top:2px;display:flex;align-items:center;gap:3px;}
-  .onode .ncnt{font-size:10.5px;color:#94a3b8;margin-top:1px;}
-  .onode.groupnode{background:var(--soft,#f8fafc);}
-  html[data-theme="dark"] .onode.groupnode{background:#16212e;}
-  .onode.hotelnode{background:var(--accent,#185FA5);border-color:transparent;text-align:center;min-width:170px;}
-  .onode.hotelnode .nttl{color:#fff;font-size:15px;}
-  .onode.hotelnode .ncnt{color:#dbeafe;}
-  .onode.leadnode{background:#fffbeb;}
-  html[data-theme="dark"] .onode.leadnode{background:#2a2412;}
-  .npos{font-size:9.5px;font-weight:700;color:#64748b;margin-top:6px;text-transform:uppercase;letter-spacing:.3px;border-top:1px dashed var(--bd,#e2e8f0);padding-top:4px;}
-  .nper{font-size:11.5px;padding:1px 0;display:flex;gap:4px;align-items:baseline;}
-  .nper .c{color:#94a3b8;font-size:10px;}
-  .nper.mgr .nm{font-weight:700;}
-  .legend{font-size:11.5px;color:#64748b;display:flex;gap:14px;flex-wrap:wrap;margin-top:4px;}
-  .legend span{display:inline-flex;align-items:center;gap:5px;}
-  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block;}
-  @media print{.htabs,.toolbar,.topbar,.bnav{display:none !important;} .chartwrap{overflow:visible;}}
+  .htabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+  .htab{font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;font-weight:600;}
+  .htab.on{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
+  .chcard{background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:14px;padding:12px;margin-bottom:14px;}
+  .wrap{overflow-x:auto;padding:6px 4px 14px;}
+  .tree,.tree ul{position:relative;text-align:center;list-style:none;margin:0;padding:0;}
+  .tree ul{padding-top:26px;}
+  .tree li{display:inline-block;vertical-align:top;text-align:center;position:relative;padding:26px 10px 0;}
+  .tree li::before,.tree li::after{content:'';position:absolute;top:0;right:50%;border-top:2px solid var(--bd,#d8e0e8);width:50%;height:26px;}
+  .tree li::after{right:auto;left:50%;border-left:2px solid var(--bd,#d8e0e8);}
+  .tree li:only-child::after,.tree li:only-child::before{display:none;}
+  .tree li:only-child{padding-top:0;}
+  .tree li:first-child::before,.tree li:last-child::after{border:0 none;}
+  .tree li:last-child::before{border-right:2px solid var(--bd,#d8e0e8);border-radius:0 8px 0 0;}
+  .tree li:first-child::after{border-radius:8px 0 0 0;}
+  .tree ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid var(--bd,#d8e0e8);height:26px;}
+  .tree>li{padding-top:0;}
+  .card{display:inline-block;width:210px;background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:14px;text-align:left;box-shadow:0 2px 5px rgba(15,23,42,.05),0 1px 2px rgba(15,23,42,.04);overflow:hidden;transition:transform .12s,box-shadow .12s;}
+  .card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,23,42,.10);}
+  .bar{height:5px;}
+  .pad{padding:10px 12px 12px;}
+  .lbl{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#9aa7b5;}
+  .ttl{font-weight:750;font-size:13.5px;color:var(--navy,#16324a);line-height:1.2;margin-top:1px;}
+  .pill{float:right;font-size:10px;font-weight:700;color:#5b6b7b;background:var(--soft,#f1f5f9);border-radius:20px;padding:2px 8px;margin-top:-1px;}
+  .head{display:flex;align-items:center;gap:8px;margin-top:9px;padding:6px;background:var(--soft,#f7fafc);border-radius:10px;}
+  .head .hn{font-size:12px;font-weight:700;color:var(--navy,#16324a);line-height:1.15;}
+  .head .hr{font-size:9.5px;color:#8a98a6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+  .av{flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;letter-spacing:.3px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);background-size:cover;background-position:center;}
+  .pos{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#9aa7b5;margin:10px 0 4px;display:flex;align-items:center;gap:6px;}
+  .pos::after{content:'';flex:1;height:1px;background:var(--bd,#eef2f6);}
+  .per{display:flex;align-items:center;gap:7px;padding:3px 2px;border-radius:8px;}
+  .per:hover{background:var(--soft,#f7fafc);}
+  .per .pn{font-size:12px;color:#33414f;}
+  .per .pc{font-size:9.5px;color:#aab4be;margin-left:auto;}
+  .per.mgr .pn{font-weight:750;color:var(--navy,#16324a);}
+  .star{color:#e0a106;font-size:10px;}
+  .hotel{width:232px;background:var(--accent,#185FA5);border:0;color:#fff;text-align:center;}
+  .hotel .ttl{color:#fff;font-size:16px;}
+  .hotel .code{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 10px;margin-bottom:5px;}
+  .hotel .meta{color:#dbeafe;font-size:11px;margin-top:3px;}
+  .group{width:190px;}
+  .grpcount{font-size:10.5px;color:#94a3b8;margin-top:4px;}
+  .leadcard .head{background:#fff7ed;}
+  html[data-theme="dark"] .leadcard .head{background:#2a2412;}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;padding:8px 10px;font-size:11.5px;color:#64748b;background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:10px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  @media print{.htabs,.toolbar,.topbar,.bnav{display:none !important;} .wrap{overflow:visible;} .card{box-shadow:none;}}
 </style></head><body>
-{{ mp.topbar('chart', 'ΕΣΤΙΑ — Κλασικό οργανόγραμμα', 'Δεντρική όψη: Ξενοδοχείο → Ομάδες → Τμήματα → Θέσεις → Άτομα') }}
+{{ mp.topbar('chart', 'ΕΣΤΙΑ — Κλασικό οργανόγραμμα', 'Ξενοδοχείο → Ομάδες → Τμήματα → Θέσεις → Άτομα') }}
 
 {% set emb = '&embed=1' if request.args.get('embed') else '' %}
+{% macro avatar(av, size) %}
+  {%- if av.avatar -%}<span class="av" style="width:{{ size }}px;height:{{ size }}px;background-image:url('{{ av.avatar }}');"></span>
+  {%- else -%}<span class="av" style="width:{{ size }}px;height:{{ size }}px;background:{{ av.color }};font-size:{{ (size*0.36)|int }}px;">{{ av.initials }}</span>{%- endif -%}
+{% endmacro %}
+
+{% macro headrow(av, role) %}
+<div class="head">{{ avatar(av, 30) }}<div><div class="hn">{{ av.name }}</div><div class="hr">{{ role }}</div></div></div>
+{% endmacro %}
+
 {% macro node(n) %}
 <li>
-  <div class="onode {{ n.type }}node {% if n.lead %}leadnode{% endif %}" style="border-top-color:{{ n.color }};">
-    <div class="ntype">{% if n.type=='group' %}Ομάδα{% elif n.lead %}Διεύθυνση{% else %}Τμήμα{% endif %}</div>
-    <div class="nttl">{{ n.name }}</div>
-    {% if n.sup %}<div class="nsup"><i class="ti ti-user-star"></i> {{ n.sup }}</div>{% endif %}
-    {% if n.type=='dept' %}
-      <div class="ncnt">{{ n.count }} {{ 'άτομο' if n.count==1 else 'άτομα' }}</div>
-      {% for pos in n.positions %}
-        {% if pos.name %}<div class="npos">{{ pos.name }}</div>{% elif n.positions|length > 1 %}<div class="npos">— χωρίς θέση —</div>{% endif %}
-        {% for p in pos.people %}<div class="nper {{ 'mgr' if p.mgr }}"><span class="nm">{{ p.name }}</span>{% if p.code %}<span class="c">#{{ p.code }}</span>{% endif %}</div>{% endfor %}
+  {% if n.type == 'group' %}
+  <div class="card group"><div class="bar" style="background:{{ n.color }};"></div><div class="pad">
+    <div class="lbl">{% if n.depth and n.depth > 0 %}Υποομάδα{% else %}Ομάδα{% endif %}</div>
+    <div class="ttl">{{ n.name }}</div>
+    {% if n.sup %}{{ headrow(n.sup, 'Υπεύθυνος ομάδας') }}{% endif %}
+    <div class="grpcount">{{ n.depts_n }} {{ 'τμήμα' if n.depts_n==1 else 'τμήματα' }} · {{ n.people_n }} {{ 'άτομο' if n.people_n==1 else 'άτομα' }}</div>
+  </div></div>
+  {% else %}
+  <div class="card {{ 'leadcard' if n.lead }}"><div class="bar" style="background:{{ n.color }};"></div><div class="pad">
+    <span class="pill">{{ n.count }}</span>
+    <div class="lbl">{% if n.lead %}Διεύθυνση{% else %}Τμήμα{% endif %}</div>
+    <div class="ttl">{{ n.name }}</div>
+    {% if n.sup %}{{ headrow(n.sup, 'Υπεύθυνος τμήματος') }}{% endif %}
+    {% for pos in n.positions %}
+      {% if pos.name %}<div class="pos">{{ pos.name }}</div>{% elif n.positions|length > 1 %}<div class="pos">Χωρίς θέση</div>{% endif %}
+      {% for p in pos.people %}
+      <div class="per {{ 'mgr' if p.mgr }}">{{ avatar(p.av, 22) }}<span class="pn">{{ p.name }}{% if p.mgr %} <span class="star">★</span>{% endif %}</span>{% if p.code %}<span class="pc">#{{ p.code }}</span>{% endif %}</div>
       {% endfor %}
-    {% endif %}
-  </div>
+    {% endfor %}
+    {% if n.count == 0 %}<div class="grpcount" style="margin-top:8px;">— χωρίς προσωπικό —</div>{% endif %}
+  </div></div>
+  {% endif %}
   {% set kids = (n.children or []) + (n.depts or []) %}
   {% if kids %}<ul>{% for k in kids %}{{ node(k) }}{% endfor %}</ul>{% endif %}
 </li>
@@ -80,23 +108,24 @@
   <div class="chcard">
     {% set tops = lead_nodes + roots + ungrouped_nodes %}
     {% if tops %}
-    <div class="chartwrap">
-      <ul class="orgtree">
+    <div class="wrap">
+      <ul class="tree">
         <li>
-          <div class="onode hotelnode" style="border-top-color:#0b3d63;">
-            <div class="nttl">{{ hotel.name if hotel else 'Ξενοδοχείο' }}</div>
-            <div class="ncnt">{{ total }} άτομα συνολικά</div>
-          </div>
+          <div class="card hotel"><div class="bar" style="background:#0b3d63;"></div><div class="pad" style="text-align:center;">
+            {% if hcode %}<span class="code">{{ hcode }}</span>{% endif %}
+            <div class="ttl">{{ hotel.name if hotel else 'Ξενοδοχείο' }}</div>
+            <div class="meta">{{ total }} άτομα · {{ total_depts }} {{ 'τμήμα' if total_depts==1 else 'τμήματα' }}</div>
+          </div></div>
           <ul>{% for n in tops %}{{ node(n) }}{% endfor %}</ul>
         </li>
       </ul>
     </div>
     <div class="legend">
-      <span><span class="swatch" style="background:#185FA5;"></span> Ξενοδοχείο</span>
-      <span><span class="swatch" style="background:#f8fafc;border:1px solid #cbd5e1;"></span> Ομάδα</span>
-      <span><span class="swatch" style="background:#fffbeb;border:1px solid #fde68a;"></span> Διεύθυνση</span>
-      <span><i class="ti ti-user-star" style="color:#185FA5;"></i> Υπεύθυνος</span>
-      <span><b>Έντονα</b> = manager/admin</span>
+      <span><span class="dot" style="background:#185FA5;"></span> Ξενοδοχείο</span>
+      <span><span class="dot" style="background:#7c3aed;"></span> Ομάδα / Υποομάδα</span>
+      <span><span class="dot" style="background:#d97706;"></span> Διεύθυνση</span>
+      <span><span class="dot" style="background:#16a34a;"></span> Τμήμα</span>
+      <span>★ = manager · #κωδικός μητρώου</span>
     </div>
     {% else %}
     <div style="color:#94a3b8;font-size:13px;padding:24px;text-align:center;"><i class="ti ti-sitemap"></i> Δεν υπάρχουν ανατεθειμένα τμήματα/προσωπικό για αυτό το ξενοδοχείο.<br>Όρισε τμήματα από τη <a href="/dashboard/org?embed={{ 1 if request.args.get('embed') else 0 }}">διαχείριση οργανογράμματος</a>.</div>
