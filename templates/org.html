@@ -54,6 +54,9 @@
   .ogroup-ttl.muted{color:#94a3b8;font-weight:600;}
   .gedit{cursor:pointer;color:#cbd5e1;font-size:12px;}
   .gedit:hover{color:var(--accent,#185FA5);}
+  .gchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:20px;user-select:none;}
+  .gchip .gp{cursor:pointer;color:#94a3b8;font-size:11px;}
+  .gchip .gp:hover{color:var(--accent,#185FA5);}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
@@ -123,6 +126,22 @@
       </span>
       {% endfor %}
       <span onclick="newDept()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέο τμήμα</span>
+    </div>
+  </div>
+
+  <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-layout-grid"></i> Ομάδες (master groups)</b>
+      <span class="muted" style="font-size:11.5px;">κοινές για όλα τα ξενοδοχεία· βάλε τμήμα σε ομάδα από το ✎ του τμήματος</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+      {% for g in all_groups %}
+      <span class="gchip" style="border:1px solid {{ g.color }}66;background:{{ g.color }}1a;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ g.color }};"></span>{{ g.name }}
+        <span class="gp" onclick='editGroup({{ g.id }}, {{ g.name|tojson }}, {{ g.color|tojson }})' title="Επεξεργασία/διαγραφή"><i class="ti ti-pencil"></i></span>
+      </span>
+      {% else %}<span class="muted" style="font-size:12px;color:#94a3b8;">— καμία ομάδα ακόμη —</span>{% endfor %}
+      <span onclick="newGroup()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέα ομάδα</span>
     </div>
   </div>
 
@@ -279,6 +298,8 @@ function editDept(id,name,color,gid){ curDept=id;
   document.getElementById('deptModal').style.display='flex';
 }
 function _gpost(url,body){ return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
+function newGroup(){ var nm=prompt('Όνομα νέας ομάδας:'); if(!nm)return; var col=prompt('Χρώμα (hex, π.χ. #7c3aed):','#64748b')||'#64748b';
+  _gpost('/dashboard/org/group/save',{name:nm,color:col}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν δημιουργήθηκε'); }); }
 function editGroup(id,name,color){
   var nm=prompt('Όνομα ομάδας (άδειο = διαγραφή):', name||'');
   if(nm===null) return;
