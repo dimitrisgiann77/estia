@@ -299,6 +299,12 @@ def org_console():
                 posmap[ma.user_id] = ma.position
     except Exception:
         pass
+    jpmap = {}
+    try:
+        from schedule import JobPosition as _JP
+        jpmap = {p.id: p.name for p in _JP.query.all()}
+    except Exception:
+        pass
     active_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     dmap = {d.id: d for d in Department.query.all()}   # active+inactive (για ασφαλή εμφάνιση)
     hcodes = _hotel_codes()
@@ -311,7 +317,8 @@ def org_console():
                 'role': u.role,
                 'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
                 'avatar': getattr(u, 'avatar', None),
-                'pos': posmap.get(u.id),
+                'pos': (jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id)),
+                'pos_id': getattr(u, 'position_id', None),
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     # v12.173 (#7) — στήλες = ΜΟΝΟ τα επιλεγμένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί)
@@ -708,4 +715,24 @@ def org_position_delete():
     p.active = False
     db.session.commit()
     log_activity('org_position_delete', str(pid))
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/person/setposition', methods=['POST'])
+def org_person_setposition():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    d = request.json or {}
+    try:
+        uid = int(d['user_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    u = User.query.get(uid)
+    if not u:
+        return jsonify(ok=False, msg='not found'), 404
+    pid = d.get('position_id')
+    if hasattr(u, 'position_id'):
+        u.position_id = int(pid) if pid else None
+    db.session.commit()
+    log_activity('org_setposition', 'user=%s pos=%s' % (uid, pid))
     return jsonify(ok=True)

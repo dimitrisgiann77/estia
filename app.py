@@ -331,11 +331,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.178'
-APP_BUILD   = '459'
+APP_VERSION = '12.179'
+APP_BUILD   = '460'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.179', 'b': '460', 'date': '21/06/2026', 'time': '11:35', 'title': 'Οργανόγραμμα: ανάθεση θέσης ανά εργαζόμενο',
+     'items': ['Κλικ στην ετικέτα θέσης μιας κάρτας (ή στο «+ θέση») → διαλέγεις τη θέση του εργαζομένου από τον κατάλογο. Το οργανόγραμμα κρατά πλέον τη θέση κάθε ατόμου.', 'Αν δεν έχεις ορίσει θέση χειροκίνητα, εμφανίζεται αυτόματα η θέση από τα δεδομένα του προσωπικού (Management).']},
     {'v': '12.178', 'b': '459', 'date': '21/06/2026', 'time': '11:10', 'title': 'Οργανόγραμμα: θέσεις εργασίας (από το προσωπικό)',
      'items': ['Νέα μπάρα «Θέσεις εργασίας» με κουμπί «Δημιουργία από προσωπικό»: φτιάχνει αυτόματα τον κατάλογο θέσεων (Chef/Μάγειρας/Σερβιτόρος…) από τις θέσεις που ήδη έχει το προσωπικό. Μετά τις επεξεργάζεσαι/σβήνεις (adjustable).', 'Η θέση του καθενός εμφανίζεται πλέον ως ετικέτα πάνω στην κάρτα του στο οργανόγραμμα.', 'Επόμενο: χειροκίνητη ανάθεση θέσης ανά άτομο + σύνδεση θέσεων με ομάδες (το τυπικό οργανόγραμμα).']},
     {'v': '12.178', 'b': '459', 'date': '21/06/2026', 'time': '11:10', 'title': 'Οργανόγραμμα: θέσεις εργασίας (από το προσωπικό)',
@@ -1081,6 +1083,7 @@ class User(db.Model):
     subunit           = db.Column(db.String(20))
     home_hotel_id     = db.Column(db.Integer)
     import_hotel_id   = db.Column(db.Integer)   # v12.170 — πρόταση Epsilon (πίνακας διαφωνιών)
+    position_id       = db.Column(db.Integer)   # v12.179 soft FK -> job_position.id (org-owned θέση)
     login_enabled     = db.Column(db.Boolean)
     employment_active = db.Column(db.Boolean)
     is_active  = db.Column(db.Boolean, default=True)
@@ -3789,6 +3792,7 @@ def ensure_columns():
     _add_col('user', 'subunit', 'subunit VARCHAR(20)')
     _add_col('user', 'home_hotel_id', 'home_hotel_id INTEGER')
     _add_col('user', 'import_hotel_id', 'import_hotel_id INTEGER')  # v12.170
+    _add_col('user', 'position_id', 'position_id INTEGER')  # v12.179
     _add_col('user', 'login_enabled', 'login_enabled BOOLEAN')
     _add_col('user', 'employment_active', 'employment_active BOOLEAN')
 

@@ -57,7 +57,8 @@
   .gchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:20px;user-select:none;}
   .gchip .gp{cursor:pointer;color:#94a3b8;font-size:11px;}
   .gchip .gp:hover{color:var(--accent,#185FA5);}
-  .ptag{font-size:9px;border-radius:6px;padding:1px 6px;background:#e0f2fe;color:#075985;font-weight:600;}
+  .ptag{font-size:9px;border-radius:6px;padding:1px 6px;background:#e0f2fe;color:#075985;font-weight:600;cursor:pointer;}
+  .ptag-add{background:transparent;border:1px dashed #cbd5e1;color:#94a3b8;}
   html[data-theme="dark"] .ptag{background:#0c2a3a;color:#7dd3fc;}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
@@ -80,7 +81,7 @@
     <div class="nm">{{ c.name }}</div>
     <div class="meta">
       {% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}
-      {% if c.pos %}<span class="ptag">{{ c.pos }}</span>{% endif %}
+      {% if c.pos %}<span class="ptag" title="Αλλαγή θέσης" onclick="event.stopPropagation();setPos({{ c.id }},{{ c.pos_id or 0 }})">{{ c.pos }}</span>{% else %}<span class="ptag ptag-add" title="Ορισμός θέσης" onclick="event.stopPropagation();setPos({{ c.id }},0)">+ θέση</span>{% endif %}
       {% if c.mgr %}<span class="rbadge">{{ c.role }}</span>{% endif %}
       {% if showh and c.hcode %}<span class="otag h">{{ c.hcode }}</span>{% endif %}
     </div>
@@ -226,6 +227,21 @@
   </div>
 </div>
 
+<div class="omodal" id="posModal">
+  <div class="box">
+    <h3><i class="ti ti-briefcase"></i> Θέση εργαζομένου</h3>
+    <p class="sub" id="posTitle">Διάλεξε θέση από τον κατάλογο.</p>
+    <select class="osel" id="posSel">
+      <option value="">— καμία —</option>
+      {% for p in all_positions %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+    </select>
+    <div class="obtns">
+      <button class="obtn" onclick="closePos()">Άκυρο</button>
+      <button class="obtn pri" onclick="savePos()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
 <div class="omodal" id="deptModal">
   <div class="box">
     <h3><i class="ti ti-edit"></i> Επεξεργασία τμήματος</h3>
@@ -356,6 +372,11 @@ function deleteDept(){
     .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν διαγράφηκε'); });
 }
 document.getElementById('deptModal').addEventListener('click', function(e){ if(e.target===this) closeDept(); });
+var posUid=null;
+function setPos(uid,pid){ posUid=uid; document.getElementById('posSel').value=(pid?String(pid):''); document.getElementById('posModal').style.display='flex'; }
+function closePos(){ document.getElementById('posModal').style.display='none'; }
+function savePos(){ _gpost('/dashboard/org/person/setposition',{user_id:posUid, position_id:document.getElementById('posSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); }); }
+document.getElementById('posModal').addEventListener('click', function(e){ if(e.target===this) closePos(); });
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>
