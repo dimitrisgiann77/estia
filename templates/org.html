@@ -81,7 +81,7 @@
     <div class="nm">{{ c.name }}</div>
     <div class="meta">
       {% if c.code %}<span class="otag">#{{ c.code }}</span>{% endif %}
-      {% if c.pos %}<span class="ptag" title="Αλλαγή θέσης" onclick="event.stopPropagation();setPos({{ c.id }},{{ c.pos_id or 0 }})">{{ c.pos }}</span>{% else %}<span class="ptag ptag-add" title="Ορισμός θέσης" onclick="event.stopPropagation();setPos({{ c.id }},0)">+ θέση</span>{% endif %}
+      {% if c.pos %}<span class="ptag" title="Αλλαγή θέσης" onclick="event.stopPropagation();setPos({{ c.id }},{{ c.pos_id or 0 }},{{ c.dept_group_id or 0 }})">{{ c.pos }}</span>{% else %}<span class="ptag ptag-add" title="Ορισμός θέσης" onclick="event.stopPropagation();setPos({{ c.id }},0,{{ c.dept_group_id or 0 }})">+ θέση</span>{% endif %}
       {% if c.mgr %}<span class="rbadge">{{ c.role }}</span>{% endif %}
       {% if showh and c.hcode %}<span class="otag h">{{ c.hcode }}</span>{% endif %}
     </div>
@@ -159,7 +159,7 @@
       {% for p in all_positions %}
       <span class="gchip" style="border:1px solid {{ p.color }}66;background:{{ p.color }}1a;">
         <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ p.color }};"></span>{{ p.name }}
-        <span class="gp" onclick='editPosition({{ p.id }}, {{ p.name|tojson }}, {{ p.color|tojson }})' title="Επεξεργασία/διαγραφή"><i class="ti ti-pencil"></i></span>
+        <span class="gp" onclick='editPosition({{ p.id }}, {{ p.name|tojson }}, {{ p.color|tojson }}, {{ p.group_id or 0 }})' title="Επεξεργασία/διαγραφή"><i class="ti ti-pencil"></i></span>
       </span>
       {% else %}<span class="muted" style="font-size:12px;color:#94a3b8;">— καμία θέση ακόμη· πάτησε «Δημιουργία από προσωπικό» —</span>{% endfor %}
       <span onclick="newPosition()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέα θέση</span>
@@ -231,13 +231,34 @@
   <div class="box">
     <h3><i class="ti ti-briefcase"></i> Θέση εργαζομένου</h3>
     <p class="sub" id="posTitle">Διάλεξε θέση από τον κατάλογο.</p>
-    <select class="osel" id="posSel">
-      <option value="">— καμία —</option>
-      {% for p in all_positions %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
-    </select>
+    <select class="osel" id="posSel"></select>
     <div class="obtns">
       <button class="obtn" onclick="closePos()">Άκυρο</button>
       <button class="obtn pri" onclick="savePos()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
+<div class="omodal" id="posEditModal">
+  <div class="box">
+    <h3><i class="ti ti-briefcase"></i> Θέση εργασίας</h3>
+    <p class="sub">Κοινός κατάλογος· σύνδεσέ τη με μια ομάδα για να φιλτράρεται στις αναθέσεις.</p>
+    <input class="osel" id="peName" placeholder="Όνομα θέσης">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:13px;color:#64748b;">Χρώμα:</span>
+      <input type="color" id="peColor" style="width:48px;height:32px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;cursor:pointer;background:var(--card,#fff);">
+    </div>
+    <div style="margin-bottom:6px;">
+      <span style="font-size:13px;color:#64748b;">Ομάδα:</span>
+      <select class="osel" id="peGroup" style="margin-top:6px;">
+        <option value="">— καμία —</option>
+        {% for g in all_groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="obtns">
+      <button class="obtn gho" onclick="deletePosition()"><i class="ti ti-trash"></i> Διαγραφή</button>
+      <button class="obtn" onclick="closePosEdit()">Άκυρο</button>
+      <button class="obtn pri" onclick="savePosition()">Αποθήκευση</button>
     </div>
   </div>
 </div>
@@ -338,12 +359,15 @@ function newGroup(){ var nm=prompt('Όνομα νέας ομάδας:'); if(!nm)
   _gpost('/dashboard/org/group/save',{name:nm,color:col}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν δημιουργήθηκε'); }); }
 function seedPositions(){ if(!confirm('Δημιουργία καταλόγου θέσεων από τις θέσεις του προσωπικού;'))return;
   _gpost('/dashboard/org/positions/seed',{}).then(function(j){ if(j&&j.ok){ alert('Δημιουργήθηκαν '+j.created+' νέες θέσεις.'); location.reload(); } else alert((j&&j.msg)||'Δεν έγινε'); }); }
-function newPosition(){ var nm=prompt('Όνομα νέας θέσης:'); if(!nm)return; var col=prompt('Χρώμα (hex, π.χ. #0ea5e9):','#64748b')||'#64748b';
-  _gpost('/dashboard/org/position/save',{name:nm,color:col}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν δημιουργήθηκε'); }); }
-function editPosition(id,name,color){ var nm=prompt('Όνομα θέσης (άδειο = διαγραφή):', name||''); if(nm===null) return;
-  if(nm.trim()===''){ if(!confirm('Διαγραφή θέσης;'))return; _gpost('/dashboard/org/position/delete',{position_id:id}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν διαγράφηκε'); }); return; }
-  var col=prompt('Χρώμα (hex):', color||'#64748b')||color||'#64748b';
-  _gpost('/dashboard/org/position/save',{position_id:id, name:nm, color:col}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); }); }
+var curPos=null;
+function newPosition(){ curPos=null; document.getElementById('peName').value=''; document.getElementById('peColor').value='#64748b'; document.getElementById('peGroup').value=''; document.getElementById('posEditModal').style.display='flex'; }
+function editPosition(id,name,color,gid){ curPos=id; document.getElementById('peName').value=name||''; document.getElementById('peColor').value=(color&&color.length>=7)?color.slice(0,7):'#64748b'; document.getElementById('peGroup').value=(gid?String(gid):''); document.getElementById('posEditModal').style.display='flex'; }
+function closePosEdit(){ document.getElementById('posEditModal').style.display='none'; }
+function savePosition(){ var body={name:document.getElementById('peName').value, color:document.getElementById('peColor').value, group_id:document.getElementById('peGroup').value}; if(curPos) body.position_id=curPos;
+  _gpost('/dashboard/org/position/save',body).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); }); }
+function deletePosition(){ if(!curPos){ closePosEdit(); return; } if(!confirm('Διαγραφή θέσης;'))return;
+  _gpost('/dashboard/org/position/delete',{position_id:curPos}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν διαγράφηκε'); }); }
+document.getElementById('posEditModal').addEventListener('click', function(e){ if(e.target===this) closePosEdit(); });
 function editGroup(id,name,color){
   var nm=prompt('Όνομα ομάδας (άδειο = διαγραφή):', name||'');
   if(nm===null) return;
@@ -373,7 +397,12 @@ function deleteDept(){
 }
 document.getElementById('deptModal').addEventListener('click', function(e){ if(e.target===this) closeDept(); });
 var posUid=null;
-function setPos(uid,pid){ posUid=uid; document.getElementById('posSel').value=(pid?String(pid):''); document.getElementById('posModal').style.display='flex'; }
+var POSITIONS=[{% for p in all_positions %}{id:{{ p.id }},name:{{ p.name|tojson }},gid:{{ p.group_id or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}];
+function setPos(uid,pid,deptGid){ posUid=uid;
+  var sel=document.getElementById('posSel'); sel.innerHTML='<option value="">— καμία —</option>';
+  POSITIONS.forEach(function(p){ if(!deptGid || !p.gid || p.gid==deptGid){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); } });
+  sel.value=(pid?String(pid):'');
+  document.getElementById('posModal').style.display='flex'; }
 function closePos(){ document.getElementById('posModal').style.display='none'; }
 function savePos(){ _gpost('/dashboard/org/person/setposition',{user_id:posUid, position_id:document.getElementById('posSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); }); }
 document.getElementById('posModal').addEventListener('click', function(e){ if(e.target===this) closePos(); });

@@ -319,6 +319,7 @@ def org_console():
                 'avatar': getattr(u, 'avatar', None),
                 'pos': (jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id)),
                 'pos_id': getattr(u, 'position_id', None),
+                'dept_group_id': getattr(dmap.get(getattr(u, 'department_id', None)), 'group_id', None),
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     # v12.173 (#7) — στήλες = ΜΟΝΟ τα επιλεγμένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί)
