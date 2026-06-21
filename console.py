@@ -403,9 +403,17 @@ def org_console():
             continue
         cdept = getattr(u, 'department_id', None)
         cpos = jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id)
-        if not cdept and not cpos:
-            unassigned.append(card(u))
-    unassigned.sort(key=lambda c: (c['name'] or ''))
+        chotel = getattr(u, 'home_hotel_id', None)
+        miss = []
+        if not chotel:
+            miss.append('ξενοδοχείο')
+        if not cdept:
+            miss.append('τμήμα')
+        if not cpos:
+            miss.append('θέση')
+        if miss:
+            cd = card(u); cd['missing'] = miss; unassigned.append(cd)
+    unassigned.sort(key=lambda c: (len(c['missing']) * -1, c['name'] or ''))
     return render_template('org.html', hotels=hotels, sel=sel, columns=columns,
                            bydept=bydept, pool=pool, hcodes=hcodes,
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
