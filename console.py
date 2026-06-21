@@ -458,3 +458,75 @@ def org_dept_leadership():
     db.session.commit()
     log_activity('org_dept_leadership', 'dept=%s on=%s' % (did, dep.is_leadership))
     return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/dept/edit', methods=['POST'])
+def org_dept_edit():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department
+    d = request.json or {}
+    try:
+        did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    dep = Department.query.get(did)
+    if not dep:
+        return jsonify(ok=False, msg='not found'), 404
+    name = (d.get('name') or '').strip()[:60]
+    if name:
+        ex = Department.query.filter(db.func.lower(Department.name) == name.lower(), Department.id != did).first()
+        if ex:
+            return jsonify(ok=False, msg='Υπάρχει ήδη τμήμα με αυτό το όνομα.'), 400
+        dep.name = name
+    color = (d.get('color') or '').strip()[:9]
+    if color:
+        dep.color = color
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify(ok=False, msg='Υπάρχει ήδη τμήμα με αυτό το όνομα.'), 400
+    log_activity('org_dept_edit', str(did))
+    return jsonify(ok=True)
+
+@app.route('/dashboard/org/dept/delete', methods=['POST'])
+def org_dept_delete():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department, HotelDepartment
+    d = request.json or {}
+    try:
+        did = int(d['department_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    dep = Department.query.get(did)
+    if not dep:
+        return jsonify(ok=False, msg='not found'), 404
+    # soft-delete: όσοι ανήκουν → Χωρίς τμήμα· αφαίρεση από ξενοδοχεία· κρατά ιστορικό (WeekPlan/shifts)
+    moved = 0
+    for u in User.query.filter(User.department_id == did).all():
+        u.department_id = None; moved += 1
+    HotelDepartment.query.filter_by(department_id=did).delete()
+    dep.active = False; dep.is_leadership = False
+    db.session.commit()
+    log_activity('org_dept_delete', '%s moved=%d' % (did, moved))
+    return jsonify(ok=True, moved=moved)
+
+@app.route('/dashboard/org/dept/reorder', methods=['POST'])
+def org_dept_reorder():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import Department
+    d = request.json or {}
+    order = d.get('order') or []
+    for i, did in enumerate(order):
+        try:
+            dep = Department.query.get(int(did))
+            if dep:
+                dep.sort = i
+        except Exception:
+            pass
+    db.session.commit()
+    log_activity('org_dept_reorder', '%d depts' % len(order))
+    return jsonify(ok=True)

@@ -38,6 +38,11 @@
   .crown{margin-left:6px;cursor:pointer;color:#cbd5e1;font-size:13px;}
   .crown:hover{color:#b45309;}
   .crown.demote{color:#b45309;}
+  .ogrip{cursor:grab;color:#cbd5e1;font-size:14px;}
+  .ogrip:active{cursor:grabbing;}
+  .dedit{cursor:pointer;color:#cbd5e1;font-size:13px;margin-left:4px;}
+  .dedit:hover{color:var(--accent,#185FA5);}
+  .sortable-ghost{opacity:.4;}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
@@ -107,7 +112,7 @@
     {% for d in lead_cols %}
     <div class="ocol olead-col" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
       <div class="oacc" style="background:{{ d.color }};"></div>
-      <h4><i class="ti ti-crown" style="color:#b45309;"></i> {{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown demote" onclick="toggleLead({{ d.id }}, false)" title="Αφαίρεση από Διεύθυνση"><i class="ti ti-arrow-down"></i></span></h4>
+      <h4><i class="ti ti-crown" style="color:#b45309;"></i> {{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown demote" onclick="toggleLead({{ d.id }}, false)" title="Αφαίρεση από Διεύθυνση"><i class="ti ti-arrow-down"></i></span><span class="dedit" onclick='editDept({{ d.id }}, {{ d.name|tojson }}, {{ d.color|tojson }})' title="Επεξεργασία τμήματος"><i class="ti ti-pencil"></i></span></h4>
       {{ suprow(d, supmap.get(d.id)) }}
       {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
     </div>
@@ -126,14 +131,14 @@
 
     <div class="oboard">
       {% for d in columns %}
-      <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
+      <div class="ocol" data-dept="{{ d.id }}" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
         <div class="oacc" style="background:{{ d.color }};"></div>
-        <h4><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown" onclick="toggleLead({{ d.id }}, true)" title="Όρισε ως Διεύθυνση"><i class="ti ti-crown"></i></span></h4>
+        <h4><span class="ogrip" title="Σύρε για αναδιάταξη"><i class="ti ti-grip-vertical"></i></span><span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:3px;background:{{ d.color }};"></span>{{ d.name }}<span class="cnt">{{ (bydept.get(d.id)|length) if bydept.get(d.id) else 0 }}</span><span class="crown" onclick="toggleLead({{ d.id }}, true)" title="Όρισε ως Διεύθυνση"><i class="ti ti-crown"></i></span><span class="dedit" onclick='editDept({{ d.id }}, {{ d.name|tojson }}, {{ d.color|tojson }})' title="Επεξεργασία τμήματος"><i class="ti ti-pencil"></i></span></h4>
         {{ suprow(d, supmap.get(d.id)) }}
         {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
       {% endfor %}
-      <div class="ocol" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
+      <div class="ocol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
         <div class="oacc" style="background:#cbd5e1;"></div>
         <h4><i class="ti ti-help-circle" style="color:#94a3b8;"></i> Χωρίς τμήμα<span class="cnt">{{ (bydept.get(0)|length) if bydept.get(0) else 0 }}</span></h4>
         {% for c in (bydept.get(0) or []) %}{{ pcard(c) }}{% endfor %}
@@ -151,6 +156,23 @@
       <button class="obtn gho" onclick="clearSup()">Καθαρισμός</button>
       <button class="obtn" onclick="closeSup()">Άκυρο</button>
       <button class="obtn pri" onclick="saveSup()">Αποθήκευση</button>
+    </div>
+  </div>
+</div>
+
+<div class="omodal" id="deptModal">
+  <div class="box">
+    <h3><i class="ti ti-edit"></i> Επεξεργασία τμήματος</h3>
+    <p class="sub">Οι αλλαγές ισχύουν σε ΟΛΑ τα ξενοδοχεία (κοινός κατάλογος τμημάτων).</p>
+    <input class="osel" id="deptName" placeholder="Όνομα τμήματος">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-size:13px;color:#64748b;">Χρώμα:</span>
+      <input type="color" id="deptColor" style="width:48px;height:32px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;cursor:pointer;background:var(--card,#fff);">
+    </div>
+    <div class="obtns">
+      <button class="obtn gho" onclick="deleteDept()"><i class="ti ti-trash"></i> Διαγραφή</button>
+      <button class="obtn" onclick="closeDept()">Άκυρο</button>
+      <button class="obtn pri" onclick="saveDept()">Αποθήκευση</button>
     </div>
   </div>
 </div>
@@ -214,5 +236,38 @@ function _saveSup(uid){
 function saveSup(){ _saveSup(document.getElementById('supSel').value); }
 function clearSup(){ _saveSup(''); }
 document.getElementById('supModal').addEventListener('click', function(e){ if(e.target===this) closeSup(); });
+var curDept=null;
+function editDept(id,name,color){ curDept=id;
+  document.getElementById('deptName').value=name||'';
+  document.getElementById('deptColor').value=(color&&color.length>=7)?color.slice(0,7):'#64748b';
+  document.getElementById('deptModal').style.display='flex';
+}
+function closeDept(){ document.getElementById('deptModal').style.display='none'; }
+function saveDept(){
+  fetch('/dashboard/org/dept/edit',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({department_id:curDept, name:document.getElementById('deptName').value, color:document.getElementById('deptColor').value})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); });
+}
+function deleteDept(){
+  if(!confirm('Διαγραφή τμήματος; Όσοι ανήκουν θα πάνε στο «Χωρίς τμήμα». Ισχύει σε όλα τα ξενοδοχεία.'))return;
+  fetch('/dashboard/org/dept/delete',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({department_id:curDept})})
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν διαγράφηκε'); });
+}
+document.getElementById('deptModal').addEventListener('click', function(e){ if(e.target===this) closeDept(); });
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+(function(){
+  var board=document.querySelector('.oboard');
+  if(board && window.Sortable){
+    Sortable.create(board, {handle:'.ogrip', draggable:'.ocol', filter:'[data-dept=""]', animation:140,
+      onMove:function(e){ return e.related.getAttribute('data-dept')!==''; },
+      onEnd:function(){
+        var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); });
+        fetch('/dashboard/org/dept/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:ids})});
+      }});
+  }
+})();
 </script>
 </body></html>
