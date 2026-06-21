@@ -693,6 +693,39 @@ def org_group_supervisor():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/org/group/move', methods=['POST'])
+def org_group_move():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import DepartmentGroup
+    d = request.json or {}
+    try:
+        gid = int(d['group_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    g = DepartmentGroup.query.get(gid)
+    if not g:
+        return jsonify(ok=False, msg='not found'), 404
+    parent = d.get('parent_id'); parent = int(parent) if parent else None
+    if parent:
+        cur = DepartmentGroup.query.get(parent); seen = set()
+        while cur is not None and cur.id not in seen:
+            if cur.id == gid:
+                return jsonify(ok=False, msg='Δεν γίνεται μέσα στον εαυτό του.'), 400
+            seen.add(cur.id); cur = DepartmentGroup.query.get(cur.parent_id) if cur.parent_id else None
+    g.parent_id = parent
+    for i, sid in enumerate(d.get('order') or []):
+        try:
+            sg = DepartmentGroup.query.get(int(sid))
+            if sg:
+                sg.sort = i
+        except Exception:
+            pass
+    db.session.commit()
+    log_activity('org_group_move', 'g=%s parent=%s' % (gid, parent))
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/org/positions/seed', methods=['POST'])
 def org_positions_seed():
     if not is_admin():

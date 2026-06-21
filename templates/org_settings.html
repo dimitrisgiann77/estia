@@ -28,6 +28,15 @@
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
   .gsup{cursor:pointer;font-size:11px;color:var(--accent,#185FA5);font-weight:600;margin-left:6px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
   .gsup.add{color:#94a3b8;}
+  .gchildren{margin-left:22px;min-height:6px;padding:1px 0;}
+  .gchildren[data-parent="0"]{margin-left:0;}
+  .gwrap{margin:3px 0;}
+  .gnode{border:1px solid var(--bd,#e7eef2);background:var(--card,#fff);}
+  .ggrip{cursor:grab;color:#cbd5e1;font-size:14px;flex-shrink:0;}
+  .ggrip:active{cursor:grabbing;}
+  .sortable-ghost{opacity:.4;}
+  .sortable-drag .gchildren{display:none;}
+  .gchildren.gover{outline:2px dashed var(--accent,#185FA5);outline-offset:-2px;border-radius:8px;}
   .omodal2{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal2 .box2{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal2 select{width:100%;padding:9px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;margin:10px 0;font-size:13px;background:var(--card,#fff);color:inherit;}
@@ -37,21 +46,26 @@
 </style></head><body>
 {{ mp.topbar('settings', 'ΕΣΤΙΑ — Ρυθμίσεις οργανογράμματος', 'Ομάδες, υποομάδες & θέσεις εργασίας — το δέντρο') }}
 
-{% macro tree(nodes, children, dept_count, gsup, depth) %}
+{% macro treebox(pid, nodes, children, dept_count, gsup) %}
+<div class="gchildren" data-parent="{{ pid }}">
   {% for g in nodes %}
-  <div class="gnode" style="margin-left:{{ depth*22 }}px;border-left:3px solid {{ g.color }};">
-    <span class="gdot" style="background:{{ g.color }};"></span>
-    <span class="gname">{{ g.name }}</span>
-    <span class="gcnt">{{ dept_count.get(g.id, 0) }} τμήματα</span>
-    {% if gsup.get(g.id) %}<span class="gsup" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-user-star"></i> {{ gsup[g.id] }}</span>{% else %}<span class="gsup add" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})'><i class="ti ti-user-plus"></i> υπεύθυνος</span>{% endif %}
-    <span class="gact">
-      <span onclick='addSubGroup({{ g.id }})' title="Νέα υποομάδα"><i class="ti ti-plus"></i></span>
-      <span onclick='renameGroup({{ g.id }}, {{ g.name|tojson }}, {{ g.color|tojson }})' title="Μετονομασία / χρώμα"><i class="ti ti-pencil"></i></span>
-      <span onclick='delGroup({{ g.id }})' title="Διαγραφή"><i class="ti ti-trash"></i></span>
-    </span>
+  <div class="gwrap" data-id="{{ g.id }}">
+    <div class="gnode" style="border-left:3px solid {{ g.color }};">
+      <span class="ggrip" title="Σύρε για μετακίνηση / αναδιάταξη"><i class="ti ti-grip-vertical"></i></span>
+      <span class="gdot" style="background:{{ g.color }};"></span>
+      <span class="gname">{{ g.name }}</span>
+      <span class="gcnt">{{ dept_count.get(g.id, 0) }} τμήματα</span>
+      {% if gsup.get(g.id) %}<span class="gsup" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-user-star"></i> {{ gsup[g.id] }}</span>{% else %}<span class="gsup add" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})'><i class="ti ti-user-plus"></i> υπεύθυνος</span>{% endif %}
+      <span class="gact">
+        <span onclick='addSubGroup({{ g.id }})' title="Νέα υποομάδα"><i class="ti ti-plus"></i></span>
+        <span onclick='renameGroup({{ g.id }}, {{ g.name|tojson }}, {{ g.color|tojson }})' title="Μετονομασία / χρώμα"><i class="ti ti-pencil"></i></span>
+        <span onclick='delGroup({{ g.id }})' title="Διαγραφή"><i class="ti ti-trash"></i></span>
+      </span>
+    </div>
+    {{ treebox(g.id, children.get(g.id, []), children, dept_count, gsup) }}
   </div>
-  {{ tree(children.get(g.id, []), children, dept_count, gsup, depth + 1) }}
   {% endfor %}
+</div>
 {% endmacro %}
 
 <div class="container">
@@ -61,7 +75,9 @@
     <h3><i class="ti ti-sitemap"></i> Δέντρο ομάδων</h3>
     <p class="sub">Φτιάξε ομάδες και υποομάδες (απεριόριστο βάθος). Π.χ. F&B → Κουζίνες, Εστιατόρια/Μπαρ. Τα τμήματα τα βάζεις σε ομάδα από το ✎ του τμήματος στο οργανόγραμμα.</p>
     <div class="toolbar"><span class="sbtn pri" onclick="addTopGroup()"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</span></div>
-    {% if roots %}{{ tree(roots, children, dept_count, gsup, 0) }}{% else %}<div style="color:#94a3b8;font-size:12.5px;">— καμία ομάδα ακόμη —</div>{% endif %}
+    {{ treebox(0, roots, children, dept_count, gsup) }}
+    {% if not roots %}<div style="color:#94a3b8;font-size:12.5px;">— καμία ομάδα ακόμη —</div>{% endif %}
+    <p class="sub" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Σύρε από το <i class="ti ti-grip-vertical"></i> μια ομάδα μέσα σε άλλη (γίνεται υποομάδα) ή στο πάνω-πάνω επίπεδο (γίνεται κορυφή).</p>
   </div>
 
   <div class="scard">
@@ -118,5 +134,16 @@ function closeGroupSup(){ document.getElementById('gsupModal').style.display='no
 function saveGroupSup(){ _post('/dashboard/org/group/supervisor',{group_id:gsupGid, user_id:document.getElementById('gsupSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); }); }
 document.getElementById('gsupModal').addEventListener('click', function(e){ if(e.target===this) closeGroupSup(); });
 function seedPos(){ if(!confirm('Δημιουργία θέσεων από τις θέσεις του προσωπικού;'))return; _post('/dashboard/org/positions/seed',{}).then(function(j){ if(j&&j.ok){ alert('Δημιουργήθηκαν '+j.created+' νέες θέσεις.'); location.reload(); } else alert('Δεν έγινε'); }); }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script>
+if(window.Sortable){ document.querySelectorAll('.gchildren').forEach(function(box){
+  Sortable.create(box, {group:'gtree', handle:'.ggrip', draggable:'.gwrap', animation:140, fallbackOnBody:true, swapThreshold:0.6,
+    onEnd:function(evt){
+      var gid=evt.item.getAttribute('data-id'); var box=evt.to; var parent=box.getAttribute('data-parent');
+      var order=[]; box.querySelectorAll(':scope > .gwrap').forEach(function(w){ order.push(w.getAttribute('data-id')); });
+      _post('/dashboard/org/group/move',{group_id:gid, parent_id:(parent==='0'?'':parent), order:order}).then(function(j){ if(!(j&&j.ok)){ alert((j&&j.msg)||'Δεν έγινε'); location.reload(); } });
+    }});
+}); }
 </script>
 </body></html>
