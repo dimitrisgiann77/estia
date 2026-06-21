@@ -290,6 +290,15 @@ def org_console():
     piimap = _pii_map()
     hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     sel = request.args.get('hotel_id', type=int) or (hotels[0].id if hotels else None)
+    # v12.178 — τρέχουσα θέση ανά εργαζόμενο (από MgmtAssignment)
+    posmap = {}
+    try:
+        from payroll import MgmtAssignment
+        for ma in MgmtAssignment.query.filter(MgmtAssignment.valid_to == None).order_by(MgmtAssignment.id).all():
+            if ma.position:
+                posmap[ma.user_id] = ma.position
+    except Exception:
+        pass
     active_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     dmap = {d.id: d for d in Department.query.all()}   # active+inactive (για ασφαλή εμφάνιση)
     hcodes = _hotel_codes()
@@ -302,6 +311,7 @@ def org_console():
                 'role': u.role,
                 'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
                 'avatar': getattr(u, 'avatar', None),
+                'pos': posmap.get(u.id),
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
     # v12.173 (#7) — στήλες = ΜΟΝΟ τα επιλεγμένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί)
@@ -339,6 +349,8 @@ def org_console():
         else:
             ungrouped.append(dcol)
     grouped = [{'group': g, 'cols': bucket[g.id]} for g in all_groups if g.id in bucket]
+    from schedule import JobPosition
+    all_positions = JobPosition.query.filter_by(active=True).order_by(JobPosition.sort, JobPosition.name).all()
     # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
     enabled_set = enabled or set()
     available = [d for d in active_depts if d.id not in enabled_set]
@@ -367,6 +379,7 @@ def org_console():
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
                            configured=(enabled is not None),
                            lead_cols=lead_cols, grouped=grouped, ungrouped=ungrouped, all_groups=all_groups,
+                           all_positions=all_positions,
                            supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])
@@ -615,4 +628,84 @@ def org_dept_setgroup():
     gid = d.get('group_id'); dep.group_id = int(gid) if gid else None
     db.session.commit()
     log_activity('org_dept_setgroup', 'dept=%s group=%s' % (did, dep.group_id))
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/positions/seed', methods=['POST'])
+def org_positions_seed():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import JobPosition
+    try:
+        from payroll import MgmtAssignment
+    except Exception:
+        return jsonify(ok=False, msg='Δεν υπάρχουν δεδομένα θέσεων.'), 400
+    existing = {(jp.name or '').strip().lower() for jp in JobPosition.query.all()}
+    seen = set(); created = 0
+    mx = db.session.query(db.func.max(JobPosition.sort)).scalar() or 0
+    for ma in MgmtAssignment.query.filter(MgmtAssignment.position != None).all():
+        nm = (ma.position or '').strip()
+        if not nm:
+            continue
+        key = nm.lower()
+        if key in existing or key in seen:
+            seen.add(key); continue
+        seen.add(key); mx += 1
+        db.session.add(JobPosition(name=nm[:80], color='#64748b', active=True, sort=mx)); created += 1
+    db.session.commit()
+    log_activity('org_positions_seed', 'created=%d' % created)
+    return jsonify(ok=True, created=created)
+
+@app.route('/dashboard/org/position/save', methods=['POST'])
+def org_position_save():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import JobPosition
+    d = request.json or {}
+    pid = d.get('position_id'); pid = int(pid) if pid else None
+    name = (d.get('name') or '').strip()[:80]
+    color = (d.get('color') or '').strip()[:9]
+    gid = d.get('group_id')
+    if pid:
+        p = JobPosition.query.get(pid)
+        if not p:
+            return jsonify(ok=False, msg='not found'), 404
+        if name:
+            p.name = name
+        if color:
+            p.color = color
+        if 'group_id' in d:
+            p.group_id = int(gid) if gid else None
+    else:
+        if not name:
+            return jsonify(ok=False, msg='Όνομα;'), 400
+        p = JobPosition.query.filter(db.func.lower(JobPosition.name) == name.lower(), JobPosition.active == True).first()
+        if not p:
+            mx = db.session.query(db.func.max(JobPosition.sort)).scalar() or 0
+            p = JobPosition(name=name, color=color or '#64748b', group_id=(int(gid) if gid else None), active=True, sort=mx + 1)
+            db.session.add(p)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify(ok=False, msg='Υπάρχει ήδη θέση με αυτό το όνομα.'), 400
+    log_activity('org_position_save', str(p.id))
+    return jsonify(ok=True, id=p.id)
+
+@app.route('/dashboard/org/position/delete', methods=['POST'])
+def org_position_delete():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import JobPosition
+    d = request.json or {}
+    try:
+        pid = int(d['position_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    p = JobPosition.query.get(pid)
+    if not p:
+        return jsonify(ok=False, msg='not found'), 404
+    p.active = False
+    db.session.commit()
+    log_activity('org_position_delete', str(pid))
     return jsonify(ok=True)

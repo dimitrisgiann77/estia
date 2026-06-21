@@ -86,6 +86,15 @@ class DepartmentGroup(db.Model):
     active  = db.Column(db.Boolean, default=True)
     sort    = db.Column(db.Integer, default=0)
 
+class JobPosition(db.Model):
+    """v12.178 — θέση εργασίας (Chef/Μάγειρας/Σερβιτόρος...). Seed από MgmtAssignment.position· adjustable."""
+    id       = db.Column(db.Integer, primary_key=True)
+    name     = db.Column(db.String(80), unique=True, nullable=False)
+    color    = db.Column(db.String(9), default='#64748b')
+    group_id = db.Column(db.Integer)   # προαιρετικά συνδεδεμένη σε ομάδα
+    active   = db.Column(db.Boolean, default=True)
+    sort     = db.Column(db.Integer, default=0)
+
 class Department(db.Model):
     id        = db.Column(db.Integer, primary_key=True)
     name      = db.Column(db.String(60), unique=True, nullable=False)
