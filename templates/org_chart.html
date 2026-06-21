@@ -8,62 +8,60 @@
   .htab{font-size:12.5px;padding:6px 12px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;font-weight:600;}
   .htab.on{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
   .chcard{background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:14px;padding:12px;margin-bottom:14px;}
-  .wrap{overflow:auto;padding:6px 4px 14px;}
-  /* ── οριζόντιο δέντρο (αριστερά→δεξιά) ── */
+  .wrap{overflow:auto;padding:6px 4px 14px;text-align:center;}
+  /* ── κλασικό top-down δέντρο ── */
+  .tree,.tree ul{position:relative;text-align:center;list-style:none;margin:0;padding:0;}
   .tree{display:inline-block;}
-  .tree ul{padding-left:46px;list-style:none;margin:0;}
-  .tree li{position:relative;padding:13px 0;list-style:none;text-align:left;white-space:nowrap;}
-  .tree li>.card{display:inline-block;vertical-align:middle;white-space:normal;}
-  .tree li>ul{display:inline-block;vertical-align:middle;position:relative;}
-  .tree li::before{content:'';position:absolute;left:-23px;top:0;bottom:0;border-left:2px solid var(--bd,#d8e0e8);}
-  .tree li:first-child::before{top:50%;}
-  .tree li:last-child::before{bottom:50%;}
-  .tree li:only-child::before{display:none;}
-  .tree li::after{content:'';position:absolute;left:-23px;top:50%;width:23px;border-top:2px solid var(--bd,#d8e0e8);}
-  .tree li>ul::before{content:'';position:absolute;left:0;top:50%;width:23px;border-top:2px solid var(--bd,#d8e0e8);}
-  .tree>li{padding:0;}
-  .tree>li::before,.tree>li::after{display:none;}
-  .card{display:inline-block;width:210px;background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:14px;text-align:left;box-shadow:0 2px 5px rgba(15,23,42,.05),0 1px 2px rgba(15,23,42,.04);overflow:hidden;transition:transform .12s,box-shadow .12s;vertical-align:middle;}
-  .card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,23,42,.10);}
+  .tree ul{padding-top:26px;}
+  .tree li{display:inline-block;vertical-align:top;text-align:center;position:relative;padding:26px 10px 0;}
+  .tree li::before,.tree li::after{content:'';position:absolute;top:0;right:50%;border-top:2px solid var(--bd,#d8e0e8);width:50%;height:26px;}
+  .tree li::after{right:auto;left:50%;border-left:2px solid var(--bd,#d8e0e8);}
+  .tree li:only-child::after,.tree li:only-child::before{display:none;}
+  .tree li:only-child{padding-top:0;}
+  .tree li:first-child::before,.tree li:last-child::after{border:0 none;}
+  .tree li:last-child::before{border-right:2px solid var(--bd,#d8e0e8);border-radius:0 8px 0 0;}
+  .tree li:first-child::after{border-radius:8px 0 0 0;}
+  .tree ul::before{content:'';position:absolute;top:0;left:50%;border-left:2px solid var(--bd,#d8e0e8);height:26px;}
+  .tree>li{padding-top:0;}
+  .card{display:inline-block;width:212px;background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-top:3px solid var(--bd,#e8edf2);border-radius:13px;text-align:left;box-shadow:0 2px 5px rgba(15,23,42,.05);overflow:hidden;vertical-align:top;}
   .bar{height:5px;}
-  .pad{padding:10px 12px 12px;}
+  .pad{padding:10px 12px 11px;}
   .lbl{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#9aa7b5;}
-  .ttl{font-weight:750;font-size:13.5px;color:var(--navy,#16324a);line-height:1.2;margin-top:1px;}
-  .pill{float:right;font-size:10px;font-weight:700;color:#5b6b7b;background:var(--soft,#f1f5f9);border-radius:20px;padding:2px 8px;margin-top:-1px;}
+  .ttl{font-weight:750;font-size:14px;color:var(--navy,#16324a);line-height:1.2;margin-top:1px;}
+  .pill{float:right;font-size:10px;font-weight:700;color:#5b6b7b;background:var(--soft,#f1f5f9);border-radius:20px;padding:2px 8px;}
   .head{display:flex;align-items:center;gap:8px;margin-top:9px;padding:6px;background:var(--soft,#f7fafc);border-radius:10px;}
   .head .hn{font-size:12px;font-weight:700;color:var(--navy,#16324a);line-height:1.15;}
   .head .hr{font-size:9.5px;color:#8a98a6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
-  .av{flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;letter-spacing:.3px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);background-size:cover;background-position:center;}
-  .pos{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#9aa7b5;margin:10px 0 4px;display:flex;align-items:center;gap:6px;}
+  .av{flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;box-shadow:inset 0 0 0 2px rgba(255,255,255,.55);background-size:cover;background-position:center;}
+  .pos{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#9aa7b5;margin:9px 0 3px;display:flex;align-items:center;gap:6px;}
   .pos::after{content:'';flex:1;height:1px;background:var(--bd,#eef2f6);}
-  .per{display:flex;align-items:center;gap:7px;padding:3px 2px;border-radius:8px;}
-  .per:hover{background:var(--soft,#f7fafc);}
-  .per .pn{font-size:12px;color:#33414f;}
+  .per{display:flex;align-items:center;gap:7px;padding:2px 2px;}
+  .per .pn{font-size:12.5px;color:#33414f;}
   .per .pc{font-size:9.5px;color:#aab4be;margin-left:auto;}
   .per.mgr .pn{font-weight:750;color:var(--navy,#16324a);}
   .star{color:#e0a106;font-size:10px;}
-  .hotel{width:232px;background:var(--accent,#185FA5);border:0;color:#fff;text-align:center;}
+  .hotel{width:240px;background:var(--accent,#185FA5);border:0;color:#fff;text-align:center;}
   .hotel .ttl{color:#fff;font-size:16px;}
   .hotel .code{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;background:rgba(255,255,255,.18);border-radius:20px;padding:3px 10px;margin-bottom:5px;}
   .hotel .meta{color:#dbeafe;font-size:11px;margin-top:3px;}
-  .group{width:190px;}
+  .group{width:196px;}
   .grpcount{font-size:10.5px;color:#94a3b8;margin-top:4px;}
   .leadcard .head{background:#fff7ed;}
   html[data-theme="dark"] .leadcard .head{background:#2a2412;}
   .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:4px;padding:8px 10px;font-size:11.5px;color:#64748b;background:var(--card,#fff);border:1px solid var(--bd,#e8edf2);border-radius:10px;}
   .legend span{display:inline-flex;align-items:center;gap:6px;}
   .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
-  /* ── View mode (fit-to-window) ── */
+  /* ── View mode: ΚΑΝΟΝΙΚΟ μέγεθος + scroll, zoom προαιρετικό ── */
   body.viewmode{margin:0;overflow:hidden;}
   .vbar{display:flex;align-items:center;gap:8px;height:48px;padding:0 14px;border-bottom:1px solid var(--bd,#e2e8f0);background:var(--card,#fff);}
   .vtitle{font-weight:750;font-size:14px;color:var(--navy,#16324a);}
   .vspace{flex:1;}
   .vbtn{cursor:pointer;font-size:13px;padding:5px 11px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;font-weight:600;display:inline-flex;align-items:center;gap:5px;}
   .vbtn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
-  .vstage{position:relative;width:100vw;height:calc(100vh - 49px);overflow:hidden;background:var(--soft,#f1f5f9);}
+  .vstage{width:100vw;height:calc(100vh - 49px);overflow:auto;background:var(--soft,#f1f5f9);text-align:center;}
   html[data-theme="dark"] .vstage{background:#0f1722;}
-  .vscale{position:absolute;top:14px;left:14px;transform-origin:top left;transform:scale(1);}
-  @media print{.htabs,.toolbar,.topbar,.bnav,.vbar{display:none !important;} .wrap,.vstage{overflow:visible;height:auto;} .vscale{position:static;transform:none;} .card{box-shadow:none;}}
+  .vscale{display:inline-block;padding:22px;}
+  @media print{.htabs,.toolbar,.topbar,.bnav,.vbar{display:none !important;} .wrap,.vstage{overflow:visible;height:auto;} .vscale{zoom:1 !important;} .card{box-shadow:none;}}
 </style></head>
 {% set view = request.args.get('view') %}
 <body class="{{ 'viewmode' if view }}">
@@ -79,14 +77,14 @@
 {% macro node(n) %}
 <li>
   {% if n.type == 'group' %}
-  <div class="card group"><div class="bar" style="background:{{ n.color }};"></div><div class="pad">
+  <div class="card group" style="border-top-color:{{ n.color }};"><div class="pad">
     <div class="lbl">{% if n.depth and n.depth > 0 %}Υποομάδα{% else %}Ομάδα{% endif %}</div>
     <div class="ttl">{{ n.name }}</div>
     {% if n.sup %}{{ headrow(n.sup, 'Υπεύθυνος ομάδας') }}{% endif %}
     <div class="grpcount">{{ n.depts_n }} {{ 'τμήμα' if n.depts_n==1 else 'τμήματα' }} · {{ n.people_n }} {{ 'άτομο' if n.people_n==1 else 'άτομα' }}</div>
   </div></div>
   {% else %}
-  <div class="card {{ 'leadcard' if n.lead }}"><div class="bar" style="background:{{ n.color }};"></div><div class="pad">
+  <div class="card {{ 'leadcard' if n.lead }}" style="border-top-color:{{ n.color }};"><div class="pad">
     <span class="pill">{{ n.count }}</span>
     <div class="lbl">{% if n.lead %}Διεύθυνση{% else %}Τμήμα{% endif %}</div>
     <div class="ttl">{{ n.name }}</div>
@@ -122,8 +120,9 @@
   <span class="vtitle">{{ hotel.name if hotel else 'Ξενοδοχείο' }} — Οργανόγραμμα</span>
   <span class="vspace"></span>
   <button class="vbtn" onclick="zoom(-0.1)" title="Σμίκρυνση">−</button>
-  <button class="vbtn pri" onclick="fitView()" title="Να χωρά όλο στο παράθυρο">Προσαρμογή</button>
+  <button class="vbtn" onclick="setZ(1)" title="Κανονικό μέγεθος">100%</button>
   <button class="vbtn" onclick="zoom(0.1)" title="Μεγέθυνση">+</button>
+  <button class="vbtn pri" onclick="fitWidth()" title="Να χωρά στο πλάτος">Προσαρμογή πλάτους</button>
   <button class="vbtn" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση</button>
 </div>
 <div class="vstage" id="vstage">
@@ -132,21 +131,10 @@
   </div>
 </div>
 <script>
-  var Z=1;
-  function setZ(s){ Z=s; document.getElementById('vscale').style.transform='scale('+s+')'; }
-  function fitView(){
-    var st=document.getElementById('vstage'), el=document.getElementById('vscale');
-    el.style.transform='scale(1)';
-    var tw=el.offsetWidth||1, th=el.offsetHeight||1;
-    var aw=st.clientWidth-28, ah=st.clientHeight-28;
-    var s=Math.min(aw/tw, ah/th);
-    if(s>2.4)s=2.4; if(s<0.12)s=0.12;
-    setZ(s);
-  }
-  function zoom(d){ setZ(Math.max(0.12, Math.min(3, Z+d))); }
-  window.addEventListener('resize', fitView);
-  window.addEventListener('load', fitView);
-  setTimeout(fitView, 80);
+  var Z=1, el=document.getElementById('vscale'), st=document.getElementById('vstage');
+  function setZ(z){ Z=z; el.style.zoom=z; }
+  function zoom(d){ setZ(Math.max(0.4, Math.min(2.5, Math.round((Z+d)*10)/10))); }
+  function fitWidth(){ el.style.zoom=1; var z=(st.clientWidth-30)/el.scrollWidth; if(z>1)z=1; if(z<0.3)z=0.3; setZ(z); }
 </script>
 {% else %}
 {{ mp.topbar('chart', 'ΕΣΤΙΑ — Κλασικό οργανόγραμμα', 'Ξενοδοχείο → Ομάδες → Τμήματα → Θέσεις → Άτομα') }}
@@ -155,8 +143,7 @@
   <div class="toolbar">
     <a href="/dashboard/org?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-arrow-left"></i> Πίσω στη διαχείριση</a>
     <a href="/dashboard/org/settings?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-settings"></i> Ρυθμίσεις δομής</a>
-    <span class="sbtn pri" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση / PDF</span>
-    <a href="/dashboard/org/chart?hotel_id={{ sel }}&view=1" target="_blank" rel="noopener" class="sbtn"><i class="ti ti-external-link"></i> View</a>
+    <a href="/dashboard/org/chart?hotel_id={{ sel }}&view=1" target="_blank" rel="noopener" class="sbtn pri"><i class="ti ti-external-link"></i> View (πλήρης οθόνη)</a>
   </div>
   <div class="htabs">
     {% for h in hotels %}<a class="htab {{ 'on' if h.id==sel }}" href="/dashboard/org/chart?hotel_id={{ h.id }}{{ emb }}">{{ h.name }}</a>{% endfor %}
