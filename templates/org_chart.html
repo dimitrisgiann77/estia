@@ -99,6 +99,7 @@
     <a href="/dashboard/org?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-arrow-left"></i> Πίσω στη διαχείριση</a>
     <a href="/dashboard/org/settings?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-settings"></i> Ρυθμίσεις δομής</a>
     <span class="sbtn pri" onclick="window.print()"><i class="ti ti-printer"></i> Εκτύπωση / PDF</span>
+    <a href="/dashboard/org/chart?hotel_id={{ sel }}" target="_blank" rel="noopener" class="sbtn"><i class="ti ti-external-link"></i> Άνοιγμα σε νέα καρτέλα</a>
   </div>
 
   <div class="htabs">
