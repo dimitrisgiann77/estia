@@ -367,7 +367,15 @@ var posUid=null;
 var POSITIONS=[{% for p in all_positions %}{id:{{ p.id }},name:{{ p.name|tojson }},gid:{{ p.group_id or 0 }}}{% if not loop.last %},{% endif %}{% endfor %}];
 function setPos(uid,pid,deptGid){ posUid=uid;
   var sel=document.getElementById('posSel'); sel.innerHTML='<option value="">— καμία —</option>';
-  POSITIONS.forEach(function(p){ if(!deptGid || !p.gid || p.gid==deptGid){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; sel.appendChild(o); } });
+  function _opt(p){ var o=document.createElement('option'); o.value=p.id; o.textContent=p.name; return o; }
+  if(deptGid){
+    var rel=POSITIONS.filter(function(p){ return !p.gid || p.gid==deptGid; });
+    var oth=POSITIONS.filter(function(p){ return p.gid && p.gid!=deptGid; });
+    if(rel.length){ var g1=document.createElement('optgroup'); g1.label='Σχετικές με το τμήμα'; rel.forEach(function(p){ g1.appendChild(_opt(p)); }); sel.appendChild(g1); }
+    if(oth.length){ var g2=document.createElement('optgroup'); g2.label='Άλλες θέσεις'; oth.forEach(function(p){ g2.appendChild(_opt(p)); }); sel.appendChild(g2); }
+  } else {
+    POSITIONS.forEach(function(p){ sel.appendChild(_opt(p)); });
+  }
   sel.value=(pid?String(pid):'');
   document.getElementById('posModal').style.display='flex'; }
 function closePos(){ document.getElementById('posModal').style.display='none'; }
@@ -381,10 +389,4 @@ document.getElementById('posModal').addEventListener('click', function(e){ if(e.
   document.querySelectorAll('.oboard').forEach(function(board){
     Sortable.create(board, {handle:'.ogrip', draggable:'.ocol', filter:'[data-dept=""]', preventOnFilter:false, animation:140,
       onEnd:function(){
-        var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); });
-        fetch('/dashboard/org/dept/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:ids})});
-      }});
-  });
-})();
-</script>
-</body></html>
+        var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); })
