@@ -116,7 +116,7 @@
     {% for h in hotels %}<a class="otab {{ 'on' if h.id==sel }}" href="/dashboard/org?hotel_id={{ h.id }}&embed=1">{{ hcodes.get(h.id) or '' }} · {{ h.name }}</a>{% endfor %}
   </div>
 
-  <div style="margin-bottom:12px;"><a href="/dashboard/org/settings?embed=1" class="otab"><i class="ti ti-settings"></i> Ρυθμίσεις (ομάδες / υποομάδες / θέσεις)</a></div>
+  <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"><a href="/dashboard/org/settings?embed=1" class="otab"><i class="ti ti-settings"></i> Ρυθμίσεις (ομάδες / υποομάδες / θέσεις)</a><a href="/dashboard/org/chart?hotel_id={{ sel }}&embed=1" class="otab"><i class="ti ti-sitemap"></i> Κλασική όψη (οργανόγραμμα)</a></div>
 
   <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">

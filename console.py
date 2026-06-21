@@ -404,6 +404,121 @@ def org_console():
                            all_positions=all_positions, group_opts=group_opts,
                            supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
+
+@app.route('/dashboard/org/chart')
+def org_chart():
+    """v12.185 — Κλασική (δεντρική) όψη οργανογράμματος, read-only. Ξεν.→Ομάδες→Τμήματα→Θέσεις→Άτομα."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    from schedule import Department, DepartmentGroup, HotelDepartment, JobPosition
+    piimap = _pii_map()
+    hcodes = _hotel_codes()
+    hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    sel = request.args.get('hotel_id', type=int) or (hotels[0].id if hotels else None)
+    hotel = Hotel.query.get(sel) if sel else None
+    posmap = {}
+    try:
+        from payroll import MgmtAssignment
+        for ma in MgmtAssignment.query.filter(MgmtAssignment.valid_to == None).order_by(MgmtAssignment.id).all():
+            if ma.position:
+                posmap[ma.user_id] = ma.position
+    except Exception:
+        pass
+    jpmap = {}
+    pos_order = {}
+    try:
+        for p in JobPosition.query.order_by(JobPosition.sort, JobPosition.name).all():
+            jpmap[p.id] = p.name
+            pos_order[p.name] = p.sort or 0
+    except Exception:
+        pass
+    dmap = {d.id: d for d in Department.query.all()}
+    active_depts = Department.query.filter_by(active=True).all()
+    enabled = _hotel_dept_ids(sel)
+    base_ids = enabled if enabled is not None else {d.id for d in active_depts}
+
+    def pcard(u):
+        pii = piimap.get(u.id)
+        return {'id': u.id, 'name': u.full_name or u.username,
+                'code': (pii.emp_code if pii else None),
+                'role': u.role, 'mgr': role_rank(u.role) >= ROLE_RANK['manager'],
+                'pos': (jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id))}
+
+    bydept = {}
+    for u in User.query.filter(User.is_active == True).order_by(User.full_name).all():
+        if getattr(u, 'employment_active', None) is False:
+            continue
+        if getattr(u, 'home_hotel_id', None) == sel:
+            did = getattr(u, 'department_id', None)
+            key = did if (did and did in dmap and did in base_ids) else 0
+            bydept.setdefault(key, []).append(pcard(u))
+
+    all_groups = DepartmentGroup.query.filter_by(active=True).order_by(DepartmentGroup.sort, DepartmentGroup.name).all()
+    gmap = {g.id: g for g in all_groups}
+    gsup = {}
+    _gs = {g.supervisor_user_id for g in all_groups if getattr(g, 'supervisor_user_id', None)}
+    if _gs:
+        for su in User.query.filter(User.id.in_(_gs)).all():
+            gsup[su.id] = su.full_name or su.username
+    dsup = {}
+    for hd in HotelDepartment.query.filter_by(hotel_id=sel).all():
+        if hd.supervisor_user_id:
+            su = User.query.get(hd.supervisor_user_id)
+            if su:
+                dsup[hd.department_id] = su.full_name or su.username
+
+    cols = [dmap[i] for i in base_ids if i in dmap and getattr(dmap[i], 'active', True)]
+    lead = [d for d in cols if getattr(d, 'is_leadership', False)]
+    cols = [d for d in cols if not getattr(d, 'is_leadership', False)]
+    cols.sort(key=lambda d: (d.sort or 0, d.name or ''))
+    lead.sort(key=lambda d: (d.sort or 0, d.name or ''))
+    dept_by_group = {}
+    ungrouped = []
+    for d in cols:
+        gid = getattr(d, 'group_id', None)
+        if gid and gid in gmap:
+            dept_by_group.setdefault(gid, []).append(d)
+        else:
+            ungrouped.append(d)
+    children_of = {}
+    for g in all_groups:
+        pid = getattr(g, 'parent_id', None)
+        children_of.setdefault(pid if (pid and pid in gmap) else 0, []).append(g)
+
+    def dept_node(d, is_lead=False):
+        ppl = bydept.get(d.id, [])
+        buckets = {}
+        for p in ppl:
+            buckets.setdefault(p['pos'] or '', []).append(p)
+        positions = []
+        for nm in sorted(buckets.keys(), key=lambda n: (pos_order.get(n, 9999), n or 'zzzz')):
+            positions.append({'name': nm or None,
+                              'people': sorted(buckets[nm], key=lambda x: (0 if x['mgr'] else 1, x['name'] or ''))})
+        return {'type': 'dept', 'id': d.id, 'name': d.name, 'color': d.color or '#64748b',
+                'sup': dsup.get(d.id), 'count': len(ppl), 'positions': positions, 'lead': is_lead}
+
+    def group_node(g):
+        kids = [group_node(c) for c in children_of.get(g.id, [])]
+        kids = [k for k in kids if k]
+        depts = [dept_node(d) for d in dept_by_group.get(g.id, [])]
+        if not kids and not depts:
+            return None
+        return {'type': 'group', 'id': g.id, 'name': g.name, 'color': g.color or '#185FA5',
+                'sup': gsup.get(getattr(g, 'supervisor_user_id', None)),
+                'children': kids, 'depts': depts}
+
+    roots = [group_node(g) for g in children_of.get(0, [])]
+    roots = [r for r in roots if r]
+    lead_nodes = [dept_node(d, True) for d in lead]
+    ungrouped_nodes = [dept_node(d) for d in ungrouped]
+    if bydept.get(0):
+        ungrouped_nodes.append({'type': 'dept', 'id': 0, 'name': 'Χωρίς τμήμα', 'color': '#94a3b8',
+                                'sup': None, 'count': len(bydept[0]),
+                                'positions': [{'name': None, 'people': bydept[0]}], 'lead': False})
+    total = sum(len(v) for v in bydept.values())
+    return render_template('org_chart.html', hotels=hotels, sel=sel, hotel=hotel,
+                           roots=roots, lead_nodes=lead_nodes, ungrouped_nodes=ungrouped_nodes, total=total)
+
 @app.route('/dashboard/org/dept/create', methods=['POST'])
 def org_dept_create():
     if not is_admin():
