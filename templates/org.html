@@ -44,7 +44,12 @@
   .dedit:hover{color:var(--accent,#185FA5);}
   .sortable-ghost{opacity:.4;}
   .opoolcol{border-color:#bcd5ee;}
-  .opoollist{max-height:62vh;overflow:auto;margin-top:2px;}
+  .onodept{border-color:#cbd5e1;}
+  .ostage-ttl{font-size:12px;font-weight:700;color:var(--navy,#193847);display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+  .ostage{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;align-items:start;}
+  @media (max-width:760px){.ostage{grid-template-columns:1fr;}}
+  .opoollist{max-height:320px;overflow:auto;margin-top:2px;}
+  .onodeptlist{max-height:320px;overflow:auto;}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
@@ -108,6 +113,23 @@
     </div>
   </div>
 
+  <div class="ostage-ttl"><i class="ti ti-arrow-down-circle"></i> Σύρε από εδώ στα τμήματα — διαθέσιμο & αταξινόμητο προσωπικό</div>
+  <div class="ostage">
+    <div class="ocol opoolcol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,'','')">
+      <div class="oacc" style="background:var(--accent,#185FA5);"></div>
+      <h4><i class="ti ti-users"></i> Διαθέσιμο προσωπικό<span class="cnt">{{ pool|length }}</span></h4>
+      <input class="ofilter" id="pf" placeholder="Αναζήτηση..." oninput="filt()">
+      <div id="poollist" class="opoollist">
+        {% for c in pool %}{{ pcard(c, true) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
+      </div>
+    </div>
+    <div class="ocol onodept" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
+      <div class="oacc" style="background:#cbd5e1;"></div>
+      <h4><i class="ti ti-help-circle" style="color:#94a3b8;"></i> Χωρίς τμήμα <span class="muted" style="font-weight:400;color:#94a3b8;">(στο ξενοδοχείο, χωρίς τμήμα)</span><span class="cnt">{{ (bydept.get(0)|length) if bydept.get(0) else 0 }}</span></h4>
+      <div class="onodeptlist">{% for c in (bydept.get(0) or []) %}{{ pcard(c) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}</div>
+    </div>
+  </div>
+
   {% if lead_cols %}
   <div class="olead-ttl"><i class="ti ti-crown"></i> Διεύθυνση / Προϊστάμενοι</div>
   <div class="olead">
@@ -131,19 +153,6 @@
         {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
       {% endfor %}
-      <div class="ocol opoolcol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,'','')">
-        <div class="oacc" style="background:var(--accent,#185FA5);"></div>
-        <h4><i class="ti ti-users"></i> Διαθέσιμο προσωπικό<span class="cnt">{{ pool|length }}</span></h4>
-        <input class="ofilter" id="pf" placeholder="Αναζήτηση..." oninput="filt()">
-        <div id="poollist" class="opoollist">
-          {% for c in pool %}{{ pcard(c, true) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
-        </div>
-      </div>
-      <div class="ocol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
-        <div class="oacc" style="background:#cbd5e1;"></div>
-        <h4><i class="ti ti-help-circle" style="color:#94a3b8;"></i> Χωρίς τμήμα<span class="cnt">{{ (bydept.get(0)|length) if bydept.get(0) else 0 }}</span></h4>
-        {% for c in (bydept.get(0) or []) %}{{ pcard(c) }}{% endfor %}
-      </div>
     </div>
 </div>
 
