@@ -43,6 +43,8 @@
   .dedit{cursor:pointer;color:#cbd5e1;font-size:13px;margin-left:4px;}
   .dedit:hover{color:var(--accent,#185FA5);}
   .sortable-ghost{opacity:.4;}
+  .opoolcol{border-color:#bcd5ee;}
+  .opoollist{max-height:62vh;overflow:auto;margin-top:2px;}
   .omodal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
   .omodal .box{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
   .omodal h3{margin:0 0 4px;font-size:15px;color:var(--navy,#193847);}
@@ -120,16 +122,7 @@
   </div>
   {% endif %}
 
-  <div class="olayout">
-    <div class="opool" id="pool" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,'','')">
-      <h3><i class="ti ti-users"></i> Διαθέσιμο προσωπικό <span class="cnt" style="margin-left:auto;">{{ pool|length }}</span></h3>
-      <input class="ofilter" id="pf" placeholder="Αναζήτηση..." oninput="filt()">
-      <div id="poollist">
-        {% for c in pool %}{{ pcard(c, true) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
-      </div>
-    </div>
-
-    <div class="oboard">
+  <div class="oboard">
       {% for d in columns %}
       <div class="ocol" data-dept="{{ d.id }}" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},{{ d.id }})">
         <div class="oacc" style="background:{{ d.color }};"></div>
@@ -138,13 +131,20 @@
         {% for c in (bydept.get(d.id) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
       {% endfor %}
+      <div class="ocol opoolcol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,'','')">
+        <div class="oacc" style="background:var(--accent,#185FA5);"></div>
+        <h4><i class="ti ti-users"></i> Διαθέσιμο προσωπικό<span class="cnt">{{ pool|length }}</span></h4>
+        <input class="ofilter" id="pf" placeholder="Αναζήτηση..." oninput="filt()">
+        <div id="poollist" class="opoollist">
+          {% for c in pool %}{{ pcard(c, true) }}{% else %}<div style="color:#94a3b8;font-size:12px;">— κανείς —</div>{% endfor %}
+        </div>
+      </div>
       <div class="ocol" data-dept="" ondragover="allowDrop(event)" ondragleave="leave(event)" ondrop="drop(event,{{ sel }},'')">
         <div class="oacc" style="background:#cbd5e1;"></div>
         <h4><i class="ti ti-help-circle" style="color:#94a3b8;"></i> Χωρίς τμήμα<span class="cnt">{{ (bydept.get(0)|length) if bydept.get(0) else 0 }}</span></h4>
         {% for c in (bydept.get(0) or []) %}{{ pcard(c) }}{% endfor %}
       </div>
     </div>
-  </div>
 </div>
 
 <div class="omodal" id="supModal">
