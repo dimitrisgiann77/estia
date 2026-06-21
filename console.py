@@ -356,9 +356,17 @@ def org_console():
             bucket.setdefault(gid, []).append(dcol)
         else:
             ungrouped.append(dcol)
-    grouped = [{'group': g, 'cols': bucket[g.id]} for g in all_groups if g.id in bucket]
+    def _gpath(g):
+        parts = []; seen = set(); cur = g
+        while cur is not None and cur.id not in seen:
+            seen.add(cur.id); parts.append(cur.name)
+            pid = getattr(cur, 'parent_id', None); cur = gmap.get(pid) if pid else None
+        return ' › '.join(reversed(parts))
+    grouped = [{'group': g, 'cols': bucket[g.id], 'path': _gpath(g)} for g in all_groups if g.id in bucket]
     from schedule import JobPosition
     all_positions = JobPosition.query.filter_by(active=True).order_by(JobPosition.sort, JobPosition.name).all()
+    group_opts = [{'id': g.id, 'path': _gpath(g)} for g in all_groups]
+    group_opts.sort(key=lambda x: x['path'])
     # για τον επιλογέα «πρόσθεσε τμήμα στο ξενοδοχείο»
     enabled_set = enabled or set()
     available = [d for d in active_depts if d.id not in enabled_set]
@@ -387,7 +395,7 @@ def org_console():
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
                            configured=(enabled is not None),
                            lead_cols=lead_cols, grouped=grouped, ungrouped=ungrouped, all_groups=all_groups,
-                           all_positions=all_positions,
+                           all_positions=all_positions, group_opts=group_opts,
                            supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
 
 @app.route('/dashboard/org/dept/create', methods=['POST'])
@@ -584,14 +592,15 @@ def org_group_save():
             g.name = name
         if color:
             g.color = color
+        if 'parent_id' in d:
+            g.parent_id = int(d['parent_id']) if d.get('parent_id') else None
     else:
         if not name:
             return jsonify(ok=False, msg='Όνομα;'), 400
-        g = DepartmentGroup.query.filter(db.func.lower(DepartmentGroup.name) == name.lower(), DepartmentGroup.active == True).first()
-        if not g:
-            mx = db.session.query(db.func.max(DepartmentGroup.sort)).scalar() or 0
-            g = DepartmentGroup(name=name, name_en=name, color=color or '#64748b', active=True, sort=mx + 1)
-            db.session.add(g)
+        pid = d.get('parent_id'); pid = int(pid) if pid else None
+        mx = db.session.query(db.func.max(DepartmentGroup.sort)).scalar() or 0
+        g = DepartmentGroup(name=name, name_en=name, color=color or '#64748b', parent_id=pid, active=True, sort=mx + 1)
+        db.session.add(g)
     try:
         db.session.commit()
     except Exception:
@@ -615,6 +624,14 @@ def org_group_delete():
         return jsonify(ok=False, msg='not found'), 404
     for dep in Department.query.filter(Department.group_id == gid).all():
         dep.group_id = None
+    for ch in DepartmentGroup.query.filter(DepartmentGroup.parent_id == gid).all():
+        ch.parent_id = g.parent_id   # τα παιδιά ανεβαίνουν στον γονέα του διαγραμμένου
+    try:
+        from schedule import JobPosition as _JP2
+        for p in _JP2.query.filter(_JP2.group_id == gid).all():
+            p.group_id = None
+    except Exception:
+        pass
     g.active = False
     db.session.commit()
     log_activity('org_group_delete', str(gid))
@@ -737,3 +754,33 @@ def org_person_setposition():
     db.session.commit()
     log_activity('org_setposition', 'user=%s pos=%s' % (uid, pid))
     return jsonify(ok=True)
+
+
+@app.route('/dashboard/org/settings')
+def org_settings():
+    if not is_admin():
+        return redirect(url_for('login'))
+    from schedule import DepartmentGroup, Department, JobPosition
+    groups = DepartmentGroup.query.filter_by(active=True).order_by(DepartmentGroup.sort, DepartmentGroup.name).all()
+    gmap = {g.id: g for g in groups}
+    children = {}
+    for g in groups:
+        children.setdefault(g.parent_id or 0, []).append(g)
+    roots = children.get(0, [])
+    dept_count = {}
+    for dep in Department.query.filter_by(active=True).all():
+        if dep.group_id:
+            dept_count[dep.group_id] = dept_count.get(dep.group_id, 0) + 1
+    def gpath(gid):
+        parts = []; seen = set(); cur = gmap.get(gid)
+        while cur is not None and cur.id not in seen:
+            seen.add(cur.id); parts.append(cur.name)
+            pid = cur.parent_id; cur = gmap.get(pid) if pid else None
+        return ' › '.join(reversed(parts))
+    positions = JobPosition.query.filter_by(active=True).order_by(JobPosition.sort, JobPosition.name).all()
+    pos_rows = [{'p': p, 'gpath': (gpath(p.group_id) if p.group_id else None)} for p in positions]
+    nogroup = [p for p in positions if not p.group_id]
+    group_opts = [{'id': g.id, 'path': gpath(g.id)} for g in groups]
+    group_opts.sort(key=lambda x: x['path'])
+    return render_template('org_settings.html', roots=roots, children=children, dept_count=dept_count,
+                           pos_rows=pos_rows, nogroup=nogroup, group_opts=group_opts)

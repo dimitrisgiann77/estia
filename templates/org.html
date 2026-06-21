@@ -116,6 +116,8 @@
     {% for h in hotels %}<a class="otab {{ 'on' if h.id==sel }}" href="/dashboard/org?hotel_id={{ h.id }}&embed=1">{{ hcodes.get(h.id) or '' }} · {{ h.name }}</a>{% endfor %}
   </div>
 
+  <div style="margin-bottom:12px;"><a href="/dashboard/org/settings?embed=1" class="otab"><i class="ti ti-settings"></i> Ρυθμίσεις (ομάδες / υποομάδες / θέσεις)</a></div>
+
   <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-building-cog"></i> Τμήματα αυτού του ξενοδοχείου</b>
@@ -130,39 +132,6 @@
       </span>
       {% endfor %}
       <span onclick="newDept()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέο τμήμα</span>
-    </div>
-  </div>
-
-  <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-layout-grid"></i> Ομάδες (master groups)</b>
-      <span class="muted" style="font-size:11.5px;">κοινές για όλα τα ξενοδοχεία· βάλε τμήμα σε ομάδα από το ✎ του τμήματος</span>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-      {% for g in all_groups %}
-      <span class="gchip" style="border:1px solid {{ g.color }}66;background:{{ g.color }}1a;">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ g.color }};"></span>{{ g.name }}
-        <span class="gp" onclick='editGroup({{ g.id }}, {{ g.name|tojson }}, {{ g.color|tojson }})' title="Επεξεργασία/διαγραφή"><i class="ti ti-pencil"></i></span>
-      </span>
-      {% else %}<span class="muted" style="font-size:12px;color:#94a3b8;">— καμία ομάδα ακόμη —</span>{% endfor %}
-      <span onclick="newGroup()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέα ομάδα</span>
-    </div>
-  </div>
-
-  <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-briefcase"></i> Θέσεις εργασίας</b>
-      <span class="muted" style="font-size:11.5px;">από το προσωπικό· εμφανίζονται στις κάρτες</span>
-      <span onclick="seedPositions()" style="margin-left:auto;cursor:pointer;font-size:11.5px;color:var(--accent,#185FA5);font-weight:600;"><i class="ti ti-download"></i> Δημιουργία από προσωπικό</span>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-      {% for p in all_positions %}
-      <span class="gchip" style="border:1px solid {{ p.color }}66;background:{{ p.color }}1a;">
-        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{{ p.color }};"></span>{{ p.name }}
-        <span class="gp" onclick='editPosition({{ p.id }}, {{ p.name|tojson }}, {{ p.color|tojson }}, {{ p.group_id or 0 }})' title="Επεξεργασία/διαγραφή"><i class="ti ti-pencil"></i></span>
-      </span>
-      {% else %}<span class="muted" style="font-size:12px;color:#94a3b8;">— καμία θέση ακόμη· πάτησε «Δημιουργία από προσωπικό» —</span>{% endfor %}
-      <span onclick="newPosition()" style="cursor:pointer;font-size:12px;padding:4px 11px;border-radius:20px;border:1px dashed #94a3b8;color:#475569;user-select:none;"><i class="ti ti-plus"></i> Νέα θέση</span>
     </div>
   </div>
 
@@ -199,8 +168,7 @@
 
   {% for grp in grouped %}
   <div class="ogroup-ttl" style="border-left:3px solid {{ grp.group.color }};">
-    <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:{{ grp.group.color }};"></span>{{ grp.group.name }}
-    <span class="gedit" onclick='editGroup({{ grp.group.id }}, {{ grp.group.name|tojson }}, {{ grp.group.color|tojson }})' title="Επεξεργασία ομάδας"><i class="ti ti-pencil"></i></span>
+    <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:{{ grp.group.color }};"></span>{{ grp.path }}
   </div>
   <div class="oboard">
     {% for d in grp.cols %}{{ deptcol(d, bydept, supmap, sel) }}{% endfor %}
@@ -276,8 +244,7 @@
       <span style="font-size:13px;color:#64748b;">Ομάδα (master group):</span>
       <select class="osel" id="deptGroup" style="margin-top:6px;">
         <option value="">— καμία —</option>
-        {% for g in all_groups %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}
-        <option value="__new__">+ Νέα ομάδα…</option>
+        {% for go in group_opts %}<option value="{{ go.id }}">{{ go.path }}</option>{% endfor %}
       </select>
     </div>
     <div class="obtns">
