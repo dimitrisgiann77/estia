@@ -29,6 +29,20 @@
       </div>
     </div>
 
+    <div class="card"><h3>Ανάθεση (Εστία)</h3>
+      <p class="muted" style="font-size:12px;margin:0 0 8px;">Όρισε <b>ξενοδοχείο / τμήμα / θέση</b> — γράφεται στο προφίλ (οργανόγραμμα) με ιστορικό. Είναι το ίδιο που βλέπει το Πρόγραμμα Εργασίας.</p>
+      <form method="post" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <input type="hidden" name="action" value="org">
+        <div class="row" style="min-width:160px;"><label>Ξενοδοχείο</label>
+          <select name="home_hotel_id"><option value="">— κανένα —</option>{% for h in all_hotels %}<option value="{{ h.id }}" {{ 'selected' if u.home_hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}</select></div>
+        <div class="row" style="min-width:160px;"><label>Τμήμα</label>
+          <select name="department_id"><option value="">— κανένα —</option>{% for d in all_depts %}<option value="{{ d.id }}" {{ 'selected' if u.department_id==d.id }}>{{ d.name }}</option>{% endfor %}</select></div>
+        <div class="row" style="min-width:160px;"><label>Θέση</label>
+          <select name="position_id"><option value="">— καμία —</option>{% for p in all_positions %}<option value="{{ p.id }}" {{ 'selected' if u.position_id==p.id }}>{{ p.name }}</option>{% endfor %}</select></div>
+        <button class="b" type="submit">Αποθήκευση</button>
+      </form>
+    </div>
+
     <div class="card"><h3>Συμφωνία (Management)</h3>
       {% if prof %}
       <form method="POST"><input type="hidden" name="action" value="agreement">

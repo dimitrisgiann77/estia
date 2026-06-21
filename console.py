@@ -968,8 +968,8 @@ def org_person_setposition():
     if not u:
         return jsonify(ok=False, msg='not found'), 404
     pid = d.get('position_id')
-    if hasattr(u, 'position_id'):
-        u.position_id = int(pid) if pid else None
+    import people
+    people.set_user_position(u, pid, actor_id=(current_user().id if current_user() else None))
     db.session.commit()
     log_activity('org_setposition', 'user=%s pos=%s' % (uid, pid))
     return jsonify(ok=True)

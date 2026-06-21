@@ -452,6 +452,14 @@ def payroll_employee(uid):
             prof.agreement_type = request.form.get('agreement_type') or prof.agreement_type
             db.session.commit()
             log_activity('payroll_agreement_edit', u.full_name or u.username)
+        elif action == 'org':
+            import people as _PPL
+            cu = current_user()
+            _h = request.form.get('home_hotel_id'); _d = request.form.get('department_id'); _p = request.form.get('position_id')
+            _PPL.assign_user_org(u, int(_h) if _h else None, int(_d) if _d else None, actor_id=(cu.id if cu else None), reason='καρτέλα μητρώου')
+            _PPL.set_user_position(u, int(_p) if _p else None, actor_id=(cu.id if cu else None))
+            db.session.commit()
+            log_activity('payroll_org_assign', u.full_name or u.username)
         return redirect(url_for('payroll_employee', uid=uid))
     comp = _company_for_hotel(getattr(u, 'home_hotel_id', None))
     hotel = Hotel.query.get(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
@@ -502,12 +510,20 @@ def payroll_employee(uid):
             _p = _JP.query.get(u.position_id); org_pos = _p.name if _p else None
     except Exception:
         pass
+    all_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    try:
+        from schedule import Department as _Dep2, JobPosition as _JP2
+        all_depts = _Dep2.query.filter_by(active=True).order_by(_Dep2.sort, _Dep2.name).all()
+        all_positions = _JP2.query.filter_by(active=True).order_by(_JP2.sort, _JP2.name).all()
+    except Exception:
+        all_depts, all_positions = [], []
     return render_template('payroll_employee.html',
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, work_history=work_history,
         fin=fin, fin_tot=fin_tot, fin_months=fin_months, month_gr=_MONTH_GR,
         assignments=assignments, events=events, flags=flags,
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
-        is_admin=is_admin(), org_dept=org_dept, org_pos=org_pos)
+        is_admin=is_admin(), org_dept=org_dept, org_pos=org_pos,
+        all_hotels=all_hotels, all_depts=all_depts, all_positions=all_positions)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

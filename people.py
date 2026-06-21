@@ -72,6 +72,8 @@ EVENT_LABELS = {
     'edit':      'Επεξεργασία στοιχείων',
     'status':    'Αλλαγή κατάστασης',
     'flag':      'Σημαία προσοχής',
+    'org_assign':   'Ανάθεση (οργανόγραμμα)',
+    'org_position': 'Θέση (οργανόγραμμα)',
 }
 
 
@@ -106,6 +108,25 @@ def assign_user_org(user, hotel_id=None, dept_id=None, actor_id=None, reason='')
         hn, dn = (hid or '—'), (did or '—')
     detail = 'Ανάθεση: %s / %s%s' % (hn, dn, (' · %s' % reason if reason else ''))
     log_event(user.id, 'org_assign', detail, actor_id=actor_id)
+    return True
+
+
+def set_user_position(user, position_id=None, actor_id=None):
+    """v12.195 — ΤΟ ΜΟΝΟ σημείο εγγραφής θέσης (User.position_id) + ιστορικό (ProfileEvent).
+    Καλείται από owner-screens (Οργανόγραμμα + καρτέλα μητρώου). ΔΕΝ κάνει commit."""
+    if not user:
+        return False
+    pid = int(position_id) if position_id else None
+    old = getattr(user, 'position_id', None)
+    if old == pid:
+        return False
+    user.position_id = pid
+    try:
+        from schedule import JobPosition
+        pn = (JobPosition.query.get(pid).name if pid else '—')
+    except Exception:
+        pn = pid or '—'
+    log_event(user.id, 'org_position', 'Θέση: %s' % pn, actor_id=actor_id)
     return True
 
 
