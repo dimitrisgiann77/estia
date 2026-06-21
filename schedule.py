@@ -80,7 +80,7 @@ def monday_of(d):
 class DepartmentGroup(db.Model):
     """v12.176 — master group τμημάτων (Κουζίνες/F&B/Όροφοι...). Single source· adjustable."""
     id      = db.Column(db.Integer, primary_key=True)
-    name    = db.Column(db.String(60), unique=True, nullable=False)
+    name    = db.Column(db.String(60), nullable=False)   # v12.183 — όχι global unique (μοναδικό μεταξύ αδελφών)
     name_en = db.Column(db.String(60))
     color   = db.Column(db.String(9), default='#64748b')
     parent_id = db.Column(db.Integer)   # v12.181 — υποομάδες (self-FK, απεριόριστο βάθος)
@@ -259,6 +259,7 @@ def ensure_schedule_columns():
             if db.engine.dialect.name == 'postgresql':
                 db.session.execute(_text('ALTER TABLE shift_assignment DROP CONSTRAINT IF EXISTS uq_user_date'))
                 db.session.execute(_text('ALTER TABLE pending_shift DROP CONSTRAINT IF EXISTS uq_pending_name_date'))
+                db.session.execute(_text('ALTER TABLE department_group DROP CONSTRAINT IF EXISTS department_group_name_key'))  # v12.183
                 db.session.commit()
         except Exception as _e:
             db.session.rollback()

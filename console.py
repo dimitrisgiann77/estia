@@ -590,20 +590,32 @@ def org_group_save():
     gid = d.get('group_id'); gid = int(gid) if gid else None
     name = (d.get('name') or '').strip()[:60]
     color = (d.get('color') or '').strip()[:9]
+    def _sib(nm, pid, exclude=None):
+        q = DepartmentGroup.query.filter(db.func.lower(DepartmentGroup.name) == nm.lower(), DepartmentGroup.active == True)
+        q = q.filter(DepartmentGroup.parent_id == pid) if pid else q.filter(DepartmentGroup.parent_id.is_(None))
+        if exclude:
+            q = q.filter(DepartmentGroup.id != exclude)
+        return q.first()
     if gid:
         g = DepartmentGroup.query.get(gid)
         if not g:
             return jsonify(ok=False, msg='not found'), 404
+        new_parent = (int(d['parent_id']) if d.get('parent_id') else None) if 'parent_id' in d else g.parent_id
+        new_name = name or g.name
+        if _sib(new_name, new_parent, exclude=g.id):
+            return jsonify(ok=False, msg='Υπάρχει ήδη ομάδα με αυτό το όνομα στο ίδιο επίπεδο.'), 400
         if name:
             g.name = name
         if color:
             g.color = color
         if 'parent_id' in d:
-            g.parent_id = int(d['parent_id']) if d.get('parent_id') else None
+            g.parent_id = new_parent
     else:
         if not name:
             return jsonify(ok=False, msg='Όνομα;'), 400
         pid = d.get('parent_id'); pid = int(pid) if pid else None
+        if _sib(name, pid):
+            return jsonify(ok=False, msg='Υπάρχει ήδη ομάδα με αυτό το όνομα στο ίδιο επίπεδο.'), 400
         mx = db.session.query(db.func.max(DepartmentGroup.sort)).scalar() or 0
         g = DepartmentGroup(name=name, name_en=name, color=color or '#64748b', parent_id=pid, active=True, sort=mx + 1)
         db.session.add(g)
@@ -611,7 +623,7 @@ def org_group_save():
         db.session.commit()
     except Exception:
         db.session.rollback()
-        return jsonify(ok=False, msg='Υπάρχει ήδη ομάδα με αυτό το όνομα.'), 400
+        return jsonify(ok=False, msg='Δεν αποθηκεύτηκε.'), 400
     log_activity('org_group_save', '%s' % (g.id))
     return jsonify(ok=True, id=g.id, name=g.name, color=g.color)
 
