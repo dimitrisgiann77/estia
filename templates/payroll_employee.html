@@ -110,12 +110,12 @@
         <th style="border-bottom:1px solid #eef2f6;"></th>
       </tr>
       {% for a in assignments %}
-      <tr {% if not a.valid_to %}style="background:#f0fdf4;"{% endif %}>
+      <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">{{ a.unit or '—' }}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;font-weight:500;">{{ a.department or '—' }}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">{{ a.position or '—' }}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">{% if a.valid_from %}{{ a.valid_from.strftime('%d/%m/%Y') }}{% elif a.needs_date %}<span class="pill no">⚠ ορίστε</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">{% if a.valid_to %}{{ a.valid_to.strftime('%d/%m/%Y') }}{% else %}<span style="color:#166534;">τρέχουσα</span>{% endif %}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">{% if a.valid_to %}{{ a.valid_to.strftime('%d/%m/%Y') }}{% else %}<span class="muted">παλιό αρχείο</span>{% endif %}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;">{% if a.agreement_amount %}{{ '%.0f'|format(a.agreement_amount) }}€{% else %}—{% endif %}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;">
           <details><summary style="cursor:pointer;color:#64748b;font-size:12px;">επεξεργασία</summary>
