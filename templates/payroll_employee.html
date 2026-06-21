@@ -23,6 +23,8 @@
         <div><b>Ονοματεπώνυμο:</b> {{ u.full_name or u.username }} {{ lock_badge(u) }}</div>
         <div><b>Εταιρεία:</b> {{ comp.legal_name if comp else '—' }}</div>
         <div><b>Ξενοδοχείο (home):</b> {{ hotel.name if hotel else '—' }}</div>
+        <div><b>Τμήμα (οργανόγραμμα):</b> {% if org_dept %}{{ org_dept }}{% else %}<span style="color:#b91c1c;">— δεν έχει οριστεί —</span>{% endif %}</div>
+        <div><b>Θέση (οργανόγραμμα):</b> {% if org_pos %}{{ org_pos }}{% else %}<span style="color:#b91c1c;">— δεν έχει οριστεί —</span>{% endif %}</div>
         <div><b>Σύνδεση:</b> {{ 'Ναι' if u.login_enabled else 'Όχι (μόνο μητρώο)' }}</div>
       </div>
     </div>
@@ -81,7 +83,7 @@
   </div>
   {% endif %}
 
-  <div class="card"><h3>Αναθέσεις (Management) <span class="muted" style="font-size:12px;font-weight:400;">τμήμα/θέση/συμφωνία με ιστορικό</span></h3>
+  <div class="card"><h3>Αναθέσεις (Management) <span class="muted" style="font-size:12px;font-weight:400;">παλιό αρχείο / ιστορικό — το τρέχον τμήμα/θέση ορίζεται πλέον στο Οργανόγραμμα</span></h3>
     {% if assignments %}
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <tr style="color:#64748b;font-size:11px;text-transform:uppercase;">

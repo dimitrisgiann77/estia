@@ -265,6 +265,13 @@ def _employees(status='active'):
     else:
         q = q.filter((User.employment_active == True) | (User.employment_active.is_(None)))
     users = q.all()
+    # v12.194 — τμήμα/θέση από ΟΡΓΑΝΟΓΡΑΜΜΑ (προφίλ), κενό αν δεν έχει οριστεί
+    try:
+        from schedule import Department as _Dep, JobPosition as _JP
+        _dname = {d.id: d.name for d in _Dep.query.all()}
+        _pname = {p.id: p.name for p in _JP.query.all()}
+    except Exception:
+        _dname, _pname = {}, {}
     out = []
     for u in users:
         prof = EmploymentProfile.query.filter_by(user_id=u.id).first() if EmploymentProfile else None
@@ -280,6 +287,8 @@ def _employees(status='active'):
         out.append({'user': u, 'profile': prof, 'pii': pii, 'company': comp,
                     'hotel_name': (hotel.name if hotel else ''), 'hotel_id': hid,
                     'dept_id': getattr(u, 'department_id', None), 'mgmt': ma,
+                    'org_dept': _dname.get(getattr(u, 'department_id', None)),
+                    'org_pos': _pname.get(getattr(u, 'position_id', None)),
                     'mgmt_dept': (ma.department if ma else None), 'mgmt_pos': (ma.position if ma else None),
                     'mgmt_unit': (ma.unit if ma else None),
                     'cost_center': cc, 'cost_center_label': (COST_CENTERS.get(cc, cc) if cc else '')})
@@ -484,12 +493,21 @@ def payroll_employee(uid):
         work_history = _wh(uid)
     except Exception:
         work_history = []
+    org_dept = None; org_pos = None
+    try:
+        from schedule import Department as _Dep, JobPosition as _JP
+        if getattr(u, 'department_id', None):
+            _d = _Dep.query.get(u.department_id); org_dept = _d.name if _d else None
+        if getattr(u, 'position_id', None):
+            _p = _JP.query.get(u.position_id); org_pos = _p.name if _p else None
+    except Exception:
+        pass
     return render_template('payroll_employee.html',
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, work_history=work_history,
         fin=fin, fin_tot=fin_tot, fin_months=fin_months, month_gr=_MONTH_GR,
         assignments=assignments, events=events, flags=flags,
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
-        is_admin=is_admin())
+        is_admin=is_admin(), org_dept=org_dept, org_pos=org_pos)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
