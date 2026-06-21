@@ -118,6 +118,14 @@
 
   <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"><a href="/dashboard/org/settings?embed=1" class="otab"><i class="ti ti-settings"></i> Ρυθμίσεις (ομάδες / υποομάδες / θέσεις)</a><a href="/dashboard/org/chart?hotel_id={{ sel }}&embed=1" class="otab"><i class="ti ti-sitemap"></i> Κλασική όψη (οργανόγραμμα)</a></div>
 
+  <div style="margin-bottom:12px;"><button type="button" class="otab" id="unbtn" onclick="toggleUnassigned()" style="cursor:pointer;{% if unassigned %}border-color:#f59e0b;color:#b45309;background:#fffbeb;{% endif %}"><i class="ti ti-alert-triangle"></i> Χωρίς τμήμα &amp; θέση ({{ unassigned|length }})</button></div>
+  <div id="unpanel" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;margin-bottom:14px;">
+    <div style="font-size:12.5px;color:#92400e;margin-bottom:8px;"><i class="ti ti-info-circle"></i> Εργαζόμενοι <b>χωρίς τμήμα ΚΑΙ χωρίς θέση</b> (όλα τα ξενοδοχεία). Πάτησε «+ θέση» για θέση· για τμήμα, διάλεξε το ξενοδοχείο του και σύρ' τον από τη ζώνη «Χωρίς τμήμα».</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      {% for c in unassigned %}{{ pcard(c, true) }}{% else %}<div style="color:#92400e;font-size:12.5px;">— κανείς, όλοι έχουν τμήμα ή θέση —</div>{% endfor %}
+    </div>
+  </div>
+
   <div class="ohotdepts" style="background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:12px;padding:12px;margin-bottom:14px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <b style="font-size:13px;color:var(--navy,#193847);"><i class="ti ti-building-cog"></i> Τμήματα αυτού του ξενοδοχείου</b>
@@ -381,6 +389,7 @@ function setPos(uid,pid,deptGid){ posUid=uid;
 function closePos(){ document.getElementById('posModal').style.display='none'; }
 function savePos(){ _gpost('/dashboard/org/person/setposition',{user_id:posUid, position_id:document.getElementById('posSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); }); }
 document.getElementById('posModal').addEventListener('click', function(e){ if(e.target===this) closePos(); });
+function toggleUnassigned(){ var p=document.getElementById('unpanel'); if(!p) return; p.style.display=(!p.style.display||p.style.display==='none')?'block':'none'; }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>

@@ -396,13 +396,24 @@ def org_console():
         if getattr(u, 'home_hotel_id', None) == sel or role_rank(u.role) >= ROLE_RANK['manager']:
             cand[u.id] = {'id': u.id, 'name': u.full_name or u.username}
     sup_candidates = sorted(cand.values(), key=lambda x: (x['name'] or ''))
+    # v12.192 — εκκρεμή ανάθεσης: ΟΛΟΙ (όλα τα ξενοδοχεία) χωρίς τμήμα ΚΑΙ χωρίς θέση
+    unassigned = []
+    for u in allu:
+        if getattr(u, 'employment_active', None) is False:
+            continue
+        cdept = getattr(u, 'department_id', None)
+        cpos = jpmap.get(getattr(u, 'position_id', None)) or posmap.get(u.id)
+        if not cdept and not cpos:
+            unassigned.append(card(u))
+    unassigned.sort(key=lambda c: (c['name'] or ''))
     return render_template('org.html', hotels=hotels, sel=sel, columns=columns,
                            bydept=bydept, pool=pool, hcodes=hcodes,
                            active_depts=active_depts, enabled_ids=list(enabled_set), available=available,
                            configured=(enabled is not None),
                            lead_cols=lead_cols, grouped=grouped, ungrouped=ungrouped, all_groups=all_groups,
                            all_positions=all_positions, group_opts=group_opts,
-                           supmap=supmap, cursup=cursup, sup_candidates=sup_candidates)
+                           supmap=supmap, cursup=cursup, sup_candidates=sup_candidates,
+                           unassigned=unassigned)
 
 
 @app.route('/dashboard/org/chart')
