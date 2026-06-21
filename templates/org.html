@@ -261,7 +261,7 @@ document.getElementById('deptModal').addEventListener('click', function(e){ if(e
 (function(){
   var board=document.querySelector('.oboard');
   if(board && window.Sortable){
-    Sortable.create(board, {handle:'.ogrip', draggable:'.ocol', filter:'[data-dept=""]', animation:140,
+    Sortable.create(board, {handle:'.ogrip', draggable:'.ocol', filter:'[data-dept=""]', preventOnFilter:false, animation:140,
       onMove:function(e){ return e.related.getAttribute('data-dept')!==''; },
       onEnd:function(){
         var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); });

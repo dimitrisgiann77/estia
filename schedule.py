@@ -829,17 +829,14 @@ def validate_hotel_week(hotel_id, week_start):
 
 # ── ROUTE: Board (multi-week + πολλαπλά τμήματα δυναμικά) ──────────────────────
 def _depts_present(hotel_id):
-    """v12.167 — Τμήματα του ξενοδοχείου = ό,τι ορίζει το οργανόγραμμα (HotelDepartment)
-    ∪ όσα έχουν ήδη άτομα. Κενά ρυθμισμένα τμήματα εμφανίζονται. Fallback: όλα τα ενεργά."""
+    """v12.173 (#2) — Τμήματα στο Πρόγραμμα = ΜΟΝΟ τα επιλεγμένα (HotelDepartment).
+    Μη-επιλεγμένα ΔΕΝ εμφανίζονται (ακόμη κι αν έχουν άτομα). Μη ρυθμισμένο → όλα τα ενεργά."""
     if not hotel_id:
         return Department.query.filter_by(active=True).order_by(Department.sort).all()
     configured = {hd.department_id for hd in HotelDepartment.query.filter_by(hotel_id=hotel_id).all()}
-    present = {u.department_id for u in User.query.filter(User.is_active == True,
-               User.home_hotel_id == hotel_id, User.department_id != None).all()}
-    ids = configured | present
-    if not ids:
-        return Department.query.filter_by(active=True).order_by(Department.sort).all()
-    return Department.query.filter(Department.id.in_(ids)).order_by(Department.sort, Department.name).all()
+    if configured:
+        return Department.query.filter(Department.id.in_(configured), Department.active == True).order_by(Department.sort, Department.name).all()
+    return Department.query.filter_by(active=True).order_by(Department.sort).all()
 
 def _dept_supervisors(hotel_id):
     """v12.168 — {dept_id: όνομα υπευθύνου} ανά ξενοδοχείο, από HotelDepartment (owner=οργανόγραμμα)."""

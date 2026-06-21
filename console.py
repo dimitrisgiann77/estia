@@ -304,6 +304,9 @@ def org_console():
                 'avatar': getattr(u, 'avatar', None),
                 'hcode': hcodes.get(getattr(u, 'home_hotel_id', None))}
 
+    # v12.173 (#7) — στήλες = ΜΟΝΟ τα επιλεγμένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί)
+    enabled = _hotel_dept_ids(sel)
+    base_ids = enabled if enabled is not None else {d.id for d in active_depts}
     allu = User.query.filter(User.is_active == True).order_by(User.full_name).all()
     bydept = {}     # dept_id (ή 0=Χωρίς τμήμα) -> [cards] για το επιλεγμένο ξενοδοχείο
     pool = []       # όσοι ΔΕΝ είναι στο επιλεγμένο ξενοδοχείο
@@ -312,15 +315,12 @@ def org_console():
             continue
         if getattr(u, 'home_hotel_id', None) == sel:
             did = getattr(u, 'department_id', None)
-            key = did if (did and did in dmap) else 0   # άγνωστο/διαγραμμένο τμήμα → Χωρίς τμήμα
+            # μη-επιλεγμένο/άγνωστο/διαγραμμένο τμήμα → Χωρίς τμήμα (#7 edge)
+            key = did if (did and did in dmap and did in base_ids) else 0
             bydept.setdefault(key, []).append(card(u))
         else:
             pool.append(card(u))
-    # στήλες = ενεργοποιημένα τμήματα του ξενοδοχείου (ή όλα τα ενεργά αν δεν έχει οριστεί) + όσα έχουν άτομα
-    enabled = _hotel_dept_ids(sel)
-    base_ids = enabled if enabled is not None else {d.id for d in active_depts}
-    people_ids = {k for k in bydept.keys() if k != 0}
-    col_ids = base_ids | people_ids
+    col_ids = base_ids   # ΜΟΝΟ επιλεγμένα — όχι «όσα έχουν άτομα»
     columns = [dmap[i] for i in col_ids if i in dmap]
     columns.sort(key=lambda d: (d.sort or 0, d.name or ''))
     # v12.171 — λωρίδα Διεύθυνσης (όσα τμήματα είναι μαρκαρισμένα is_leadership)
