@@ -348,6 +348,11 @@ def org_console():
     from schedule import DepartmentGroup
     all_groups = DepartmentGroup.query.filter_by(active=True).order_by(DepartmentGroup.sort, DepartmentGroup.name).all()
     gmap = {g.id: g for g in all_groups}
+    gsupmap = {}
+    _suids = {g.supervisor_user_id for g in all_groups if getattr(g, 'supervisor_user_id', None)}
+    if _suids:
+        for su in User.query.filter(User.id.in_(_suids)).all():
+            gsupmap[su.id] = su.full_name or su.username
     bucket = {}
     ungrouped = []
     for dcol in columns:
@@ -362,7 +367,8 @@ def org_console():
             seen.add(cur.id); parts.append(cur.name)
             pid = getattr(cur, 'parent_id', None); cur = gmap.get(pid) if pid else None
         return ' › '.join(reversed(parts))
-    grouped = [{'group': g, 'cols': bucket[g.id], 'path': _gpath(g)} for g in all_groups if g.id in bucket]
+    grouped = [{'group': g, 'cols': bucket[g.id], 'path': _gpath(g),
+                'sup': gsupmap.get(getattr(g, 'supervisor_user_id', None))} for g in all_groups if g.id in bucket]
     from schedule import JobPosition
     all_positions = JobPosition.query.filter_by(active=True).order_by(JobPosition.sort, JobPosition.name).all()
     group_opts = [{'id': g.id, 'path': _gpath(g)} for g in all_groups]
@@ -656,6 +662,25 @@ def org_dept_setgroup():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/org/group/supervisor', methods=['POST'])
+def org_group_supervisor():
+    if not is_admin():
+        return jsonify(ok=False, msg='forbidden'), 403
+    from schedule import DepartmentGroup
+    d = request.json or {}
+    try:
+        gid = int(d['group_id'])
+    except Exception:
+        return jsonify(ok=False, msg='bad'), 400
+    g = DepartmentGroup.query.get(gid)
+    if not g:
+        return jsonify(ok=False, msg='not found'), 404
+    uid = d.get('user_id'); g.supervisor_user_id = int(uid) if uid else None
+    db.session.commit()
+    log_activity('org_group_supervisor', 'g=%s u=%s' % (gid, uid))
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/org/positions/seed', methods=['POST'])
 def org_positions_seed():
     if not is_admin():
@@ -782,5 +807,14 @@ def org_settings():
     nogroup = [p for p in positions if not p.group_id]
     group_opts = [{'id': g.id, 'path': gpath(g.id)} for g in groups]
     group_opts.sort(key=lambda x: x['path'])
+    cand = [{'id': u.id, 'name': u.full_name or u.username} for u in User.query.filter(User.is_active == True).order_by(User.full_name).all()]
+    gsup = {}; cursup = {}
+    _us = {g.supervisor_user_id for g in groups if g.supervisor_user_id}
+    if _us:
+        _um = {u.id: (u.full_name or u.username) for u in User.query.filter(User.id.in_(_us)).all()}
+        for g in groups:
+            if g.supervisor_user_id and g.supervisor_user_id in _um:
+                gsup[g.id] = _um[g.supervisor_user_id]; cursup[g.id] = g.supervisor_user_id
     return render_template('org_settings.html', roots=roots, children=children, dept_count=dept_count,
-                           pos_rows=pos_rows, nogroup=nogroup, group_opts=group_opts)
+                           pos_rows=pos_rows, nogroup=nogroup, group_opts=group_opts,
+                           candidates=cand, gsup=gsup, cursup=cursup)

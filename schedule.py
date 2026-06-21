@@ -84,6 +84,7 @@ class DepartmentGroup(db.Model):
     name_en = db.Column(db.String(60))
     color   = db.Column(db.String(9), default='#64748b')
     parent_id = db.Column(db.Integer)   # v12.181 — υποομάδες (self-FK, απεριόριστο βάθος)
+    supervisor_user_id = db.Column(db.Integer)   # v12.182 — υπεύθυνος ομάδας/υποομάδας
     active  = db.Column(db.Boolean, default=True)
     sort    = db.Column(db.Integer, default=0)
 
@@ -251,6 +252,7 @@ def ensure_schedule_columns():
         _add_col('department', 'is_leadership', 'is_leadership BOOLEAN')  # v12.171
         _add_col('department', 'group_id', 'group_id INTEGER')  # v12.176
         _add_col('department_group', 'parent_id', 'parent_id INTEGER')  # v12.181
+        _add_col('department_group', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.182
         # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
         try:
             from sqlalchemy import text as _text

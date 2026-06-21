@@ -168,7 +168,7 @@
 
   {% for grp in grouped %}
   <div class="ogroup-ttl" style="border-left:3px solid {{ grp.group.color }};">
-    <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:{{ grp.group.color }};"></span>{{ grp.path }}
+    <span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:{{ grp.group.color }};"></span>{{ grp.path }}{% if grp.sup %}<span style="font-weight:500;color:var(--accent,#185FA5);font-size:11px;margin-left:8px;"><i class="ti ti-user-star"></i> {{ grp.sup }}</span>{% endif %}
   </div>
   <div class="oboard">
     {% for d in grp.cols %}{{ deptcol(d, bydept, supmap, sel) }}{% endfor %}

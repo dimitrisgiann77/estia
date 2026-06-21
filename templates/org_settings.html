@@ -26,22 +26,31 @@
   .warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;}
   html[data-theme="dark"] .warn{background:#2a2412;border-color:#5a4a2a;color:#fcd34d;}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .gsup{cursor:pointer;font-size:11px;color:var(--accent,#185FA5);font-weight:600;margin-left:6px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+  .gsup.add{color:#94a3b8;}
+  .omodal2{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;align-items:center;justify-content:center;}
+  .omodal2 .box2{background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;padding:18px;width:min(380px,92vw);}
+  .omodal2 select{width:100%;padding:9px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:8px;margin:10px 0;font-size:13px;background:var(--card,#fff);color:inherit;}
+  .obtns2{display:flex;gap:8px;justify-content:flex-end;}
+  .obtns2 button{padding:8px 14px;border-radius:8px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;font-weight:600;cursor:pointer;}
+  .obtns2 button.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
 </style></head><body>
 {{ mp.topbar('settings', 'ΕΣΤΙΑ — Ρυθμίσεις οργανογράμματος', 'Ομάδες, υποομάδες & θέσεις εργασίας — το δέντρο') }}
 
-{% macro tree(nodes, children, dept_count, depth) %}
+{% macro tree(nodes, children, dept_count, gsup, depth) %}
   {% for g in nodes %}
   <div class="gnode" style="margin-left:{{ depth*22 }}px;border-left:3px solid {{ g.color }};">
     <span class="gdot" style="background:{{ g.color }};"></span>
     <span class="gname">{{ g.name }}</span>
     <span class="gcnt">{{ dept_count.get(g.id, 0) }} τμήματα</span>
+    {% if gsup.get(g.id) %}<span class="gsup" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})' title="Αλλαγή υπευθύνου"><i class="ti ti-user-star"></i> {{ gsup[g.id] }}</span>{% else %}<span class="gsup add" onclick='setGroupSup({{ g.id }}, {{ g.name|tojson }})'><i class="ti ti-user-plus"></i> υπεύθυνος</span>{% endif %}
     <span class="gact">
       <span onclick='addSubGroup({{ g.id }})' title="Νέα υποομάδα"><i class="ti ti-plus"></i></span>
       <span onclick='renameGroup({{ g.id }}, {{ g.name|tojson }}, {{ g.color|tojson }})' title="Μετονομασία / χρώμα"><i class="ti ti-pencil"></i></span>
       <span onclick='delGroup({{ g.id }})' title="Διαγραφή"><i class="ti ti-trash"></i></span>
     </span>
   </div>
-  {{ tree(children.get(g.id, []), children, dept_count, depth + 1) }}
+  {{ tree(children.get(g.id, []), children, dept_count, gsup, depth + 1) }}
   {% endfor %}
 {% endmacro %}
 
@@ -52,7 +61,7 @@
     <h3><i class="ti ti-sitemap"></i> Δέντρο ομάδων</h3>
     <p class="sub">Φτιάξε ομάδες και υποομάδες (απεριόριστο βάθος). Π.χ. F&B → Κουζίνες, Εστιατόρια/Μπαρ. Τα τμήματα τα βάζεις σε ομάδα από το ✎ του τμήματος στο οργανόγραμμα.</p>
     <div class="toolbar"><span class="sbtn pri" onclick="addTopGroup()"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</span></div>
-    {% if roots %}{{ tree(roots, children, dept_count, 0) }}{% else %}<div style="color:#94a3b8;font-size:12.5px;">— καμία ομάδα ακόμη —</div>{% endif %}
+    {% if roots %}{{ tree(roots, children, dept_count, gsup, 0) }}{% else %}<div style="color:#94a3b8;font-size:12.5px;">— καμία ομάδα ακόμη —</div>{% endif %}
   </div>
 
   <div class="scard">
@@ -80,6 +89,13 @@
   </div>
 </div>
 
+<div class="omodal2" id="gsupModal"><div class="box2">
+  <h3 style="margin:0 0 4px;font-size:15px;color:var(--navy,#193847);"><i class="ti ti-user-star"></i> Υπεύθυνος ομάδας</h3>
+  <p class="sub" id="gsupTitle"></p>
+  <select id="gsupSel"></select>
+  <div class="obtns2"><button onclick="closeGroupSup()">Άκυρο</button><button class="pri" onclick="saveGroupSup()">Αποθήκευση</button></div>
+</div></div>
+
 <script>
 function _post(url,body){ return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
 function _ok(j){ if(j&&j.ok){ location.reload(); } else { alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); } }
@@ -91,6 +107,16 @@ function newPos(){ var n=prompt('Όνομα νέας θέσης:'); if(!n)return
 function renamePos(id,name,color){ var n=prompt('Όνομα θέσης:', name||''); if(n===null)return; var c=prompt('Χρώμα (hex):', color||'#64748b')||color||'#64748b'; _post('/dashboard/org/position/save',{position_id:id,name:n,color:c}).then(_ok); }
 function delPos(id){ if(!confirm('Διαγραφή θέσης;'))return; _post('/dashboard/org/position/delete',{position_id:id}).then(_ok); }
 function setPosGroup(id,gid){ _post('/dashboard/org/position/save',{position_id:id,group_id:gid}).then(function(j){ if(!(j&&j.ok)) alert('Δεν αποθηκεύτηκε'); else location.reload(); }); }
+var CANDIDATES = {{ candidates|tojson }};
+var CURSUP = {{ cursup|tojson }};
+var gsupGid=null;
+function setGroupSup(gid,name){ gsupGid=gid; document.getElementById('gsupTitle').textContent='Ομάδα: '+name;
+  var sel=document.getElementById('gsupSel'); sel.innerHTML='<option value="">— κανένας —</option>';
+  CANDIDATES.forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  sel.value=(CURSUP[gid]!=null?String(CURSUP[gid]):''); document.getElementById('gsupModal').style.display='flex'; }
+function closeGroupSup(){ document.getElementById('gsupModal').style.display='none'; }
+function saveGroupSup(){ _post('/dashboard/org/group/supervisor',{group_id:gsupGid, user_id:document.getElementById('gsupSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); }); }
+document.getElementById('gsupModal').addEventListener('click', function(e){ if(e.target===this) closeGroupSup(); });
 function seedPos(){ if(!confirm('Δημιουργία θέσεων από τις θέσεις του προσωπικού;'))return; _post('/dashboard/org/positions/seed',{}).then(function(j){ if(j&&j.ok){ alert('Δημιουργήθηκαν '+j.created+' νέες θέσεις.'); location.reload(); } else alert('Δεν έγινε'); }); }
 </script>
 </body></html>
