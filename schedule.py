@@ -1363,6 +1363,66 @@ def schedule_period_mark():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/schedule/paste_excel', methods=['POST'])
+def schedule_paste_excel():
+    """v12.209 — Επικόλληση ΑΠΟ Excel: parse κειμένου (TSV) -> βάρδιες μέσω parse_cell,
+    εφαρμογή στα επιλεγμένα κελιά. 1 τιμή -> όλα τα κελιά· πολλές -> κατά σειρά."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    cells = d.get('cells') or []
+    text = (d.get('text') or '')
+    tokens = []
+    for line in text.replace('\r', '').split('\n'):
+        for tok in line.split('\t'):
+            tokens.append(tok)
+    parsed = []
+    for t in tokens:
+        code, segs, tag = parse_cell(t)
+        if code:
+            parsed.append((code, segs, tag))
+    if not parsed:
+        return jsonify(ok=False, msg='Δεν βρέθηκε έγκυρη βάρδια στο κείμενο του Excel.')
+    short2id = {}
+    for h in Hotel.query.all():
+        sh = _hotel_short(h.name)
+        if sh:
+            short2id[sh.upper()] = h.id
+    done = 0; locked = 0; touched = set()
+    for i, c in enumerate(cells):
+        try:
+            uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        pc = parsed[0] if len(parsed) == 1 else (parsed[i] if i < len(parsed) else None)
+        if pc is None:
+            break
+        if not week_editable(monday_of(wd), user):
+            locked += 1; continue
+        code, segs, tag = pc
+        whid = short2id.get((tag or '').upper()) if tag else None
+        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
+            segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+        touched.add((uid, monday_of(wd)))
+        done += 1
+    for uid, ws in touched:
+        u = User.query.get(uid)
+        if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
+            wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws).first()
+            if not wp:
+                wp = WeekPlan(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=ws, status='draft')
+                db.session.add(wp)
+            if wp.status in ('submitted', 'locked'):
+                wp.status = 'draft'
+            wp.updated_by = user.id
+    db.session.commit()
+    return jsonify(ok=True, done=done, locked=locked)
+
+
 
 # ── Αντιγραφή προηγούμενης εβδομάδας ──────────────────────────────────────────
 @app.route('/dashboard/schedule/copyprev', methods=['POST'])

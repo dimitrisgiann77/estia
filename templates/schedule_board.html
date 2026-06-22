@@ -107,7 +107,7 @@
   </div>
   {% endif %}
 
-  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b> (επικόλληση σε στήλες/γραμμές).</p>
+  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b>, και το <b>Ctrl+V</b> επικολλά και <b>από</b> Excel πάνω στα κελιά. Η αντιγραφή μένει ενεργή μέχρι να αντιγράψεις κάτι άλλο.</p>
 
   {% set qs=request.args %}
   {% if qs.get('ok')=='submitted' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκε στο λογιστήριο.</div>{% endif %}
@@ -401,7 +401,8 @@ function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
 document.addEventListener('mousedown',function(e){var ed=document.getElementById('editor');if(ed.style.display==='block'&&!ed.contains(e.target)&&!e.target.closest('.cell')){ed.style.display='none';clearSel();}});
 // ── Αντιγραφή/Επικόλληση κελιών (Ctrl+C / Ctrl+V, layout-agnostic μέσω e.code) ──
-var clip=null;
+var clip=null, clipTSV=null;
+try{ clip=JSON.parse(sessionStorage.getItem('estia_clip')||'null'); clipTSV=sessionStorage.getItem('estia_clipTSV'); }catch(_){}
 function _toast(msg){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#185FA5;color:#fff;padding:8px 14px;border-radius:9px;font-size:13px;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.25);';document.body.appendChild(t);setTimeout(function(){t.remove();},1500);}
 function _cellTxt(cell){
   var es=[];try{es=JSON.parse(cell.getAttribute('data-entries')||'[]');}catch(_){return '';}
@@ -423,17 +424,31 @@ function _toClipboard(txt){
   try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt); return true; } }catch(_){}
   try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;left:-9999px;top:0;'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }catch(_){ return false; }
 }
+function _selSorted(){ return curSel.slice().sort(function(a,b){var pa=_pos(a),pb=_pos(b);return (pa.r-pb.r)||(pa.c-pb.c);}); }
+function _readClipboard(){ try{ if(navigator.clipboard&&navigator.clipboard.readText) return navigator.clipboard.readText().catch(function(){return null;}); }catch(_){} return Promise.resolve(null); }
+function _pasteInternal(cells){
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+}
+function _pasteExcel(cells, txt){
+  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,text:txt})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
+}
 document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&curSel.length){
     var src=curSel[curSel.length-1]; var es=[];try{es=JSON.parse(src.getAttribute('data-entries')||'[]');}catch(_){}
     clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),work_hotel_id:(x.wh||null)};});
-    _toClipboard(_selToTSV());   // v12.208 — και στο σύστημα (paste σε Excel)
-    e.preventDefault(); _toast((curSel.length>1?('Αντιγράφηκαν '+curSel.length+' κελιά'):(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε'))+' — έτοιμο για Excel');
-  } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&clip&&curSel.length){
+    clipTSV=_selToTSV(); _toClipboard(clipTSV);
+    try{ sessionStorage.setItem('estia_clip',JSON.stringify(clip)); sessionStorage.setItem('estia_clipTSV',clipTSV); }catch(_){}
+    e.preventDefault(); _toast((curSel.length>1?('Αντιγράφηκαν '+curSel.length+' κελιά'):(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε'))+' — μένει ενεργό για πολλά paste');
+  } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&curSel.length){
     e.preventDefault();
-    var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+    var cells=_selSorted().map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
+    _readClipboard().then(function(txt){
+      if(txt && clipTSV && txt===clipTSV && clip){ _pasteInternal(cells); }     // δικό μας copy → πλήρης βάρδια
+      else if(txt && txt.trim()){ _pasteExcel(cells, txt); }                    // από Excel → parse
+      else if(clip){ _pasteInternal(cells); }                                   // fallback
+      else { _toast('Δεν υπάρχει κάτι για επικόλληση'); }
+    });
   }
 });
 // ── Draggable editor (σύρε από τον τίτλο) ──
