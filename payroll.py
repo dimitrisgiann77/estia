@@ -501,6 +501,13 @@ def payroll_employee(uid):
         work_history = _wh(uid)
     except Exception:
         work_history = []
+    # v12.197 — Έναρξη/Τελευταία εμφάνιση στο Πρόγραμμα (read-only, από βάρδιες)
+    sched_first = sched_last = None
+    try:
+        from schedule import schedule_span as _span
+        sched_first, sched_last = _span(uid)
+    except Exception:
+        pass
     org_dept = None; org_pos = None
     try:
         from schedule import Department as _Dep, JobPosition as _JP
@@ -523,6 +530,7 @@ def payroll_employee(uid):
         assignments=assignments, events=events, flags=flags,
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
         is_admin=is_admin(), org_dept=org_dept, org_pos=org_pos,
+        sched_first=sched_first, sched_last=sched_last,
         all_hotels=all_hotels, all_depts=all_depts, all_positions=all_positions)
 
 

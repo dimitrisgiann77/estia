@@ -79,6 +79,17 @@
     </form>
   </div>
 
+  <div class="card"><h3>Δραστηριότητα στο Πρόγραμμα <span class="muted" style="font-size:12px;font-weight:400;">αυτόματα από τις βάρδιες — read-only</span></h3>
+    <p class="meta" style="margin-top:0;">Πότε ξεκίνησε και πότε σταμάτησε να τον χρησιμοποιεί ο manager στο Πρόγραμμα Εργασίας (κάθε εμφάνιση, μαζί ρεπό/άδεια). Διαφορετικό από την «Πρόσληψη/Αποχώρηση» του Λογιστηρίου (Epsilon).</p>
+    <div class="grid">
+      <div class="row"><label>Έναρξη (Πρόγραμμα)</label>
+        <input type="text" value="{{ sched_first.strftime('%d/%m/%Y') if sched_first else '—' }}" disabled></div>
+      <div class="row"><label>Τελευταία εμφάνιση (Πρόγραμμα)</label>
+        <input type="text" value="{{ sched_last.strftime('%d/%m/%Y') if sched_last else '—' }}" disabled></div>
+    </div>
+    {% if not sched_first %}<p class="meta" style="color:#94a3b8;">Δεν υπάρχει ακόμη καμία βάρδια στο Πρόγραμμα.</p>{% endif %}
+  </div>
+
   {% if flags %}
   <div class="card" style="border:1px solid #fde68a;background:#fffbeb;">
     <h3 style="color:#92400e;">⚠ Χρειάζονται προσοχή</h3>

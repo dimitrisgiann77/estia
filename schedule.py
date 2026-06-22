@@ -372,6 +372,18 @@ def is_work_code(code):
         return bool(st.counts_as_work)
     return code == 'ΕΡΓ'
 
+def schedule_span(uid):
+    """v12.197 — Πρώτη/τελευταία εμφάνιση εργαζομένου στο ΠΡΟΓΡΑΜΜΑ (ΟΛΕΣ οι βάρδιες,
+    μαζί ΡΕΠΟ/άδεια = κάθε χρήση του από manager). Read-only, ζωντανός υπολογισμός.
+    Επιστρέφει (first_date, last_date) ή (None, None) αν δεν υπάρχει καμία βάρδια."""
+    from sqlalchemy import func as _func
+    row = (db.session.query(_func.min(ShiftAssignment.work_date),
+                            _func.max(ShiftAssignment.work_date))
+           .filter(ShiftAssignment.user_id == uid,
+                   ShiftAssignment.work_date.isnot(None))
+           .one())
+    return (row[0], row[1]) if row else (None, None)
+
 def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
     hol = {h.hol_date for h in Holiday.query.all()}
