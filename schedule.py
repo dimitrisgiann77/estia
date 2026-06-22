@@ -197,6 +197,17 @@ class PendingShift(db.Model):
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
     # v12.132: επιτρέπονται πολλές βάρδιες/μέρα στον προθάλαμο (αφαιρέθηκε το unique norm_name+work_date)
 
+class SchedulePeriodMark(db.Model):
+    """v12.199 — Δήλωση manager στην ΕΠΙΣΤΡΟΦΗ εργαζομένου στο Πρόγραμμα (μετά από κενό ή αλλαγή ξεν.).
+    Anchored στην ημερομηνία επιστροφής. kind: 'new'=νέα περίοδος (default) | 'continue'=συνέχεια (ενώνει το κενό ίδιου ξεν.)."""
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    work_date  = db.Column(db.Date, nullable=False, index=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'))
+    kind       = db.Column(db.String(12), default='new')
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class Holiday(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     hol_date    = db.Column(db.Date, unique=True, nullable=False)
@@ -402,9 +413,10 @@ def schedule_periods(uid):
                     ShiftAssignment.work_date.isnot(None))
             .all())
     seen = sorted({(d, (h or home)) for d, h in rows})   # (ημερομηνία, ξενοδοχείο) μοναδικά
+    cont = {m.work_date for m in SchedulePeriodMark.query.filter_by(user_id=uid, kind='continue').all()}
     periods, cur = [], None
     for d, hid in seen:
-        if cur and hid == cur['hotel_id'] and (d - cur['end']).days <= SCHEDULE_PERIOD_MAX_GAP_DAYS:
+        if cur and hid == cur['hotel_id'] and ((d - cur['end']).days <= SCHEDULE_PERIOD_MAX_GAP_DAYS or d in cont):
             cur['end'] = d; cur['days'] += 1
         else:
             cur = {'hotel_id': hid, 'hotel': hotels.get(hid, '—'),
@@ -412,6 +424,35 @@ def schedule_periods(uid):
             periods.append(cur)
     periods.sort(key=lambda pr: pr['start'], reverse=True)
     return periods
+
+def _schedule_return_context(uid, wd, this_hotel_id):
+    """v12.199 — Αν η ημ. wd ξεκινά νέα περίοδο σε σχέση με την προηγούμενη βάρδια
+    (κενό > MAX_GAP Ή αλλαγή ξενοδοχείου), επιστρέφει context για το pop-up· αλλιώς None."""
+    u = User.query.get(uid)
+    home = getattr(u, 'home_hotel_id', None) if u else None
+    this_h = this_hotel_id or home
+    prev = (ShiftAssignment.query
+            .filter(ShiftAssignment.user_id == uid, ShiftAssignment.work_date < wd)
+            .order_by(ShiftAssignment.work_date.desc()).first())
+    if not prev:
+        return None   # πρώτη εμφάνιση — όχι «επιστροφή»
+    prev_h = prev.work_hotel_id or home
+    gap = (wd - prev.work_date).days
+    gap_break = gap > SCHEDULE_PERIOD_MAX_GAP_DAYS
+    hotel_break = (prev_h != this_h)
+    if not (gap_break or hotel_break):
+        return None
+    hotels = {h.id: h.name for h in Hotel.query.all()}
+    dep = None
+    if u and getattr(u, 'department_id', None):
+        _d = Department.query.get(u.department_id); dep = _d.name if _d else None
+    existing = SchedulePeriodMark.query.filter_by(user_id=uid, work_date=wd).first()
+    reason = 'both' if (gap_break and hotel_break) else ('hotel' if hotel_break else 'gap')
+    return {'user_id': uid, 'name': (u.full_name or u.username) if u else '',
+            'date': wd.isoformat(), 'last_date': prev.work_date.isoformat(),
+            'last_hotel': hotels.get(prev_h, '—'), 'this_hotel': hotels.get(this_h, '—'),
+            'gap_days': gap, 'reason': reason, 'dept': dep, 'hotel_id': this_h,
+            'marked': existing.kind if existing else None}
 
 def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
@@ -1202,7 +1243,45 @@ def schedule_paste_cells():
                 wp.updated_by = user.id
         done += 1
     db.session.commit()
-    return jsonify(ok=True, done=done, locked=locked)
+    prompt = None
+    cells_in = d.get('cells') or []
+    if norm and len(cells_in) == 1:
+        try:
+            _uid = int(cells_in[0]['user_id'])
+            _wd = datetime.strptime(cells_in[0]['date'], '%Y-%m-%d').date()
+            _wh = next((w for (_c, _s, w) in norm if w), None)
+            ctx = _schedule_return_context(_uid, _wd, _wh)
+            if ctx and not ctx['marked']:
+                prompt = ctx
+        except Exception:
+            prompt = None
+    return jsonify(ok=True, done=done, locked=locked, return_prompt=prompt)
+
+
+@app.route('/dashboard/schedule/period_mark', methods=['POST'])
+def schedule_period_mark():
+    """v12.199 — Αποθηκεύει τη δήλωση του manager στην επιστροφή: νέα περίοδος ή συνέχεια."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    try:
+        uid = int(d['user_id'])
+        wd = datetime.strptime(d['date'], '%Y-%m-%d').date()
+    except Exception:
+        return jsonify(ok=False, err='bad'), 400
+    kind = (d.get('kind') or 'new').strip()
+    if kind not in ('new', 'continue'):
+        kind = 'new'
+    whid = d.get('hotel_id'); whid = int(whid) if whid else None
+    m = SchedulePeriodMark.query.filter_by(user_id=uid, work_date=wd).first()
+    if not m:
+        m = SchedulePeriodMark(user_id=uid, work_date=wd); db.session.add(m)
+    m.kind = kind; m.hotel_id = whid; m.created_by = user.id
+    db.session.commit()
+    return jsonify(ok=True)
 
 
 
