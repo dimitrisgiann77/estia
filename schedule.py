@@ -125,6 +125,8 @@ class ShiftType(db.Model):
     default_start = db.Column(db.String(5))   # 'HH:MM'
     default_end   = db.Column(db.String(5))
     counts_as_work= db.Column(db.Boolean, default=False)
+    count_as      = db.Column(db.String(10))   # v12.207: work|extra|repo|absence (παραμετροποιήσιμο)
+    break_deduct  = db.Column(db.Boolean)       # v12.207: αφαίρεση 30' αν παρουσία ≥6ω
     payroll_note  = db.Column(db.String(120))
     ergani_type   = db.Column(db.String(16))
     active        = db.Column(db.Boolean, default=True)
@@ -264,6 +266,18 @@ def ensure_schedule_columns():
         _add_col('department', 'group_id', 'group_id INTEGER')  # v12.176
         _add_col('department_group', 'parent_id', 'parent_id INTEGER')  # v12.181
         _add_col('department_group', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.182
+        _add_col('shift_type', 'count_as', "count_as VARCHAR(10)")  # v12.207
+        _add_col('shift_type', 'break_deduct', 'break_deduct BOOLEAN')  # v12.207
+        try:  # backfill κατηγοριών (idempotent)
+            for _st in ShiftType.query.all():
+                if not _st.count_as:
+                    _st.count_as = ('extra' if _st.code == 'ΕΩ' else 'repo' if _st.code == 'ΑΝ'
+                                    else 'work' if _st.counts_as_work else 'absence')
+                if _st.break_deduct is None:
+                    _st.break_deduct = _st.count_as in ('work', 'extra')
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         # v12.131 — επέτρεψε πολλές βάρδιες/μέρα: ρίξε το unique constraint (μόνο Postgres· αναστρέψιμο)
         try:
             from sqlalchemy import text as _text
@@ -304,10 +318,13 @@ BREAK_MIN_PRESENCE = 6.0
 def shift_break(presence):
     return BREAK_HOURS if (presence and presence >= BREAK_MIN_PRESENCE) else 0.0
 def worked_hours(a):
-    """Πληρωτέες ώρες = παρουσία − διάλειμμα (30' αν παρουσία ≥6ω). Σε σπαστή το κενό
-    είναι ήδη εκτός (segments_hours) ΚΑΙ αφαιρείται επιπλέον 30' εφόσον σύνολο ≥6ω."""
+    """Πληρωτέες ώρες = παρουσία − διάλειμμα. Το διάλειμμα (30' αν ≥6ω) εφαρμόζεται
+    ΑΝΑ ΚΩΔΙΚΟ (ShiftType.break_deduct, παραμετροποιήσιμο στις Ρυθμίσεις)."""
     p = assignment_hours(a)
-    return round(max(0.0, p - shift_break(p)), 4)
+    _st = ShiftType.query.filter_by(code=a.shift_code).first()
+    _bd = _st.break_deduct if (_st and _st.break_deduct is not None) else (a.shift_code in ('ΕΡΓ', 'ΕΩ'))
+    brk = BREAK_HOURS if (_bd and p and p >= BREAK_MIN_PRESENCE) else 0.0
+    return round(max(0.0, p - brk), 4)
 
 # v12.119 — Επιτρεπτοί κωδικοί καταχώρησης (ρυθμιζόμενο από Πρόγραμμα·Ρυθμίσεις).
 def _entry_codes_setting(role='admin'):
@@ -377,15 +394,27 @@ def assignment_hours(a):
         segs = []
     return segments_hours(segs)
 
-def is_work_code(code):
+def _shift_count_as(code):
+    """v12.207 — Κατηγορία μέτρησης κωδικού (data-driven από ShiftType.count_as).
+    work=εργάσιμη · extra=έξτρα ώρες · repo=ρεπό · absence=άδεια/απουσία."""
     st = ShiftType.query.filter_by(code=code).first()
-    if st:
-        return bool(st.counts_as_work)
-    return code == 'ΕΡΓ'
+    if st and st.count_as:
+        return st.count_as
+    if code == 'ΕΡΓ': return 'work'
+    if code == 'ΕΩ': return 'extra'
+    if code == 'ΑΝ': return 'repo'
+    if st and st.counts_as_work: return 'work'
+    return 'absence'
+
+def is_work_code(code):
+    # «παράγει δουλεμένες ώρες» = εργάσιμη Ή έξτρα (διατηρεί την υπάρχουσα σημασία)
+    return _shift_count_as(code) in ('work', 'extra')
 
 def is_extra_code(code):
-    """v12.206 — Κωδικός «έξτρα ωρών» (ΕΩ): οι ώρες του μετράνε ΣΤΙΣ ΕΞΤΡΑ, ΟΧΙ ως εργάσιμη."""
-    return code == 'ΕΩ'
+    return _shift_count_as(code) == 'extra'
+
+def is_repo_code(code):
+    return _shift_count_as(code) == 'repo'
 
 def schedule_span(uid):
     """v12.197 — Πρώτη/τελευταία εμφάνιση εργαζομένου στο ΠΡΟΓΡΑΜΜΑ (ΟΛΕΣ οι βάρδιες,
@@ -475,7 +504,7 @@ def aggregate(assignments, home_hotel_id=None):
                 hol_worked += 1
             if a.work_hotel_id and home_hotel_id and a.work_hotel_id != home_hotel_id:
                 elsewhere += 1
-        elif code == 'ΑΝ':
+        elif is_repo_code(code):
             repo += 1
     return {'work_days': work, 'repo': repo, 'sundays': sundays,
             'holidays_worked': hol_worked, 'extra_hours': round(extra, 2),
@@ -885,7 +914,7 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                         day_extra += worked_hours(a)
                     elif is_work_code(a.shift_code):
                         day_hours += worked_hours(a); day_work = True
-                    elif a.shift_code == 'ΑΝ':
+                    elif is_repo_code(a.shift_code):
                         day_repo = True
                     try:
                         segs = json.loads(a.segments) if a.segments else []
@@ -938,7 +967,7 @@ def validate_hotel_week(hotel_id, week_start):
         if not alist:
             continue
         codes = [a.shift_code for a in alist]
-        if 'R1_repo' in rules and codes.count('ΑΝ') < 1:
+        if 'R1_repo' in rules and sum(1 for c in codes if is_repo_code(c)) < 1:
             issues.append({'user': u, 'rule': 'R1_repo', 'severity': rules['R1_repo'].severity,
                            'msg': f'{u.full_name}: κανένα ρεπό αυτή την εβδομάδα'})
         # v12.200 — μέτρημα ΔΙΑΚΡΙΤΩΝ ημερών (όχι βαρδιών: πολλές/μέρα δεν «γεμίζουν» κενά)
@@ -1573,7 +1602,7 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                     _sun.add(a.work_date)
                 if a.work_date in hol:
                     _hol.add(a.work_date)
-            elif a.shift_code == 'ΑΝ':
+            elif is_repo_code(a.shift_code):
                 _repo.add(a.work_date)
         sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
@@ -2320,6 +2349,14 @@ def schedule_settings():
                 _c = request.form.get('color_%d' % st.id)
                 if _c and _re.match(r'^#[0-9a-fA-F]{6}$', _c):
                     st.color = _c
+            db.session.commit()
+        elif act == 'shift_meta':
+            for st in ShiftType.query.all():
+                _cat = request.form.get('cat_%d' % st.id)
+                if _cat in ('work', 'extra', 'repo', 'absence'):
+                    st.count_as = _cat
+                    st.counts_as_work = _cat in ('work', 'extra')  # συγχρονισμός legacy
+                st.break_deduct = (request.form.get('brk_%d' % st.id) is not None)
             db.session.commit()
         elif act == 'entry_codes':
             for _key, _field in (('sched_entry_codes', 'entry_code'), ('sched_entry_codes_mgr', 'entry_code_mgr')):

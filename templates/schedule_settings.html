@@ -30,15 +30,28 @@
 
   <div class="card"><h3>Κωδικοί βαρδιών</h3>
     <p style="font-size:13px;color:#64748b;margin:0 0 8px;">Διάλεξε χρώμα ανά κωδικό (φαίνεται στα τσιπ του προγράμματος, στη μηνιαία και στο υπόμνημα). Πάτα «Αποθήκευση χρωμάτων».</p>
+    <p style="font-size:13px;color:#64748b;margin:0 0 8px;">Ανά κωδικό ορίζεις πώς μετράει: <b>Κατηγορία</b> (Εργάσιμη=μετράει ώρες+εργάσιμη μέρα· Έξτρα=ώρες στις έξτρα, όχι εργάσιμη· Ρεπό· Άδεια/Απουσία=δεν μετράει) και αν αφαιρείται <b>διάλειμμα</b> 30΄ (όταν ≥6ω). Το πρόγραμμα/μηνιαίο/μισθοδοσία διαβάζουν από εδώ.</p>
     <form method="POST" id="colorsform"><input type="hidden" name="action" value="shift_colors"></form>
+    <form method="POST" id="metaform"><input type="hidden" name="action" value="shift_meta"></form>
     <table>
-    <tr><th>Κωδικός</th><th>Σημασία</th><th>Χρώμα</th><th>Εργάσιμη;</th><th>Ενεργός</th><th></th></tr>
+    <tr><th>Κωδικός</th><th>Σημασία</th><th>Χρώμα</th><th>Κατηγορία</th><th>Διάλειμμα 30΄</th><th>Ενεργός</th><th></th></tr>
     {% for s in shift_types %}<tr><td><b>{{ s.code }}</b></td><td>{{ s.label }}</td>
       <td><span style="display:inline-flex;align-items:center;gap:7px;"><input form="colorsform" type="color" name="color_{{ s.id }}" value="{{ s.color }}" style="width:42px;height:28px;padding:1px;border:1px solid #dbe3ea;border-radius:6px;cursor:pointer;"><span class="pill" style="background:{{ s.color }}33;border:1px solid {{ s.color }}">{{ s.color }}</span></span></td>
-      <td>{{ '✓' if s.counts_as_work else '—' }}</td><td>{{ '✓' if s.active else '—' }}</td>
+      <td><select form="metaform" name="cat_{{ s.id }}" style="padding:5px;border:1px solid #dbe3ea;border-radius:6px;">
+        {% set ca = s.count_as or ('extra' if s.code=='ΕΩ' else 'repo' if s.code=='ΑΝ' else 'work' if s.counts_as_work else 'absence') %}
+        <option value="work" {{ 'selected' if ca=='work' }}>Εργάσιμη</option>
+        <option value="extra" {{ 'selected' if ca=='extra' }}>Έξτρα</option>
+        <option value="repo" {{ 'selected' if ca=='repo' }}>Ρεπό</option>
+        <option value="absence" {{ 'selected' if ca=='absence' }}>Άδεια/Απουσία</option>
+      </select></td>
+      <td style="text-align:center;"><input form="metaform" type="checkbox" name="brk_{{ s.id }}" {{ 'checked' if s.break_deduct }} style="width:18px;height:18px;cursor:pointer;"></td>
+      <td>{{ '✓' if s.active else '—' }}</td>
       <td><form method="POST" style="margin:0;"><input type="hidden" name="action" value="shift_toggle"><input type="hidden" name="id" value="{{ s.id }}"><button class="b" style="background:#64748b;">{{ 'Απενεργ.' if s.active else 'Ενεργ.' }}</button></form></td></tr>{% endfor %}
     </table>
-    <button class="b" type="submit" form="colorsform" style="margin-top:10px;"><i class="ti ti-palette"></i> Αποθήκευση χρωμάτων</button>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+      <button class="b" type="submit" form="metaform" style="background:var(--accent,#185FA5);"><i class="ti ti-settings"></i> Αποθήκευση κατηγοριών/διαλείμματος</button>
+      <button class="b" type="submit" form="colorsform"><i class="ti ti-palette"></i> Αποθήκευση χρωμάτων</button>
+    </div>
   </div>
   <div class="card"><h3>Επιτρεπτοί κωδικοί στην καταχώρηση (ανά ρόλο)</h3>
     <p style="font-size:13px;color:#64748b;margin:0 0 10px;">Διάλεξε ποιοι κωδικοί εμφανίζονται στο παράθυρο δήλωσης βάρδιας (πρόγραμμα + μηνιαία), ξεχωριστά για Admin και για Managers. Αν δεν τσεκάρεις κανέναν σε μια στήλη, εμφανίζονται όλοι οι ενεργοί για εκείνον τον ρόλο.</p>
