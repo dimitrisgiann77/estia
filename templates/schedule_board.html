@@ -107,7 +107,7 @@
   </div>
   {% endif %}
 
-  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά.</p>
+  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b> (επικόλληση σε στήλες/γραμμές).</p>
 
   {% set qs=request.args %}
   {% if qs.get('ok')=='submitted' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκε στο λογιστήριο.</div>{% endif %}
@@ -403,12 +403,33 @@ document.addEventListener('mousedown',function(e){var ed=document.getElementById
 // ── Αντιγραφή/Επικόλληση κελιών (Ctrl+C / Ctrl+V, layout-agnostic μέσω e.code) ──
 var clip=null;
 function _toast(msg){var t=document.createElement('div');t.textContent=msg;t.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#185FA5;color:#fff;padding:8px 14px;border-radius:9px;font-size:13px;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.25);';document.body.appendChild(t);setTimeout(function(){t.remove();},1500);}
+function _cellTxt(cell){
+  var es=[];try{es=JSON.parse(cell.getAttribute('data-entries')||'[]');}catch(_){return '';}
+  if(!es.length)return '';
+  return es.map(function(e){return e.code+(e.times?(' '+e.times):'')+(e.hotel_short?(' ['+e.hotel_short+']'):'');}).join(' / ');
+}
+function _selToTSV(){
+  var byRow={};
+  curSel.forEach(function(cell){var p=_pos(cell);(byRow[p.r]=byRow[p.r]||[]).push({c:p.c,cell:cell});});
+  var rows=Object.keys(byRow).map(Number).sort(function(a,b){return a-b;});
+  return rows.map(function(rk){
+    var items=byRow[rk].sort(function(a,b){return a.c-b.c;});
+    var tr=items[0].cell.parentNode.parentNode;
+    var nm=tr.querySelector('td.name .nm'); var name=nm?nm.textContent.trim():'';
+    return [name].concat(items.map(function(it){return _cellTxt(it.cell);})).join('\t');
+  }).join('\n');
+}
+function _toClipboard(txt){
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt); return true; } }catch(_){}
+  try{ var ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;left:-9999px;top:0;'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }catch(_){ return false; }
+}
 document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&curSel.length){
     var src=curSel[curSel.length-1]; var es=[];try{es=JSON.parse(src.getAttribute('data-entries')||'[]');}catch(_){}
     clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),work_hotel_id:(x.wh||null)};});
-    e.preventDefault(); _toast(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε (κενό κελί)');
+    _toClipboard(_selToTSV());   // v12.208 — και στο σύστημα (paste σε Excel)
+    e.preventDefault(); _toast((curSel.length>1?('Αντιγράφηκαν '+curSel.length+' κελιά'):(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε'))+' — έτοιμο για Excel');
   } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&clip&&curSel.length){
     e.preventDefault();
     var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
