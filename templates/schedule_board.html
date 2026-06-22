@@ -98,6 +98,7 @@
     </div>
     <a class="btn pri" href="/dashboard/schedule/staff?embed=1" style="margin-left:auto;align-self:flex-end;"><i class="ti ti-users-plus"></i> Προσωπικό</a>
   </form>
+  {% endif %}
 
   <div class="deptbar">
     <span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
@@ -106,7 +107,6 @@
       {% for d in dept_list %}<span class="dchip on" data-dept="{{ d.id }}" onclick="toggleDept('{{ d.id }}')" style="border-left:4px solid {{ d.color }};">{{ d.name }}</span>{% endfor %}
     </div>
   </div>
-  {% endif %}
 
   <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b>, και το <b>Ctrl+V</b> επικολλά και <b>από</b> Excel — διάλεξε ένα κελί-αφετηρία και κολλάει ολόκληρο το μπλοκ. Η αντιγραφή μένει ενεργή μέχρι να αντιγράψεις κάτι άλλο.</p>
 
@@ -146,7 +146,7 @@
           <th>Ώρες</th><th>Έξτρα</th><th>Ρεπό</th><th>Εργ.</th></tr></thead>
         <tbody>
         {% for r in month_block.rows %}
-          <tr>
+          <tr data-dept="{{ r.user.department_id or '' }}">
             <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for c in r.cells %}
               <td class="{{ 'sun' if month_block.day_hdr[loop.index0].we }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if c.edit else '0' }}">{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span>{% if en.segs and en.segs|length %}{% for sg in en.segs %}{% if not loop.first %}<br><span class="segc">{% endif %}{{ sg.start }} - {{ sg.end }}{% if not loop.last %} &{% else %}{% if not loop.first %}</span>{% endif %}{% endif %}{% endfor %}{% elif en.times %}{{ en.times }}{% endif %}</span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
@@ -228,6 +228,9 @@ function applyDeptFilter(){
   var sel=JSON.parse(localStorage.getItem(HKEY)||'null'); // null = όλα
   document.querySelectorAll('.deptsec[data-dept]').forEach(function(s){
     var id=s.getAttribute('data-dept'); s.style.display=(!sel || sel.indexOf(id)>=0)?'':'none';
+  });
+  document.querySelectorAll('tr[data-dept]').forEach(function(tr){
+    var id=tr.getAttribute('data-dept'); tr.style.display=(!sel || (id && sel.indexOf(id)>=0))?'':'none';
   });
   document.querySelectorAll('.dchip[data-dept]').forEach(function(c){
     var id=c.getAttribute('data-dept');
