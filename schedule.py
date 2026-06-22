@@ -844,9 +844,11 @@ def _dept_users(hotel_id, dept_id):
 def week_grid(hotel_id, dept_id, week_start):
     return _grid_for_days(hotel_id, dept_id, [week_start + timedelta(days=i) for i in range(7)])
 
-def _grid_for_days(hotel_id, dept_id, days):
-    """v12.201 — Γενικό grid για ΟΠΟΙΕΣΔΗΠΟΤΕ μέρες (εβδομάδα ή μήνας). Ίδια δομή κελιών/totals."""
-    users = _dept_users(hotel_id, dept_id)
+def _grid_for_days(hotel_id, dept_id, days, users=None):
+    """v12.201 — Γενικό grid για ΟΠΟΙΕΣΔΗΠΟΤΕ μέρες (εβδομάδα ή μήνας). Ίδια δομή κελιών/totals.
+    users=None → προσωπικό τμήματος· αλλιώς δοθείσα λίστα (π.χ. όλο το ξεν., ungrouped)."""
+    if users is None:
+        users = _dept_users(hotel_id, dept_id)
     uids = [u.id for u in users]
     amap = {}
     if uids:
@@ -983,31 +985,32 @@ def _build_block(hotel_id, dept_list, week_start, user):
     }
 
 def _build_month_block(hotel_id, dept_list, year, month, user):
-    """v12.201 — Μηνιαίο πλάνο: ένα grid με ΟΛΕΣ τις μέρες του μήνα ως στήλες, ίδια κελιά/editor.
-    Τα row totals (extra/repo/work_days) βγαίνουν ΜΗΝΙΑΙΑ από το _grid_for_days(μέρες μήνα)."""
+    """v12.204 — Μηνιαίο πλάνο: ΟΛΟ το προσωπικό σε ΜΙΑ λίστα (ΟΧΙ ανά τμήμα), όλες οι μέρες
+    του μήνα ως στήλες, ίδια κελιά/editor. Row totals (hours/extra/repo/work_days) = ΜΗΝΙΑΙΑ."""
     import calendar as _cal
     ndays = _cal.monthrange(year, month)[1]
     days = [date(year, month, dd) for dd in range(1, ndays + 1)]
     hol = {h.hol_date for h in Holiday.query.all()}
-    sup = _dept_supervisors(hotel_id)
+    seen = set(); users = []
+    for dep in dept_list:
+        for u in _dept_users(hotel_id, dep.id):
+            if u.id not in seen:
+                seen.add(u.id); users.append(u)
+    users.sort(key=lambda u: (u.full_name or u.username or '').lower())
     _wk = {}
     def _ed(d):
         ws = monday_of(d)
         if ws not in _wk:
             _wk[ws] = bool(week_editable(ws, user) and can_edit_schedule())
         return _wk[ws]
-    deptgrids = []
-    for dep in dept_list:
-        _, rows = _grid_for_days(hotel_id, dep.id, days)
-        for r in rows:
-            for c in r['cells']:
-                c['edit'] = _ed(date.fromisoformat(c['date']))
-        deptgrids.append({'dept': dep, 'rows': rows, 'supervisor': sup.get(dep.id)})
+    _, rows = _grid_for_days(hotel_id, None, days, users=users)
+    for r in rows:
+        for c in r['cells']:
+            c['edit'] = _ed(date.fromisoformat(c['date']))
     WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
     day_hdr = [{'iso': d.isoformat(), 'd': d.day, 'wd': WD[d.weekday()],
                 'we': d.weekday() >= 5, 'hol': d in hol} for d in days]
-    return {'deptgrids': deptgrids, 'day_hdr': day_hdr, 'ndays': ndays,
-            'label': f'{MONTHS_EL[month]} {year}'}
+    return {'rows': rows, 'day_hdr': day_hdr, 'ndays': ndays, 'label': f'{MONTHS_EL[month]} {year}'}
 
 @app.route('/dashboard/schedule')
 def schedule_board():
