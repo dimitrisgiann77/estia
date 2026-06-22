@@ -107,7 +107,7 @@
   </div>
   {% endif %}
 
-  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b>, και το <b>Ctrl+V</b> επικολλά και <b>από</b> Excel πάνω στα κελιά. Η αντιγραφή μένει ενεργή μέχρι να αντιγράψεις κάτι άλλο.</p>
+  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b>, και το <b>Ctrl+V</b> επικολλά και <b>από</b> Excel — διάλεξε ένα κελί-αφετηρία και κολλάει ολόκληρο το μπλοκ. Η αντιγραφή μένει ενεργή μέχρι να αντιγράψεις κάτι άλλο.</p>
 
   {% set qs=request.args %}
   {% if qs.get('ok')=='submitted' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκε στο λογιστήριο.</div>{% endif %}
@@ -429,8 +429,25 @@ function _readClipboard(){ try{ if(navigator.clipboard&&navigator.clipboard.read
 function _pasteInternal(cells){
   fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
 }
-function _pasteExcel(cells, txt){
-  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,text:txt})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
+function _pasteExcel(txt){
+  var grid=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(function(l){return l.split('\t');});
+  var nonEmpty=[]; grid.forEach(function(r){r.forEach(function(v){if((v||'').trim())nonEmpty.push(v.trim());});});
+  if(!nonEmpty.length){ _toast('Κενό περιεχόμενο'); return; }
+  var items=[];
+  if(nonEmpty.length===1){                                   // μία τιμή → όλα τα επιλεγμένα
+    items=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date'),text:nonEmpty[0]};});
+  } else {                                                   // BLOCK → από το πάνω-αριστερά κελί-άγκυρα
+    var anchor=_selSorted()[0]; if(!anchor){_toast('Διάλεξε κελί-αφετηρία');return;}
+    var tb=_pos(anchor).tb, rows=[];
+    Array.prototype.forEach.call(tb.children,function(tr){ rows.push(Array.prototype.filter.call(tr.querySelectorAll('.cell[data-edit="1"]'),function(x){return x.getAttribute('data-date');})); });
+    var trIdx=Array.prototype.indexOf.call(tb.children, anchor.parentNode.parentNode);
+    var colIdx=(rows[trIdx]||[]).indexOf(anchor);
+    for(var i=0;i<grid.length;i++){ var tr2=rows[trIdx+i]; if(!tr2)break;
+      for(var j=0;j<grid[i].length;j++){ var cell=tr2[colIdx+j]; if(!cell)continue; var val=(grid[i][j]||'').trim(); if(!val)continue;
+        items.push({user_id:cell.getAttribute('data-uid'),date:cell.getAttribute('data-date'),text:val}); } }
+  }
+  if(!items.length){ _toast('Τίποτα για επικόλληση'); return; }
+  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
 }
 document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
@@ -445,7 +462,7 @@ document.addEventListener('keydown',function(e){
     var cells=_selSorted().map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
     _readClipboard().then(function(txt){
       if(txt && clipTSV && txt===clipTSV && clip){ _pasteInternal(cells); }     // δικό μας copy → πλήρης βάρδια
-      else if(txt && txt.trim()){ _pasteExcel(cells, txt); }                    // από Excel → parse
+      else if(txt && txt.trim()){ _pasteExcel(txt); }                    // από Excel → parse
       else if(clip){ _pasteInternal(cells); }                                   // fallback
       else { _toast('Δεν υπάρχει κάτι για επικόλληση'); }
     });
