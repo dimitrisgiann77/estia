@@ -25,7 +25,8 @@
   .deptsec{margin:10px 0;} .deptsec h4{margin:0 0 4px;font-size:13px;display:flex;align-items:center;gap:6px;}
   table.grid{width:100%;border-collapse:collapse;font-size:12.5px;}
   table.grid th,table.grid td{border:1px solid var(--bd,#e2e8f0);padding:4px 6px;text-align:center;}
-  table.grid th.name,table.grid td.name{text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);min-width:160px;}
+  table.grid th.name,table.grid td.name{text-align:left;white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);min-width:160px;z-index:3;box-shadow:2px 0 6px -3px rgba(0,0,0,.22);}
+  table.grid thead th.name{z-index:4;}
   table.grid th{background:var(--soft,#f1f5f9);font-weight:600;} table.grid th.sun,table.grid td.sun{background:#fff4f4;}
   .cell{min-width:78px;min-height:34px;cursor:pointer;border-radius:6px;font-size:11px;line-height:1.25;white-space:pre-line;}
   .cell.empty{color:#cbd5e1;} .cell .hh{font-size:9px;opacity:.7;display:block;margin-top:1px;} .cell .x{font-size:8px;color:#e11d48;font-weight:700;}
@@ -128,7 +129,7 @@
     {% for dg in month_block.deptgrids %}
     <div class="deptsec" data-dept="{{ dg.dept.id }}">
       <h4><span class="dot" style="background:{{ dg.dept.color }}"></span>{{ dg.dept.name }} <span style="color:#94a3b8;font-weight:400;">({{ dg.rows|length }})</span>{% if dg.supervisor %}<span title="Υπεύθυνος προγράμματος τμήματος" style="margin-left:8px;font-size:11px;font-weight:500;color:#185FA5;"><i class="ti ti-user-star"></i> {{ dg.supervisor }}</span>{% endif %}</h4>
-      <div style="overflow-x:auto;">
+      <div class="gridwrap" style="overflow-x:auto;">
       <table class="grid">
         <thead><tr><th class="name">Εργαζόμενος</th>
           {% for dh in month_block.day_hdr %}<th class="{{ 'sun' if dh.we }}" style="{{ 'background:#fff7ed;' if dh.hol }}">{{ dh.wd }}<br><small>{{ dh.d }}</small></th>{% endfor %}
@@ -163,7 +164,7 @@
     {% for dg in blk.deptgrids %}
     <div class="deptsec" data-dept="{{ dg.dept.id }}">
       <h4><span class="dot" style="background:{{ dg.dept.color }}"></span>{{ dg.dept.name }} <span style="color:#94a3b8;font-weight:400;">({{ dg.rows|length }})</span>{% if dg.supervisor %}<span title="Υπεύθυνος προγράμματος τμήματος" style="margin-left:8px;font-size:11px;font-weight:500;color:#185FA5;"><i class="ti ti-user-star"></i> {{ dg.supervisor }}</span>{% endif %}</h4>
-      <div style="overflow-x:auto;">
+      <div class="gridwrap" style="overflow-x:auto;">
       <table class="grid">
         <thead><tr><th class="name">Εργαζόμενος</th>
           {% for d in blk.days %}<th class="{{ 'sun' if d.weekday()==6 }}">{{ weekdays[d.weekday()][:3] }}<br><small>{{ d.strftime('%d/%m') }}</small></th>{% endfor %}
@@ -243,11 +244,27 @@ function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('s
 document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
   el.addEventListener('mousedown',function(e){
     if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
-    e.preventDefault();anchor=_pos(el);selecting=true;markRect(anchor,anchor);
+    e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
   });
   el.addEventListener('mouseenter',function(){if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el));});
 });
+var _activeWrap=null,_autoRAF=null,_mx=0,_my=0;
+window.addEventListener('mousemove',function(e){_mx=e.clientX;_my=e.clientY;});
+function _startEdgeScroll(){ if(!_autoRAF) _autoRAF=requestAnimationFrame(_edgeTick); }
+function _edgeTick(){
+  if(!selecting||!_activeWrap){_autoRAF=null;return;}
+  var r=_activeWrap.getBoundingClientRect(),pad=55,sp=0;
+  if(_mx>r.right-pad) sp=Math.min(32,(_mx-(r.right-pad))/1.4);
+  else if(_mx<r.left+pad) sp=-Math.min(32,((r.left+pad)-_mx)/1.4);
+  if(sp){ _activeWrap.scrollLeft+=sp;
+    var cx=Math.max(r.left+3,Math.min(r.right-3,_mx));
+    var t=document.elementFromPoint(cx,_my), cell=(t&&t.closest)?t.closest('.cell[data-edit="1"]'):null;
+    if(cell&&anchor&&_pos(cell).tb===anchor.tb) markRect(anchor,_pos(cell));
+  }
+  _autoRAF=requestAnimationFrame(_edgeTick);
+}
 window.addEventListener('mouseup',function(){
+  _activeWrap=null;
   if(ctrlPending){ctrlPending=false;if(curSel.length)openEd();return;}
   if(!selecting)return;selecting=false;if(curSel.length)openEd();
 });
