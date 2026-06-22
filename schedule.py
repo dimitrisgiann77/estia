@@ -383,6 +383,10 @@ def is_work_code(code):
         return bool(st.counts_as_work)
     return code == 'ΕΡΓ'
 
+def is_extra_code(code):
+    """v12.206 — Κωδικός «έξτρα ωρών» (ΕΩ): οι ώρες του μετράνε ΣΤΙΣ ΕΞΤΡΑ, ΟΧΙ ως εργάσιμη."""
+    return code == 'ΕΩ'
+
 def schedule_span(uid):
     """v12.197 — Πρώτη/τελευταία εμφάνιση εργαζομένου στο ΠΡΟΓΡΑΜΜΑ (ΟΛΕΣ οι βάρδιες,
     μαζί ΡΕΠΟ/άδεια = κάθε χρήση του από manager). Read-only, ζωντανός υπολογισμός.
@@ -458,12 +462,13 @@ def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
     hol = {h.hol_date for h in Holiday.query.all()}
     work = repo = sundays = hol_worked = elsewhere = 0
-    _day_pres = {}
+    extra = 0.0
     for a in assignments:
         code = a.shift_code
-        if is_work_code(code):
+        if is_extra_code(code):
+            extra += worked_hours(a)
+        elif is_work_code(code):
             work += 1
-            _day_pres[a.work_date] = _day_pres.get(a.work_date, 0.0) + assignment_hours(a)
             if a.work_date.weekday() == 6:
                 sundays += 1
             if a.work_date in hol:
@@ -472,7 +477,6 @@ def aggregate(assignments, home_hotel_id=None):
                 elsewhere += 1
         elif code == 'ΑΝ':
             repo += 1
-    extra = sum(extra_hours(p) for p in _day_pres.values())
     return {'work_days': work, 'repo': repo, 'sundays': sundays,
             'holidays_worked': hol_worked, 'extra_hours': round(extra, 2),
             'elsewhere_days': elsewhere, 'total_days': work}
@@ -874,11 +878,13 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
         for d in days:
             alist = amap.get((u.id, d.isoformat())) or []
             if alist:
-                day_hours = 0.0; day_pres = 0.0; day_work = False; day_repo = False
+                day_hours = 0.0; day_extra = 0.0; day_work = False; day_repo = False
                 labels = []; first = alist[0]
                 for a in alist:
-                    if is_work_code(a.shift_code):
-                        day_hours += worked_hours(a); day_pres += assignment_hours(a); day_work = True
+                    if is_extra_code(a.shift_code):
+                        day_extra += worked_hours(a)
+                    elif is_work_code(a.shift_code):
+                        day_hours += worked_hours(a); day_work = True
                     elif a.shift_code == 'ΑΝ':
                         day_repo = True
                     try:
@@ -886,8 +892,9 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                     except Exception:
                         segs = []
                     labels.append('\n'.join(f"{s['start']} - {s['end']}" for s in segs) if segs else a.shift_code)
+                wk_extra += day_extra
                 if day_work:
-                    wk_hours += day_hours; wk_extra += extra_hours(day_pres); work_days += 1
+                    wk_hours += day_hours; work_days += 1
                 if day_repo:
                     repo += 1
                 try:
@@ -1542,7 +1549,6 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
             continue
         days = {}
         hours = extra = 0.0
-        _day_pres = {}
         _wd = set(); _sun = set(); _hol = set(); _repo = set()
         for a in alist:
             dd = days.setdefault(a.work_date.day, {'entries': [], 'code': '', 'wh': None, 'segs': '[]'})
@@ -1558,8 +1564,10 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                                   'color': _colors.get(a.shift_code, '#64748b')})
             if not dd['code']:
                 dd['code'] = a.shift_code; dd['wh'] = a.work_hotel_id; dd['segs'] = a.segments or '[]'
-            if is_work_code(a.shift_code):
-                hours += worked_hours(a); _day_pres[a.work_date] = _day_pres.get(a.work_date, 0.0) + assignment_hours(a)
+            if is_extra_code(a.shift_code):
+                extra += worked_hours(a)
+            elif is_work_code(a.shift_code):
+                hours += worked_hours(a)
                 _wd.add(a.work_date)
                 if a.work_date.weekday() == 6:
                     _sun.add(a.work_date)
@@ -1567,7 +1575,6 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                     _hol.add(a.work_date)
             elif a.shift_code == 'ΑΝ':
                 _repo.add(a.work_date)
-        extra = sum(extra_hours(p) for p in _day_pres.values())
         sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
         payable = 0.0
