@@ -2,6 +2,8 @@
 <!DOCTYPE html><html lang="el"><head>
 {{ mp.head('Πρόγραμμα Εργασίας', theme.primary) }}
 <style>
+  /* v12.202 — full-width πλαίσιο μόνο στο Πρόγραμμα (το κοινό .container είναι 1240px) */
+  .container{max-width:none;}
   .sched-toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:12px 14px;background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
   .sched-toolbar select,.sched-toolbar input{padding:7px 10px;border:1px solid var(--bd,#dbe3ea);border-radius:9px;background:var(--card,#fff);color:inherit;font-size:13px;}
   .fgrp{display:flex;flex-direction:column;gap:4px;}
