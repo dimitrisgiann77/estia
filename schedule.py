@@ -616,7 +616,7 @@ def seed_schedule():
             db.session.add(ScheduleRule(code='R1_repo', severity='block',
                 description='Κάθε εργαζόμενος ≥1 ρεπό (ΑΝ) ανά εβδομάδα', params='{}'))
             db.session.add(ScheduleRule(code='R2_complete', severity='block',
-                description='Καμία κενή ημέρα για assigned εργαζόμενο (πληρότητα 7/7)', params='{}', active=False))
+                description='Καμία κενή ημέρα για assigned εργαζόμενο (πληρότητα 7/7)', params='{}'))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
@@ -928,9 +928,12 @@ def validate_hotel_week(hotel_id, week_start):
         if 'R1_repo' in rules and codes.count('ΑΝ') < 1:
             issues.append({'user': u, 'rule': 'R1_repo', 'severity': rules['R1_repo'].severity,
                            'msg': f'{u.full_name}: κανένα ρεπό αυτή την εβδομάδα'})
-        if 'R2_complete' in rules and len(alist) < 7:
+        # v12.200 — μέτρημα ΔΙΑΚΡΙΤΩΝ ημερών (όχι βαρδιών: πολλές/μέρα δεν «γεμίζουν» κενά)
+        days_set = {a.work_date for a in alist}
+        if 'R2_complete' in rules and len(days_set) < 7:
+            missing = [WEEKDAYS_EL[i] for i, dd in enumerate(days) if dd not in days_set]
             issues.append({'user': u, 'rule': 'R2_complete', 'severity': rules['R2_complete'].severity,
-                           'msg': f'{u.full_name}: {7 - len(alist)} κενές ημέρες'})
+                           'msg': f'{u.full_name}: κενές ημέρες χωρίς κωδικό — ' + ', '.join(missing)})
     return issues
 
 
