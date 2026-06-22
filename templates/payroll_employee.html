@@ -79,15 +79,19 @@
     </form>
   </div>
 
-  <div class="card"><h3>Δραστηριότητα στο Πρόγραμμα <span class="muted" style="font-size:12px;font-weight:400;">αυτόματα από τις βάρδιες — read-only</span></h3>
-    <p class="meta" style="margin-top:0;">Πότε ξεκίνησε και πότε σταμάτησε να τον χρησιμοποιεί ο manager στο Πρόγραμμα Εργασίας (κάθε εμφάνιση, μαζί ρεπό/άδεια). Διαφορετικό από την «Πρόσληψη/Αποχώρηση» του Λογιστηρίου (Epsilon).</p>
-    <div class="grid">
-      <div class="row"><label>Έναρξη (Πρόγραμμα)</label>
-        <input type="text" value="{{ sched_first.strftime('%d/%m/%Y') if sched_first else '—' }}" disabled></div>
-      <div class="row"><label>Τελευταία εμφάνιση (Πρόγραμμα)</label>
-        <input type="text" value="{{ sched_last.strftime('%d/%m/%Y') if sched_last else '—' }}" disabled></div>
-    </div>
-    {% if not sched_first %}<p class="meta" style="color:#94a3b8;">Δεν υπάρχει ακόμη καμία βάρδια στο Πρόγραμμα.</p>{% endif %}
+  <div class="card"><h3>Περίοδοι χρήσης στο Πρόγραμμα <span class="muted" style="font-size:12px;font-weight:400;">αυτόματα από τις βάρδιες — read-only</span></h3>
+    <p class="meta" style="margin-top:0;">Πότε τον χρησιμοποίησε ο manager στο Πρόγραμμα Εργασίας, σε ξεχωριστές περιόδους ανά ξενοδοχείο — κάθε κενή μέρα ή αλλαγή ξενοδοχείου ξεκινά νέα περίοδο. Διαφορετικό από την «Πρόσληψη/Αποχώρηση» του Λογιστηρίου (Epsilon).</p>
+    {% if sched_periods %}
+    <p class="meta" style="margin-top:0;">Πρώτη εμφάνιση <b>{{ sched_first.strftime('%d/%m/%Y') }}</b> · Τελευταία <b>{{ sched_last.strftime('%d/%m/%Y') }}</b> · {{ sched_periods|length }} περίοδος/-οι</p>
+    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+      <tr style="color:#94a3b8;text-align:left;"><th>Ξενοδοχείο</th><th>Από</th><th>Έως</th><th style="text-align:right;">Μέρες</th></tr>
+      {% for p in sched_periods %}
+      <tr style="border-top:1px solid #eef2f6;"><td>{{ p.hotel }}</td><td>{{ p.start.strftime('%d/%m/%Y') }}</td><td>{{ p.end.strftime('%d/%m/%Y') }}</td><td style="text-align:right;">{{ p.days }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="meta" style="color:#94a3b8;">Δεν υπάρχει ακόμη καμία βάρδια στο Πρόγραμμα.</p>
+    {% endif %}
   </div>
 
   {% if flags %}

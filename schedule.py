@@ -384,6 +384,35 @@ def schedule_span(uid):
            .one())
     return (row[0], row[1]) if row else (None, None)
 
+# v12.198 — strict: κάθε ≥1 κενή μέρα Ή αλλαγή ξενοδοχείου ξεκινά νέα περίοδο χρήσης.
+# (εύκολα ρυθμιζόμενο· μελλοντικά admin setting + manager pop-up στην επιστροφή)
+SCHEDULE_PERIOD_MAX_GAP_DAYS = 1
+
+def schedule_periods(uid):
+    """v12.198 — Περίοδοι «χρήσης» εργαζομένου στο ΠΡΟΓΡΑΜΜΑ: συνεχόμενα διαστήματα
+    παρουσίας (ΟΛΕΣ οι βάρδιες, μαζί ΡΕΠΟ/άδεια), σπασμένα ΑΝΑ ΞΕΝΟΔΟΧΕΙΟ και σε κάθε
+    κενό > SCHEDULE_PERIOD_MAX_GAP_DAYS μερών. Read-only, ζωντανός υπολογισμός.
+    Επιστρέφει λίστα dict {hotel_id, hotel, start, end, days} — νεότερη περίοδος πρώτη.
+    days = πλήθος ΔΙΑΦΟΡΕΤΙΚΩΝ ημερομηνιών (πολλές βάρδιες/μέρα μετράνε 1)."""
+    u = User.query.get(uid)
+    home = getattr(u, 'home_hotel_id', None) if u else None
+    hotels = {h.id: h.name for h in Hotel.query.all()}
+    rows = (db.session.query(ShiftAssignment.work_date, ShiftAssignment.work_hotel_id)
+            .filter(ShiftAssignment.user_id == uid,
+                    ShiftAssignment.work_date.isnot(None))
+            .all())
+    seen = sorted({(d, (h or home)) for d, h in rows})   # (ημερομηνία, ξενοδοχείο) μοναδικά
+    periods, cur = [], None
+    for d, hid in seen:
+        if cur and hid == cur['hotel_id'] and (d - cur['end']).days <= SCHEDULE_PERIOD_MAX_GAP_DAYS:
+            cur['end'] = d; cur['days'] += 1
+        else:
+            cur = {'hotel_id': hid, 'hotel': hotels.get(hid, '—'),
+                   'start': d, 'end': d, 'days': 1}
+            periods.append(cur)
+    periods.sort(key=lambda pr: pr['start'], reverse=True)
+    return periods
+
 def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
     hol = {h.hol_date for h in Holiday.query.all()}
