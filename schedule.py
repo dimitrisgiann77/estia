@@ -842,14 +842,17 @@ def _dept_users(hotel_id, dept_id):
     return q.order_by(User.full_name).all()
 
 def week_grid(hotel_id, dept_id, week_start):
-    days = [week_start + timedelta(days=i) for i in range(7)]
+    return _grid_for_days(hotel_id, dept_id, [week_start + timedelta(days=i) for i in range(7)])
+
+def _grid_for_days(hotel_id, dept_id, days):
+    """v12.201 — Γενικό grid για ΟΠΟΙΕΣΔΗΠΟΤΕ μέρες (εβδομάδα ή μήνας). Ίδια δομή κελιών/totals."""
     users = _dept_users(hotel_id, dept_id)
     uids = [u.id for u in users]
     amap = {}
     if uids:
         for a in (ShiftAssignment.query
                   .filter(ShiftAssignment.user_id.in_(uids))
-                  .filter(ShiftAssignment.work_date >= days[0], ShiftAssignment.work_date <= days[6]).all()):
+                  .filter(ShiftAssignment.work_date >= days[0], ShiftAssignment.work_date <= days[-1]).all()):
             amap.setdefault((a.user_id, a.work_date.isoformat()), []).append(a)
     _colors = {st.code: st.color for st in ShiftType.query.all()}
     _hotels = {h.id: h.name for h in Hotel.query.all()}
@@ -979,6 +982,33 @@ def _build_block(hotel_id, dept_list, week_start, user):
         'label': f"{week_start.strftime('%d/%m')} – {(week_start + timedelta(days=6)).strftime('%d/%m/%Y')}",
     }
 
+def _build_month_block(hotel_id, dept_list, year, month, user):
+    """v12.201 — Μηνιαίο πλάνο: ένα grid με ΟΛΕΣ τις μέρες του μήνα ως στήλες, ίδια κελιά/editor.
+    Τα row totals (extra/repo/work_days) βγαίνουν ΜΗΝΙΑΙΑ από το _grid_for_days(μέρες μήνα)."""
+    import calendar as _cal
+    ndays = _cal.monthrange(year, month)[1]
+    days = [date(year, month, dd) for dd in range(1, ndays + 1)]
+    hol = {h.hol_date for h in Holiday.query.all()}
+    sup = _dept_supervisors(hotel_id)
+    _wk = {}
+    def _ed(d):
+        ws = monday_of(d)
+        if ws not in _wk:
+            _wk[ws] = bool(week_editable(ws, user) and can_edit_schedule())
+        return _wk[ws]
+    deptgrids = []
+    for dep in dept_list:
+        _, rows = _grid_for_days(hotel_id, dep.id, days)
+        for r in rows:
+            for c in r['cells']:
+                c['edit'] = _ed(date.fromisoformat(c['date']))
+        deptgrids.append({'dept': dep, 'rows': rows, 'supervisor': sup.get(dep.id)})
+    WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
+    day_hdr = [{'iso': d.isoformat(), 'd': d.day, 'wd': WD[d.weekday()],
+                'we': d.weekday() >= 5, 'hol': d in hol} for d in days]
+    return {'deptgrids': deptgrids, 'day_hdr': day_hdr, 'ndays': ndays,
+            'label': f'{MONTHS_EL[month]} {year}'}
+
 @app.route('/dashboard/schedule')
 def schedule_board():
     if not _auth():
@@ -1004,7 +1034,13 @@ def schedule_board():
         weeks = ((monday_of(last) - week_start).days // 7) + 1
     prev_m = (date(sel_year, sel_month, 1) - timedelta(days=1))
     nxt = date(sel_year, sel_month, 28) + timedelta(days=10)
-    blocks = [_build_block(hotel_id, dept_list, week_start + timedelta(days=7 * i), user) for i in range(weeks)]
+    view_mode = request.args.get('view') or 'week'
+    month_block = None
+    if view_mode == 'month':
+        month_block = _build_month_block(hotel_id, dept_list, sel_year, sel_month, user)
+        blocks = []
+    else:
+        blocks = [_build_block(hotel_id, dept_list, week_start + timedelta(days=7 * i), user) for i in range(weeks)]
     shift_types = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
     shift_lookup = {st.code: st for st in shift_types}
     shift_types_json = json.dumps([{'code': st.code, 'color': st.color} for st in entry_shift_types()], ensure_ascii=False)
@@ -1017,7 +1053,7 @@ def schedule_board():
         prev_week=(week_start - timedelta(days=7)).isoformat(),
         next_week=(week_start + timedelta(days=7)).isoformat(),
         month_el=MONTHS_EL, is_admin=is_admin(),
-        sel_month=sel_month, sel_year=sel_year,
+        sel_month=sel_month, sel_year=sel_year, view_mode=view_mode, month_block=month_block,
         prev_month=prev_m.month, prev_year=prev_m.year, next_month=nxt.month, next_year=nxt.year)
 
 

@@ -109,6 +109,47 @@
   {% if qs.get('ok')=='copied' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-copy"></i> Αντιγράφηκε η προηγούμενη εβδομάδα.</div>{% endif %}
   {% if qs.get('err')=='rules' %}<div class="banner err" style="margin-bottom:10px;"><i class="ti ti-alert-triangle"></i> Η υποβολή μπλοκαρίστηκε — δες τους κανόνες.</div>{% endif %}
 
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+    <a class="btn {{ 'pri' if view_mode!='month' }}" href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ week_start_iso }}&embed=1"><i class="ti ti-calendar"></i> Εβδομάδα</a>
+    <a class="btn {{ 'pri' if view_mode=='month' }}" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1"><i class="ti ti-calendar-month"></i> Μήνας</a>
+    {% if view_mode=='month' and month_block %}<span style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+      <a class="btn" title="Προηγ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ prev_month }}&year={{ prev_year }}&embed=1"><i class="ti ti-chevron-left"></i></a>
+      <b style="min-width:130px;text-align:center;">{{ month_block.label }}</b>
+      <a class="btn" title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+    </span>{% endif %}
+  </div>
+
+  {% if view_mode=='month' and month_block %}
+  <div class="card wkcard">
+    <div class="wkhead"><h3><i class="ti ti-calendar-month"></i> {{ month_block.label }}</h3>
+      <span class="banner open" style="font-size:12px;"><i class="ti ti-pencil"></i> Μηνιαίο πλάνο — ίδια κελιά/editor· η υποβολή γίνεται από την εβδομαδιαία όψη</span></div>
+    {% for dg in month_block.deptgrids %}
+    <div class="deptsec" data-dept="{{ dg.dept.id }}">
+      <h4><span class="dot" style="background:{{ dg.dept.color }}"></span>{{ dg.dept.name }} <span style="color:#94a3b8;font-weight:400;">({{ dg.rows|length }})</span>{% if dg.supervisor %}<span title="Υπεύθυνος προγράμματος τμήματος" style="margin-left:8px;font-size:11px;font-weight:500;color:#185FA5;"><i class="ti ti-user-star"></i> {{ dg.supervisor }}</span>{% endif %}</h4>
+      <div style="overflow-x:auto;">
+      <table class="grid">
+        <thead><tr><th class="name">Εργαζόμενος</th>
+          {% for dh in month_block.day_hdr %}<th class="{{ 'sun' if dh.we }}" style="{{ 'background:#fff7ed;' if dh.hol }}">{{ dh.wd }}<br><small>{{ dh.d }}</small></th>{% endfor %}
+          <th>Έξτρα</th><th>Ρεπό</th><th>Εργ.</th></tr></thead>
+        <tbody>
+        {% for r in dg.rows %}
+          <tr>
+            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
+            {% for c in r.cells %}
+              <td class="{{ 'sun' if month_block.day_hdr[loop.index0].we }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if c.edit else '0' }}">{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span></span>{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
+            {% endfor %}
+            <td class="tot">{{ r.wk_extra }}</td><td class="tot {{ 'warn' if r.repo<1 }}">{{ r.repo }}</td><td class="tot">{{ r.work_days }}</td>
+          </tr>
+        {% else %}<tr><td colspan="{{ month_block.ndays + 4 }}" style="padding:12px;color:#94a3b8;">— καμία εγγραφή —</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+    <p style="font-size:12px;color:#64748b;margin-top:8px;">Επεξεργασία ίδια με την εβδομαδιαία (κλικ/σύρσιμο σε κελιά). Κλειδωμένες εβδομάδες δεν επεξεργάζονται. Σύνολα = μηνιαία.</p>
+  </div>
+  {% endif %}
+
   {% for blk in blocks %}
   <div class="card wkcard">
     <div class="wkhead">
