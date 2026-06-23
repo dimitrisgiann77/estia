@@ -26,8 +26,15 @@ tr:last-child td { border-bottom:none; }
 .badge-pool { background:#e0f2fe; color:#0369a1; }
 .badge-water { background:#dcfce7; color:#15803d; }
 .badge-area { background:#fef9c3; color:#a16207; }
-.newbtn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#193847; background:#eef6fb; border:1px solid #d6eef3; }
+.newbtn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#193847; background:#eef6fb; border:1px solid #d6eef3; cursor:pointer; }
 .newbtn:hover { background:#dcedf7; }
+.newbtn.primary { background:var(--brand,#193847); color:#fff; border-color:var(--brand,#193847); }
+.newwrap { position:relative; display:inline-block; }
+.newmenu { position:absolute; top:calc(100% + 6px); left:0; z-index:50; min-width:200px; background:#fff; border:1px solid #d6eef3; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:6px; display:none; }
+.newmenu.open { display:block; }
+.newmenu a { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; text-decoration:none; color:#1f3a45; }
+.newmenu a:hover { background:#eef6fb; }
+.newmenu a i { font-size:16px; color:var(--brand,#193847); }
 .badge-upd { background:#f3e8ff; color:#7e22ce; }
 .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
 .tab { padding:8px 16px; border-radius:8px; font-size:13px; text-decoration:none; color:#33454d; background:#fff; border:1px solid #d6eef3; }
@@ -54,11 +61,15 @@ tr:last-child td { border-bottom:none; }
 <div class="container">
 
   <div class="card">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-      <span class="muted" style="font-size:12px;">Νέα καταγραφή:</span>
-      <a class="newbtn" href="/pools"><i class="ti ti-pool"></i> Πισίνες</a>
-      <a class="newbtn" href="/app"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
-      <a class="newbtn" href="/areas"><i class="ti ti-checklist"></i> Τομείς</a>
+    <div style="margin-bottom:14px;">
+      <div class="newwrap">
+        <button type="button" class="newbtn primary" onclick="toggleNewMenu(event)"><i class="ti ti-plus"></i> Νέα καταγραφή <i class="ti ti-chevron-down" style="font-size:14px;"></i></button>
+        <div class="newmenu" id="newmenu">
+          <a href="/pools"><i class="ti ti-pool"></i> Πισίνες</a>
+          <a href="/app"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
+          <a href="/areas"><i class="ti ti-checklist"></i> Τομείς</a>
+        </div>
+      </div>
     </div>
 
     <div class="tabs">
@@ -112,9 +123,13 @@ tr:last-child td { border-bottom:none; }
         </tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:11px;margin-top:10px;">Εμφανίζονται οι τελευταίες {{ items|length }} υποβολές των ξενοδοχείων σου, με σειρά ώρας υποβολής.</p>
+    <p class="muted" style="font-size:11px;margin-top:10px;">Σύνολο {{ items|length }} καταγραφές (όλο το προσωπικό των ξενοδοχείων σου), με σειρά ώρας υποβολής. Για παλαιότερες/συγκεκριμένη περίοδο, χρησιμοποίησε τον επιλογέα περιόδου.</p>
   </div>
 
 </div>
+<script>
+function toggleNewMenu(e){ if(e){e.stopPropagation();} var m=document.getElementById('newmenu'); if(m){ m.classList.toggle('open'); } }
+document.addEventListener('click', function(ev){ var m=document.getElementById('newmenu'); if(m && m.classList.contains('open') && !ev.target.closest('.newwrap')){ m.classList.remove('open'); } });
+</script>
 </body>
 </html>

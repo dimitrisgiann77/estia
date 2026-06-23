@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.215'
-APP_BUILD   = '496'
+APP_VERSION = '12.216'
+APP_BUILD   = '497'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.216', 'b': '497', 'date': '23/06/2026', 'time': '12:00', 'title': 'Καταγραφές - Μετρήσεις: ένα κουμπί «Νέα καταγραφή» + όλες οι καταγραφές',
+     'items': ['Το «Νέα καταγραφή» έγινε ΕΝΑ κουμπί που ανοίγει επιλογέα (Πισίνες · Νερά Χρήσης · Τομείς · ό,τι προστεθεί) και σε πάει στη φόρμα υποβολής.',
+               'Η κονσόλα δείχνει πλέον ΟΛΕΣ τις καταγραφές που κάνει το προσωπικό (όχι δείγμα)· για παλαιότερες/συγκεκριμένη περίοδο, χρησιμοποίησε τον επιλογέα περιόδου.']},
     {'v': '12.215', 'b': '496', 'date': '23/06/2026', 'time': '11:30', 'title': 'Συντήρηση: «Καταγραφές - Μετρήσεις» — μία κονσόλα για όλες τις καταγραφές',
      'items': ['Το «Records» μετονομάστηκε σε «Καταγραφές - Μετρήσεις» και έγινε κεντρική κονσόλα: από εδώ διαχειρίζεσαι όλες τις καταγραφές μαζί.',
                'Νέο tab «Τομείς» δίπλα σε Πισίνες & Νερά Χρήσης (Όλα / Πισίνες / Νερά / Τομείς) — προβολή, διόρθωση όπου υπάρχει, και διαγραφή (admin).',
@@ -2594,7 +2597,7 @@ def _records_items(user, ftype='all'):
     if ftype in ('all', 'pools'):
         pids = [p.id for p in Pool.query.all() if p.hotel_id in hids]
         _pq = apply_period(PoolRecord.query.filter(PoolRecord.pool_id.in_(pids or [-1])), PoolRecord.record_date)
-        for r in (_pq.order_by(PoolRecord.recorded_at.desc()).limit(120).all()):
+        for r in (_pq.order_by(PoolRecord.recorded_at.desc()).limit(2000).all()):
             items.append({
                 'kind': 'pool', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
@@ -2607,7 +2610,7 @@ def _records_items(user, ftype='all'):
     if ftype in ('all', 'water'):
         sids = [s.id for s in WaterSystem.query.all() if s.hotel_id in hids]
         _wq = apply_period(WaterRecord.query.filter(WaterRecord.water_system_id.in_(sids or [-1])), WaterRecord.record_date)
-        for r in (_wq.order_by(WaterRecord.recorded_at.desc()).limit(120).all()):
+        for r in (_wq.order_by(WaterRecord.recorded_at.desc()).limit(2000).all()):
             ws = r.water_system
             items.append({
                 'kind': 'water', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
@@ -2621,7 +2624,7 @@ def _records_items(user, ftype='all'):
     if ftype in ('all', 'area'):
         aids = [a.id for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids]
         _aq = apply_period(Reading.query.filter(Reading.area_id.in_(aids or [-1])), Reading.record_date)
-        for r in (_aq.order_by(Reading.recorded_at.desc()).limit(120).all()):
+        for r in (_aq.order_by(Reading.recorded_at.desc()).limit(2000).all()):
             a = r.area
             items.append({
                 'kind': 'area', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
@@ -2633,7 +2636,7 @@ def _records_items(user, ftype='all'):
                 'edit_url': None,   # οι καταγραφές τομέων δεν έχουν χωριστή φόρμα edit (Φ2)
             })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
-    return items[:200]
+    return items
 
 @app.route('/records')
 def records_feed():
