@@ -331,11 +331,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.217'
-APP_BUILD   = '498'
+APP_VERSION = '12.218'
+APP_BUILD   = '499'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.218', 'b': '499', 'date': '23/06/2026', 'time': '14:00', 'title': 'Συντήρηση/Μετρήσεις — Φ2: μεταφορά παλιών καταγραφών στη νέα δομή (admin)',
+     'items': ['Νέα οθόνη (Διαχείριση → Συντήρηση → «Μετρήσεις · Μεταφορά (Φ2)»): δημιουργεί σημεία μέτρησης από τις πισίνες/δίκτυα και ΑΝΤΙΓΡΑΦΕΙ τις παλιές καταγραφές στην ενιαία μηχανή.',
+               'Ασφαλές: αντιγραφή (τα παλιά μένουν ως έχουν), idempotent (ξανατρέχει χωρίς διπλά), με μετρητές ελέγχου. Πάρε backup πριν.',
+               'Τα νέα σημεία/αντίγραφα είναι κρυφά από τις υπάρχουσες οθόνες μέχρι την ενοποίηση UI (Φ3) — καμία ορατή αλλαγή στη ροή σου.']},
     {'v': '12.217', 'b': '498', 'date': '23/06/2026', 'time': '13:00', 'title': 'Συντήρηση/Μετρήσεις — Φ1 ενοποίησης (παρασκήνιο, καμία ορατή αλλαγή)',
      'items': ['Θεμελίωση ενιαίας μηχανής μετρήσεων: προστέθηκαν τα templates «Πισίνα» & «ΖΝΧ/Δίκτυο νερού» με τις παραμέτρους/όρια/ενέργειες που χρησιμοποιεί ήδη η εφαρμογή.',
                'Νέο: παραμετροποιήσιμες περίοδοι/βάρδιες ανά template (αρχικά Πρωί/Απόγευμα). Θα ρυθμίζονται από οθόνη διαχείρισης σε επόμενη φάση.',
@@ -1366,6 +1370,9 @@ class Area(db.Model):
     location     = db.Column(db.String(120))
     is_active    = db.Column(db.Boolean, default=True)
     created_at   = db.Column(db.DateTime, default=datetime.now)
+    engine_only  = db.Column(db.Boolean, default=False)   # Φ2: σημείο ενιαίας μηχανής (κρυφό από legacy «Τομείς» μέχρι Φ3)
+    legacy_kind  = db.Column(db.String(10))               # Φ2: 'pool' | 'water' (προέλευση)
+    legacy_id    = db.Column(db.Integer)                  # Φ2: Pool.id / WaterSystem.id
     hotel        = db.relationship('Hotel')
     template     = db.relationship('MonitorTemplate')
 
@@ -1381,6 +1388,8 @@ class Reading(db.Model):
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
     values      = db.Column(db.Text)     # JSON {pkey: value}
     notes       = db.Column(db.Text)
+    source_kind = db.Column(db.String(10))   # Φ2: 'pool' | 'water' αν είναι αντίγραφο legacy record
+    source_id   = db.Column(db.Integer)      # Φ2: PoolRecord.id / WaterRecord.id (idempotency)
     area        = db.relationship('Area')
     user        = db.relationship('User', foreign_keys=[user_id])
 
@@ -2626,7 +2635,7 @@ def _records_items(user, ftype='all'):
                 'edit_url': '/edit/%d' % r.id,
             })
     if ftype in ('all', 'area'):
-        aids = [a.id for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids]
+        aids = [a.id for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids and not a.engine_only]
         _aq = apply_period(Reading.query.filter(Reading.area_id.in_(aids or [-1])), Reading.record_date)
         for r in (_aq.order_by(Reading.recorded_at.desc()).limit(2000).all()):
             a = r.area
@@ -3227,7 +3236,7 @@ def areas_app():
         return redirect(url_for('areas_dashboard'))
     user = current_user()
     hids = {h.id for h in allowed_hotels(user)}
-    areas = [a for a in Area.query.filter_by(is_active=True).order_by(Area.template_key, Area.name).all() if a.hotel_id in hids]
+    areas = [a for a in Area.query.filter_by(is_active=True).order_by(Area.template_key, Area.name).all() if a.hotel_id in hids and not a.engine_only]
     areas_json = [{'id': a.id, 'name': a.name, 'location': a.location or '',
                    'hotel': a.hotel.name if a.hotel else '', 'template': a.template_key} for a in areas]
     todays = Reading.query.filter_by(record_date=date.today()).all()
@@ -3278,7 +3287,7 @@ def areas_dashboard():
         return redirect(url_for('login'))
     user = current_user()
     hids = scoped_hotel_ids(user)
-    areas = [a for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids]
+    areas = [a for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids and not a.engine_only]
     aids = {a.id for a in areas}
     q = Reading.query
     if role_rank(user.role) < ROLE_RANK['admin']:
@@ -3385,7 +3394,7 @@ def overview():
         for p in [p for p in h.pools if p.is_active]:
             exp += 2
             done += min(2, PoolRecord.query.filter_by(pool_id=p.id, record_date=today).count())
-        for a in Area.query.filter_by(hotel_id=h.id, is_active=True).all():
+        for a in Area.query.filter(Area.hotel_id == h.id, Area.is_active == True, Area.engine_only.isnot(True)).all():
             tpl = MonitorTemplate.query.get(a.template_key)
             n = len(periods_for(tpl.frequency)) if tpl else 1
             exp += n
@@ -3403,7 +3412,7 @@ def overview():
         for a in compute_pool_actions(r):
             alerts.append({'where': (r.pool.hotel.name + ' / ' + r.pool.name) if (r.pool and r.pool.hotel) else (r.pool.name if r.pool else '—'),
                            'label': a['label'], 'urgent': a['urgent'], 'date': r.record_date})
-    for r in Reading.query.filter(Reading.record_date.in_(rec_dates)).order_by(Reading.recorded_at.desc()).limit(80).all():
+    for r in Reading.query.filter(Reading.record_date.in_(rec_dates), Reading.source_kind.is_(None)).order_by(Reading.recorded_at.desc()).limit(80).all():
         if r.area and r.area.hotel_id not in hids: continue
         for a in area_actions(r):
             alerts.append({'where': (r.area.hotel.name + ' / ' + r.area.name) if (r.area and r.area.hotel) else '—',
@@ -3435,7 +3444,7 @@ def overview():
     pending = User.query.filter_by(is_active=True, approved=False).all()
     activity = ActivityLog.query.order_by(ActivityLog.id.desc()).limit(12).all()
     checkpoints = sum(len([p for p in h.pools if p.is_active]) for h in hotels) + \
-                  Area.query.filter(Area.hotel_id.in_(hids or [-1]), Area.is_active == True).count()
+                  Area.query.filter(Area.hotel_id.in_(hids or [-1]), Area.is_active == True, Area.engine_only.isnot(True)).count()
 
     tiledata = {
         'compliance': compliance, 'alerts': len(alerts), 'open_faults': open_faults_n,
@@ -3629,7 +3638,7 @@ def areas_admin():
     return render_template('areas_admin.html',
                            hotels=Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all(),
                            templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort).all(),
-                           areas=Area.query.filter_by(is_active=True).all())
+                           areas=Area.query.filter(Area.is_active == True, Area.engine_only.isnot(True)).all())
 
 @app.route('/dashboard/area/<int:area_id>/delete', methods=['POST'])
 def area_delete(area_id):
@@ -3922,6 +3931,12 @@ def ensure_columns():
     _add_col('user', 'position_id', 'position_id INTEGER')  # v12.179
     _add_col('user', 'login_enabled', 'login_enabled BOOLEAN')
     _add_col('user', 'employment_active', 'employment_active BOOLEAN')
+    # v12.218 — Φ2 ενοποίηση μετρήσεων (σημεία/αντίγραφα legacy)
+    _add_col('area', 'engine_only', 'engine_only BOOLEAN')
+    _add_col('area', 'legacy_kind', 'legacy_kind VARCHAR(10)')
+    _add_col('area', 'legacy_id', 'legacy_id INTEGER')
+    _add_col('reading', 'source_kind', 'source_kind VARCHAR(10)')
+    _add_col('reading', 'source_id', 'source_id INTEGER')
 
 def init_db():
     with app.app_context():

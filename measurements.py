@@ -113,3 +113,128 @@ def seed_measurement_engine():
 
 
 print('measurements module loaded (Φ1 ενοποίηση μετρήσεων Συντήρησης)')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  Φ2 — Δημιουργία σημείων από Pool/WaterSystem + ΑΝΤΙΓΡΑΦΗ legacy records → Reading
+#  Ασφαλές: COPY (τα παλιά μένουν), idempotent (source_kind/source_id), admin-triggered.
+# ════════════════════════════════════════════════════════════════════════════
+import json as _json
+from flask import request, redirect, url_for, render_template
+from app import (app, current_user, is_admin, log_activity,
+                 Hotel, Pool, WaterSystem, PoolRecord, WaterRecord, Area, Reading)
+
+# pkeys που αντιγράφονται από κάθε legacy record (ίδια ονόματα στηλών)
+_POOL_KEYS = ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
+              'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done']
+_ZNX_KEYS  = ['clo2_tank', 'clo2_kitchen', 'clo2_remote', 'clo2_dhw_out', 'clo2_dhw_return',
+              'clo2_ro', 'temp_dhw_out', 'temp_dhw_return', 'temp_kitchen_hot', 'temp_remote_hot',
+              'temp_tank', 'temp_kitchen_cold', 'temp_remote_cold', 'temp_ro', 'ph_tank',
+              'location_kitchen', 'location_remote']
+
+
+def _values_from(rec, keys):
+    out = {}
+    for k in keys:
+        v = getattr(rec, k, None)
+        if v is not None and v != '':
+            out[k] = v
+    return out
+
+
+def ensure_measurement_points():
+    """Δημιουργεί ΕΝΑ engine_only Area ανά Pool/WaterSystem (idempotent via legacy_kind/legacy_id)."""
+    made = 0
+    for p in Pool.query.all():
+        if not Area.query.filter_by(legacy_kind='pool', legacy_id=p.id).first():
+            a = Area(hotel_id=p.hotel_id, template_key='pool', name=p.name,
+                             location=p.location, is_active=True, engine_only=True,
+                             legacy_kind='pool', legacy_id=p.id)
+            db.session.add(a); made += 1
+    for w in WaterSystem.query.all():
+        if not Area.query.filter_by(legacy_kind='water', legacy_id=w.id).first():
+            a = Area(hotel_id=w.hotel_id, template_key='znx', name=w.name,
+                     location=w.location, is_active=True, engine_only=True,
+                     legacy_kind='water', legacy_id=w.id)
+            db.session.add(a); made += 1
+    db.session.commit()
+    return made
+
+
+def _point_map():
+    m = {}
+    for a in Area.query.filter(Area.engine_only.is_(True)).all():
+        if a.legacy_kind and a.legacy_id:
+            m[(a.legacy_kind, a.legacy_id)] = a.id
+    return m
+
+
+def migrate_legacy_records():
+    """ΑΝΤΙΓΡΑΦΗ PoolRecord/WaterRecord → Reading (idempotent). Επιστρέφει counts."""
+    ensure_measurement_points()
+    pm = _point_map()
+    res = {'pool': 0, 'water': 0, 'pool_skip': 0, 'water_skip': 0, 'orphan': 0}
+    n = 0
+    for r in PoolRecord.query.all():
+        if Reading.query.filter_by(source_kind='pool', source_id=r.id).first():
+            res['pool_skip'] += 1; continue
+        aid = pm.get(('pool', r.pool_id))
+        if not aid:
+            res['orphan'] += 1; continue
+        db.session.add(Reading(area_id=aid, template_key='pool', user_id=r.user_id,
+                               record_date=r.record_date, period=r.period, recorded_at=r.recorded_at,
+                               updated_at=r.updated_at, updated_by=r.updated_by,
+                               values=_json.dumps(_values_from(r, _POOL_KEYS)), notes=r.notes,
+                               source_kind='pool', source_id=r.id))
+        res['pool'] += 1; n += 1
+        if n % 500 == 0:
+            db.session.commit()
+    for r in WaterRecord.query.all():
+        if Reading.query.filter_by(source_kind='water', source_id=r.id).first():
+            res['water_skip'] += 1; continue
+        aid = pm.get(('water', r.water_system_id))
+        if not aid:
+            res['orphan'] += 1; continue
+        db.session.add(Reading(area_id=aid, template_key='znx', user_id=r.user_id,
+                               record_date=r.record_date, period=r.period, recorded_at=r.recorded_at,
+                               updated_at=r.updated_at, updated_by=r.updated_by,
+                               values=_json.dumps(_values_from(r, _ZNX_KEYS)), notes=r.notes,
+                               source_kind='water', source_id=r.id))
+        res['water'] += 1; n += 1
+        if n % 500 == 0:
+            db.session.commit()
+    db.session.commit()
+    return res
+
+
+def migration_status():
+    return {
+        'pool_records':  PoolRecord.query.count(),
+        'water_records': WaterRecord.query.count(),
+        'pool_migrated':  Reading.query.filter_by(source_kind='pool').count(),
+        'water_migrated': Reading.query.filter_by(source_kind='water').count(),
+        'points_pool':  Area.query.filter_by(legacy_kind='pool').count(),
+        'points_water': Area.query.filter_by(legacy_kind='water').count(),
+        'pools':  Pool.query.count(),
+        'systems': WaterSystem.query.count(),
+    }
+
+
+@app.route('/dashboard/measurements', methods=['GET', 'POST'])
+def measurements_migrate():
+    if not is_admin():
+        return redirect(url_for('login'))
+    msg = None
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'points':
+            made = ensure_measurement_points()
+            log_activity('measurements_points', f'{made} σημεία')
+            msg = f'Δημιουργήθηκαν {made} νέα σημεία μέτρησης (όσα έλειπαν).'
+        elif action == 'migrate':
+            res = migrate_legacy_records()
+            log_activity('measurements_migrate', str(res))
+            msg = ('Μεταφορά ολοκληρώθηκε — Πισίνες: %d νέες (%d ήδη)· Νερά: %d νέες (%d ήδη)· ορφανά: %d.'
+                   % (res['pool'], res['pool_skip'], res['water'], res['water_skip'], res['orphan']))
+        return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
+    return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
