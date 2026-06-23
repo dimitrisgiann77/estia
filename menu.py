@@ -14,7 +14,6 @@ MENU_CATALOG = [
     ('meas_console','Μετρήσεις · Ρυθμίσεις',   'ti-adjustments-cog',  '/dashboard/measurements',      False),
     ('meas_entry',  'Μετρήσεις · Καταχώρηση',  'ti-pencil-plus',      '/dashboard/measurements/entry', False),
     ('meas_stats',  'Μετρήσεις · Στατιστικά',  'ti-chart-histogram',  '/dashboard/measurements/stats', False),
-    ('coverage',    'Εβδομαδιαία κάλυψη',     'ti-calendar-stats',   '/pools/coverage',              False),
     ('faults_board','Πίνακας Βλαβών',         'ti-alert-triangle',   '/dashboard/faults',            False),
     ('fault_submit','Δήλωση βλάβης',          'ti-tool',             '/fault',                       False),
     ('areas_rec',   'Καταγραφή τομέων',       'ti-clipboard-list',   '/areas',                       False),
@@ -65,7 +64,7 @@ CAT = {i[0]: {'id': i[0], 'label': i[1], 'icon': i[2], 'url': i[3], 'master': i[
 
 DEFAULT_LAYOUT = [
     {'title': 'Επισκόπηση', 'items': ['dashboard']},
-    {'title': 'Συντήρηση', 'items': ['today', 'areas_rec', 'fault_submit', 'faults_board', 'areas_dash', 'records', 'coverage']},
+    {'title': 'Συντήρηση', 'items': ['today', 'areas_rec', 'fault_submit', 'faults_board', 'areas_dash', 'records']},
     {'title': 'Υποδοχή', 'items': ['surveys']},
     {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff', 'sched_identify', 'sched_imported', 'sched_monthly', 'sched_oversight']},
     {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},

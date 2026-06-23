@@ -338,11 +338,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.236'
-APP_BUILD   = '517'
+APP_VERSION = '12.237'
+APP_BUILD   = '518'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.237', 'b': '518', 'date': '24/06/2026', 'time': '09:00', 'title': 'Συντήρηση — καθάρισμα: απόσυρση παλιάς «Σήμερα» & «Εβδομαδιαίας κάλυψης»· tile «Μετρήσεις σήμερα» από τη μηχανή',
+     'items': ['Η παλιά «Σήμερα» (/katagrafes) και η «Εβδομαδιαία κάλυψη» αποσύρθηκαν — οδηγούν πλέον στη νέα «Σήμερα» και στα Στατιστικά (ενότητα Κάλυψη).',
+               'Το tile «Μετρήσεις πισινών/νερών σήμερα» στο Dashboard μετρά πλέον από τη νέα μηχανή (Reading) — όχι από τις παγωμένες παλιές δομές.']},
     {'v': '12.236', 'b': '517', 'date': '23/06/2026', 'time': '23:40', 'title': 'Πρόγραμμα: Ctrl+κλικ μπλοκ κελιών (εβδομαδιαίο & μηνιαίο)',
      'items': ['Ctrl+κλικ σε πολλά κελιά χτίζει μπλοκ επιλογής (μη συνεχόμενα) χωρίς να ανοίγει αμέσως ο editor. Εμφανίζεται κουμπί «Επεξεργασία N κελιών» (ή Enter) για μαζική επεξεργασία.',
                'Το σύρσιμο (drag) για ορθογώνιο μπλοκ συνεχίζει να δουλεύει όπως πριν.']},
@@ -2373,10 +2376,11 @@ def hotels_payload(user=None):
 
 @app.route('/katagrafes')
 def katagrafes_today():
-    """v12.83 — Ενιαία οθόνη «Σήμερα» για τον συντηρητή: κάρτες πισινών & δικτύων
-    νερού με 2 slots (πρωί 08:00 / απόγευμα 17:00), tap → φόρμα με preset."""
+    """v12.83 — (αποσύρθηκε v12.237) η παλιά «Σήμερα» αντικαταστάθηκε από την engine «Σήμερα»."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.237: απόσυρση παλιάς «Σήμερα» → νέα engine «Σήμερα»
+    return redirect(url_for('measurements_today') + ('?embed=1' if request.args.get('embed') else ''))
     if not can_log():
         return redirect(url_for('pools_dashboard'))
     user = current_user()
@@ -2956,6 +2960,8 @@ def toggle_user(user_id):
 def pools_coverage():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.237: «Εβδομαδιαία κάλυψη» αποσύρθηκε → ενότητα «Κάλυψη» στα Στατιστικά
+    return redirect(url_for('measurements_stats') + ('?embed=1' if request.args.get('embed') else ''))
     if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
         return redirect(url_for('measurements_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
@@ -3507,11 +3513,13 @@ def overview():
         ~F.status.in_(('done','not_done','resubmitted'))).filter(
         (F.assigned_user_id == user.id) | (F.submitted_by == user.id)).count()
 
-    # — Μετρήσεις σήμερα —
-    pool_today = PoolRecord.query.join(Pool, PoolRecord.pool_id == Pool.id).filter(
-        Pool.hotel_id.in_(hids or [-1]), PoolRecord.record_date == today).count()
+    # — Μετρήσεις σήμερα (v12.237: από τη ΜΗΧΑΝΗ — Reading σε engine σημεία) —
+    _ZNX_TPL = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
+    pool_today = (db.session.query(Reading.id).join(Area, Reading.area_id == Area.id).filter(
+        Area.hotel_id.in_(hids or [-1]), Reading.record_date == today, Reading.template_key == 'pool').count())
     try:
-        water_today = WaterRecord.query.filter(WaterRecord.record_date == today).count()
+        water_today = (db.session.query(Reading.id).join(Area, Reading.area_id == Area.id).filter(
+            Area.hotel_id.in_(hids or [-1]), Reading.record_date == today, Reading.template_key.in_(_ZNX_TPL)).count())
     except Exception:
         water_today = 0
     try:

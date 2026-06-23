@@ -24,7 +24,6 @@ MENU_REG = [
     {'k': 'faults_board', 'label': 'Πίνακας Βλαβών',      'icon': 'ti-alert-triangle',   'url': '/dashboard/faults', 'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'areas_dash',   'label': 'Πίνακας τομέων',      'icon': 'ti-clipboard-list',   'url': '/areas/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'records',      'label': 'Καταγραφές - Μετρήσεις', 'short': 'Καταγραφές', 'icon': 'ti-clipboard-data',   'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
-    {'k': 'coverage',     'label': 'Εβδομαδιαία κάλυψη',  'icon': 'ti-calendar-stats',   'url': '/pools/coverage',   'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
     {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'evals',        'label': 'Αξιολόγηση προσωπικού','icon': 'ti-star',            'url': '/dashboard/evaluations','ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
