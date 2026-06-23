@@ -240,3 +240,64 @@ def measurements_migrate():
                    % (res['pool'], res['pool_skip'], res['water'], res['water_skip'], res['orphan']))
         return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
     return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+#  Φ3a — Ρυθμίσεις μηχανής: διαχείριση ΠΕΡΙΟΔΩΝ (MonitorPeriod) ανά template (admin)
+#  Καθαρά προσθετικό. Οι παράμετροι/όρια επεξεργάζονται στο /dashboard/templates.
+# ════════════════════════════════════════════════════════════════════════════
+
+def _next_period_key(template_key):
+    keys = {p.key for p in MonitorPeriod.query.filter_by(template_key=template_key).all()}
+    n = 1
+    while f'p{n}' in keys:
+        n += 1
+    return f'p{n}'
+
+
+@app.route('/dashboard/measurements/periods')
+def measurements_periods():
+    if not is_admin():
+        return redirect(url_for('login'))
+    rows = []
+    for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
+        periods = MonitorPeriod.query.filter_by(template_key=t.key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
+        rows.append({'tpl': t, 'periods': periods, 'nparams': len(t.params or [])})
+    return render_template('measurements_periods.html', rows=rows)
+
+
+@app.route('/dashboard/measurements/period/save', methods=['POST'])
+def measurements_period_save():
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    tk = (f.get('template_key') or '').strip()
+    label = (f.get('label') or '').strip()
+    tm = (f.get('time') or '').strip()
+    try:
+        sort = int(f.get('sort') or 0)
+    except (ValueError, TypeError):
+        sort = 0
+    pid = f.get('period_id')
+    if tk and label:
+        if pid:
+            p = MonitorPeriod.query.get(int(pid))
+            if p:
+                p.label = label[:40]; p.time = tm[:5]; p.sort = sort
+        else:
+            db.session.add(MonitorPeriod(template_key=tk, key=_next_period_key(tk),
+                                         label=label[:40], time=tm[:5], sort=sort))
+        db.session.commit()
+        log_activity('meas_period_save', f'{tk}:{label}')
+    return redirect(url_for('measurements_periods') + '?embed=1')
+
+
+@app.route('/dashboard/measurements/period/<int:period_id>/delete', methods=['POST'])
+def measurements_period_delete(period_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    p = MonitorPeriod.query.get(period_id)
+    if p:
+        db.session.delete(p); db.session.commit()   # Α-02: readings ΔΕΝ θίγονται
+        log_activity('meas_period_delete', f'{p.template_key}:{p.label}')
+    return redirect(url_for('measurements_periods') + '?embed=1')
