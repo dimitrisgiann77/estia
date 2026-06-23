@@ -9,7 +9,7 @@ from app import app, db, current_user, is_admin, log_activity, Setting
 # ── Κατάλογος ΟΛΩΝ των στοιχείων (deduped). master=μόνο masteradmin ──
 MENU_CATALOG = [
     ('dashboard',   'Dashboard',              'ti-layout-dashboard', '/overview',                    False),
-    ('today',       'Σήμερα (Καταγραφές)',    'ti-clipboard-list',   '/katagrafes',                  False),
+    ('today',       'Σήμερα (Μετρήσεις)',     'ti-calendar-check',   '/dashboard/measurements/today',False),
     ('pools',       'Πισίνες',                'ti-pool',             '/pools',                       False),
     ('water',       'Νερά Χρήσης',            'ti-droplet',          '/app',                         False),
     ('pools_dash',  'Πίνακας Πισινών',        'ti-chart-bar',        '/pools/dashboard',             False),

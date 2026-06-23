@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Σήμερα (Μετρήσεις)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/estia-theme.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f7ff;color:#1a1a1a;}
+.topbar{background:#193847;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.topbar-title{font-size:16px;font-weight:600;}
+.topbar-sub{font-size:12px;opacity:.75;margin-top:2px;}
+.prog{font-size:13px;background:rgba(255,255,255,.15);padding:6px 12px;border-radius:999px;}
+.container{max-width:900px;margin:0 auto;padding:24px;}
+.card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid #e0f0ff;margin-bottom:14px;}
+.htitle{font-size:13px;font-weight:700;color:#193847;margin:12px 0 6px;}
+.pname{font-size:14px;font-weight:600;margin-bottom:8px;}
+.pname .loc{font-size:12px;color:#889;font-weight:400;}
+.slots{display:flex;gap:8px;flex-wrap:wrap;}
+.slot{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;text-decoration:none;font-size:13px;border:1.5px dashed #cfe0ea;color:#33454d;background:#fbfdff;}
+.slot.done{border-style:solid;border-color:#16a34a;background:#dcfce7;color:#166534;font-weight:600;}
+.slot .dot{width:8px;height:8px;border-radius:50%;background:#c8d6df;}
+.slot.done .dot{background:#16a34a;}
+.alerts{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+.alerts .at{font-weight:700;color:#9a3412;margin-bottom:8px;font-size:14px;}
+.alert{font-size:13px;color:#9a3412;padding:4px 0;}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.qbtn{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;color:#fff;background:var(--brand,#193847);}
+.qbtn.ghost{background:#eef6fb;color:#193847;border:1px solid #d6eef3;}
+.muted{color:#888;font-size:12px;}
+:root{--brand:{{ theme.primary if theme else '#193847' }};}
+.topbar{background:var(--brand)!important;}.slot.done{background:#dcfce7!important;}
+</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+<div class="topbar">
+  <div>
+    <div class="topbar-title"><i class="ti ti-calendar-check"></i> Σήμερα — Μετρήσεις</div>
+    <div class="topbar-sub">Συμπλήρωσε τις μετρήσεις ανά περιοχή. Πράσινο = έγινε, διακεκομμένο = εκκρεμεί.</div>
+  </div>
+  <div class="prog">{{ donen }} / {{ total }} σήμερα</div>
+</div>
+<div class="container">
+
+  <div class="quick">
+    <a class="qbtn" href="/dashboard/measurements/entry"><i class="ti ti-pencil-plus"></i> Νέα καταχώρηση</a>
+    <a class="qbtn ghost" href="/fault"><i class="ti ti-tool"></i> Δήλωση βλάβης</a>
+  </div>
+
+  {% if alerts %}
+  <div class="alerts">
+    <div class="at"><i class="ti ti-alert-triangle"></i> Εκτός ορίων σήμερα — προτεινόμενες ενέργειες</div>
+    {% for a in alerts %}<div class="alert">• <b>{{ a.point }} · {{ a.label }}:</b> {{ a.action }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% for g in today_by_hotel %}
+    <div class="htitle">{{ g.hotel }}</div>
+    {% for c in g.areas %}
+    <div class="card">
+      <div class="pname">{{ c.area.name }}{% if c.area.location %} <span class="loc">· {{ c.area.location }}</span>{% endif %}</div>
+      <div class="slots">
+        {% for s in c.slots %}
+        <a class="slot {{ 'done' if s.done }}" href="/dashboard/measurements/entry?point={{ c.area.id }}">
+          <span class="dot"></span> {{ s.label }}{% if s.time %} · {{ s.time }}{% endif %}{% if s.done %} ✓{% endif %}
+        </a>
+        {% endfor %}
+        {% if not c.slots %}<span class="muted">Δεν έχουν οριστεί περίοδοι — δες «Μετρήσεις · Ρυθμίσεις → Περίοδοι».</span>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% endfor %}
+  {% if not today_by_hotel %}<div class="card muted">Δεν υπάρχουν σημεία μέτρησης για σένα.</div>{% endif %}
+
+</div>
+</body>
+</html>

@@ -338,11 +338,17 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.226'
-APP_BUILD   = '507'
+APP_VERSION = '12.228'
+APP_BUILD   = '509'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.228', 'b': '509', 'date': '23/06/2026', 'time': '19:30', 'title': 'Μετρήσεις Φ3c-2b — νέα «Σήμερα» (engine): σημεία ανά περιοχή + status ημέρας',
+     'items': ['Η «Σήμερα» δείχνει πλέον τα σημεία ανά περιοχή με κατάσταση ημέρας (πράσινο=έγινε / διακεκομμένο=εκκρεμεί) ανά περίοδο· tap → φόρμα καταχώρησης.',
+               'Πάνελ «Εκτός ορίων σήμερα» με προτεινόμενες ενέργειες + γρήγορα κουμπιά. Scope στα ξενοδοχεία του χρήστη. (Η παλιά «Σήμερα» μένει ως εφεδρεία.)']},
+    {'v': '12.227', 'b': '508', 'date': '23/06/2026', 'time': '19:00', 'title': 'Μετρήσεις Φ3c-2 — το προσωπικό αποκτά τη νέα φόρμα «Καταγραφή μετρήσεων»',
+     'items': ['Νέο στοιχείο μενού «Καταγραφή μετρήσεων» για προσωπικό & managers (η νέα φόρμα ανά περιοχή).',
+               'Πρόσβαση με δικαίωμα καταγραφής (can_log), με αυτόματο περιορισμό στα ξενοδοχεία του χρήστη. Οι παλιές φόρμες μένουν προς το παρόν ως εφεδρεία (πάγωμα στη Φ3c-3).']},
     {'v': '12.226', 'b': '507', 'date': '23/06/2026', 'time': '18:30', 'title': 'Διόρθωση ώρας — όλες οι ώρες σε ώρα Ελλάδος (UTC→Αθήνα στην εμφάνιση)',
      'items': ['Οι ώρες αποθηκεύονται UTC από τον server· τώρα μετατρέπονται σε ώρα Ελλάδος (Europe/Athens, με θερινή ώρα) τη στιγμή της εμφάνισης — διορθώνει το −3 ωρών σε ΟΛΕΣ τις οθόνες/εξαγωγές (Καταγραφές, πίνακες, βλάβες κ.λπ.).']},
     {'v': '12.225', 'b': '506', 'date': '23/06/2026', 'time': '18:00', 'title': 'Μετρήσεις Φ3c-1 — η κονσόλα «Καταγραφές» δείχνει & τις νέες καταχωρήσεις της μηχανής',
@@ -2567,7 +2573,7 @@ def dashboard():
     import extras as _E
     me = current_user()
     if not (is_admin() or _E.menu_allows('water_dash', me)):
-        return redirect(url_for('katagrafes_today')) if can_log() else redirect(url_for('login'))
+        return redirect(url_for('measurements_today')) if can_log() else redirect(url_for('login'))
     # scope ξενοδοχείων: admin=όλα, αλλιώς μόνο τα ανατεθειμένα (mirror Πίνακα Πισινών)
     if is_admin():
         hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
@@ -2693,7 +2699,7 @@ def records_feed():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
-        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
+        return redirect(url_for('measurements_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     ftype = request.args.get('type', 'all')          # all | pools | water
     items = _records_items(user, ftype)
@@ -2763,7 +2769,7 @@ def pools_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
-        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
+        return redirect(url_for('measurements_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     hotels = allowed_hotels(user)
     hids = {h.id for h in hotels}
@@ -2914,7 +2920,7 @@ def pools_coverage():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
-        return redirect(url_for('katagrafes_today'))  # v12.83 — staff = μόνο καταγραφή
+        return redirect(url_for('measurements_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()
     hids = {h.id for h in allowed_hotels(user)}
     pools = [p for p in Pool.query.filter_by(is_active=True).order_by(Pool.hotel_id, Pool.name).all() if p.hotel_id in hids]

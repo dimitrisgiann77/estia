@@ -17,10 +17,11 @@ from app import (app, db, current_user, is_admin, ROLE_RANK, role_rank, log_acti
 # Νέο στοιχείο «Συντήρησης» = πρόσθεσέ το εδώ -> εμφανίζεται ΑΥΤΟΜΑΤΑ και στα δύο.
 # πεδία: key, label, icon, url, ws (workspaces), group
 MENU_REG = [
-    {'k': 'today',        'label': 'Σήμερα (Καταγραφές)', 'short': 'Σήμερα', 'icon': 'ti-layout-dashboard', 'url': '/katagrafes',       'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'today',        'label': 'Σήμερα (Μετρήσεις)', 'short': 'Σήμερα', 'icon': 'ti-calendar-check', 'url': '/dashboard/measurements/today',       'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'pools',        'label': 'Πισίνες',             'icon': 'ti-pool',             'url': '/pools',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'water',        'label': 'Νερά Χρήσης',         'icon': 'ti-droplet',          'url': '/app',              'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'areas',        'label': 'Καταγραφή τομέων',    'icon': 'ti-checklist',        'url': '/areas',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
+    {'k': 'measure',      'label': 'Καταγραφή μετρήσεων', 'short': 'Μετρήσεις', 'icon': 'ti-pencil-plus',  'url': '/dashboard/measurements/entry', 'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'fault_submit', 'label': 'Δήλωση βλάβης',       'icon': 'ti-tool',             'url': '/fault',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'faults_board', 'label': 'Πίνακας Βλαβών',      'icon': 'ti-alert-triangle',   'url': '/dashboard/faults', 'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'pools_dash',   'label': 'Πίνακας Πισινών',     'icon': 'ti-layout-dashboard', 'url': '/pools/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
@@ -41,9 +42,10 @@ _REG_BY_KEY = {it['k']: it for it in MENU_REG}
 ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· viewer = ελάχιστα
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
-    'manager': {'today', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
+    'manager': {'today', 'measure', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
-    'staff':   {'today', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
+    # v12.227 — +measure (νέα ενιαία φόρμα μετρήσεων)
+    'staff':   {'today', 'measure', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
 }
 
 # ── v12.85 — Ορατότητα «πάνω κουμπιών» (workspaces) ανά ρόλο ──────────────────

@@ -12,8 +12,8 @@ Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: cre
 Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
 from datetime import date
-from flask import request, redirect, url_for, render_template
-from app import (app, db, current_user, is_admin, log_activity, area_actions,
+from flask import request, redirect, url_for, render_template, session
+from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
                  PoolRecord, WaterRecord, Area, Reading)
 import json as _json
@@ -403,9 +403,13 @@ def measurements_period_delete(period_id):
 # ── ΦΟΡΜΑ ΚΑΤΑΧΩΡΗΣΗΣ (operational) ──────────────────────────────────────────
 @app.route('/dashboard/measurements/entry')
 def measurements_entry():
-    if not is_admin():
+    if 'user_id' not in session or not can_log():
         return redirect(url_for('login'))
+    user = current_user()
     points = _entry_points()
+    if not is_admin():
+        _hids = scoped_hotel_ids(user)
+        points = [a for a in points if a.hotel_id in _hids]
     hmap = {h.id: h.name for h in Hotel.query.all()}
     hsel = request.args.get('hotel')
     try:
@@ -444,11 +448,13 @@ def measurements_entry():
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])
 def measurements_entry_save():
-    if not is_admin():
+    if 'user_id' not in session or not can_log():
         return redirect(url_for('login'))
     f = request.form
     area = Area.query.get(int(f.get('area_id'))) if f.get('area_id') else None
     if not area:
+        return redirect(url_for('measurements_entry'))
+    if not is_admin() and area.hotel_id not in scoped_hotel_ids(current_user()):
         return redirect(url_for('measurements_entry'))
     tpl = MonitorTemplate.query.get(area.template_key)
     vals = {}
@@ -476,4 +482,52 @@ def measurements_entry_save():
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
 
 
-print('measurements module loaded (Φ1→Φ3b-2 ενοποίηση μετρήσεων)')
+# ── Φ3c-2b: ΕΝΙΑΙΑ «Σήμερα» (engine) — σημεία ανά περιοχή + status ημέρας ─────
+@app.route('/dashboard/measurements/today')
+def measurements_today():
+    if 'user_id' not in session or not can_log():
+        return redirect(url_for('login'))
+    user = current_user()
+    points = _entry_points()
+    if not is_admin():
+        _hids = scoped_hotel_ids(user)
+        points = [a for a in points if a.hotel_id in _hids]
+    today = date.today()
+    aids = [a.id for a in points]
+    done = {}
+    if aids:
+        for r in Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date == today).all():
+            done.setdefault(r.area_id, {})[r.period] = r
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    _pcache = {}
+
+    def _periods(tk):
+        if tk not in _pcache:
+            _pcache[tk] = MonitorPeriod.query.filter_by(template_key=tk).order_by(
+                MonitorPeriod.sort, MonitorPeriod.id).all()
+        return _pcache[tk]
+
+    by_hotel = {}
+    alerts = []
+    total = donen = 0
+    for a in points:
+        prs = _periods(a.template_key)
+        slots = []
+        for pr in prs:
+            r = done.get(a.id, {}).get(pr.key)
+            slots.append({'period': pr.key, 'label': pr.label, 'time': pr.time, 'done': bool(r)})
+            total += 1
+            if r:
+                donen += 1
+                try:
+                    for act in area_actions(r):
+                        alerts.append({'point': a.name, 'label': act.get('label'), 'action': act.get('action')})
+                except Exception:
+                    pass
+        by_hotel.setdefault(a.hotel_id, []).append({'area': a, 'slots': slots})
+    today_by_hotel = [{'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in by_hotel.items()]
+    return render_template('measurements_today.html', today_by_hotel=today_by_hotel,
+                           alerts=alerts, total=total, donen=donen)
+
+
+print('measurements module loaded (Φ1→Φ3c-2b ενοποίηση μετρήσεων)')
