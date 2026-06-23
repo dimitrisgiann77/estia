@@ -432,7 +432,8 @@ def measurements_entry():
         if sel:
             tpl = MonitorTemplate.query.get(sel.template_key)
             params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
-                       'max_v': p.max_v, 'kind': _param_input_kind(p.pkey)} for p in (tpl.params if tpl else [])]
+                       'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
+                       'kind': _param_input_kind(p.pkey)} for p in (tpl.params if tpl else [])]
             periods = MonitorPeriod.query.filter_by(template_key=sel.template_key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
             recent = Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc()).limit(10).all()
             if recent:

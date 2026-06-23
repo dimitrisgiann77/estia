@@ -28,6 +28,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .hint{font-size:11px;color:#9aa;margin-top:2px;}
 .btn{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;color:#fff;background:var(--brand,#193847);}
 .act{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;}
+.liveact{background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 14px;margin:4px 0 14px;}
+.liveact-t{font-weight:700;color:#9a3412;font-size:13px;margin-bottom:6px;}
+.liveact-i{font-size:13px;color:#9a3412;padding:3px 0;}
 table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
 td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
 :root{--brand:{{ theme.primary if theme else '#193847' }};}
@@ -74,15 +77,38 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
         <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}</label>
           {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
           {% elif p.kind=='text' %}<input type="text" name="{{ p.pkey }}">
-          {% else %}<input type="number" step="any" name="{{ p.pkey }}">{% endif %}
+          {% else %}<input type="number" step="any" name="{{ p.pkey }}" class="measin" oninput="recalcActions()" data-label="{{ p.label }}" data-min="{{ p.min_v if p.min_v is not none else '' }}" data-max="{{ p.max_v if p.max_v is not none else '' }}" data-low="{{ p.low or '' }}" data-high="{{ p.high or '' }}">{% endif %}
           {% if p.min_v is not none or p.max_v is not none %}<div class="hint">όρια: {{ p.min_v if p.min_v is not none else '—' }} … {{ p.max_v if p.max_v is not none else '—' }}</div>{% endif %}
         </div>
         {% endfor %}
         <div class="f" style="grid-column:1/-1;"><label>Σημειώσεις</label><input type="text" name="notes"></div>
       </div>
+      <div id="liveact" class="liveact" style="display:none;"></div>
       <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Καταχώρηση</button>
     </form>
   </div>
+  <script>
+  function recalcActions(){
+    var box=document.getElementById('liveact'); if(!box) return;
+    var items=[];
+    document.querySelectorAll('.measin').forEach(function(el){
+      var raw=el.value; if(raw===''||raw==null) return;
+      var v=parseFloat((''+raw).replace(',','.')); if(isNaN(v)) return;
+      var mn=el.dataset.min, mx=el.dataset.max, lab=el.dataset.label||'';
+      if(mn!=='' && v<parseFloat(mn) && el.dataset.low){ items.push([lab, el.dataset.low]); }
+      else if(mx!=='' && v>parseFloat(mx) && el.dataset.high){ items.push([lab, el.dataset.high]); }
+    });
+    box.innerHTML='';
+    if(!items.length){ box.style.display='none'; return; }
+    var h=document.createElement('div'); h.className='liveact-t'; h.textContent='⚠ Προτεινόμενες ενέργειες'; box.appendChild(h);
+    items.forEach(function(o){
+      var d=document.createElement('div'); d.className='liveact-i';
+      var b=document.createElement('b'); b.textContent=o[0]+': '; d.appendChild(b);
+      d.appendChild(document.createTextNode(o[1])); box.appendChild(d);
+    });
+    box.style.display='block';
+  }
+  </script>
 
   {% if actions %}
   <div class="card">
