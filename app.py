@@ -331,11 +331,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.224'
-APP_BUILD   = '505'
+APP_VERSION = '12.225'
+APP_BUILD   = '506'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.225', 'b': '506', 'date': '23/06/2026', 'time': '18:00', 'title': 'Μετρήσεις Φ3c-1 — η κονσόλα «Καταγραφές» δείχνει & τις νέες καταχωρήσεις της μηχανής',
+     'items': ['Η κονσόλα «Καταγραφές - Μετρήσεις» εμφανίζει πλέον ΚΑΙ τις καταχωρήσεις από τη νέα φόρμα (ανά περιοχή), μαζί με τις παλιές — χωρίς διπλά.',
+               'Καθαρά reads — οι υποβολές του προσωπικού δεν αλλάζουν ακόμη (Φ3c-2). Η διαγραφή δρομολογείται σωστά ανά πηγή (legacy ή μηχανή).']},
     {'v': '12.224', 'b': '505', 'date': '23/06/2026', 'time': '17:20', 'title': 'Hotfix: φόρμα/κονσόλα μετρήσεων (σφάλμα ομαδοποίησης ανά ξενοδοχείο)',
      'items': ['Διορθώθηκε σφάλμα («not iterable») στη φόρμα καταχώρησης & στην κονσόλα σημείων που εμφανιζόταν κατά την ομαδοποίηση ανά ξενοδοχείο.']},
     {'v': '12.223', 'b': '504', 'date': '23/06/2026', 'time': '17:00', 'title': 'Μετρήσεις Φ3b-2 — σημεία ανά περιοχή + ΕΝΙΑΙΑ κονσόλα ρυθμίσεων + φόρμα με ενέργειες',
@@ -2629,7 +2632,7 @@ def _records_items(user, ftype='all'):
         _pq = apply_period(PoolRecord.query.filter(PoolRecord.pool_id.in_(pids or [-1])), PoolRecord.record_date)
         for r in (_pq.order_by(PoolRecord.recorded_at.desc()).limit(2000).all()):
             items.append({
-                'kind': 'pool', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
+                'kind': 'pool', 'src': 'legacy', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
                 'hotel': r.pool.hotel.name if r.pool and r.pool.hotel else '—',
                 'place': r.pool.name if r.pool else '—',
@@ -2643,7 +2646,7 @@ def _records_items(user, ftype='all'):
         for r in (_wq.order_by(WaterRecord.recorded_at.desc()).limit(2000).all()):
             ws = r.water_system
             items.append({
-                'kind': 'water', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
+                'kind': 'water', 'src': 'legacy', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
                 'period': r.period,
                 'hotel': ws.hotel.name if ws and ws.hotel else '—',
                 'place': ws.name if ws else '—',
@@ -2651,20 +2654,28 @@ def _records_items(user, ftype='all'):
                 'updated': bool(r.updated_at),
                 'edit_url': '/edit/%d' % r.id,
             })
-    if ftype in ('all', 'area'):
-        aids = [a.id for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids and not a.engine_only]
-        _aq = apply_period(Reading.query.filter(Reading.area_id.in_(aids or [-1])), Reading.record_date)
-        for r in (_aq.order_by(Reading.recorded_at.desc()).limit(2000).all()):
-            a = r.area
-            items.append({
-                'kind': 'area', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
-                'period': r.period,
-                'hotel': a.hotel.name if a and a.hotel else '—',
-                'place': (a.name or '—') if a else '—',
-                'user': r.user.full_name if r.user else '—',
-                'updated': bool(r.updated_at),
-                'edit_url': None,   # οι καταγραφές τομέων δεν έχουν χωριστή φόρμα edit (Φ2)
-            })
+    # v12.225 (Φ3c-1) — γνήσιες καταχωρήσεις ΜΗΧΑΝΗΣ (Reading, ΟΧΙ migrated αντίγραφα):
+    #   εμφανίζονται μαζί με τα legacy, ΧΩΡΙΣ διπλά (source_kind IS NULL). Κατηγοριοποίηση ανά template.
+    _ZNX_TPL = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
+    _ft_of = {'pool': 'pools', 'water': 'water', 'area': 'area'}
+    _rq = apply_period(Reading.query.filter(Reading.source_kind.is_(None)), Reading.record_date)
+    for r in (_rq.order_by(Reading.recorded_at.desc()).limit(2000).all()):
+        a = r.area
+        if not a or a.hotel_id not in hids:
+            continue
+        tk = r.template_key or (a.template_key if a else '') or ''
+        kind = 'pool' if tk == 'pool' else ('water' if tk in _ZNX_TPL else 'area')
+        if ftype not in ('all', _ft_of[kind]):
+            continue
+        items.append({
+            'kind': kind, 'src': 'reading', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
+            'period': r.period,
+            'hotel': a.hotel.name if a and a.hotel else '—',
+            'place': (a.name or '—'),
+            'user': r.user.full_name if r.user else '—',
+            'updated': bool(r.updated_at),
+            'edit_url': None,
+        })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
     return items
 

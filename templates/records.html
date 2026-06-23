@@ -113,7 +113,7 @@ tr:last-child td { border-bottom:none; }
             <td>{% if it.updated %}<span class="badge badge-upd" title="Έχει ενημερωθεί μετά την αρχική υποβολή">διορθώθηκε</span>{% endif %}</td>
             <td style="white-space:nowrap;">
               {% if it.edit_url %}<a href="{{ it.edit_url }}" class="badge badge-am" style="text-decoration:none;" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}
-              {% if is_admin %}<form method="POST" action="{% if it.kind=='pool' %}/pools/record/{{ it.id }}/delete{% elif it.kind=='area' %}/areas/reading/{{ it.id }}/delete{% else %}/water/record/{{ it.id }}/delete{% endif %}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="badge" style="background:#fee2e2;color:#b91c1c;border:none;cursor:pointer;text-decoration:none;" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}
+              {% if is_admin %}<form method="POST" action="{% if it.src=='reading' %}/areas/reading/{{ it.id }}/delete{% elif it.kind=='pool' %}/pools/record/{{ it.id }}/delete{% else %}/water/record/{{ it.id }}/delete{% endif %}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="badge" style="background:#fee2e2;color:#b91c1c;border:none;cursor:pointer;text-decoration:none;" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}
             </td>
           </tr>
           {% endfor %}
