@@ -338,11 +338,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.233'
-APP_BUILD   = '514'
+APP_VERSION = '12.234'
+APP_BUILD   = '515'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.234', 'b': '515', 'date': '23/06/2026', 'time': '22:45', 'title': 'Στατιστικά μετρήσεων: Excel + φίλτρο ξενοδοχείου + περίοδοι (μέρα/εβδ/μήνα/έτος) + κάλυψη· απόσυρση Πινάκων Πισινών/Νερών',
+     'items': ['Export σε Excel (εκτυπώσιμο) — π.χ. φιλτράρεις «SRG» και βγάζεις έτοιμη αναφορά «πώς πάνε οι μετρήσεις».',
+               'Φίλτρο ξενοδοχείου + γρήγορη επιλογή περιόδου: Ημέρα / Εβδομάδα / Μήνας / Έτος.',
+               'Νέα ενότητα «Κάλυψη»: ανά περίοδο δείχνει τι μετρήθηκε και τι λείπει (αντικαθιστά την «Εβδομαδιαία κάλυψη»).',
+               'Αποσύρθηκαν τελείως οι Πίνακες Πισινών & Νερών (οδηγούν πλέον στα ενιαία Στατιστικά).']},
     {'v': '12.233', 'b': '514', 'date': '23/06/2026', 'time': '22:00', 'title': 'Μετρήσεις — πλουσιότερα στατιστικά (KPIs + γραφήματα) + αφαίρεση παλιών φορμών από μενού',
      'items': ['Στατιστικά: προστέθηκαν δείκτες (KPIs) — σύνολο μετρήσεων, % συμμόρφωσης, εκτός ορίων, σημεία — και γραφήματα (συμμόρφωση ανά σημείο, εκτός ορίων ανά παράμετρο), μαζί με τους πίνακες & export CSV.',
                'Καθάρισμα: οι παλιές φόρμες «Πισίνες» & «Νερά Χρήσης» αφαιρέθηκαν εντελώς από τα μενού (παραμένει η ενιαία «Καταγραφή μετρήσεων»).']},
@@ -2593,6 +2598,8 @@ def dashboard():
     # v12.113 — πρόσβαση βάσει δικαιώματος μενού (water_dash), όχι μόνο admin.
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.234: Πίνακας Νερών αποσύρθηκε → ενιαία Στατιστικά μετρήσεων
+    return redirect(url_for('measurements_stats') + ('?embed=1' if request.args.get('embed') else ''))
     import extras as _E
     me = current_user()
     if not (is_admin() or _E.menu_allows('water_dash', me)):
@@ -2791,6 +2798,8 @@ def records_export_xlsx():
 def pools_dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.234: Πίνακας Πισινών αποσύρθηκε → ενιαία Στατιστικά μετρήσεων
+    return redirect(url_for('measurements_stats') + ('?embed=1' if request.args.get('embed') else ''))
     if can_log() and role_rank(current_user().role) < ROLE_RANK['manager']:
         return redirect(url_for('measurements_today'))  # v12.83 — staff = μόνο καταγραφή
     user = current_user()

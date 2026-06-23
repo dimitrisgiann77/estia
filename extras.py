@@ -22,8 +22,6 @@ MENU_REG = [
     {'k': 'measure',      'label': 'Καταγραφή μετρήσεων', 'short': 'Μετρήσεις', 'icon': 'ti-pencil-plus',  'url': '/dashboard/measurements/entry', 'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'fault_submit', 'label': 'Δήλωση βλάβης',       'icon': 'ti-tool',             'url': '/fault',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'faults_board', 'label': 'Πίνακας Βλαβών',      'icon': 'ti-alert-triangle',   'url': '/dashboard/faults', 'ws': 'operations',          'group': 'Συντήρηση'},
-    {'k': 'pools_dash',   'label': 'Πίνακας Πισινών',     'icon': 'ti-layout-dashboard', 'url': '/pools/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
-    {'k': 'water_dash',   'label': 'Πίνακας Νερών',       'icon': 'ti-droplet-filled',   'url': '/dashboard',        'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'areas_dash',   'label': 'Πίνακας τομέων',      'icon': 'ti-clipboard-list',   'url': '/areas/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'records',      'label': 'Καταγραφές - Μετρήσεις', 'short': 'Καταγραφές', 'icon': 'ti-clipboard-data',   'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'coverage',     'label': 'Εβδομαδιαία κάλυψη',  'icon': 'ti-calendar-stats',   'url': '/pools/coverage',   'ws': 'operations',          'group': 'Συντήρηση'},
@@ -40,7 +38,7 @@ _REG_BY_KEY = {it['k']: it for it in MENU_REG}
 ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· viewer = ελάχιστα
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
-    'manager': {'today', 'measure', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
+    'manager': {'today', 'measure', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
     # v12.231 — Φ3c-3: παλιές φόρμες pools/water αποσύρθηκαν· staff χρησιμοποιεί 'measure' (νέα ενιαία)
     'staff':   {'today', 'measure', 'fault_submit', 'areas', 'whatsnew'},

@@ -10,8 +10,6 @@ from app import app, db, current_user, is_admin, log_activity, Setting
 MENU_CATALOG = [
     ('dashboard',   'Dashboard',              'ti-layout-dashboard', '/overview',                    False),
     ('today',       'Σήμερα (Μετρήσεις)',     'ti-calendar-check',   '/dashboard/measurements/today',False),
-    ('pools_dash',  'Πίνακας Πισινών',        'ti-chart-bar',        '/pools/dashboard',             False),
-    ('water_dash',  'Πίνακας Νερών',          'ti-chart-line',       '/dashboard',                   False),
     ('records',     'Καταγραφές - Μετρήσεις', 'ti-clipboard-data',   '/records',                     False),
     ('meas_console','Μετρήσεις · Ρυθμίσεις',   'ti-adjustments-cog',  '/dashboard/measurements',      False),
     ('meas_entry',  'Μετρήσεις · Καταχώρηση',  'ti-pencil-plus',      '/dashboard/measurements/entry', False),
@@ -67,7 +65,7 @@ CAT = {i[0]: {'id': i[0], 'label': i[1], 'icon': i[2], 'url': i[3], 'master': i[
 
 DEFAULT_LAYOUT = [
     {'title': 'Επισκόπηση', 'items': ['dashboard']},
-    {'title': 'Συντήρηση', 'items': ['today', 'areas_rec', 'fault_submit', 'faults_board', 'pools_dash', 'water_dash', 'areas_dash', 'records', 'coverage']},
+    {'title': 'Συντήρηση', 'items': ['today', 'areas_rec', 'fault_submit', 'faults_board', 'areas_dash', 'records', 'coverage']},
     {'title': 'Υποδοχή', 'items': ['surveys']},
     {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff', 'sched_identify', 'sched_imported', 'sched_monthly', 'sched_oversight']},
     {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},

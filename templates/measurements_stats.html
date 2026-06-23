@@ -33,6 +33,9 @@ td.num{text-align:right;}
 .kpi .kn{font-size:24px;font-weight:700;color:#193847;}
 .kpi .kl{font-size:12px;color:#778;margin-top:2px;}
 .kpi.bad .kn{color:#b91c1c;}
+.hsel{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{padding:6px 12px;border-radius:999px;font-size:13px;text-decoration:none;color:#33454d;background:#fff;border:1px solid #d6eef3;}
+.chip.active{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);}
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
 .chartbox{background:#fff;border:1px solid #e0f0ff;border-radius:12px;padding:14px 16px;}
 .chartbox .ct{font-size:13px;font-weight:600;color:#193847;margin-bottom:8px;}
@@ -49,12 +52,26 @@ td.num{text-align:right;}
   <div class="topbar-sub">Σύνοψη ανά σημείο & παράμετρο για την περίοδο που επιλέγεις.</div>
 </div>
 <div class="container">
+  <div class="hsel" style="margin-bottom:10px;">
+    <span class="muted" style="align-self:center;">Ξενοδοχείο:</span>
+    <a class="chip {{ 'active' if hsel is none }}" href="/dashboard/measurements/stats?embed=1&from={{ dfrom }}&to={{ dto }}">Όλα</a>
+    {% for hid,hname in hotel_opts %}<a class="chip {{ 'active' if hsel==hid }}" href="/dashboard/measurements/stats?embed=1&hotel={{ hid }}&from={{ dfrom }}&to={{ dto }}">{{ hname }}</a>{% endfor %}
+  </div>
+  <div class="hsel" style="margin-bottom:10px;">
+    <span class="muted" style="align-self:center;">Περίοδος:</span>
+    <a class="chip {{ 'active' if cur_range=='day' }}" href="/dashboard/measurements/stats?embed=1&range=day{% if hsel %}&hotel={{ hsel }}{% endif %}">Ημέρα</a>
+    <a class="chip {{ 'active' if cur_range=='week' }}" href="/dashboard/measurements/stats?embed=1&range=week{% if hsel %}&hotel={{ hsel }}{% endif %}">Εβδομάδα</a>
+    <a class="chip {{ 'active' if cur_range=='month' }}" href="/dashboard/measurements/stats?embed=1&range=month{% if hsel %}&hotel={{ hsel }}{% endif %}">Μήνας</a>
+    <a class="chip {{ 'active' if cur_range=='year' }}" href="/dashboard/measurements/stats?embed=1&range=year{% if hsel %}&hotel={{ hsel }}{% endif %}">Έτος</a>
+  </div>
   <form class="bar" method="GET" action="/dashboard/measurements/stats">
     <input type="hidden" name="embed" value="1">
+    {% if hsel %}<input type="hidden" name="hotel" value="{{ hsel }}">{% endif %}
     <div><label>Από</label><input type="date" name="from" value="{{ dfrom }}"></div>
     <div><label>Έως</label><input type="date" name="to" value="{{ dto }}"></div>
     <button class="btn" type="submit"><i class="ti ti-filter"></i> Εφαρμογή</button>
-    <a class="btn ghost" href="/dashboard/measurements/stats?fmt=csv&from={{ dfrom }}&to={{ dto }}"><i class="ti ti-file-type-csv"></i> Export CSV</a>
+    <a class="btn ghost" href="/dashboard/measurements/stats?fmt=xlsx&from={{ dfrom }}&to={{ dto }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-file-type-xls"></i> Export Excel</a>
+    <a class="btn ghost" href="/dashboard/measurements/stats?fmt=csv&from={{ dfrom }}&to={{ dto }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-file-type-csv"></i> CSV</a>
   </form>
 
   <div class="kpis">
@@ -63,6 +80,7 @@ td.num{text-align:right;}
     <div class="kpi {{ 'bad' if kpis.total_out }}"><div class="kn">{{ kpis.total_out }}</div><div class="kl">Εκτός ορίων</div></div>
     <div class="kpi"><div class="kn">{{ kpis.npoints }}</div><div class="kl">Σημεία</div></div>
     <div class="kpi"><div class="kn">{{ kpis.nparams_out }}</div><div class="kl">Παράμετροι εκτός</div></div>
+    <div class="kpi {{ 'bad' if kpis.missing }}"><div class="kn">{{ kpis.missing }}</div><div class="kl">Λείπουν (κάλυψη)</div></div>
   </div>
 
   {% if rows %}
@@ -91,6 +109,25 @@ td.num{text-align:right;}
     </table>
   </div>
   {% endfor %}
+  {% if cov %}
+  <div class="card">
+    <div class="pname"><i class="ti ti-checklist"></i> Κάλυψη — τι μετρήθηκε / τι λείπει</div>
+    <table>
+      <tr><th>Σημείο</th><th>Αναμενόμενες</th><th>Έγιναν</th><th>Λείπουν</th><th>Κάλυψη</th></tr>
+      {% for c in cov %}
+      <tr>
+        <td>{{ c.point.name }}</td>
+        <td class="num">{{ c.expected }}</td>
+        <td class="num">{{ c.actual }}</td>
+        <td class="num {{ 'out' if c.missing }}">{{ c.missing }}</td>
+        <td class="num {{ 'comp-ok' if c.cov >= 90 else 'comp-bad' }}">{{ c.cov }}%</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="muted" style="margin-top:8px;">Αναμενόμενες = μέρες περιόδου × περίοδοι ανά σημείο. «Λείπουν» = μετρήσεις που δεν έγιναν.</p>
+  </div>
+  {% endif %}
+
   {% if not rows %}<div class="card muted">Δεν υπάρχουν μετρήσεις στην περίοδο.</div>{% endif %}
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>

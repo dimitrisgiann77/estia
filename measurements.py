@@ -11,7 +11,7 @@ Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: cre
   Φ3b-2 — granular σημεία ανά περιοχή (Option B) + ΕΝΙΑΙΑ κονσόλα ρυθμίσεων (tabs)
 Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
-from datetime import date
+from datetime import date, timedelta
 from flask import request, redirect, url_for, render_template, session, Response
 from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
@@ -585,6 +585,15 @@ def _stats_compute(points, dfrom, dto):
 
 def _stats_range():
     today = date.today()
+    rng = request.args.get('range')
+    if rng == 'day':
+        return today, today
+    if rng == 'week':
+        return today - timedelta(days=today.weekday()), today
+    if rng == 'month':
+        return today.replace(day=1), today
+    if rng == 'year':
+        return today.replace(month=1, day=1), today
     df = request.args.get('from') or today.replace(day=1).isoformat()
     dt = request.args.get('to') or today.isoformat()
     try:
@@ -598,6 +607,77 @@ def _stats_range():
     return dfrom, dto
 
 
+def _coverage(points, dfrom, dto):
+    """Κάλυψη: αναμενόμενες (μέρες × περίοδοι/template) vs πραγματικές (distinct ημέρα/περίοδος)."""
+    days = (dto - dfrom).days + 1
+    if days < 1:
+        days = 1
+    out = []
+    for a in points:
+        nper = MonitorPeriod.query.filter_by(template_key=a.template_key).count() or 1
+        expected = days * nper
+        actual = (db.session.query(Reading.record_date, Reading.period)
+                  .filter(Reading.area_id == a.id, Reading.record_date >= dfrom, Reading.record_date <= dto)
+                  .distinct().count())
+        missing = max(0, expected - actual)
+        cov = round(100.0 * min(actual, expected) / expected) if expected else 100
+        out.append({'point': a, 'expected': expected, 'actual': actual, 'missing': missing, 'cov': cov})
+    return out
+
+
+def _stats_xlsx(rows, cov, dfrom, dto, hotel_name):
+    """Εκτυπώσιμο Excel: τίτλος + περίοδος/ξενοδοχείο + στατιστικά ανά σημείο + κάλυψη."""
+    import io as _io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.worksheet.properties import PageSetupProperties
+    NAVY = '193847'
+    wb = Workbook(); ws = wb.active; ws.title = 'Μετρήσεις'
+    ws.page_setup.orientation = 'landscape'
+    ws.page_setup.fitToWidth = 1; ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    thin = Side(style='thin', color='DDDDDD')
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hdr_fill = PatternFill('solid', fgColor=NAVY)
+    hdr_font = Font(bold=True, color='FFFFFF', size=10)
+    r = 1
+    ws.cell(r, 1, 'Εστία — CONDIAN HOTELS · Αναφορά Μετρήσεων').font = Font(bold=True, size=15, color=NAVY); r += 1
+    ws.cell(r, 1, '%s · Περίοδος: %s έως %s' % (hotel_name, dfrom.strftime('%d/%m/%Y'), dto.strftime('%d/%m/%Y'))).font = Font(size=10, color='777777'); r += 2
+    cols = ['Σημείο', 'Παράμετρος', 'Μονάδα', 'Πλήθος', 'Μέσος', 'Ελάχ', 'Μέγ', 'Εκτός ορίων', 'Συμμόρφωση %']
+    for c, h in enumerate(cols, 1):
+        cell = ws.cell(r, c, h); cell.fill = hdr_fill; cell.font = hdr_font; cell.border = border
+    r += 1
+    for row in rows:
+        for it in row['params']:
+            vals = [row['point'].name, it['label'], it['unit'], it['n'], it['avg'], it['min'], it['max'], it['out'], it['comp']]
+            for c, v in enumerate(vals, 1):
+                cell = ws.cell(r, c, v); cell.border = border
+                if c >= 4:
+                    cell.alignment = Alignment(horizontal='right')
+                if c == 8 and it['out']:
+                    cell.font = Font(color='B91C1C', bold=True)
+            r += 1
+    widths = [26, 22, 9, 9, 9, 9, 9, 12, 13]
+    for c, w in enumerate(widths, 1):
+        ws.column_dimensions[ws.cell(1, c).column_letter].width = w
+    # Κάλυψη
+    r += 2
+    ws.cell(r, 1, 'Κάλυψη (τι έχει μετρηθεί / τι λείπει)').font = Font(bold=True, size=12, color=NAVY); r += 1
+    for c, h in enumerate(['Σημείο', 'Αναμενόμενες', 'Έγιναν', 'Λείπουν', 'Κάλυψη %'], 1):
+        cell = ws.cell(r, c, h); cell.fill = hdr_fill; cell.font = hdr_font; cell.border = border
+    r += 1
+    for cc in cov:
+        vals = [cc['point'].name, cc['expected'], cc['actual'], cc['missing'], cc['cov']]
+        for c, v in enumerate(vals, 1):
+            cell = ws.cell(r, c, v); cell.border = border
+            if c >= 2:
+                cell.alignment = Alignment(horizontal='right')
+            if c == 4 and cc['missing']:
+                cell.font = Font(color='B91C1C', bold=True)
+        r += 1
+    bio = _io.BytesIO(); wb.save(bio); return bio.getvalue()
+
+
 @app.route('/dashboard/measurements/stats')
 def measurements_stats():
     if 'user_id' not in session or not can_log():
@@ -608,9 +688,25 @@ def measurements_stats():
     if not is_admin():
         _hids = scoped_hotel_ids(user)
         points = [a for a in points if a.hotel_id in _hids]
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    hotel_ids = sorted({a.hotel_id for a in points})
+    hsel = request.args.get('hotel')
+    try:
+        hsel = int(hsel) if hsel else None
+    except (ValueError, TypeError):
+        hsel = None
+    if hsel:
+        points = [a for a in points if a.hotel_id == hsel]
     dfrom, dto = _stats_range()
     rows = _stats_compute(points, dfrom, dto)
-    if request.args.get('fmt') == 'csv':
+    cov = _coverage(points, dfrom, dto)
+    hotel_name = hmap.get(hsel, 'Όλα τα ξενοδοχεία')
+    _fmt = request.args.get('fmt')
+    if _fmt == 'xlsx':
+        data = _stats_xlsx(rows, cov, dfrom, dto, hotel_name)
+        return Response(data, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        headers={'Content-Disposition': 'attachment; filename=measurements-%s.xlsx' % dto.isoformat()})
+    if _fmt == 'csv':
         lines = ['Σημείο,Παράμετρος,Μονάδα,Πλήθος,Μέσος,Ελάχ,Μέγ,Εκτός ορίων,Συμμόρφωση %']
         for r in rows:
             for it in r['params']:
@@ -635,12 +731,15 @@ def measurements_stats():
             if it['out']:
                 param_out[it['label']] = param_out.get(it['label'], 0) + it['out']
     po = sorted(param_out.items(), key=lambda kv: -kv[1])[:12]
+    total_missing = sum(c['missing'] for c in cov)
     kpis = {'total_n': total_n, 'total_out': total_out, 'overall': overall,
-            'npoints': len(rows), 'nparams_out': len(param_out)}
+            'npoints': len(rows), 'nparams_out': len(param_out), 'missing': total_missing}
     charts = {'pt_labels': pt_labels, 'pt_comp': pt_comp,
               'po_labels': [k for k, _ in po], 'po_vals': [v for _, v in po]}
-    return render_template('measurements_stats.html', rows=rows, kpis=kpis, charts=charts,
-                           dfrom=dfrom.isoformat(), dto=dto.isoformat())
+    return render_template('measurements_stats.html', rows=rows, cov=cov, kpis=kpis, charts=charts,
+                           dfrom=dfrom.isoformat(), dto=dto.isoformat(),
+                           hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotel_ids],
+                           hsel=hsel, hotel_name=hotel_name, cur_range=request.args.get('range', ''))
 
 
 print('measurements module loaded (Φ1→Φ4 ενοποίηση μετρήσεων)')
