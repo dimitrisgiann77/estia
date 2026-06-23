@@ -322,20 +322,29 @@ def inject_theme():
 
 @app.template_filter('gr')
 def _gr_time(dt, fmt='%d/%m %H:%M'):
-    """v12.91 — όλη η πλατφόρμα τρέχει σε ώρα Ελλάδος (TZ=Europe/Athens), οι datetimes είναι ήδη τοπικοί· απλή μορφοποίηση."""
+    """v12.226 — οι ώρες αποθηκεύονται UTC (server). Εμφάνιση σε ώρα Ελλάδος (Europe/Athens, με θερινή ώρα).
+    Μετατροπή στο σημείο εμφάνισης ώστε να είναι σωστή ανεξάρτητα από το TZ του server."""
     if not dt:
         return ''
     try:
-        return dt.strftime(fmt)
+        from datetime import timezone as _tz
+        from zoneinfo import ZoneInfo
+        d = dt if dt.tzinfo else dt.replace(tzinfo=_tz.utc)
+        return d.astimezone(ZoneInfo('Europe/Athens')).strftime(fmt)
     except Exception:
-        return str(dt)
+        try:
+            return dt.strftime(fmt)
+        except Exception:
+            return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.225'
-APP_BUILD   = '506'
+APP_VERSION = '12.226'
+APP_BUILD   = '507'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.226', 'b': '507', 'date': '23/06/2026', 'time': '18:30', 'title': 'Διόρθωση ώρας — όλες οι ώρες σε ώρα Ελλάδος (UTC→Αθήνα στην εμφάνιση)',
+     'items': ['Οι ώρες αποθηκεύονται UTC από τον server· τώρα μετατρέπονται σε ώρα Ελλάδος (Europe/Athens, με θερινή ώρα) τη στιγμή της εμφάνισης — διορθώνει το −3 ωρών σε ΟΛΕΣ τις οθόνες/εξαγωγές (Καταγραφές, πίνακες, βλάβες κ.λπ.).']},
     {'v': '12.225', 'b': '506', 'date': '23/06/2026', 'time': '18:00', 'title': 'Μετρήσεις Φ3c-1 — η κονσόλα «Καταγραφές» δείχνει & τις νέες καταχωρήσεις της μηχανής',
      'items': ['Η κονσόλα «Καταγραφές - Μετρήσεις» εμφανίζει πλέον ΚΑΙ τις καταχωρήσεις από τη νέα φόρμα (ανά περιοχή), μαζί με τις παλιές — χωρίς διπλά.',
                'Καθαρά reads — οι υποβολές του προσωπικού δεν αλλάζουν ακόμη (Φ3c-2). Η διαγραφή δρομολογείται σωστά ανά πηγή (legacy ή μηχανή).']},
