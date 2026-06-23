@@ -17,6 +17,7 @@ MENU_CATALOG = [
     ('records',     'Καταγραφές - Μετρήσεις', 'ti-clipboard-data',   '/records',                     False),
     ('meas_migrate','Μετρήσεις · Μεταφορά (Φ2)','ti-database-import', '/dashboard/measurements',      False),
     ('meas_periods','Μετρήσεις · Περίοδοι',    'ti-clock-cog',        '/dashboard/measurements/periods',False),
+    ('meas_entry',  'Μετρήσεις · Καταχώρηση (δοκιμή)','ti-pencil-plus','/dashboard/measurements/entry', False),
     ('coverage',    'Εβδομαδιαία κάλυψη',     'ti-calendar-stats',   '/pools/coverage',              False),
     ('faults_board','Πίνακας Βλαβών',         'ti-alert-triangle',   '/dashboard/faults',            False),
     ('fault_submit','Δήλωση βλάβης',          'ti-tool',             '/fault',                       False),

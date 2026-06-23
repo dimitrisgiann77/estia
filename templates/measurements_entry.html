@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Μετρήσεις: Καταχώρηση (δοκιμή Φ3b)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="stylesheet" href="/static/estia-theme.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f7ff;color:#1a1a1a;}
+.topbar{background:#193847;color:#fff;padding:14px 24px;}
+.topbar-title{font-size:16px;font-weight:600;}
+.topbar-sub{font-size:12px;opacity:.7;margin-top:2px;}
+.container{max-width:820px;margin:0 auto;padding:24px;}
+.card{background:#fff;border-radius:12px;padding:18px 20px;border:1px solid #e0f0ff;margin-bottom:18px;}
+.card-title{font-size:14px;font-weight:600;margin-bottom:12px;}
+.ok{background:#dcfce7;border:1px solid #bbf7d0;color:#166534;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;}
+.muted{color:#888;font-size:12px;}
+.pt{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:8px;border:1px solid #d6eef3;text-decoration:none;color:#1f3a45;font-size:13px;margin:0 8px 8px 0;background:#fff;}
+.pt:hover{background:#eef6fb;}
+.pt.sel{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin:12px 0;}
+.f label{display:block;font-size:12px;color:#556;margin-bottom:4px;}
+.f input,.f select{width:100%;padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:14px;}
+.hint{font-size:11px;color:#9aa;margin-top:2px;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;color:#fff;background:#193847;}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;}
+td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
+:root{--brand:{{ theme.primary if theme else '#193847' }};}
+.topbar{background:var(--brand)!important;} .btn{background:var(--brand)!important;}
+</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title"><i class="ti ti-pencil-plus"></i> Μετρήσεις — Καταχώρηση (δοκιμή Φ3b)</div>
+  <div class="topbar-sub">Δοκιμαστική φόρμα της νέας μηχανής (admin). Γράφει στη νέα δομή· δεν επηρεάζει τις φόρμες του προσωπικού.</div>
+</div>
+<div class="container">
+
+  {% if request.args.get('ok') %}<div class="ok"><i class="ti ti-check"></i> Η καταγραφή αποθηκεύτηκε.</div>{% endif %}
+
+  <div class="card">
+    <div class="card-title">Σημείο μέτρησης</div>
+    {% for p in points %}
+      <a class="pt {{ 'sel' if sel and sel.id == p.id }}" href="/dashboard/measurements/entry?point={{ p.id }}&embed=1"><i class="ti ti-map-pin"></i> {{ p.name }} <span class="muted">({{ p.template_key }})</span></a>
+    {% endfor %}
+    {% if not points %}<div class="muted">Δεν υπάρχουν σημεία μηχανής. Τρέξε πρώτα «Μετρήσεις · Μεταφορά → Δημιουργία σημείων».</div>{% endif %}
+  </div>
+
+  {% if sel %}
+  <div class="card">
+    <div class="card-title"><i class="ti {{ tpl.icon or 'ti-checklist' }}"></i> {{ sel.name }} — {{ tpl.name if tpl else sel.template_key }}</div>
+    <form method="POST" action="/dashboard/measurements/entry/save">
+      <input type="hidden" name="area_id" value="{{ sel.id }}">
+      <div class="grid">
+        <div class="f">
+          <label>Περίοδος / Βάρδια</label>
+          <select name="period">
+            {% for pr in periods %}<option value="{{ pr.key }}">{{ pr.label }}{% if pr.time %} ({{ pr.time }}){% endif %}</option>{% endfor %}
+            {% if not periods %}<option value="day">Ημέρα</option>{% endif %}
+          </select>
+        </div>
+        {% for p in params %}
+        <div class="f">
+          <label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}</label>
+          {% if p.kind == 'bool' %}
+            <select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
+          {% elif p.kind == 'text' %}
+            <input type="text" name="{{ p.pkey }}">
+          {% else %}
+            <input type="number" step="any" name="{{ p.pkey }}">
+          {% endif %}
+          {% if p.min_v is not none or p.max_v is not none %}<div class="hint">όρια: {{ p.min_v if p.min_v is not none else '—' }} … {{ p.max_v if p.max_v is not none else '—' }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="f" style="grid-column:1/-1;">
+          <label>Σημειώσεις</label>
+          <input type="text" name="notes">
+        </div>
+      </div>
+      <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Καταχώρηση</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Πρόσφατες καταγραφές (αυτό το σημείο)</div>
+    <table>
+      <tr><th>Ημ/νία/ώρα</th><th>Περίοδος</th><th>Σημειώσεις</th></tr>
+      {% for r in recent %}
+      <tr><td>{{ r.recorded_at.strftime('%d/%m/%Y %H:%M') if r.recorded_at else '—' }}</td><td>{{ r.period }}</td><td class="muted">{{ r.notes or '' }}</td></tr>
+      {% endfor %}
+      {% if not recent %}<tr><td colspan="3" class="muted">Καμία ακόμη.</td></tr>{% endif %}
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>
