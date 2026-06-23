@@ -1,4 +1,5 @@
 {% import '_monitoring.html' as mp %}
+{% macro chip(iid) %}<div class="chip" data-id="{{ iid }}" data-ws="{{ (meta.get(iid, {}).get('ws') or [])|join(' ') }}" data-roles="{{ (meta.get(iid, {}).get('roles') or [])|join(' ') }}"><i class="ti {{ cat[iid].icon }}"></i><span class="lbl">{{ cat[iid].label }}</span><span class="wsb"></span><span class="cfg" title="Ορατότητα: workspaces & ρόλοι" onclick="cfg(event,this)">⚙</span></div>{% endmacro %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Διαμόρφωση μενού', theme.primary) }}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
@@ -12,14 +13,29 @@
  .items{min-height:36px;display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
  .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:grab;color:#334155;}
  .chip i{color:#64748b;}
+ .chip .wsb{font-size:9px;color:#185FA5;background:#eef5f8;border-radius:4px;padding:1px 4px;}
+ .chip .cfg{cursor:pointer;color:#94a3b8;font-size:13px;}
+ .chip .cfg:hover{color:#185FA5;}
  .pool .items{background:#fff7ed;}
  .muted{color:#94a3b8;font-size:12px;} .ok{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;}
  .xg{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;}
+ .mwbar{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin:10px 0;}
+ .cfgpop{position:fixed;z-index:400;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:12px 14px;min-width:210px;display:none;}
+ .cfgpop h5{margin:0 0 6px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;}
+ .cfgpop label{display:block;font-size:13px;padding:3px 0;}
+ .cfgpop hr{border:none;border-top:1px solid #eef2f5;margin:9px 0;}
 </style></head><body>
 {{ mp.topbar('layout-grid', 'ΕΣΤΙΑ — Διαμόρφωση μενού') }}
 <div class="container">
-  {% if saved %}<div class="ok">✓ Αποθηκεύτηκε. Το αριστερό μενού ενημερώθηκε (κάνε refresh).</div>{% endif %}
-  <p class="muted">Σύρε τα στοιχεία μέσα/μεταξύ ομάδων, άλλαξε σειρά, μετονόμασε τίτλους (κλικ πάνω τους). Ό,τι μένει στα «Κρυμμένα» δεν εμφανίζεται. Ισχύει για admin· οι υπόλοιποι κρατούν το προεπιλεγμένο.</p>
+  {% if saved %}<div class="ok">✓ Αποθηκεύτηκε. Κάνε refresh για να δεις το μενού.</div>{% endif %}
+  {% if err %}<div style="background:#fee2e2;color:#b91c1c;padding:8px 12px;border-radius:8px;">{{ err }}</div>{% endif %}
+  <p class="muted">Σύρε τα στοιχεία μέσα/μεταξύ ομάδων, μετονόμασε τίτλους (κλικ). Το <b>⚙</b> σε κάθε στοιχείο ορίζει σε ποια <b>workspaces</b> & <b>ρόλους</b> εμφανίζεται. «Κρυμμένα» = δεν εμφανίζονται πουθενά.</p>
+
+  <div class="mwbar">
+    <label><input type="checkbox" id="mwchk" {{ 'checked' if master_ws }}> <b>Χρήση αυτού του μενού για ΟΛΑ τα workspaces / ρόλους</b></label>
+    <div class="muted" style="margin-top:4px;">Κλειστό = ισχύει μόνο για admin· οι υπόλοιποι κρατούν το προεπιλεγμένο μενού. Ανοιχτό = ο καθένας βλέπει, στο workspace του, μόνο όσα του όρισες με το ⚙.</div>
+  </div>
+
   <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
     <button class="b" onclick="save()">💾 Αποθήκευση</button>
     <button class="gh2" onclick="addGroup()">+ Νέα ομάδα</button>
@@ -31,7 +47,7 @@
     <div class="group">
       <div class="ghead"><span class="ghandle">⠿</span><span class="gtitle" contenteditable="true">{{ g.title }}</span><button class="xg" onclick="delGroup(this)" title="Διάλυση ομάδας">✕</button></div>
       <div class="items">
-        {% for iid in g['items'] %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}</div>{% endif %}{% endfor %}
+        {% for iid in g['items'] %}{% if iid in cat %}{{ chip(iid) }}{% endif %}{% endfor %}
       </div>
     </div>
     {% endfor %}
@@ -40,17 +56,38 @@
   <div class="group pool">
     <div class="ghead"><span style="font-weight:700;color:#b45309;">Κρυμμένα / Διαθέσιμα (δεν εμφανίζονται)</span></div>
     <div class="items" id="pool">
-      {% for iid in unused %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}</div>{% endif %}{% endfor %}
+      {% for iid in unused %}{% if iid in cat %}{{ chip(iid) }}{% endif %}{% endfor %}
     </div>
   </div>
 
-  <form method="POST" action="/dashboard/menu-builder?embed=1" id="f"><input type="hidden" name="layout" id="layout"></form>
+  <form method="POST" action="/dashboard/menu-builder?embed=1" id="f">
+    <input type="hidden" name="layout" id="layout">
+    <input type="hidden" name="meta" id="meta">
+    <input type="hidden" name="master_ws" id="masterws">
+  </form>
 </div>
+
+<div class="cfgpop" id="cfgpop">
+  <h5>Workspaces (πού εμφανίζεται)</h5>
+  {% for w,lbl in ws_opts %}<label><input type="checkbox" class="cfw" value="{{ w }}"> {{ lbl }}</label>{% endfor %}
+  <hr><h5>Ρόλοι (ποιοι το βλέπουν)</h5>
+  {% for r,lbl in role_opts %}<label><input type="checkbox" class="cfr" value="{{ r }}"> {{ lbl }}</label>{% endfor %}
+  <hr><button class="gh2" onclick="cfgClose()">Κλείσιμο</button>
+</div>
+
 <script>
-function initSort(el){ new Sortable(el,{group:'mitems',animation:120,ghostClass:'muted'}); }
+var _WSAB={operations:'Op',staffhub:'SH',guestapp:'Guest',admin:'Ad'};
+function badge(chip){
+  var ws=(chip.dataset.ws||'').split(' ').filter(Boolean);
+  var b=chip.querySelector('.wsb'); if(!b)return;
+  b.textContent = ws.length ? ws.map(function(w){return _WSAB[w]||w;}).join('·') : '—';
+}
+function badgeAll(){ document.querySelectorAll('.chip[data-id]').forEach(badge); }
+function initSort(el){ new Sortable(el,{group:'mitems',animation:120,ghostClass:'muted',filter:'.cfg',preventOnFilter:false}); }
 function initAll(){
   document.querySelectorAll('.items').forEach(initSort);
   new Sortable(document.getElementById('groups'),{handle:'.ghandle',animation:120});
+  badgeAll();
 }
 function addGroup(){
   var d=document.createElement('div'); d.className='group';
@@ -62,14 +99,42 @@ function delGroup(btn){
   g.querySelectorAll('.chip').forEach(function(c){pool.appendChild(c);});
   g.remove();
 }
+var _cfgChip=null;
+function cfg(e,el){
+  e.stopPropagation(); e.preventDefault();
+  _cfgChip=el.closest('.chip');
+  var ws=(_cfgChip.dataset.ws||'').split(' ').filter(Boolean);
+  var roles=(_cfgChip.dataset.roles||'').split(' ').filter(Boolean);
+  document.querySelectorAll('#cfgpop .cfw').forEach(function(c){c.checked=ws.indexOf(c.value)>=0;});
+  document.querySelectorAll('#cfgpop .cfr').forEach(function(c){c.checked=roles.indexOf(c.value)>=0;});
+  var p=document.getElementById('cfgpop'); p.style.display='block';
+  var x=Math.min(e.clientX,(window.innerWidth||800)-230), y=Math.min(e.clientY,(window.innerHeight||600)-270);
+  p.style.left=Math.max(8,x)+'px'; p.style.top=Math.max(8,y)+'px';
+}
+function cfgApply(){
+  if(!_cfgChip)return;
+  var ws=[].filter.call(document.querySelectorAll('#cfgpop .cfw'),function(c){return c.checked;}).map(function(c){return c.value;});
+  var roles=[].filter.call(document.querySelectorAll('#cfgpop .cfr'),function(c){return c.checked;}).map(function(c){return c.value;});
+  _cfgChip.dataset.ws=ws.join(' '); _cfgChip.dataset.roles=roles.join(' '); badge(_cfgChip);
+}
+function cfgClose(){ document.getElementById('cfgpop').style.display='none'; _cfgChip=null; }
+document.addEventListener('change',function(e){ if(e.target.closest&&e.target.closest('#cfgpop')) cfgApply(); });
+document.addEventListener('click',function(e){ var p=document.getElementById('cfgpop'); if(p.style.display==='block' && !e.target.closest('#cfgpop') && !(e.target.closest&&e.target.closest('.cfg'))) cfgClose(); });
 function save(){
-  var out=[];
+  var out=[], meta={};
   document.querySelectorAll('#groups .group').forEach(function(g){
     var t=g.querySelector('.gtitle').innerText.trim();
     var ids=[].map.call(g.querySelectorAll('.items .chip'),function(c){return c.dataset.id;});
     if(t && ids.length) out.push({title:t,items:ids});
   });
+  document.querySelectorAll('.chip[data-id]').forEach(function(c){
+    var ws=(c.dataset.ws||'').split(' ').filter(Boolean);
+    var roles=(c.dataset.roles||'').split(' ').filter(Boolean);
+    if(ws.length||roles.length) meta[c.dataset.id]={ws:ws,roles:roles};
+  });
   document.getElementById('layout').value=JSON.stringify(out);
+  document.getElementById('meta').value=JSON.stringify(meta);
+  document.getElementById('masterws').value=document.getElementById('mwchk').checked?'1':'';
   document.getElementById('f').submit();
 }
 document.addEventListener('DOMContentLoaded',initAll);

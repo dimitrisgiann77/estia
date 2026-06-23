@@ -64,11 +64,14 @@ CAT = {i[0]: {'id': i[0], 'label': i[1], 'icon': i[2], 'url': i[3], 'master': i[
 
 DEFAULT_LAYOUT = [
     {'title': 'Επισκόπηση', 'items': ['dashboard']},
-    {'title': 'Συντήρηση', 'items': ['today', 'areas_rec', 'fault_submit', 'faults_board', 'areas_dash', 'records']},
+    {'title': 'Μετρήσεις & Καταγραφές', 'items': ['today', 'meas_entry', 'areas_rec', 'records', 'meas_stats', 'areas_dash', 'meas_console']},
+    {'title': 'Βλάβες', 'items': ['fault_submit', 'faults_board']},
+    {'title': 'Πρόγραμμα Εργασίας', 'items': ['sched', 'sched_monthly', 'sched_oversight', 'sched_sub', 'sched_set']},
+    {'title': 'Προσωπικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'sched_identify', 'sched_imported', 'sched_staff', 'dups']},
+    {'title': 'Μισθοδοσία', 'items': ['pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention']},
     {'title': 'Υποδοχή', 'items': ['surveys']},
-    {'title': 'HR — Ανθρώπινο Δυναμικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'pay_grid', 'sched', 'sched_sub', 'pay_runs', 'pay_control', 'attention', 'dups', 'companies', 'rates', 'sched_set', 'sched_staff', 'sched_identify', 'sched_imported', 'sched_monthly', 'sched_oversight']},
     {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},
-    {'title': 'Διαχείριση συστήματος', 'items': ['users', 'menu_roles', 'menu_builder', 'activity', 'feedback_adm', 'hotels', 'areas_admin', 'templates', 'fault_set', 'fault_cat', 'email', 'theme', 'ai']},
+    {'title': 'Ρυθμίσεις συστήματος', 'items': ['users', 'hotels', 'areas_admin', 'templates', 'fault_set', 'fault_cat', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder', 'activity', 'feedback_adm']},
     {'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'whatsnew', 'feedback']},
 ]
 
@@ -88,31 +91,96 @@ def save_layout(groups):
     st.value = json.dumps(groups, ensure_ascii=False)
     db.session.commit()
 
+# ── v12.238 — Μενού ανά workspace × ρόλο (master = admin) ─────────────────────
+WS_OPTS   = [('operations', 'Operations'), ('staffhub', 'Staff HUB'),
+             ('guestapp', 'Guest App'), ('admin', 'Admin')]
+ROLE_OPTS = [('manager', 'Manager'), ('staff', 'Staff'), ('viewer', 'Viewer')]
+
+def get_meta():
+    """{item_id: {'ws': [...], 'roles': [...]}} — workspace + ρόλοι ανά στοιχείο."""
+    st = Setting.query.filter_by(key='menu_meta').first()
+    if st and st.value:
+        try:
+            return json.loads(st.value)
+        except Exception:
+            pass
+    return {}
+
+def save_meta(meta):
+    st = Setting.query.filter_by(key='menu_meta').first()
+    if not st:
+        st = Setting(key='menu_meta'); db.session.add(st)
+    st.value = json.dumps(meta, ensure_ascii=False)
+    db.session.commit()
+
+def master_ws_on():
+    """Αν ON: το master μενού (admin) οδηγεί ΟΛΑ τα workspaces/ρόλους. Default OFF (καμία αλλαγή)."""
+    st = Setting.query.filter_by(key='menu_master_ws').first()
+    return bool(st and str(st.value) == '1')
+
 
 @app.context_processor
 def _inject_menu_custom():
     layout = get_layout()
     cu = current_user()
-    master = bool(cu and cu.role == 'masteradmin')
-    if not layout or not is_admin():
+    if not layout:
         return {'menu_custom': False, 'menu_groups': []}
+    master = bool(cu and cu.role == 'masteradmin')
+    admin = is_admin()
+    role = cu.role if cu else None
+    meta = get_meta()
+    mon = master_ws_on()
+    # Custom μενού: admin ΠΑΝΤΑ (master)· μη-admin ΜΟΝΟ αν είναι ενεργό το «master για όλα τα workspaces».
+    if not admin and not mon:
+        return {'menu_custom': False, 'menu_groups': []}
+
+    def _item(iid):
+        it = CAT.get(iid)
+        if not it:
+            return None
+        if it['master'] and not master:
+            return None
+        m = meta.get(iid) or {}
+        ws = [w for w in (m.get('ws') or []) if w]
+        roles = [r for r in (m.get('roles') or []) if r]
+        if admin:
+            wsv = ' '.join(sorted(set(ws) | {'operations', 'admin'}))
+            out = dict(it); out['ws'] = wsv or 'operations admin'; return out
+        if role not in roles:
+            return None
+        wsv = ' '.join(ws)
+        if not wsv:
+            return None
+        out = dict(it); out['ws'] = wsv; return out
+
+    def _gws(items):
+        s = set()
+        for it in items:
+            for w in (it.get('ws') or '').split():
+                s.add(w)
+        return ' '.join(sorted(s)) or 'operations admin'
+
     groups = []
     present = set()
     for g in layout:
         items = []
         for iid in g.get('items', []):
-            it = CAT.get(iid)
-            if not it: continue
             present.add(iid)
-            if it['master'] and not master: continue
-            items.append(it)
+            x = _item(iid)
+            if x:
+                items.append(x)
         if items:
-            groups.append({'title': g.get('title', ''), 'items': items})
-    # auto-sync: νέα στοιχεία καταλόγου που λείπουν από το αποθηκευμένο layout → εμφανίζονται μόνα τους
-    extra = [CAT[k] for k in CAT
-             if k not in present and not (CAT[k]['master'] and not master)]
-    if extra:
-        groups.append({'title': '🆕 Νέα', 'items': extra})
+            groups.append({'title': g.get('title', ''), 'items': items, 'ws': _gws(items)})
+    if admin:
+        extra = []
+        for k in CAT:
+            if k in present:
+                continue
+            x = _item(k)
+            if x:
+                extra.append(x)
+        if extra:
+            groups.append({'title': '🆕 Νέα', 'items': extra, 'ws': _gws(extra)})
     return {'menu_custom': True, 'menu_groups': groups}
 
 
@@ -125,15 +193,37 @@ def menu_builder():
             groups = json.loads(request.form.get('layout') or '[]')
             groups = [{'title': str(g.get('title', ''))[:60], 'items': [i for i in g.get('items', []) if i in CAT]} for g in groups if g.get('title')]
             save_layout(groups)
+            # v12.238 — meta (workspace + ρόλοι ανά στοιχείο)
+            try:
+                raw = json.loads(request.form.get('meta') or '{}')
+            except Exception:
+                raw = {}
+            wsk = {w for w, _ in WS_OPTS}; rk = {r for r, _ in ROLE_OPTS}
+            clean = {}
+            if isinstance(raw, dict):
+                for iid, m in raw.items():
+                    if iid not in CAT or not isinstance(m, dict):
+                        continue
+                    clean[iid] = {'ws': [w for w in (m.get('ws') or []) if w in wsk],
+                                  'roles': [r for r in (m.get('roles') or []) if r in rk]}
+            save_meta(clean)
+            # flag: master για όλα τα workspaces
+            mw = '1' if request.form.get('master_ws') else '0'
+            fst = Setting.query.filter_by(key='menu_master_ws').first()
+            if not fst:
+                fst = Setting(key='menu_master_ws'); db.session.add(fst)
+            fst.value = mw; db.session.commit()
             log_activity('menu_builder_save', '%d ομάδες' % len(groups))
         except Exception as e:
-            return render_template('menu_builder.html', layout=get_layout() or DEFAULT_LAYOUT, cat=CAT, err=str(e), is_admin=is_admin())
+            return render_template('menu_builder.html', layout=get_layout() or DEFAULT_LAYOUT, cat=CAT, err=str(e), is_admin=is_admin(),
+                                   meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on())
         return redirect(url_for('menu_builder') + '?embed=1&saved=1')
     layout = get_layout() or DEFAULT_LAYOUT
     used = {i for g in layout for i in g.get('items', [])}
     unused = [iid for iid, _ in [(i[0], i) for i in MENU_CATALOG] if iid not in used]
     return render_template('menu_builder.html', layout=layout, cat=CAT, unused=unused,
-                           saved=request.args.get('saved'), is_admin=is_admin())
+                           saved=request.args.get('saved'), is_admin=is_admin(),
+                           meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on())
 
 
 @app.route('/dashboard/menu-builder/reset', methods=['POST'])

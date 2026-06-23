@@ -256,8 +256,8 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
     <nav class="side" id="side">
       {% if menu_custom %}
       {% for g in menu_groups %}
-      <div class="grp" data-ws="operations admin">{{ g['title'] }}</div>
-      {% for it in g['items'] %}<div class="item" data-ws="operations admin" data-url="{{ it.url }}?embed=1"><i class="ti {{ it.icon }}"></i> {{ it.label }}</div>{% endfor %}
+      <div class="grp" data-ws="{{ g.ws or 'operations admin' }}">{{ g['title'] }}</div>
+      {% for it in g['items'] %}<div class="item" data-ws="{{ it.ws or 'operations admin' }}" data-url="{{ it.url }}?embed=1"><i class="ti {{ it.icon }}"></i> {{ it.label }}</div>{% endfor %}
       {% endfor %}
       {% else %}
       {% if is_admin %}<div class="item" data-ws="operations admin" data-url="/overview?embed=1"><i class="ti ti-dashboard"></i> Dashboard</div>{% endif %}
