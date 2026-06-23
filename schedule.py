@@ -1045,8 +1045,18 @@ def _build_month_block(hotel_id, dept_list, year, month, user):
         for c in r['cells']:
             c['edit'] = _ed(date.fromisoformat(c['date']))
     WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
+    today = date.today()
+    day_work = [0] * ndays; day_repo = [0] * ndays
+    for r in rows:
+        for idx, c in enumerate(r['cells']):
+            cds = [e['code'] for e in c['entries']]
+            if any(is_work_code(x) and not is_extra_code(x) for x in cds):
+                day_work[idx] += 1
+            if any(is_repo_code(x) for x in cds):
+                day_repo[idx] += 1
     day_hdr = [{'iso': d.isoformat(), 'd': d.day, 'wd': WD[d.weekday()],
-                'we': d.weekday() >= 5, 'hol': d in hol} for d in days]
+                'we': d.weekday() >= 5, 'hol': d in hol, 'today': (d == today),
+                'work': day_work[i], 'repo': day_repo[i]} for i, d in enumerate(days)]
     return {'rows': rows, 'day_hdr': day_hdr, 'ndays': ndays, 'label': f'{MONTHS_EL[month]} {year}'}
 
 @app.route('/dashboard/schedule')
@@ -1095,6 +1105,94 @@ def schedule_board():
         month_el=MONTHS_EL, is_admin=is_admin(),
         sel_month=sel_month, sel_year=sel_year, view_mode=view_mode, month_block=month_block,
         prev_month=prev_m.month, prev_year=prev_m.year, next_month=nxt.month, next_year=nxt.year)
+
+
+@app.route('/dashboard/schedule/submit_month', methods=['POST'])
+def schedule_submit_month():
+    """v12.213 — Υποβολή ΟΛΟΥ του μήνα: υποβάλλει κάθε εβδομάδα (με δεδομένα) που περνά τους κανόνες."""
+    if not _auth() or not can_edit_schedule():
+        return redirect(url_for('login'))
+    user = current_user()
+    hotel_id = request.form.get('hotel_id', type=int)
+    year = request.form.get('year', type=int); month = request.form.get('month', type=int)
+    import calendar as _cal
+    if not (hotel_id and year and month):
+        return redirect('/dashboard/schedule?embed=1')
+    last = date(year, month, _cal.monthrange(year, month)[1])
+    uids = [u.id for u in User.query.filter(User.is_active == True, User.home_hotel_id == hotel_id).all()]
+    def _has(ws):
+        if WeekPlan.query.filter_by(hotel_id=hotel_id, week_start=ws).first():
+            return True
+        if not uids:
+            return False
+        return db.session.query(ShiftAssignment.id).filter(
+            ShiftAssignment.user_id.in_(uids),
+            ShiftAssignment.work_date >= ws, ShiftAssignment.work_date <= ws + timedelta(days=6)).first() is not None
+    submitted = 0; blocked = 0
+    wk = monday_of(date(year, month, 1))
+    while wk <= last:
+        if not _has(wk):
+            wk += timedelta(days=7); continue
+        issues = validate_hotel_week(hotel_id, wk)
+        if any(i['severity'] == 'block' for i in issues):
+            blocked += 1; wk += timedelta(days=7); continue
+        lastsub = (ScheduleSubmission.query.filter_by(hotel_id=hotel_id, week_start=wk)
+                   .order_by(ScheduleSubmission.version.desc()).first())
+        snap = _hotel_week_snapshot(hotel_id, wk)
+        version = (lastsub.version + 1) if lastsub else 1
+        changes = _diff_snapshots(json.loads(lastsub.snapshot) if lastsub and lastsub.snapshot else None, snap) if lastsub else []
+        sub = ScheduleSubmission(hotel_id=hotel_id, week_start=wk, version=version,
+                                 parent_version=(lastsub.version if lastsub else None),
+                                 status='submitted', snapshot=json.dumps(snap, ensure_ascii=False),
+                                 changes=json.dumps(changes, ensure_ascii=False), submitted_by=user.id)
+        db.session.add(sub)
+        for wp in WeekPlan.query.filter_by(hotel_id=hotel_id, week_start=wk).all():
+            wp.status = 'submitted'
+        _notify_accountants(hotel_id, wk, version, 'ΤΡΟΠΟΠΟΙΗΣΗ' if version > 1 else 'Νέα υποβολή', changes)
+        submitted += 1
+        wk += timedelta(days=7)
+    db.session.commit()
+    log_activity('schedule_submit_month', f'{month}/{year} ({submitted})', hotel_id=hotel_id)
+    return redirect(f'/dashboard/schedule?view=month&hotel_id={hotel_id}&month={month}&year={year}&embed=1&ok=msub&n={submitted}&b={blocked}')
+
+
+@app.route('/dashboard/schedule/month_export.xlsx')
+def schedule_month_export():
+    """v12.213 — Εξαγωγή μηνιαίου πλάνου (εργαζόμενοι × μέρες με κωδικούς) σε Excel."""
+    if not _auth() or not can_edit_schedule():
+        return redirect(url_for('login'))
+    user = current_user()
+    hotel_id = request.args.get('hotel_id', type=int)
+    year = request.args.get('year', type=int) or date.today().year
+    month = request.args.get('month', type=int) or date.today().month
+    dept_list = _depts_present(hotel_id)
+    mb = _build_month_block(hotel_id, dept_list, year, month, user)
+    import openpyxl, io
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Μηνιαίο'
+    navy = PatternFill('solid', fgColor='193847'); we = PatternFill('solid', fgColor='fde2e2')
+    hdr = ['Εργαζόμενος'] + ['%s %d' % (d['wd'], d['d']) for d in mb['day_hdr']] + ['Ώρες', 'Έξτρα', 'Ρεπό', 'Εργ.']
+    ws.append(hdr)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF'); cell.fill = navy; cell.alignment = Alignment(horizontal='center')
+    for r in mb['rows']:
+        row = [r['user'].full_name or r['user'].username]
+        for c in r['cells']:
+            row.append(' / '.join((e['code'] + ((' ' + e['times']) if e.get('times') else '')) for e in c['entries']) if c['entries'] else '')
+        row += [r['wk_hours'], r['wk_extra'], r['repo'], r['work_days']]
+        ws.append(row)
+    ws.freeze_panes = 'B2'
+    ws.column_dimensions['A'].width = 26
+    for i, d in enumerate(mb['day_hdr']):
+        col = openpyxl.utils.get_column_letter(2 + i); ws.column_dimensions[col].width = 13
+        if d['we']:
+            for rr in range(1, ws.max_row + 1):
+                ws.cell(row=rr, column=2 + i).fill = we
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    fn = 'monthly_%d_%02d.xlsx' % (year, month)
+    return Response(bio.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=%s' % fn})
 
 
 # ── API: autosave κελιού ──────────────────────────────────────────────────────
