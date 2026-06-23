@@ -294,16 +294,33 @@ function toggleDense(){ var t=document.getElementById('monthtable'); if(!t)retur
 // ── Cell editor (drag-select εύρους ημερών ανά γραμμή) ──
 var curSel=[], selecting=false, anchor=null, ctrlPending=false;
 function _pos(el){var td=el.parentNode,tr=td.parentNode,tb=tr.parentNode;return {tb:tb,r:Array.prototype.indexOf.call(tb.children,tr),c:Array.prototype.indexOf.call(tr.children,td)};}
-function clearSel(){ curSel.forEach(function(c){c.classList.remove('sel');}); curSel=[]; }
+function clearSel(){ curSel.forEach(function(c){c.classList.remove('sel');}); curSel=[]; _updSelBtn(); }
 function markRect(a,b){ clearSel(); var r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r),c0=Math.min(a.c,b.c),c1=Math.max(a.c,b.c);
   a.tb.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){var p=_pos(el);if(p.r>=r0&&p.r<=r1&&p.c>=c0&&p.c<=c1){el.classList.add('sel');curSel.push(el);}}); }
-function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);}}
+function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);} _updSelBtn(); }
 document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
   el.addEventListener('mousedown',function(e){
     if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
     e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
   });
   el.addEventListener('mouseenter',function(){if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el));});
+});
+var _selBtn=null;
+function _updSelBtn(){
+  if(!_selBtn){
+    _selBtn=document.createElement('button');_selBtn.type='button';
+    _selBtn.style.cssText='position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:200;background:#185FA5;color:#fff;border:none;border-radius:999px;padding:10px 18px;font-size:14px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer;display:none;';
+    _selBtn.addEventListener('click',function(){ if(curSel.length){ _selBtn.style.display='none'; openEd(); } });
+    document.body.appendChild(_selBtn);
+  }
+  if(curSel.length){ _selBtn.textContent='✎ Επεξεργασία '+curSel.length+' κελιών'; _selBtn.style.display='block'; }
+  else { _selBtn.style.display='none'; }
+}
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter'||!curSel.length) return;
+  var t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA')) return;
+  var ed=document.getElementById('editor'); if(ed&&ed.style.display==='block') return;
+  e.preventDefault(); if(_selBtn)_selBtn.style.display='none'; openEd();
 });
 var _activeWrap=null,_autoRAF=null,_mx=0,_my=0;
 window.addEventListener('mousemove',function(e){_mx=e.clientX;_my=e.clientY;});
@@ -322,7 +339,7 @@ function _edgeTick(){
 }
 window.addEventListener('mouseup',function(){
   _activeWrap=null;
-  if(ctrlPending){ctrlPending=false;if(curSel.length)openEd();return;}
+  if(ctrlPending){ctrlPending=false;_updSelBtn();return;}  // Ctrl-block: χτίσε επιλογή, ΟΧΙ άμεσο άνοιγμα
   if(!selecting)return;selecting=false;if(curSel.length)openEd();
 });
 var HOTELS_LIST=[{% for h in hotels %}{id:{{h.id}},name:{{ h.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
