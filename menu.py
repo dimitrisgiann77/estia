@@ -15,6 +15,7 @@ MENU_CATALOG = [
     ('pools_dash',  'Πίνακας Πισινών',        'ti-chart-bar',        '/pools/dashboard',             False),
     ('water_dash',  'Πίνακας Νερών',          'ti-chart-line',       '/dashboard',                   False),
     ('records',     'Καταγραφές - Μετρήσεις', 'ti-clipboard-data',   '/records',                     False),
+    ('meas_migrate','Μετρήσεις · Μεταφορά (Φ2)','ti-database-import', '/dashboard/measurements',      False),
     ('coverage',    'Εβδομαδιαία κάλυψη',     'ti-calendar-stats',   '/pools/coverage',              False),
     ('faults_board','Πίνακας Βλαβών',         'ti-alert-triangle',   '/dashboard/faults',            False),
     ('fault_submit','Δήλωση βλάβης',          'ti-tool',             '/fault',                       False),
