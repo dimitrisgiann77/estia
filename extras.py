@@ -18,8 +18,6 @@ from app import (app, db, current_user, is_admin, ROLE_RANK, role_rank, log_acti
 # πεδία: key, label, icon, url, ws (workspaces), group
 MENU_REG = [
     {'k': 'today',        'label': 'Σήμερα (Μετρήσεις)', 'short': 'Σήμερα', 'icon': 'ti-calendar-check', 'url': '/dashboard/measurements/today',       'ws': 'operations staffhub', 'group': 'Συντήρηση'},
-    {'k': 'pools',        'label': 'Πισίνες',             'icon': 'ti-pool',             'url': '/pools',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
-    {'k': 'water',        'label': 'Νερά Χρήσης',         'icon': 'ti-droplet',          'url': '/app',              'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'areas',        'label': 'Καταγραφή τομέων',    'icon': 'ti-checklist',        'url': '/areas',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'measure',      'label': 'Καταγραφή μετρήσεων', 'short': 'Μετρήσεις', 'icon': 'ti-pencil-plus',  'url': '/dashboard/measurements/entry', 'ws': 'operations staffhub', 'group': 'Συντήρηση'},
     {'k': 'fault_submit', 'label': 'Δήλωση βλάβης',       'icon': 'ti-tool',             'url': '/fault',            'ws': 'operations staffhub', 'group': 'Συντήρηση'},

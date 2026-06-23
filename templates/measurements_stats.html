@@ -28,6 +28,15 @@ td.num{text-align:right;}
 .comp-ok{color:#166534;font-weight:600;}
 .comp-bad{color:#b91c1c;font-weight:600;}
 .muted{color:#888;font-size:12px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:#fff;border:1px solid #e0f0ff;border-radius:12px;padding:14px 16px;text-align:center;}
+.kpi .kn{font-size:24px;font-weight:700;color:#193847;}
+.kpi .kl{font-size:12px;color:#778;margin-top:2px;}
+.kpi.bad .kn{color:#b91c1c;}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.chartbox{background:#fff;border:1px solid #e0f0ff;border-radius:12px;padding:14px 16px;}
+.chartbox .ct{font-size:13px;font-weight:600;color:#193847;margin-bottom:8px;}
+@media(max-width:700px){.charts{grid-template-columns:1fr;}}
 :root{--brand:{{ theme.primary if theme else '#193847' }};}
 .topbar{background:var(--brand)!important;}
 </style>
@@ -47,6 +56,21 @@ td.num{text-align:right;}
     <button class="btn" type="submit"><i class="ti ti-filter"></i> Εφαρμογή</button>
     <a class="btn ghost" href="/dashboard/measurements/stats?fmt=csv&from={{ dfrom }}&to={{ dto }}"><i class="ti ti-file-type-csv"></i> Export CSV</a>
   </form>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kn">{{ kpis.total_n }}</div><div class="kl">Μετρήσεις</div></div>
+    <div class="kpi"><div class="kn">{{ kpis.overall }}%</div><div class="kl">Συμμόρφωση</div></div>
+    <div class="kpi {{ 'bad' if kpis.total_out }}"><div class="kn">{{ kpis.total_out }}</div><div class="kl">Εκτός ορίων</div></div>
+    <div class="kpi"><div class="kn">{{ kpis.npoints }}</div><div class="kl">Σημεία</div></div>
+    <div class="kpi"><div class="kn">{{ kpis.nparams_out }}</div><div class="kl">Παράμετροι εκτός</div></div>
+  </div>
+
+  {% if rows %}
+  <div class="charts">
+    <div class="chartbox"><div class="ct">Συμμόρφωση ανά σημείο (%)</div><canvas id="chComp" height="170"></canvas></div>
+    <div class="chartbox"><div class="ct">Εκτός ορίων ανά παράμετρο</div><canvas id="chOut" height="170"></canvas></div>
+  </div>
+  {% endif %}
 
   {% for r in rows %}
   <div class="card">
@@ -69,5 +93,23 @@ td.num{text-align:right;}
   {% endfor %}
   {% if not rows %}<div class="card muted">Δεν υπάρχουν μετρήσεις στην περίοδο.</div>{% endif %}
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+(function(){
+  var C={{ charts|tojson }};
+  if(typeof Chart==='undefined') return;
+  var brand=(getComputedStyle(document.documentElement).getPropertyValue('--brand')||'#193847').trim();
+  if(C.pt_labels && C.pt_labels.length && document.getElementById('chComp')){
+    new Chart(document.getElementById('chComp'),{type:'bar',
+      data:{labels:C.pt_labels,datasets:[{label:'Συμμόρφωση %',data:C.pt_comp,backgroundColor:brand}]},
+      options:{scales:{y:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
+  }
+  if(C.po_labels && C.po_labels.length && document.getElementById('chOut')){
+    new Chart(document.getElementById('chOut'),{type:'bar',
+      data:{labels:C.po_labels,datasets:[{label:'Εκτός ορίων',data:C.po_vals,backgroundColor:'#dc2626'}]},
+      options:{indexAxis:'y',plugins:{legend:{display:false}}}});
+  }
+})();
+</script>
 </body>
 </html>

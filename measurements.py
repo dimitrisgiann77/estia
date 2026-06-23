@@ -620,7 +620,26 @@ def measurements_stats():
         csv = '﻿' + '\n'.join(lines)
         return Response(csv, mimetype='text/csv',
                         headers={'Content-Disposition': 'attachment; filename=measurements-stats.csv'})
-    return render_template('measurements_stats.html', rows=rows,
+    # KPIs + δεδομένα γραφημάτων
+    total_n = sum(it['n'] for r in rows for it in r['params'])
+    total_out = sum(it['out'] for r in rows for it in r['params'])
+    overall = round(100.0 * (total_n - total_out) / total_n) if total_n else 100
+    pt_labels = []; pt_comp = []
+    for r in rows:
+        n = sum(it['n'] for it in r['params']); o = sum(it['out'] for it in r['params'])
+        pt_labels.append(r['point'].name or '—')
+        pt_comp.append(round(100.0 * (n - o) / n) if n else 100)
+    param_out = {}
+    for r in rows:
+        for it in r['params']:
+            if it['out']:
+                param_out[it['label']] = param_out.get(it['label'], 0) + it['out']
+    po = sorted(param_out.items(), key=lambda kv: -kv[1])[:12]
+    kpis = {'total_n': total_n, 'total_out': total_out, 'overall': overall,
+            'npoints': len(rows), 'nparams_out': len(param_out)}
+    charts = {'pt_labels': pt_labels, 'pt_comp': pt_comp,
+              'po_labels': [k for k, _ in po], 'po_vals': [v for _, v in po]}
+    return render_template('measurements_stats.html', rows=rows, kpis=kpis, charts=charts,
                            dfrom=dfrom.isoformat(), dto=dto.isoformat())
 
 
