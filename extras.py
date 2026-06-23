@@ -26,7 +26,7 @@ MENU_REG = [
     {'k': 'pools_dash',   'label': 'Πίνακας Πισινών',     'icon': 'ti-layout-dashboard', 'url': '/pools/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'water_dash',   'label': 'Πίνακας Νερών',       'icon': 'ti-droplet-filled',   'url': '/dashboard',        'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'areas_dash',   'label': 'Πίνακας τομέων',      'icon': 'ti-clipboard-list',   'url': '/areas/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
-    {'k': 'records',      'label': 'Records',             'icon': 'ti-list-details',     'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'records',      'label': 'Καταγραφές - Μετρήσεις', 'short': 'Καταγραφές', 'icon': 'ti-clipboard-data',   'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'coverage',     'label': 'Εβδομαδιαία κάλυψη',  'icon': 'ti-calendar-stats',   'url': '/pools/coverage',   'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
     {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},

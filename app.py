@@ -331,11 +331,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.214'
-APP_BUILD   = '495'
+APP_VERSION = '12.215'
+APP_BUILD   = '496'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.215', 'b': '496', 'date': '23/06/2026', 'time': '11:30', 'title': 'Συντήρηση: «Καταγραφές - Μετρήσεις» — μία κονσόλα για όλες τις καταγραφές',
+     'items': ['Το «Records» μετονομάστηκε σε «Καταγραφές - Μετρήσεις» και έγινε κεντρική κονσόλα: από εδώ διαχειρίζεσαι όλες τις καταγραφές μαζί.',
+               'Νέο tab «Τομείς» δίπλα σε Πισίνες & Νερά Χρήσης (Όλα / Πισίνες / Νερά / Τομείς) — προβολή, διόρθωση όπου υπάρχει, και διαγραφή (admin).',
+               'Κουμπιά «Νέα καταγραφή» στην κορυφή (Πισίνες · Νερά Χρήσης · Τομείς) ώστε καταχώρηση και διαχείριση να γίνονται από ένα μέρος.',
+               'Ό,τι νέος τύπος καταγραφής έρθει στο μέλλον θα συγκεντρώνεται κι αυτός εδώ.']},
     {'v': '12.214', 'b': '495', 'date': '23/06/2026', 'time': '10:30', 'title': 'Μηνιαίο: «Συμπαγές» κρύβει ώρες (μόνο κωδικός) + διόρθωση παγωμένης κεφαλίδας',
      'items': ['Το κουμπί «Συμπαγή» δείχνει πλέον μόνο τον κωδικό βάρδιας (κρύβονται οι ώρες) για πιο πυκνή εικόνα.',
                'Διορθώθηκε η παγωμένη κεφαλίδα ημερών: το μηνιαίο grid κάνει εσωτερικό scroll (max-height) ώστε οι ημερομηνίες και η στήλη ονόματος να μένουν σταθερές καθώς σκρολάρεις.']},
@@ -1837,8 +1842,8 @@ def _records_row(it):
     return [
         it['date'].strftime('%d/%m/%Y') if it.get('date') else '',
         _gr_time(it['when'], '%H:%M') if it.get('when') else '',
-        'Πισίνα' if it['kind'] == 'pool' else 'Νερά',
-        'Πρωί' if it['period'] == 'morning' else 'Απόγευμα',
+        _RECORDS_KIND_LABEL.get(it['kind'], it['kind']),
+        _RECORDS_PERIOD_LABEL.get(it['period'], it['period'] or ''),
         it.get('hotel') or '', it.get('place') or '', it.get('user') or '',
         'διορθώθηκε' if it.get('updated') else '',
     ]
@@ -2578,7 +2583,9 @@ def users_admin():
 
 
 # v12.4 — Records: ενιαίο feed υποβολών (πισίνες + νερά χρήσης), role-scoped
-_RECORDS_TYPE_LABEL = {'all': 'Όλες οι υποβολές', 'pools': 'Πισίνες', 'water': 'Νερά Χρήσης'}
+_RECORDS_TYPE_LABEL = {'all': 'Όλες οι υποβολές', 'pools': 'Πισίνες', 'water': 'Νερά Χρήσης', 'area': 'Τομείς'}
+_RECORDS_KIND_LABEL = {'pool': 'Πισίνα', 'water': 'Νερά', 'area': 'Τομέας'}
+_RECORDS_PERIOD_LABEL = {'morning': 'Πρωί', 'afternoon': 'Απόγευμα', 'day': 'Ημέρα'}
 
 def _records_items(user, ftype='all'):
     """Κοινός builder της λίστας Records (page + εξαγωγές PDF/XLSX)."""
@@ -2611,8 +2618,22 @@ def _records_items(user, ftype='all'):
                 'updated': bool(r.updated_at),
                 'edit_url': '/edit/%d' % r.id,
             })
+    if ftype in ('all', 'area'):
+        aids = [a.id for a in Area.query.filter_by(is_active=True).all() if a.hotel_id in hids]
+        _aq = apply_period(Reading.query.filter(Reading.area_id.in_(aids or [-1])), Reading.record_date)
+        for r in (_aq.order_by(Reading.recorded_at.desc()).limit(120).all()):
+            a = r.area
+            items.append({
+                'kind': 'area', 'id': r.id, 'when': r.recorded_at, 'date': r.record_date,
+                'period': r.period,
+                'hotel': a.hotel.name if a and a.hotel else '—',
+                'place': (a.name or '—') if a else '—',
+                'user': r.user.full_name if r.user else '—',
+                'updated': bool(r.updated_at),
+                'edit_url': None,   # οι καταγραφές τομέων δεν έχουν χωριστή φόρμα edit (Φ2)
+            })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
-    return items[:150]
+    return items[:200]
 
 @app.route('/records')
 def records_feed():
@@ -2645,6 +2666,17 @@ def delete_water_record(record_id):
         nm = r.water_system.name if r.water_system else ''
         db.session.delete(r); db.session.commit()
         log_activity('water_record_delete', f'{nm} #{record_id}')
+    return redirect(request.referrer or (url_for('records_feed') + '?embed=1'))
+
+@app.route('/areas/reading/<int:record_id>/delete', methods=['POST'])
+def delete_area_reading(record_id):
+    if not is_admin():
+        return redirect(url_for('login'))
+    r = Reading.query.get(record_id)
+    if r:
+        nm = r.area.name if r.area else ''
+        db.session.delete(r); db.session.commit()
+        log_activity('area_reading_delete', f'{nm} #{record_id}')
     return redirect(request.referrer or (url_for('records_feed') + '?embed=1'))
 
 # v12.5 — Εξαγωγές Records (έτοιμες προς εκτύπωση)
