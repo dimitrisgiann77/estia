@@ -1,27 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Εστία — measurements.py — Φ1 ενοποίησης μετρήσεων Συντήρησης.
-Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db, ώστε το create_all να πιάσει το MonitorPeriod).
+Εστία — measurements.py — Ενοποίηση μετρήσεων Συντήρησης (Φ1→Φ3b-2).
+Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: create_all να πιάσει το MonitorPeriod).
 
-Φ1 = ΚΑΘΑΡΑ ΠΡΟΣΘΕΤΙΚΟ:
-  - νέο μοντέλο MonitorPeriod (παραμετροποιήσιμες περίοδοι/βάρδιες ανά template)
-  - seed templates «pool» (Πισίνα) & «znx» (ΖΝΧ/Δίκτυο νερού) με τις παραμέτρους/όρια/ενέργειες
-    που εγκρίθηκαν στη Φ0 (από POOL_LIMITS/ACTION_RULES & WATER_ACTION_RULES)
-  - default περίοδοι (Πρωί/Απόγευμα) — αλλάζουν αργότερα από οθόνη ρυθμίσεων (Φ3/Φ4)
-
-ΔΕΝ δημιουργεί σημεία/Area (Φ2), ΔΕΝ αγγίζει παλιές φόρμες/κονσόλα/dashboards. Idempotent.
+Περιεχόμενα:
+  Φ1  — MonitorPeriod + seed templates «pool»/«znx» + default περίοδοι (seed_measurement_engine, boot)
+  Φ2  — σημεία από Pool/WaterSystem + ΑΝΤΙΓΡΑΦΗ legacy records → Reading (idempotent)
+  Φ3a — περίοδοι CRUD
+  Φ3b — generic φόρμα καταχώρησης (Reading) + προτεινόμενες ενέργειες
+  Φ3b-2 — granular σημεία ανά περιοχή (Option B) + ΕΝΙΑΙΑ κονσόλα ρυθμίσεων (tabs)
+Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
 from datetime import date
-from app import app, db, MonitorTemplate, MonitorParam
+from flask import request, redirect, url_for, render_template
+from app import (app, db, current_user, is_admin, log_activity, area_actions,
+                 MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
+                 PoolRecord, WaterRecord, Area, Reading)
+import json as _json
 
 
+# ── Μοντέλο: περίοδοι/βάρδιες ανά template (ορίζονται από admin) ──────────────
 class MonitorPeriod(db.Model):
-    """Περίοδος/βάρδια μέτρησης ανά template (ορίζεται από admin)."""
     id           = db.Column(db.Integer, primary_key=True)
     template_key = db.Column(db.String(30), db.ForeignKey('monitor_template.key'), nullable=False)
-    key          = db.Column(db.String(20), nullable=False)   # 'morning','afternoon','evening','day'...
-    label        = db.Column(db.String(40), nullable=False)   # 'Πρωί','Απόγευμα','Βράδυ'...
-    time         = db.Column(db.String(5))                    # 'HH:MM' ενδεικτική ώρα
+    key          = db.Column(db.String(20), nullable=False)
+    label        = db.Column(db.String(40), nullable=False)
+    time         = db.Column(db.String(5))
     sort         = db.Column(db.Integer, default=0)
 
 
@@ -75,9 +79,21 @@ ZNX_PARAMS = [
     ('ph_tank', 'pH Δεξαμενής', '', None, None, None, None),
 ]
 
+# Granular templates ΖΝΧ ανά περιοχή (Option B): (key, label, [pkeys])
+ZNX_LOCATIONS = [
+    ('znx_tank',    'ΖΝΧ — Δεξαμενή / Μηχανοστάσιο', ['clo2_tank', 'temp_tank', 'ph_tank']),
+    ('znx_kitchen', 'ΖΝΧ — Κουζίνα',                 ['clo2_kitchen', 'temp_kitchen_hot', 'temp_kitchen_cold', 'location_kitchen']),
+    ('znx_remote',  'ΖΝΧ — Απομακρυσμένο',           ['clo2_remote', 'temp_remote_hot', 'temp_remote_cold', 'location_remote']),
+    ('znx_dhw',     'ΖΝΧ — Αναχώρηση / Επιστροφή',   ['clo2_dhw_out', 'clo2_dhw_return', 'temp_dhw_out', 'temp_dhw_return']),
+    ('znx_ro',      'ΖΝΧ — Αντίστροφη Όσμωση',       ['clo2_ro', 'temp_ro']),
+]
+# location_* params (text) δεν είναι στο ZNX_PARAMS με όρια — ορισμός εδώ:
+_TEXT_PARAMS = {'location_kitchen': 'Σημείο Κουζίνας', 'location_remote': 'Σημείο Απομακρ.'}
+
 DEFAULT_PERIODS = [('morning', 'Πρωί', '08:00', 1), ('afternoon', 'Απόγευμα', '17:00', 2)]
 
 
+# ── helpers seed ─────────────────────────────────────────────────────────────
 def _seed_template(key, name, icon, params):
     if MonitorTemplate.query.get(key):
         return False
@@ -97,8 +113,7 @@ def _seed_periods(key):
 
 
 def seed_measurement_engine():
-    """Idempotent Φ1 seed: templates Πισίνα/ΖΝΧ + default περίοδοι. ΔΕΝ δημιουργεί σημεία (Φ2).
-    ΣΗΜ: καλείται στο boot (module-level) -> χρειάζεται app context (όπως schedule/payroll)."""
+    """boot (module-level) → χρειάζεται app context (όπως schedule/payroll)."""
     with app.app_context():
         try:
             created = False
@@ -115,19 +130,7 @@ def seed_measurement_engine():
             print(f'[measurements] seed skipped: {e}')
 
 
-print('measurements module loaded (Φ1 ενοποίηση μετρήσεων Συντήρησης)')
-
-
-# ════════════════════════════════════════════════════════════════════════════
-#  Φ2 — Δημιουργία σημείων από Pool/WaterSystem + ΑΝΤΙΓΡΑΦΗ legacy records → Reading
-#  Ασφαλές: COPY (τα παλιά μένουν), idempotent (source_kind/source_id), admin-triggered.
-# ════════════════════════════════════════════════════════════════════════════
-import json as _json
-from flask import request, redirect, url_for, render_template
-from app import (app, current_user, is_admin, log_activity,
-                 Hotel, Pool, WaterSystem, PoolRecord, WaterRecord, Area, Reading)
-
-# pkeys που αντιγράφονται από κάθε legacy record (ίδια ονόματα στηλών)
+# ── Φ2: σημεία (coarse) + αντιγραφή legacy ───────────────────────────────────
 _POOL_KEYS = ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
               'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done']
 _ZNX_KEYS  = ['clo2_tank', 'clo2_kitchen', 'clo2_remote', 'clo2_dhw_out', 'clo2_dhw_return',
@@ -146,20 +149,18 @@ def _values_from(rec, keys):
 
 
 def ensure_measurement_points():
-    """Δημιουργεί ΕΝΑ engine_only Area ανά Pool/WaterSystem (idempotent via legacy_kind/legacy_id)."""
+    """coarse: ΕΝΑ Area ανά Pool (template 'pool') & WaterSystem (template 'znx'). idempotent."""
     made = 0
     for p in Pool.query.all():
-        if not Area.query.filter_by(legacy_kind='pool', legacy_id=p.id).first():
-            a = Area(hotel_id=p.hotel_id, template_key='pool', name=p.name,
-                             location=p.location, is_active=True, engine_only=True,
-                             legacy_kind='pool', legacy_id=p.id)
-            db.session.add(a); made += 1
+        if not Area.query.filter_by(legacy_kind='pool', legacy_id=p.id, template_key='pool').first():
+            db.session.add(Area(hotel_id=p.hotel_id, template_key='pool', name=p.name, location=p.location,
+                                is_active=True, engine_only=True, legacy_kind='pool', legacy_id=p.id))
+            made += 1
     for w in WaterSystem.query.all():
-        if not Area.query.filter_by(legacy_kind='water', legacy_id=w.id).first():
-            a = Area(hotel_id=w.hotel_id, template_key='znx', name=w.name,
-                     location=w.location, is_active=True, engine_only=True,
-                     legacy_kind='water', legacy_id=w.id)
-            db.session.add(a); made += 1
+        if not Area.query.filter_by(legacy_kind='water', legacy_id=w.id, template_key='znx').first():
+            db.session.add(Area(hotel_id=w.hotel_id, template_key='znx', name=w.name, location=w.location,
+                                is_active=True, engine_only=True, legacy_kind='water', legacy_id=w.id))
+            made += 1
     db.session.commit()
     return made
 
@@ -167,13 +168,12 @@ def ensure_measurement_points():
 def _point_map():
     m = {}
     for a in Area.query.filter(Area.engine_only.is_(True)).all():
-        if a.legacy_kind and a.legacy_id:
+        if a.legacy_kind and a.legacy_id and a.template_key in ('pool', 'znx'):
             m[(a.legacy_kind, a.legacy_id)] = a.id
     return m
 
 
 def migrate_legacy_records():
-    """ΑΝΤΙΓΡΑΦΗ PoolRecord/WaterRecord → Reading (idempotent). Επιστρέφει counts."""
     ensure_measurement_points()
     pm = _point_map()
     res = {'pool': 0, 'water': 0, 'pool_skip': 0, 'water_skip': 0, 'orphan': 0}
@@ -212,41 +212,151 @@ def migrate_legacy_records():
 
 def migration_status():
     return {
-        'pool_records':  PoolRecord.query.count(),
-        'water_records': WaterRecord.query.count(),
-        'pool_migrated':  Reading.query.filter_by(source_kind='pool').count(),
+        'pool_records': PoolRecord.query.count(), 'water_records': WaterRecord.query.count(),
+        'pool_migrated': Reading.query.filter_by(source_kind='pool').count(),
         'water_migrated': Reading.query.filter_by(source_kind='water').count(),
-        'points_pool':  Area.query.filter_by(legacy_kind='pool').count(),
-        'points_water': Area.query.filter_by(legacy_kind='water').count(),
-        'pools':  Pool.query.count(),
-        'systems': WaterSystem.query.count(),
+        'pools': Pool.query.count(), 'systems': WaterSystem.query.count(),
     }
 
 
-@app.route('/dashboard/measurements', methods=['GET', 'POST'])
-def measurements_migrate():
+# ── Φ3b-2: granular σημεία ανά περιοχή ───────────────────────────────────────
+def _znx_param(pkey):
+    for tup in ZNX_PARAMS:
+        if tup[0] == pkey:
+            return tup
+    if pkey in _TEXT_PARAMS:
+        return (pkey, _TEXT_PARAMS[pkey], '', None, None, None, None)
+    return None
+
+
+def autocreate_granular_points():
+    """Σπάει το ΖΝΧ σε σημεία ανά περιοχή (sub-templates + Area/δίκτυο). idempotent.
+    Πισίνες: ensure ένα σημείο/πισίνα. Coarse 'znx' σημεία → ανενεργά (μένουν ως ιστορικό)."""
+    made_t = made_p = 0
+    for key, label, pkeys in ZNX_LOCATIONS:
+        if not MonitorTemplate.query.get(key):
+            db.session.add(MonitorTemplate(key=key, name=label, icon='ti-droplet', frequency='twice', sort=5, is_active=True))
+            db.session.flush()
+            for i, pk in enumerate(pkeys, start=1):
+                tup = _znx_param(pk)
+                if tup:
+                    _, lab, unit, mn, mx, low, high = tup
+                    db.session.add(MonitorParam(template_key=key, pkey=pk, label=lab, unit=unit or '',
+                                                min_v=mn, max_v=mx, action_low=low, action_high=high, sort=i))
+            made_t += 1
+        _seed_periods(key)
+    db.session.commit()
+    for w in WaterSystem.query.all():
+        for key, label, _pk in ZNX_LOCATIONS:
+            if not Area.query.filter_by(legacy_kind='water', legacy_id=w.id, template_key=key).first():
+                db.session.add(Area(hotel_id=w.hotel_id, template_key=key, name=label, location=w.name,
+                                    is_active=True, engine_only=True, legacy_kind='water', legacy_id=w.id))
+                made_p += 1
+    made_p += ensure_measurement_points()  # πισίνες (+coarse znx)
+    # coarse znx σημεία → ανενεργά (ιστορικό), για να μη μπαίνουν στην καταχώρηση
+    for a in Area.query.filter_by(template_key='znx', engine_only=True).all():
+        a.is_active = False
+    db.session.commit()
+    return made_t, made_p
+
+
+# ── helpers UI ───────────────────────────────────────────────────────────────
+def _param_input_kind(pkey):
+    if pkey == 'backwash_done':
+        return 'bool'
+    if pkey.startswith('location'):
+        return 'text'
+    return 'num'
+
+
+def _entry_points():
+    """Σημεία για καταχώρηση: ενεργά engine σημεία ΕΚΤΟΣ coarse 'znx'."""
+    return (Area.query.filter(Area.is_active == True, Area.engine_only.is_(True),
+                              Area.template_key != 'znx')
+            .order_by(Area.hotel_id, Area.template_key, Area.name).all())
+
+
+# ── ΕΝΙΑΙΑ ΚΟΝΣΟΛΑ ΡΥΘΜΙΣΕΩΝ ─────────────────────────────────────────────────
+@app.route('/dashboard/measurements')
+def measurements_console():
     if not is_admin():
         return redirect(url_for('login'))
-    msg = None
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'points':
-            made = ensure_measurement_points()
-            log_activity('measurements_points', f'{made} σημεία')
-            msg = f'Δημιουργήθηκαν {made} νέα σημεία μέτρησης (όσα έλειπαν).'
-        elif action == 'migrate':
-            res = migrate_legacy_records()
-            log_activity('measurements_migrate', str(res))
-            msg = ('Μεταφορά ολοκληρώθηκε — Πισίνες: %d νέες (%d ήδη)· Νερά: %d νέες (%d ήδη)· ορφανά: %d.'
-                   % (res['pool'], res['pool_skip'], res['water'], res['water_skip'], res['orphan']))
-        return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
-    return render_template('measurements_migrate.html', st=migration_status(), msg=msg)
+    tab = request.args.get('tab', 'points')
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    # points grouped by hotel
+    pts = Area.query.filter(Area.engine_only.is_(True)).order_by(Area.hotel_id, Area.template_key, Area.name).all()
+    by_hotel = {}
+    for a in pts:
+        by_hotel.setdefault(a.hotel_id, []).append(a)
+    points_by_hotel = [{'hotel': hmap.get(hid, '—'), 'items': items} for hid, items in by_hotel.items()]
+    # periods
+    tpl_periods = []
+    for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
+        tpl_periods.append({'tpl': t, 'periods': MonitorPeriod.query.filter_by(template_key=t.key)
+                            .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
+                            'nparams': len(t.params or [])})
+    return render_template('measurements_console.html', tab=tab,
+                           points_by_hotel=points_by_hotel, tpl_periods=tpl_periods,
+                           st=migration_status(), msg=request.args.get('msg'),
+                           all_hotels=Hotel.query.order_by(Hotel.name).all(),
+                           all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all())
 
 
-# ════════════════════════════════════════════════════════════════════════════
-#  Φ3a — Ρυθμίσεις μηχανής: διαχείριση ΠΕΡΙΟΔΩΝ (MonitorPeriod) ανά template (admin)
-#  Καθαρά προσθετικό. Οι παράμετροι/όρια επεξεργάζονται στο /dashboard/templates.
-# ════════════════════════════════════════════════════════════════════════════
+@app.route('/dashboard/measurements/autocreate', methods=['POST'])
+def measurements_autocreate():
+    if not is_admin():
+        return redirect(url_for('login'))
+    t, p = autocreate_granular_points()
+    log_activity('meas_autocreate', f'{t} templates, {p} σημεία')
+    return redirect(url_for('measurements_console') + '?tab=points&msg=' + ('Δημιουργήθηκαν %d τύποι περιοχής + %d σημεία.' % (t, p)))
+
+
+@app.route('/dashboard/measurements/point/save', methods=['POST'])
+def measurements_point_save():
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    pid = f.get('point_id')
+    name = (f.get('name') or '').strip()
+    loc = (f.get('location') or '').strip()
+    if pid:
+        a = Area.query.get(int(pid))
+        if a and name:
+            a.name = name[:120]; a.location = loc[:120]
+    else:
+        hid = f.get('hotel_id'); tk = f.get('template_key')
+        if hid and tk and name:
+            db.session.add(Area(hotel_id=int(hid), template_key=tk, name=name[:120], location=loc[:120],
+                                is_active=True, engine_only=True))
+    db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=points')
+
+
+@app.route('/dashboard/measurements/point/<int:pid>/toggle', methods=['POST'])
+def measurements_point_toggle(pid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    a = Area.query.get(pid)
+    if a:
+        a.is_active = not bool(a.is_active); db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=points')
+
+
+@app.route('/dashboard/measurements/migrate', methods=['POST'])
+def measurements_migrate_run():
+    if not is_admin():
+        return redirect(url_for('login'))
+    action = request.form.get('action')
+    if action == 'points':
+        made = ensure_measurement_points()
+        msg = 'Δημιουργήθηκαν %d σημεία (coarse).' % made
+    else:
+        res = migrate_legacy_records()
+        msg = ('Μεταφορά — Πισίνες: %d (%d ήδη)· Νερά: %d (%d ήδη)· ορφανά: %d.'
+               % (res['pool'], res['pool_skip'], res['water'], res['water_skip'], res['orphan']))
+    log_activity('meas_migrate', msg)
+    return redirect(url_for('measurements_console') + '?tab=migrate&msg=' + msg)
+
 
 def _next_period_key(template_key):
     keys = {p.key for p in MonitorPeriod.query.filter_by(template_key=template_key).all()}
@@ -254,17 +364,6 @@ def _next_period_key(template_key):
     while f'p{n}' in keys:
         n += 1
     return f'p{n}'
-
-
-@app.route('/dashboard/measurements/periods')
-def measurements_periods():
-    if not is_admin():
-        return redirect(url_for('login'))
-    rows = []
-    for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
-        periods = MonitorPeriod.query.filter_by(template_key=t.key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
-        rows.append({'tpl': t, 'periods': periods, 'nparams': len(t.params or [])})
-    return render_template('measurements_periods.html', rows=rows)
 
 
 @app.route('/dashboard/measurements/period/save', methods=['POST'])
@@ -286,11 +385,9 @@ def measurements_period_save():
             if p:
                 p.label = label[:40]; p.time = tm[:5]; p.sort = sort
         else:
-            db.session.add(MonitorPeriod(template_key=tk, key=_next_period_key(tk),
-                                         label=label[:40], time=tm[:5], sort=sort))
+            db.session.add(MonitorPeriod(template_key=tk, key=_next_period_key(tk), label=label[:40], time=tm[:5], sort=sort))
         db.session.commit()
-        log_activity('meas_period_save', f'{tk}:{label}')
-    return redirect(url_for('measurements_periods') + '?embed=1')
+    return redirect(url_for('measurements_console') + '?tab=periods')
 
 
 @app.route('/dashboard/measurements/period/<int:period_id>/delete', methods=['POST'])
@@ -299,48 +396,50 @@ def measurements_period_delete(period_id):
         return redirect(url_for('login'))
     p = MonitorPeriod.query.get(period_id)
     if p:
-        db.session.delete(p); db.session.commit()   # Α-02: readings ΔΕΝ θίγονται
-        log_activity('meas_period_delete', f'{p.template_key}:{p.label}')
-    return redirect(url_for('measurements_periods') + '?embed=1')
+        db.session.delete(p); db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=periods')
 
 
-# ════════════════════════════════════════════════════════════════════════════
-#  Φ3b — Generic φόρμα υποβολής (δοκιμαστική/admin) — γράφει Reading στη μηχανή.
-#  Οδηγείται από template params + MonitorPeriod. Engine points (πισίνα/ΖΝΧ).
-#  ΔΕΝ αγγίζει τις staff φόρμες — switch + απόσυρση legacy στη Φ3c.
-# ════════════════════════════════════════════════════════════════════════════
-
-def _param_input_kind(pkey):
-    if pkey == 'backwash_done':
-        return 'bool'
-    if pkey.startswith('location'):
-        return 'text'
-    return 'num'
-
-
+# ── ΦΟΡΜΑ ΚΑΤΑΧΩΡΗΣΗΣ (operational) ──────────────────────────────────────────
 @app.route('/dashboard/measurements/entry')
 def measurements_entry():
     if not is_admin():
         return redirect(url_for('login'))
-    points = Area.query.filter(Area.is_active == True, Area.engine_only.is_(True)).order_by(
-        Area.template_key, Area.name).all()
-    sel = None
-    pid = request.args.get('point')
-    tpl = params = periods = None
+    points = _entry_points()
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    hsel = request.args.get('hotel')
+    try:
+        hsel = int(hsel) if hsel else None
+    except (ValueError, TypeError):
+        hsel = None
+    hotels_with_points = sorted({a.hotel_id for a in points})
+    shown = [a for a in points if (hsel is None or a.hotel_id == hsel)]
+    grouped = {}
+    for a in shown:
+        grouped.setdefault(a.hotel_id, []).append(a)
+    points_by_hotel = [{'hotel_id': hid, 'hotel': hmap.get(hid, '—'), 'items': items} for hid, items in grouped.items()]
+
+    sel = tpl = params = periods = None
     recent = []
+    actions = []
+    pid = request.args.get('point')
     if pid:
         sel = Area.query.get(int(pid))
         if sel:
             tpl = MonitorTemplate.query.get(sel.template_key)
-            params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit,
-                       'min_v': p.min_v, 'max_v': p.max_v, 'kind': _param_input_kind(p.pkey)}
-                      for p in (tpl.params if tpl else [])]
-            periods = MonitorPeriod.query.filter_by(template_key=sel.template_key).order_by(
-                MonitorPeriod.sort, MonitorPeriod.id).all()
-            recent = (Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc())
-                      .limit(10).all())
-    return render_template('measurements_entry.html', points=points, sel=sel, tpl=tpl,
-                           params=params, periods=periods, recent=recent)
+            params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
+                       'max_v': p.max_v, 'kind': _param_input_kind(p.pkey)} for p in (tpl.params if tpl else [])]
+            periods = MonitorPeriod.query.filter_by(template_key=sel.template_key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
+            recent = Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc()).limit(10).all()
+            if recent:
+                try:
+                    actions = area_actions(recent[0])
+                except Exception:
+                    actions = []
+    return render_template('measurements_entry.html', points_by_hotel=points_by_hotel,
+                           hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
+                           hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
+                           recent=recent, actions=actions)
 
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])
@@ -357,7 +456,8 @@ def measurements_entry_save():
         kind = _param_input_kind(p.pkey)
         raw = f.get(p.pkey)
         if kind == 'bool':
-            vals[p.pkey] = bool(f.get(p.pkey))
+            if f.get(p.pkey):
+                vals[p.pkey] = True
         elif kind == 'text':
             if raw:
                 vals[p.pkey] = raw.strip()
@@ -373,4 +473,7 @@ def measurements_entry_save():
                   notes=(f.get('notes') or '').strip())
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')
-    return redirect(url_for('measurements_entry') + '?point=%d&embed=1&ok=1' % area.id)
+    return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
+
+
+print('measurements module loaded (Φ1→Φ3b-2 ενοποίηση μετρήσεων)')
