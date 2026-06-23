@@ -137,11 +137,14 @@
         <b style="min-width:120px;text-align:center;display:inline-block;">{{ month_block.label if month_block }}</b>
         <a title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
       </span></div>
-    <div class="fgrp"><span class="flab"><i class="ti ti-category"></i> Τμήμα</span>
-      <select id="monthDept" onchange="setMonthDept(this.value)">
-        <option value="">Όλα τα τμήματα</option>
-        {% for d in dept_list %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
-      </select></div>
+    <div class="fgrp" style="position:relative;"><span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
+      <details class="mdept">
+        <summary id="mdeptSum" style="cursor:pointer;padding:7px 10px;border:1px solid #d6eef3;border-radius:7px;background:#fff;font-size:13px;list-style:none;white-space:nowrap;">Όλα τα τμήματα</summary>
+        <div style="position:absolute;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow:auto;min-width:210px;">
+          <label style="display:block;padding:4px 6px;font-size:13px;"><input type="checkbox" id="mdAll" checked onchange="monthDeptAll(this)"> Όλα</label>
+          {% for d in dept_list %}<label style="display:block;padding:4px 6px;font-size:13px;"><input type="checkbox" class="mdcb" value="{{ d.id }}" onchange="monthDeptApply()"> {{ d.name }}</label>{% endfor %}
+        </div>
+      </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
       <a class="btn" href="/dashboard/schedule/month_export.xlsx?hotel_id={{ hotel_id }}&month={{ sel_month }}&year={{ sel_year }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
@@ -270,7 +273,21 @@ function toggleDept(id){ var s=deptSelArr(); var i=s.indexOf(id); if(i>=0)s.spli
   localStorage.setItem(HKEY, (s.length>=all)?'null':JSON.stringify(s)); applyDeptFilter(); }
 function toggleAll(){ localStorage.removeItem(HKEY); applyDeptFilter(); }
 applyDeptFilter();
-function setMonthDept(v){ try{ localStorage.setItem(HKEY, v?JSON.stringify([v]):JSON.stringify(null)); }catch(_){}; applyDeptFilter(); }
+function monthDeptAll(cb){ if(cb&&cb.checked){ document.querySelectorAll('.mdcb').forEach(function(c){c.checked=false;}); } try{localStorage.removeItem(HKEY);}catch(_){}; monthDeptSync(); }
+function monthDeptApply(){
+  var sel=Array.prototype.map.call(document.querySelectorAll('.mdcb:checked'),function(c){return c.value;});
+  var all=document.querySelectorAll('.mdcb').length;
+  try{ if(sel.length===0||sel.length>=all){ localStorage.removeItem(HKEY); } else { localStorage.setItem(HKEY, JSON.stringify(sel)); } }catch(_){}
+  monthDeptSync();
+}
+function monthDeptSync(){
+  var s=null; try{ s=JSON.parse(localStorage.getItem(HKEY)||'null'); }catch(_){}
+  var allcb=document.getElementById('mdAll'), sum=document.getElementById('mdeptSum');
+  if(s&&s.length){ document.querySelectorAll('.mdcb').forEach(function(c){c.checked=(s.indexOf(c.value)>=0);}); if(allcb)allcb.checked=false; if(sum)sum.textContent=s.length+' τμήματα'; }
+  else { document.querySelectorAll('.mdcb').forEach(function(c){c.checked=false;}); if(allcb)allcb.checked=true; if(sum)sum.textContent='Όλα τα τμήματα'; }
+  applyDeptFilter();
+}
+try{ monthDeptSync(); }catch(_){}
 function toggleDense(){ var t=document.getElementById('monthtable'); if(!t)return; t.classList.toggle('dense'); try{localStorage.setItem('estia_dense', t.classList.contains('dense')?'1':'0');}catch(_){} }
 (function(){ var t=document.getElementById('monthtable'); if(t){ try{ if(localStorage.getItem('estia_dense')==='1') t.classList.add('dense'); }catch(_){} }
   var md=document.getElementById('monthDept'); if(md){ try{ var sel=JSON.parse(localStorage.getItem(HKEY)||'null'); md.value=(sel&&sel.length===1)?sel[0]:''; }catch(_){} } })();
