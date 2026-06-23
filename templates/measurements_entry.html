@@ -110,17 +110,10 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
   }
   </script>
 
-  {% if actions %}
-  <div class="card">
-    <div class="card-title"><i class="ti ti-alert-triangle"></i> Προτεινόμενες ενέργειες (τελευταία καταγραφή)</div>
-    {% for a in actions %}<div class="act"><b>{{ a.label }}{% if a.value is defined %} = {{ a.value }}{{ a.unit or '' }}{% endif %}:</b> {{ a.action }}</div>{% endfor %}
-  </div>
-  {% endif %}
-
   <div class="card">
     <div class="card-title">Πρόσφατες (αυτό το σημείο)</div>
     <table><tr><th>Ημ/νία/ώρα</th><th>Περίοδος</th><th>Σημ.</th></tr>
-      {% for r in recent %}<tr><td>{{ r.recorded_at.strftime('%d/%m/%Y %H:%M') if r.recorded_at else '—' }}</td><td>{{ r.period }}</td><td class="muted">{{ r.notes or '' }}</td></tr>{% endfor %}
+      {% for r in recent %}<tr><td>{{ r.recorded_at|gr('%d/%m/%Y %H:%M') if r.recorded_at else '—' }}</td><td>{{ r.period }}</td><td class="muted">{{ r.notes or '' }}</td></tr>{% endfor %}
       {% if not recent %}<tr><td colspan="3" class="muted">Καμία ακόμη.</td></tr>{% endif %}
     </table>
   </div>

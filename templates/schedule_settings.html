@@ -17,6 +17,7 @@
       Lead (μέρες πριν τη Δευτέρα): <input type="number" name="lead_days" value="{{ policy.lead_days }}" style="width:70px;">
     </div>
     <div class="row">Admin override: <select name="allow_admin_override"><option value="1" {{ 'selected' if policy.allow_admin_override|int==1 }}>Ναι</option><option value="0" {{ 'selected' if policy.allow_admin_override|int==0 }}>Όχι</option></select></div>
+    <div class="row">Managers επεξεργάζονται κλειδωμένες/ληγμένες εβδομάδες: <select name="manager_edit_locked"><option value="0" {{ 'selected' if policy.manager_edit_locked|int==0 }}>Όχι</option><option value="1" {{ 'selected' if policy.manager_edit_locked|int==1 }}>Ναι</option></select></div>
     <button class="b" type="submit">Αποθήκευση πολιτικής</button>
   </form></div>
 

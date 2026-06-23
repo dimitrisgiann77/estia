@@ -553,6 +553,7 @@ POLICY_DEFAULTS = {
     'cutoff_time': '18:00',
     'lead_days': 4,           # προθεσμία = lead_days πριν τη Δευτέρα της W (4 = Πέμπτη προηγ.)
     'allow_admin_override': 1,
+    'manager_edit_locked': 0, # v12.230: αν 1, οι managers επεξεργάζονται και ΚΛΕΙΔΩΜΕΝΕΣ/ληγμένες εβδομάδες
 }
 
 def get_policy():
@@ -593,6 +594,10 @@ def week_editable(week_start, user=None):
     if user is not None and role_rank(user.role) >= ROLE_RANK['admin']:
         return True
     if datetime.now() < week_deadline(week_start):
+        return True
+    # v12.230: ρυθμιζόμενη εξαίρεση — managers επεξεργάζονται κλειδωμένες/ληγμένες εβδομάδες
+    if (user is not None and role_rank(user.role) >= ROLE_RANK['manager']
+            and int(get_policy().get('manager_edit_locked', 0) or 0)):
         return True
     return False
 
