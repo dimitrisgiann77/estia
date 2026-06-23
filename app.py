@@ -338,11 +338,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.230'
-APP_BUILD   = '511'
+APP_VERSION = '12.231'
+APP_BUILD   = '512'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.231', 'b': '512', 'date': '23/06/2026', 'time': '21:00', 'title': 'Μετρήσεις Φ3c-3 — πάγωμα παλιών φορμών· πλήρης μετάβαση στη νέα ροή',
+     'items': ['Οι παλιές φόρμες Πισίνες/Νερά Χρήσης αποσύρθηκαν: ανοίγοντάς τες σε πάει στη νέα «Καταγραφή μετρήσεων» (καμία νέα εγγραφή στις παλιές δομές).',
+               'Αφαιρέθηκαν από το μενού του προσωπικού (μένει η ενιαία «Καταγραφή μετρήσεων» + «Σήμερα»). Τα ιστορικά δεδομένα παραμένουν διαθέσιμα.',
+               'Η μετάβαση ολοκληρώθηκε: υποβολή, «Σήμερα», κονσόλα και ενέργειες όλα στη νέα μηχανή.']},
     {'v': '12.230', 'b': '511', 'date': '23/06/2026', 'time': '20:30', 'title': 'Πρόγραμμα: managers σε κλειδωμένες εβδομάδες (ρύθμιση) + μετρήσεις (ώρα/καθάρισμα φόρμας)',
      'items': ['Πρόγραμμα · Ρυθμίσεις: νέα επιλογή «Managers επεξεργάζονται κλειδωμένες/ληγμένες εβδομάδες» (Όχι/Ναι). Με «Ναι», οι managers μπορούν να αλλάζουν και κλειδωμένες εβδομάδες (η αλλαγή δημιουργεί νέα έκδοση, όπως πάντα).',
                'Μετρήσεις: η ώρα στις «Πρόσφατες» της φόρμας διορθώθηκε (ώρα Ελλάδος). Αφαιρέθηκε το πάνελ «ενέργειες τελευταίας καταγραφής» από τη φόρμα — μένουν οι ζωντανές ενέργειες καθώς πληκτρολογείς.']},
@@ -2226,6 +2230,8 @@ def _water_preset(sys_id, period):
 def water_app():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.231 Φ3c-3: legacy φόρμα Νερών παγωμένη → νέα ενιαία φόρμα μετρήσεων
+    return redirect(url_for('measurements_entry') + ('?embed=1' if request.args.get('embed') else ''))
     if not can_log():
         return redirect(url_for('pools_dashboard'))
     user = User.query.get(session['user_id'])
@@ -2244,6 +2250,8 @@ def water_app():
 def submit():
     if 'user_id' not in session:
         return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
+    # v12.231 Φ3c-3: παγωμένη legacy υποβολή Νερών
+    return jsonify({'success': False, 'message': 'Η παλιά φόρμα Νερών αποσύρθηκε. Χρησιμοποίησε «Καταγραφή μετρήσεων».'}), 410
     user   = User.query.get(session['user_id'])
     data   = request.form
     period = data.get('period', 'morning')
@@ -2431,6 +2439,8 @@ def katagrafes_today():
 def pools_app():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+    # v12.231 Φ3c-3: legacy φόρμα Πισινών παγωμένη → νέα ενιαία φόρμα μετρήσεων
+    return redirect(url_for('measurements_entry') + ('?embed=1' if request.args.get('embed') else ''))
     if not can_log():
         return redirect(url_for('pools_dashboard'))
     user = User.query.get(session['user_id'])
@@ -2449,6 +2459,8 @@ def pools_app():
 def submit_pool():
     if 'user_id' not in session or not can_log():
         return jsonify({'success': False, 'message': 'Μη εξουσιοδοτημενο'}), 401
+    # v12.231 Φ3c-3: παγωμένη legacy υποβολή Πισινών
+    return jsonify({'success': False, 'message': 'Η παλιά φόρμα Πισινών αποσύρθηκε. Χρησιμοποίησε «Καταγραφή μετρήσεων».'}), 410
     user   = User.query.get(session['user_id'])
     data   = request.form
     period = data.get('period', 'morning')

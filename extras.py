@@ -44,8 +44,8 @@ ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· vie
 DEFAULT_VIS = {
     'manager': {'today', 'measure', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'pools_dash', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
-    # v12.227 — +measure (νέα ενιαία φόρμα μετρήσεων)
-    'staff':   {'today', 'measure', 'pools', 'water', 'fault_submit', 'areas', 'whatsnew'},
+    # v12.231 — Φ3c-3: παλιές φόρμες pools/water αποσύρθηκαν· staff χρησιμοποιεί 'measure' (νέα ενιαία)
+    'staff':   {'today', 'measure', 'fault_submit', 'areas', 'whatsnew'},
 }
 
 # ── v12.85 — Ορατότητα «πάνω κουμπιών» (workspaces) ανά ρόλο ──────────────────
