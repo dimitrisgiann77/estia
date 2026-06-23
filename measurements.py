@@ -12,7 +12,7 @@ Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: cre
 Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
 from datetime import date
-from flask import request, redirect, url_for, render_template, session
+from flask import request, redirect, url_for, render_template, session, Response
 from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
                  PoolRecord, WaterRecord, Area, Reading)
@@ -531,4 +531,97 @@ def measurements_today():
                            alerts=alerts, total=total, donen=donen)
 
 
-print('measurements module loaded (Φ1→Φ3c-2b ενοποίηση μετρήσεων)')
+# ── Φ4b: ΣΤΑΤΙΣΤΙΚΑ (σημείο × παράμετρος, μέσος/μέγ/ελάχ/εκτός ορίων) ──────────
+def _stats_compute(points, dfrom, dto):
+    aids = [a.id for a in points]
+    amap = {a.id: a for a in points}
+    pmeta = {}   # template_key -> {pkey: (label, unit, min, max, sort)}
+    agg = {}     # (area_id, pkey) -> stats
+    if aids:
+        q = Reading.query.filter(Reading.area_id.in_(aids),
+                                 Reading.record_date >= dfrom, Reading.record_date <= dto)
+        for r in q.all():
+            try:
+                vals = _json.loads(r.values or '{}')
+            except Exception:
+                vals = {}
+            tk = r.template_key
+            if tk not in pmeta:
+                t = MonitorTemplate.query.get(tk)
+                pmeta[tk] = {p.pkey: (p.label, p.unit, p.min_v, p.max_v, p.sort)
+                             for p in (t.params if t else [])}
+            for pk, v in vals.items():
+                try:
+                    fv = float(v)
+                except (ValueError, TypeError):
+                    continue
+                d = agg.setdefault((r.area_id, pk), {'n': 0, 'sum': 0.0, 'min': None, 'max': None, 'out': 0})
+                d['n'] += 1; d['sum'] += fv
+                d['min'] = fv if d['min'] is None else min(d['min'], fv)
+                d['max'] = fv if d['max'] is None else max(d['max'], fv)
+                meta = pmeta.get(tk, {}).get(pk)
+                if meta:
+                    mn, mx = meta[2], meta[3]
+                    if (mn is not None and fv < mn) or (mx is not None and fv > mx):
+                        d['out'] += 1
+    rows = []
+    for a in points:
+        prm = pmeta.get(a.template_key, {})
+        items = []
+        for (aid, pk), d in agg.items():
+            if aid != a.id:
+                continue
+            meta = prm.get(pk, (pk, '', None, None, 99))
+            avg = d['sum'] / d['n'] if d['n'] else 0
+            items.append({'label': meta[0], 'unit': meta[1] or '', 'sort': meta[4],
+                          'n': d['n'], 'avg': round(avg, 2),
+                          'min': d['min'], 'max': d['max'], 'out': d['out'],
+                          'comp': round(100.0 * (d['n'] - d['out']) / d['n']) if d['n'] else 100})
+        if items:
+            items.sort(key=lambda x: (x['sort'], x['label']))
+            rows.append({'point': a, 'params': items})
+    return rows
+
+
+def _stats_range():
+    today = date.today()
+    df = request.args.get('from') or today.replace(day=1).isoformat()
+    dt = request.args.get('to') or today.isoformat()
+    try:
+        dfrom = date.fromisoformat(df)
+    except Exception:
+        dfrom = today.replace(day=1)
+    try:
+        dto = date.fromisoformat(dt)
+    except Exception:
+        dto = today
+    return dfrom, dto
+
+
+@app.route('/dashboard/measurements/stats')
+def measurements_stats():
+    if 'user_id' not in session or not can_log():
+        return redirect(url_for('login'))
+    user = current_user()
+    points = Area.query.filter(Area.engine_only.is_(True)).order_by(
+        Area.hotel_id, Area.template_key, Area.name).all()
+    if not is_admin():
+        _hids = scoped_hotel_ids(user)
+        points = [a for a in points if a.hotel_id in _hids]
+    dfrom, dto = _stats_range()
+    rows = _stats_compute(points, dfrom, dto)
+    if request.args.get('fmt') == 'csv':
+        lines = ['Σημείο,Παράμετρος,Μονάδα,Πλήθος,Μέσος,Ελάχ,Μέγ,Εκτός ορίων,Συμμόρφωση %']
+        for r in rows:
+            for it in r['params']:
+                lines.append('%s,%s,%s,%d,%s,%s,%s,%d,%d' % (
+                    (r['point'].name or '').replace(',', ' '), it['label'].replace(',', ' '),
+                    it['unit'], it['n'], it['avg'], it['min'], it['max'], it['out'], it['comp']))
+        csv = '﻿' + '\n'.join(lines)
+        return Response(csv, mimetype='text/csv',
+                        headers={'Content-Disposition': 'attachment; filename=measurements-stats.csv'})
+    return render_template('measurements_stats.html', rows=rows,
+                           dfrom=dfrom.isoformat(), dto=dto.isoformat())
+
+
+print('measurements module loaded (Φ1→Φ4 ενοποίηση μετρήσεων)')
