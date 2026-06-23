@@ -331,11 +331,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
         return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.216'
-APP_BUILD   = '497'
+APP_VERSION = '12.217'
+APP_BUILD   = '498'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.217', 'b': '498', 'date': '23/06/2026', 'time': '13:00', 'title': 'Συντήρηση/Μετρήσεις — Φ1 ενοποίησης (παρασκήνιο, καμία ορατή αλλαγή)',
+     'items': ['Θεμελίωση ενιαίας μηχανής μετρήσεων: προστέθηκαν τα templates «Πισίνα» & «ΖΝΧ/Δίκτυο νερού» με τις παραμέτρους/όρια/ενέργειες που χρησιμοποιεί ήδη η εφαρμογή.',
+               'Νέο: παραμετροποιήσιμες περίοδοι/βάρδιες ανά template (αρχικά Πρωί/Απόγευμα). Θα ρυθμίζονται από οθόνη διαχείρισης σε επόμενη φάση.',
+               'Καθαρά προσθετικό — οι υπάρχουσες φόρμες/κονσόλα/πίνακες δουλεύουν ακριβώς όπως πριν. Καμία μετακίνηση δεδομένων.']},
     {'v': '12.216', 'b': '497', 'date': '23/06/2026', 'time': '12:00', 'title': 'Καταγραφές - Μετρήσεις: ένα κουμπί «Νέα καταγραφή» + όλες οι καταγραφές',
      'items': ['Το «Νέα καταγραφή» έγινε ΕΝΑ κουμπί που ανοίγει επιλογέα (Πισίνες · Νερά Χρήσης · Τομείς · ό,τι προστεθεί) και σε πάει στη φόρμα υποβολής.',
                'Η κονσόλα δείχνει πλέον ΟΛΕΣ τις καταγραφές που κάνει το προσωπικό (όχι δείγμα)· για παλαιότερες/συγκεκριμένη περίοδο, χρησιμοποίησε τον επιλογέα περιόδου.']},
@@ -4110,6 +4114,7 @@ diag     = _try_import('diag')
 menu     = _try_import('menu')
 evaluations = _try_import('evaluations')
 console  = _try_import('console')
+measurements = _try_import('measurements')   # Φ1 ενοποίηση μετρήσεων (ΠΡΙΝ init_db: create_all να πιάσει MonitorPeriod)
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 if evaluations:
@@ -4125,6 +4130,7 @@ if schedule: schedule.ensure_schedule_columns()
 if schedule: schedule.seed_schedule()
 if payroll:  payroll.ensure_payroll_columns()
 if payroll:  payroll.seed_payroll()
+if measurements: measurements.seed_measurement_engine()   # Φ1: seed templates Πισίνα/ΖΝΧ + περίοδοι (idempotent)
 start_scheduler()
 if backup:   backup.start_backup_scheduler()
 if payroll:  payroll.start_master_sync_scheduler()
