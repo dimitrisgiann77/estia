@@ -288,7 +288,7 @@ def measurements_console():
     by_hotel = {}
     for a in pts:
         by_hotel.setdefault(a.hotel_id, []).append(a)
-    points_by_hotel = [{'hotel': hmap.get(hid, '—'), 'items': items} for hid, items in by_hotel.items()]
+    points_by_hotel = [{'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in by_hotel.items()]
     # periods
     tpl_periods = []
     for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
@@ -417,7 +417,7 @@ def measurements_entry():
     grouped = {}
     for a in shown:
         grouped.setdefault(a.hotel_id, []).append(a)
-    points_by_hotel = [{'hotel_id': hid, 'hotel': hmap.get(hid, '—'), 'items': items} for hid, items in grouped.items()]
+    points_by_hotel = [{'hotel_id': hid, 'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in grouped.items()]
 
     sel = tpl = params = periods = None
     recent = []

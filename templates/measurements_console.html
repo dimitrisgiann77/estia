@@ -57,7 +57,7 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
     </form>
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
-      {% for a in g.items %}
+      {% for a in g.areas %}
       <form method="POST" action="/dashboard/measurements/point/save" class="row {{ 'off' if not a.is_active }}">
         <input type="hidden" name="point_id" value="{{ a.id }}">
         <input class="in-name" type="text" name="name" value="{{ a.name }}">

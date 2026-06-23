@@ -52,7 +52,7 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
     </div>
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
-      {% for a in g.items %}
+      {% for a in g.areas %}
         <a class="pt {{ 'sel' if sel and sel.id==a.id }}" href="/dashboard/measurements/entry?point={{ a.id }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> {{ a.name }}</a>
       {% endfor %}
     {% endfor %}
