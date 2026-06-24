@@ -657,8 +657,15 @@ def faults_settings():
         c = FaultCategory.query.get(cs.category_id)
         cmap.append({'id': cs.id, 'cat': c.name if c else '—', 'specialty': cs.specialty})
     allcats = FaultCategory.query.order_by(FaultCategory.level, FaultCategory.name).all()
+    # v12.255 — δέντρο κατηγοριών ενσωματωμένο εδώ
+    roots = FaultCategory.query.filter_by(level=1).order_by(FaultCategory.name).all()
+    def _tree(node):
+        kids = FaultCategory.query.filter_by(parent_id=node.id).order_by(FaultCategory.sort, FaultCategory.name).all()
+        return {'node': node, 'children': [_tree(k) for k in kids]}
+    forest = [_tree(r) for r in roots]
     return render_template('faults_settings.html', specs=specs, slas=slas, tags=tags,
-                           cmap=cmap, allcats=allcats, active_specs=[s.name for s in specs if s.is_active],
+                           cmap=cmap, allcats=allcats, forest=forest,
+                           active_specs=[s.name for s in specs if s.is_active],
                            PRIORITIES=PRIORITIES, stale_days=fault_stale_days())
 
 @app.route('/dashboard/faults/specialty/add', methods=['POST'])
@@ -727,14 +734,11 @@ def faults_map_del(mid):
 
 @app.route('/dashboard/faults/categories')
 def faults_categories():
+    # v12.255 — ενσωματώθηκε στις «Βλάβες · Ρυθμίσεις». Ανακατεύθυνση.
     if not is_admin(): return redirect(url_for('login'))
-    roots = FaultCategory.query.filter_by(level=1).order_by(FaultCategory.name).all()
-    def tree(node):
-        kids = FaultCategory.query.filter_by(parent_id=node.id).order_by(FaultCategory.sort, FaultCategory.name).all()
-        return {'node': node, 'children': [tree(k) for k in kids]}
-    forest = [tree(r) for r in roots]
-    allcats = FaultCategory.query.order_by(FaultCategory.level, FaultCategory.name).all()
-    return render_template('faults_categories.html', forest=forest, allcats=allcats)
+    url = url_for('faults_settings')
+    if request.args.get('embed'): url += '?embed=1'
+    return redirect(url)
 
 @app.route('/dashboard/faults/category/add', methods=['POST'])
 def faults_category_add():
@@ -746,21 +750,21 @@ def faults_category_add():
         lvl = (parent.level + 1) if parent else 1
         db.session.add(FaultCategory(name=name, parent_id=parent.id if parent else None, level=min(lvl, 3)))
         db.session.commit()
-    return redirect(url_for('faults_categories') + '?embed=1')
+    return redirect(url_for('faults_settings') + '?embed=1')
 
 @app.route('/dashboard/faults/category/<int:cid>/rename', methods=['POST'])
 def faults_category_rename(cid):
     if not is_admin(): return redirect(url_for('login'))
     c = FaultCategory.query.get(cid); name = (request.form.get('name') or '').strip()
     if c and name: c.name = name; db.session.commit()
-    return redirect(url_for('faults_categories') + '?embed=1')
+    return redirect(url_for('faults_settings') + '?embed=1')
 
 @app.route('/dashboard/faults/category/<int:cid>/toggle', methods=['POST'])
 def faults_category_toggle(cid):
     if not is_admin(): return redirect(url_for('login'))
     c = FaultCategory.query.get(cid)
     if c: c.is_active = not c.is_active; db.session.commit()
-    return redirect(url_for('faults_categories') + '?embed=1')
+    return redirect(url_for('faults_settings') + '?embed=1')
 
 @app.route('/dashboard/faults/user-specialties/<int:uid>', methods=['POST'])
 def faults_user_specialties(uid):
