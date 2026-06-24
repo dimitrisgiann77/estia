@@ -234,14 +234,13 @@ def _inject_menu_custom():
             if it['master'] and not master:
                 continue
             if admin:
-                it2 = dict(it); it2['ws'] = gws + ' admin'; it2['label'] = _label(iid, it); items.append(it2)
+                it2 = dict(it); it2['ws'] = gws; it2['label'] = _label(iid, it); items.append(it2)
             else:
                 if role not in _roles(iid):
                     continue
                 it2 = dict(it); it2['ws'] = gws; it2['label'] = _label(iid, it); items.append(it2)
         if items:
-            groups.append({'title': g.get('title', ''), 'items': items,
-                           'ws': (gws + ' admin') if admin else gws})
+            groups.append({'title': g.get('title', ''), 'items': items, 'ws': gws})
     if admin:
         extra = []
         for k in CAT:
@@ -250,9 +249,9 @@ def _inject_menu_custom():
             it = CAT[k]
             if it['master'] and not master:
                 continue
-            it2 = dict(it); it2['ws'] = 'operations admin'; extra.append(it2)
+            it2 = dict(it); it2['ws'] = 'admin'; extra.append(it2)
         if extra:
-            groups.append({'title': '🆕 Νέα', 'items': extra, 'ws': 'operations admin'})
+            groups.append({'title': '🆕 Νέα', 'items': extra, 'ws': 'admin'})
     return {'menu_custom': True, 'menu_groups': groups}
 
 
