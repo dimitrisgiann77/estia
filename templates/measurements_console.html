@@ -109,9 +109,26 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 
   {% if tab=='templates' %}
   <div class="card">
-    <div class="card-title">Παράμετροι & όρια</div>
-    <p class="muted">Η επεξεργασία παραμέτρων/ορίων/ενεργειών γίνεται στην οθόνη «Templates».</p>
-    <p style="margin-top:10px;"><a class="btn" href="/dashboard/templates?embed=1"><i class="ti ti-external-link"></i> Άνοιγμα «Templates»</a></p>
+    <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης — Παράμετροι & όρια</div>
+    <p class="muted" style="margin-bottom:6px;">Κάθε τύπος έχει τις παραμέτρους του (όρια, ενέργειες). Πάτα «Επεξεργασία» για να ρυθμίσεις τις παραμέτρους ενός τύπου.</p>
+    {% for t in param_templates %}
+    <div class="row" style="justify-content:space-between;">
+      <span><i class="ti {{ t.icon }}"></i> <b>{{ t.name }}</b> <span class="tag">{{ freq_label.get(t.frequency, t.frequency) }}</span> <span class="muted">· {{ t.params|length }} παράμετροι</span>{% if not t.is_active %} <span class="muted">(ανενεργό)</span>{% endif %}</span>
+      <a class="btn ghost" href="/dashboard/template/{{ t.key }}?embed=1"><i class="ti ti-edit"></i> Επεξεργασία</a>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-plus"></i> Νέος τύπος</div>
+    <form method="POST" action="/dashboard/template/new">
+      <div class="row" style="border:none;">
+        <div><span class="lbl">Key (λατινικά)</span><input type="text" name="key" placeholder="π.χ. fire" required></div>
+        <div><span class="lbl">Όνομα</span><input type="text" name="name" placeholder="π.χ. Πυρασφάλεια" required></div>
+        <div><span class="lbl">Εικονίδιο</span><input type="text" name="icon" class="in-sm" value="ti-checklist" style="width:120px;"></div>
+        <div><span class="lbl">Συχνότητα</span><select name="frequency"><option value="twice">2×/ημέρα</option><option value="daily" selected>Καθημερινά</option><option value="weekly">Εβδομαδιαία</option><option value="monthly">Μηνιαία</option></select></div>
+        <div style="align-self:flex-end;"><button class="btn" type="submit"><i class="ti ti-plus"></i> Δημιουργία & επεξεργασία</button></div>
+      </div>
+    </form>
   </div>
   {% endif %}
 

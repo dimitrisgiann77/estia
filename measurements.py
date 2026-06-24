@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from flask import request, redirect, url_for, render_template, session, Response
 from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
-                 PoolRecord, WaterRecord, Area, Reading)
+                 PoolRecord, WaterRecord, Area, Reading, FREQ_LABEL)
 import json as _json
 
 
@@ -299,7 +299,9 @@ def measurements_console():
                            points_by_hotel=points_by_hotel, tpl_periods=tpl_periods,
                            st=migration_status(), msg=request.args.get('msg'),
                            all_hotels=Hotel.query.order_by(Hotel.name).all(),
-                           all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all())
+                           all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
+                           param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
+                           freq_label=FREQ_LABEL)
 
 
 @app.route('/dashboard/measurements/autocreate', methods=['POST'])

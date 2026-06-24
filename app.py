@@ -339,11 +339,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.253'
-APP_BUILD   = '534'
+APP_VERSION = '12.254'
+APP_BUILD   = '535'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.254', 'b': '535', 'date': '24/06/2026', 'time': '18:00', 'title': 'Templates: το περιεχόμενο ενσωματώθηκε στο «Μετρήσεις · Ρυθμίσεις → Παράμετροι»',
+     'items': ['Στο tab «Παράμετροι» εμφανίζεται πλέον ΟΛΟΣ ο πίνακας τύπων παρακολούθησης (με Επεξεργασία ανά τύπο) + φόρμα «Νέος τύπος» — όχι απλός σύνδεσμος.',
+               'Η παλιά σελίδα /dashboard/templates ανακατευθύνει εκεί. Η επεξεργασία παραμέτρων ενός τύπου γίνεται όπως πριν (ίδια οθόνη).']},
     {'v': '12.253', 'b': '534', 'date': '24/06/2026', 'time': '17:40', 'title': 'Μενού: κατάργηση ξεχωριστού «Κατηγορίες βλαβών» — μέσα από Βλάβες · Ρυθμίσεις',
      'items': ['Αφαιρέθηκε το ξεχωριστό στοιχείο «Κατηγορίες βλαβών». Ανοίγει πλέον μέσα από «Βλάβες · Ρυθμίσεις» (νέο κουμπί «Άνοιγμα Κατηγορίες βλαβών» — ορατό και σε embed, σε αντίθεση με τον παλιό σύνδεσμο που κρυβόταν).',
                'Για να φύγει από αποθηκευμένο μενού: «Διαμόρφωση μενού → Επαναφορά προεπιλογής» ή σύρε το στα Κρυμμένα + Αποθήκευση.']},
@@ -3786,11 +3789,13 @@ def area_delete(area_id):
 # admin: template editor (hybrid)
 @app.route('/dashboard/templates')
 def templates_admin():
+    # v12.254 — ενσωματώθηκε στη «Μετρήσεις · Ρυθμίσεις → Παράμετροι». Ανακατεύθυνση.
     if not is_admin():
         return redirect(url_for('login'))
-    return render_template('templates_admin.html',
-                           templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
-                           freq_label=FREQ_LABEL)
+    url = url_for('measurements_console') + '?tab=templates'
+    if request.args.get('embed'):
+        url += '&embed=1'
+    return redirect(url)
 
 @app.route('/dashboard/template/new', methods=['POST'])
 def template_new():
