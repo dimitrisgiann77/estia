@@ -18,6 +18,12 @@
  .items{min-height:36px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
  .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:grab;color:#334155;}
  .chip i{color:#64748b;}
+ .chip .lbl{flex:0 1 auto;}
+ /* κάθετη διάταξη ανά workspace */
+ .ws.vert .items{flex-direction:column;flex-wrap:nowrap;}
+ .ws.vert .chip{width:100%;}
+ .ws.vert .chip .lbl{flex:1;}
+ .vbtn{background:#eef5f8;color:#185FA5;border:none;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:12px;}
  .chip .rb{font-size:9px;color:#166534;background:#dcfce7;border-radius:4px;padding:1px 4px;}
  .chip .cfg{cursor:pointer;color:#94a3b8;font-size:13px;}
  .chip .cfg:hover{color:#185FA5;}
@@ -49,7 +55,7 @@
   <div id="wsroot">
     {% for wk in ws_order %}
     <div class="ws" data-ws="{{ wk }}">
-      <div class="wshead"><span class="wstag">{{ wk }}</span><span class="wstitle">{{ ws_label[wk] }}</span><button class="gh2" onclick="addGroup(this)">+ Ομάδα</button></div>
+      <div class="wshead"><span class="wstag">{{ wk }}</span><span class="wstitle">{{ ws_label[wk] }}</span><button class="vbtn" onclick="toggleVert(this)" title="Κάθετα / πλάι-πλάι">↕ Κάθετα</button><button class="gh2" onclick="addGroup(this)">+ Ομάδα</button></div>
       <div class="gwrap">
         {% for g in layout if (g.ws or 'operations') == wk %}
         <div class="group">
@@ -146,6 +152,18 @@ function save(){
   document.getElementById('masterws').value=document.getElementById('mwchk').checked?'1':'';
   document.getElementById('f').submit();
 }
-document.addEventListener('DOMContentLoaded',initAll);
+function setVert(ws, on){
+  ws.classList.toggle('vert', on);
+  var btn=ws.querySelector('.vbtn'); if(btn) btn.textContent = on ? '↔ Πλάι-πλάι' : '↕ Κάθετα';
+  try{ localStorage.setItem('mb_vert_'+ws.dataset.ws, on?'1':''); }catch(e){}
+}
+function toggleVert(btn){ var ws=btn.closest('.ws'); setVert(ws, !ws.classList.contains('vert')); }
+function initVert(){
+  document.querySelectorAll('#wsroot .ws').forEach(function(ws){
+    var on=false; try{ on=localStorage.getItem('mb_vert_'+ws.dataset.ws)==='1'; }catch(e){}
+    setVert(ws, on);
+  });
+}
+document.addEventListener('DOMContentLoaded',function(){ initAll(); initVert(); });
 </script>
 </body></html>
