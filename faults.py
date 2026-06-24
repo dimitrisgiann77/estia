@@ -663,8 +663,13 @@ def faults_settings():
         kids = FaultCategory.query.filter_by(parent_id=node.id).order_by(FaultCategory.sort, FaultCategory.name).all()
         return {'node': node, 'children': [_tree(k) for k in kids]}
     forest = [_tree(r) for r in roots]
+    map_by_spec = {}
+    for cs in CategorySpecialty.query.all():
+        map_by_spec.setdefault(cs.specialty, []).append(cs.category_id)
+    catname = {c.id: c.name for c in allcats}
     return render_template('faults_settings.html', specs=specs, slas=slas, tags=tags,
                            cmap=cmap, allcats=allcats, forest=forest,
+                           map_by_spec=map_by_spec, catname=catname,
                            active_specs=[s.name for s in specs if s.is_active],
                            PRIORITIES=PRIORITIES, stale_days=fault_stale_days())
 
@@ -765,6 +770,51 @@ def faults_category_toggle(cid):
     c = FaultCategory.query.get(cid)
     if c: c.is_active = not c.is_active; db.session.commit()
     return redirect(url_for('faults_settings') + '?embed=1')
+
+@app.route('/dashboard/faults/categories/reorder', methods=['POST'])
+def faults_categories_reorder():
+    """Drag & drop: νέα parent_id + sort ανά κατηγορία· το level επαναϋπολογίζεται από την αλυσίδα."""
+    if not is_admin(): return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    by_id = {c.id: c for c in FaultCategory.query.all()}
+    for it in (data.get('items') or []):
+        c = by_id.get(it.get('id'))
+        if not c: continue
+        pid = it.get('parent_id')
+        c.parent_id = int(pid) if pid else None
+        c.sort = int(it.get('sort') or 0)
+    def _lvl(c):
+        d, p, seen = 1, c.parent_id, set()
+        while p and p not in seen:
+            seen.add(p); d += 1
+            par = by_id.get(p)
+            if not par: break
+            p = par.parent_id
+        return min(d, 3)
+    for c in by_id.values():
+        c.level = _lvl(c)
+    db.session.commit(); log_activity('fault_cats_reorder', '%d' % len(by_id))
+    return jsonify(ok=True)
+
+@app.route('/dashboard/faults/category-map/save', methods=['POST'])
+def faults_category_map_save():
+    """Drag & drop χάρτη Κατηγορία→Ειδικότητα: ξαναχτίζει τα CategorySpecialty."""
+    if not is_admin(): return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    m = data.get('map') or {}
+    CategorySpecialty.query.delete()
+    for spec, ids in m.items():
+        spec = (spec or '').strip()
+        if not spec: continue
+        seen = set()
+        for cid in ids:
+            try: cid = int(cid)
+            except (TypeError, ValueError): continue
+            if cid in seen: continue
+            seen.add(cid)
+            db.session.add(CategorySpecialty(category_id=cid, specialty=spec))
+    db.session.commit(); log_activity('fault_map_save', '%d ειδικότητες' % len(m))
+    return jsonify(ok=True)
 
 @app.route('/dashboard/faults/user-specialties/<int:uid>', methods=['POST'])
 def faults_user_specialties(uid):
