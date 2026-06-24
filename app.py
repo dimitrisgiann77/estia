@@ -339,11 +339,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.260'
-APP_BUILD   = '541'
+APP_VERSION = '12.261'
+APP_BUILD   = '542'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.261', 'b': '542', 'date': '24/06/2026', 'time': '19:05', 'title': 'Διορθώσεις: /records crash (κλειδί «values») + ώρα Διαγνωστικών σε ώρα Αθήνας',
+     'items': ['Fix: η λίστα «Καταγραφές - Μετρήσεις» έσκαγε γιατί το κλειδί δεδομένων «values» συγκρουόταν με τη μέθοδο dict.values στη Jinja — μετονομάστηκε. Οι τιμές εμφανίζονται κανονικά.',
+               'Fix: στα «Διαγνωστικά», η στήλη «Ώρα» του log σφαλμάτων δείχνει πλέον ώρα Αθήνας (φίλτρο |gr) αντί UTC.']},
     {'v': '12.260', 'b': '541', 'date': '24/06/2026', 'time': '20:45', 'title': 'Καταγραφές - Μετρήσεις: εμφάνιση των τιμών κάθε καταχώρησης',
      'items': ['Στη λίστα «Καταγραφές - Μετρήσεις» (/records) προστέθηκε στήλη «Μετρήσεις» που δείχνει τις πραγματικές τιμές κάθε καταχώρησης (π.χ. Ελ. χλώριο 0.8 mg/L · pH 7.2 · Θερμοκρασία 26°C) — για μηχανή (Reading) και legacy πισίνες/νερά.']},
     {'v': '12.259', 'b': '540', 'date': '24/06/2026', 'time': '20:15', 'title': 'Βλάβες · Ρυθμίσεις: κύριες κατηγορίες σε οριζόντιες μπάντες',
@@ -2803,7 +2806,7 @@ def _records_items(user, ftype='all'):
                 'user': r.user.full_name if r.user else '—',
                 'updated': bool(r.updated_at),
                 'edit_url': '/pools/edit/%d' % r.id,
-                'values': _vals_from_cols(r, _POOL_VAL_LABELS),
+                'mvals': _vals_from_cols(r, _POOL_VAL_LABELS),
             })
     if ftype in ('all', 'water'):
         sids = [s.id for s in WaterSystem.query.all() if s.hotel_id in hids]
@@ -2818,7 +2821,7 @@ def _records_items(user, ftype='all'):
                 'user': r.user.full_name if r.user else '—',
                 'updated': bool(r.updated_at),
                 'edit_url': '/edit/%d' % r.id,
-                'values': _vals_from_cols(r, _WATER_VAL_LABELS),
+                'mvals': _vals_from_cols(r, _WATER_VAL_LABELS),
             })
     # v12.225 (Φ3c-1) — γνήσιες καταχωρήσεις ΜΗΧΑΝΗΣ (Reading, ΟΧΙ migrated αντίγραφα):
     #   εμφανίζονται μαζί με τα legacy, ΧΩΡΙΣ διπλά (source_kind IS NULL). Κατηγοριοποίηση ανά template.
@@ -2841,7 +2844,7 @@ def _records_items(user, ftype='all'):
             'user': r.user.full_name if r.user else '—',
             'updated': bool(r.updated_at),
             'edit_url': None,
-            'values': _reading_values(r),
+            'mvals': _reading_values(r),
         })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
     return items

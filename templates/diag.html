@@ -50,7 +50,7 @@
     <table>
       <tr><th>Ώρα</th><th>Διαδρομή</th><th>Τύπος</th><th>Μήνυμα</th></tr>
       {% for e in errors %}<tr>
-        <td class="muted">{{ e.created_at.strftime('%d/%m %H:%M') if e.created_at else '' }}</td>
+        <td class="muted">{{ e.created_at|gr('%d/%m %H:%M') if e.created_at else '' }}</td>
         <td>{{ e.method }} {{ e.path }}</td><td>{{ e.etype }}</td><td>{{ (e.message or '')[:120] }}</td>
       </tr>{% endfor %}
     </table>

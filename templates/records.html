@@ -113,7 +113,7 @@ tr:last-child td { border-bottom:none; }
             <td>{% if it.period == 'morning' %}<span class="badge badge-am">Πρωί</span>{% elif it.period == 'afternoon' %}<span class="badge badge-pm">Απόγ.</span>{% else %}<span class="badge" style="background:#eef2f5;color:#556;">Ημέρα</span>{% endif %}</td>
             <td>{{ it.hotel }}</td>
             <td>{{ it.place }}</td>
-            <td>{% if it.values %}<div class="vals">{% for v in it.values %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
+            <td>{% if it.mvals %}<div class="vals">{% for v in it.mvals %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
             <td>{{ it.user }}</td>
             <td>{% if it.updated %}<span class="badge badge-upd" title="Έχει ενημερωθεί μετά την αρχική υποβολή">διορθώθηκε</span>{% endif %}</td>
             <td style="white-space:nowrap;">
