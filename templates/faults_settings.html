@@ -37,6 +37,12 @@ table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px
   {% if request.args.get('saved') %}<div class="saved">Αποθηκεύτηκε!</div>{% endif %}
 
   <div class="card">
+    <div class="card-title"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών</div>
+    <p style="margin:0;">Διαχείριση των κατηγοριών/υποκατηγοριών βλαβών.</p>
+    <p style="margin-top:10px;"><a class="btn" href="/dashboard/faults/categories?embed=1"><i class="ti ti-external-link"></i> Άνοιγμα «Κατηγορίες βλαβών»</a></p>
+  </div>
+
+  <div class="card">
     <div class="card-title"><i class="ti ti-tools"></i> Ειδικότητες τεχνικών</div>
     <div style="margin-bottom:10px;">
       {% for s in specs %}
