@@ -270,12 +270,58 @@ def autocreate_granular_points():
 
 
 # ── helpers UI ───────────────────────────────────────────────────────────────
-def _param_input_kind(pkey):
+def _param_input_kind(p):
+    """Είδος εισόδου: προτεραιότητα στο αποθηκευμένο MonitorParam.kind (Φ3),
+    αλλιώς heuristic από το pkey (συμβατότητα με legacy params)."""
+    if isinstance(p, str):
+        pkey, kind = p, None
+    else:
+        pkey, kind = getattr(p, 'pkey', '') or '', getattr(p, 'kind', None)
+    if kind in ('num', 'bool', 'text'):
+        return kind
     if pkey == 'backwash_done':
         return 'bool'
     if pkey.startswith('location'):
         return 'text'
     return 'num'
+
+
+# ── Φ3: Βιβλιοθήκη Μετρήσεων (A1 — μία κοινή, distinct ανά pkey) ──────────────
+def _library(include_inactive=False):
+    """Ενιαία βιβλιοθήκη μετρήσεων (dedup ανά pkey). Όλες οι εμφανίσεις ενός pkey
+    κρατιούνται συγχρονισμένες από το lib_save (A1)."""
+    seen, out = set(), []
+    for p in (MonitorParam.query
+              .order_by(MonitorParam.category, MonitorParam.sort, MonitorParam.id).all()):
+        if p.pkey in seen:
+            continue
+        seen.add(p.pkey)
+        active = (getattr(p, 'is_active', True) is not False)
+        if not include_inactive and not active:
+            continue
+        out.append({'pkey': p.pkey, 'label': p.label, 'unit': p.unit or '',
+                    'min_v': p.min_v, 'max_v': p.max_v,
+                    'action_low': p.action_low or '', 'action_high': p.action_high or '',
+                    'kind': _param_input_kind(p), 'category': (getattr(p, 'category', '') or ''),
+                    'active': active})
+    return out
+
+
+def _lib_groups():
+    """Βιβλιοθήκη (όλες, incl ανενεργές) ομαδοποιημένη ανά κατηγορία για το UI."""
+    groups = {}
+    for m in _library(include_inactive=True):
+        groups.setdefault(m['category'] or 'Γενικό', []).append(m)
+    order = ['Πισίνα', 'Νερό', 'ΖΝΧ', 'Γενικό']
+    keys = sorted(groups.keys(), key=lambda k: (order.index(k) if k in order else len(order), k))
+    return [{'name': k, 'rows': groups[k]} for k in keys]
+
+
+def _slug_key(s):
+    import re
+    s = (s or '').strip().lower()
+    s = re.sub(r'[^a-z0-9]+', '_', s).strip('_')
+    return s[:40] or None
 
 
 def point_params(area):
@@ -315,14 +361,9 @@ def measurements_console():
     for a in pts:
         by_hotel.setdefault(a.hotel_id, []).append(a)
     points_by_hotel = [{'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in by_hotel.items()]
-    # Φ2 — βιβλιοθήκη μετρήσεων (μία κοινή, distinct ανά pkey) + ανατεθειμένες ανά σημείο
-    seen = set()
-    library = []
-    for p in MonitorParam.query.order_by(MonitorParam.template_key, MonitorParam.sort).all():
-        if p.pkey in seen:
-            continue
-        seen.add(p.pkey)
-        library.append({'pkey': p.pkey, 'label': p.label, 'unit': p.unit or ''})
+    # Φ3 — ενιαία βιβλιοθήκη μετρήσεων (A1): παλέτα = ενεργές· διαχείριση = όλες (ομάδες)
+    library = _library(include_inactive=False)
+    lib_groups = _lib_groups()
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -338,7 +379,8 @@ def measurements_console():
                            all_hotels=Hotel.query.order_by(Hotel.name).all(),
                            all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
-                           freq_label=FREQ_LABEL, library=library, area_chips=area_chips)
+                           freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
+                           lib_groups=lib_groups)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
@@ -402,6 +444,82 @@ def measurements_point_toggle(pid):
     if a:
         a.is_active = not bool(a.is_active); db.session.commit()
     return redirect(url_for('measurements_console') + '?tab=points')
+
+
+# ── Φ3: CRUD Βιβλιοθήκης Μετρήσεων (admin) ───────────────────────────────────
+def _lib_num(x):
+    x = (x or '').strip().replace(',', '.')
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.route('/dashboard/measurements/lib/save', methods=['POST'])
+def measurements_lib_save():
+    """Προσθήκη/επεξεργασία μέτρησης. A1: edit ενημερώνει ΟΛΕΣ τις εμφανίσεις του pkey."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    pkey  = (f.get('pkey') or '').strip()
+    label = (f.get('label') or '').strip()
+    unit  = (f.get('unit') or '').strip()[:20]
+    mn, mx = _lib_num(f.get('min_v')), _lib_num(f.get('max_v'))
+    low   = (f.get('action_low') or '').strip() or None
+    high  = (f.get('action_high') or '').strip() or None
+    kind  = (f.get('kind') or 'num').strip()
+    kind  = kind if kind in ('num', 'bool', 'text') else 'num'
+    category = (f.get('category') or '').strip()[:40]
+
+    def _go(m):
+        return redirect(url_for('measurements_console') + '?tab=library&msg=' + m)
+
+    if not label:
+        return _go('Λείπει το όνομα της μέτρησης.')
+
+    if pkey:  # επεξεργασία υπάρχουσας (όλες οι εμφανίσεις)
+        rows = MonitorParam.query.filter_by(pkey=pkey).all()
+        if not rows:
+            return _go('Δεν βρέθηκε η μέτρηση.')
+        for p in rows:
+            p.label, p.unit = label[:80], unit
+            p.min_v, p.max_v = mn, mx
+            p.action_low, p.action_high = low, high
+            p.kind, p.category = kind, category
+        db.session.commit()
+        log_activity('meas_lib_save', 'edit %s' % pkey)
+        return _go('Ενημερώθηκε: ' + label)
+
+    # νέα μέτρηση
+    newkey = (f.get('key') or '').strip() or _slug_key(label) or ''
+    newkey = (_slug_key(newkey) or '')[:40]
+    if not newkey:
+        return _go('Δώσε ένα key (λατινικά) για τη μέτρηση.')
+    if MonitorParam.query.filter_by(pkey=newkey).first():
+        return _go('Υπάρχει ήδη μέτρηση με key «%s».' % newkey)
+    nsort = (db.session.query(db.func.max(MonitorParam.sort)).scalar() or 0) + 1
+    db.session.add(MonitorParam(template_key=None, pkey=newkey, label=label[:80], unit=unit,
+                                min_v=mn, max_v=mx, action_low=low, action_high=high,
+                                kind=kind, category=category, is_active=True, sort=nsort))
+    db.session.commit()
+    log_activity('meas_lib_save', 'add %s' % newkey)
+    return _go('Προστέθηκε: ' + label)
+
+
+@app.route('/dashboard/measurements/lib/<pkey>/toggle', methods=['POST'])
+def measurements_lib_toggle(pkey):
+    """Ενεργοποίηση/απενεργοποίηση μέτρησης (όλες οι εμφανίσεις). Δεν θίγει
+    αναθέσεις/καταγραφές — απλώς κρύβεται από την παλέτα/νέες φόρμες."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    rows = MonitorParam.query.filter_by(pkey=pkey).all()
+    if rows:
+        cur = (getattr(rows[0], 'is_active', True) is not False)
+        for p in rows:
+            p.is_active = not cur
+        db.session.commit()
+        log_activity('meas_lib_toggle', '%s=%s' % (pkey, not cur))
+    return redirect(url_for('measurements_console') + '?tab=library')
 
 
 @app.route('/dashboard/measurements/migrate', methods=['POST'])
@@ -495,7 +613,7 @@ def measurements_entry():
             tpl = MonitorTemplate.query.get(sel.template_key)
             params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
                        'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
-                       'kind': _param_input_kind(p.pkey)} for p in point_params(sel)]
+                       'kind': _param_input_kind(p)} for p in point_params(sel)]
             periods = MonitorPeriod.query.filter_by(template_key=sel.template_key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
             recent = Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc()).limit(10).all()
             if recent:
@@ -521,7 +639,7 @@ def measurements_entry_save():
         return redirect(url_for('measurements_entry'))
     vals = {}
     for p in point_params(area):
-        kind = _param_input_kind(p.pkey)
+        kind = _param_input_kind(p)
         raw = f.get(p.pkey)
         if kind == 'bool':
             if f.get(p.pkey):

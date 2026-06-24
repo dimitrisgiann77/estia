@@ -29,6 +29,10 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 .tag{font-size:11px;color:#667;background:#eef6fb;border-radius:5px;padding:1px 6px;}
 .off{opacity:.5;}
 .lbl{font-size:11px;color:#889;display:block;margin-bottom:2px;}
+/* Φ3 — βιβλιοθήκη inline CRUD */
+.fw{flex-basis:100%;} .fw input{width:100%;}
+.libedit{align-items:flex-end;}
+select.in-kind{width:120px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -51,14 +55,14 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 <body>
 <div class="topbar">
   <div class="topbar-title"><i class="ti ti-adjustments-cog"></i> Μετρήσεις — Ρυθμίσεις</div>
-  <div class="topbar-sub">Σημεία ανά περιοχή · Περίοδοι · Παράμετροι · Μεταφορά — όλα από εδώ.</div>
+  <div class="topbar-sub">Σημεία ανά περιοχή · Περίοδοι · Βιβλιοθήκη μετρήσεων · Μεταφορά — όλα από εδώ.</div>
 </div>
 <div class="container">
   {% if msg %}<div class="ok"><i class="ti ti-check"></i> {{ msg }}</div>{% endif %}
   <div class="tabs">
     <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-map-pin"></i> Σημεία</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Περίοδοι</a>
-    <a class="tab {{ 'active' if tab=='templates' }}" href="/dashboard/measurements?tab=templates"><i class="ti ti-adjustments"></i> Παράμετροι</a>
+    <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Βιβλιοθήκη</a>
     <a class="tab {{ 'active' if tab=='migrate' }}" href="/dashboard/measurements?tab=migrate"><i class="ti ti-database-import"></i> Μεταφορά</a>
   </div>
 
@@ -73,7 +77,7 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
     <div class="libcard">
       <div class="libtitle"><i class="ti ti-flask"></i> Βιβλιοθήκη μετρήσεων — σύρε σε ένα σημείο</div>
       <div class="libwrap" id="measlib">
-        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Παράμετροι».</span>{% endfor %}
+        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Βιβλιοθήκη».</span>{% endfor %}
       </div>
     </div>
 
@@ -135,27 +139,64 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
   {% endfor %}
   {% endif %}
 
-  {% if tab=='templates' %}
+  {% if tab in ['library','templates'] %}
+  {% macro kind_opts(k) %}<option value="num"{{ ' selected' if k=='num' }}>Αριθμός</option><option value="bool"{{ ' selected' if k=='bool' }}>Ναι/Όχι</option><option value="text"{{ ' selected' if k=='text' }}>Κείμενο</option>{% endmacro %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης — Παράμετροι & όρια</div>
-    <p class="muted" style="margin-bottom:6px;">Κάθε τύπος έχει τις παραμέτρους του (όρια, ενέργειες). Πάτα «Επεξεργασία» για να ρυθμίσεις τις παραμέτρους ενός τύπου.</p>
-    {% for t in param_templates %}
-    <div class="row" style="justify-content:space-between;">
-      <span><i class="ti {{ t.icon }}"></i> <b>{{ t.name }}</b> <span class="tag">{{ freq_label.get(t.frequency, t.frequency) }}</span> <span class="muted">· {{ t.params|length }} παράμετροι</span>{% if not t.is_active %} <span class="muted">(ανενεργό)</span>{% endif %}</span>
-      <a class="btn ghost" href="/dashboard/template/{{ t.key }}?embed=1"><i class="ti ti-edit"></i> Επεξεργασία</a>
-    </div>
+    <div class="card-title"><i class="ti ti-flask"></i> Βιβλιοθήκη μετρήσεων</div>
+    <p class="muted" style="margin-bottom:6px;">Μία κοινή βιβλιοθήκη — όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Τις σέρνεις σε σημεία από το tab «Σημεία». Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση.</p>
+    {% for g in lib_groups %}
+      <div class="htitle">{{ g.name }}</div>
+      {% for m in g.rows %}
+      <form method="POST" action="/dashboard/measurements/lib/save" class="row libedit {{ 'off' if not m.active }}">
+        <input type="hidden" name="pkey" value="{{ m.pkey }}">
+        <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" value="{{ m.label }}" required></div>
+        <div><span class="lbl">Μονάδα</span><input class="in-sm" type="text" name="unit" value="{{ m.unit }}"></div>
+        <div><span class="lbl">Κάτω</span><input class="in-sm" type="text" name="min_v" value="{{ m.min_v if m.min_v is not none else '' }}"></div>
+        <div><span class="lbl">Άνω</span><input class="in-sm" type="text" name="max_v" value="{{ m.max_v if m.max_v is not none else '' }}"></div>
+        <div><span class="lbl">Είδος</span><select class="in-kind" name="kind">{{ kind_opts(m.kind) }}</select></div>
+        <div><span class="lbl">Κατηγορία</span><input class="in-loc" type="text" name="category" value="{{ m.category }}" placeholder="Πισίνα/Νερό/Γενικό"></div>
+        <span class="tag">{{ m.pkey }}</span>
+        <div class="fw"><span class="lbl">Ενέργεια αν χαμηλό</span><input type="text" name="action_low" value="{{ m.action_low }}"></div>
+        <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high" value="{{ m.action_high }}"></div>
+        <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+        <button class="btn {{ '' if m.active else 'ghost' }}" type="submit" formaction="/dashboard/measurements/lib/{{ m.pkey }}/toggle">{{ 'Απενεργοποίηση' if m.active else 'Ενεργοποίηση' }}</button>
+      </form>
+      {% endfor %}
+    {% else %}
+      <div class="muted" style="padding-top:8px;">Καμία μέτρηση ακόμη — πρόσθεσε από κάτω.</div>
     {% endfor %}
   </div>
   <div class="card">
-    <div class="card-title"><i class="ti ti-plus"></i> Νέος τύπος</div>
-    <form method="POST" action="/dashboard/template/new">
-      <div class="row" style="border:none;">
-        <div><span class="lbl">Key (λατινικά)</span><input type="text" name="key" placeholder="π.χ. fire" required></div>
-        <div><span class="lbl">Όνομα</span><input type="text" name="name" placeholder="π.χ. Πυρασφάλεια" required></div>
-        <div><span class="lbl">Εικονίδιο</span><input type="text" name="icon" class="in-sm" value="ti-checklist" style="width:120px;"></div>
-        <div><span class="lbl">Συχνότητα</span><select name="frequency"><option value="twice">2×/ημέρα</option><option value="daily" selected>Καθημερινά</option><option value="weekly">Εβδομαδιαία</option><option value="monthly">Μηνιαία</option></select></div>
-        <div style="align-self:flex-end;"><button class="btn" type="submit"><i class="ti ti-plus"></i> Δημιουργία & επεξεργασία</button></div>
-      </div>
+    <div class="card-title"><i class="ti ti-plus"></i> Νέα μέτρηση</div>
+    <form method="POST" action="/dashboard/measurements/lib/save" class="row libedit" style="border:none;">
+      <div><span class="lbl">Key (λατινικά)</span><input class="in-sm" style="width:130px;" type="text" name="key" placeholder="π.χ. cl_free"></div>
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" placeholder="π.χ. Ελεύθερο χλώριο" required></div>
+      <div><span class="lbl">Μονάδα</span><input class="in-sm" type="text" name="unit" placeholder="mg/L"></div>
+      <div><span class="lbl">Κάτω</span><input class="in-sm" type="text" name="min_v"></div>
+      <div><span class="lbl">Άνω</span><input class="in-sm" type="text" name="max_v"></div>
+      <div><span class="lbl">Είδος</span><select class="in-kind" name="kind">{{ kind_opts('num') }}</select></div>
+      <div><span class="lbl">Κατηγορία</span><input class="in-loc" type="text" name="category" placeholder="Πισίνα/Νερό/Γενικό"></div>
+      <div class="fw"><span class="lbl">Ενέργεια αν χαμηλό</span><input type="text" name="action_low"></div>
+      <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high"></div>
+      <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
+    </form>
+    <p class="muted" style="margin-top:8px;">Το «key» είναι το σταθερό αναγνωριστικό (λατινικά, χωρίς κενά). Αν μείνει κενό, παράγεται από το όνομα.</p>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης</div>
+    <p class="muted" style="margin-bottom:6px;">Οι τύποι (Πισίνα/ΖΝΧ/…) είναι το «είδος» κάθε σημείου και ομαδοποιούν τις περιόδους. Οι μετρήσεις τους ορίζονται πλέον από τη Βιβλιοθήκη (πάνω) & ανατίθενται ανά σημείο.</p>
+    {% for t in param_templates %}
+    <div class="row" style="justify-content:space-between;">
+      <span><i class="ti {{ t.icon }}"></i> <b>{{ t.name }}</b> <span class="tag">{{ freq_label.get(t.frequency, t.frequency) }}</span>{% if not t.is_active %} <span class="muted">(ανενεργό)</span>{% endif %}</span>
+      <a class="btn ghost" href="/dashboard/template/{{ t.key }}?embed=1"><i class="ti ti-edit"></i> Επεξεργασία τύπου</a>
+    </div>
+    {% endfor %}
+    <form method="POST" action="/dashboard/template/new" class="row" style="margin-top:6px;">
+      <div><span class="lbl">Key (λατινικά)</span><input class="in-sm" style="width:110px;" type="text" name="key" placeholder="π.χ. fire" required></div>
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πυρασφάλεια" required></div>
+      <div><span class="lbl">Εικονίδιο</span><input class="in-sm" style="width:120px;" type="text" name="icon" value="ti-checklist"></div>
+      <div><span class="lbl">Συχνότητα</span><select name="frequency"><option value="twice">2×/ημέρα</option><option value="daily" selected>Καθημερινά</option><option value="weekly">Εβδομαδιαία</option><option value="monthly">Μηνιαία</option></select></div>
+      <button class="btn ghost" type="submit"><i class="ti ti-plus"></i> Νέος τύπος</button>
     </form>
   </div>
   {% endif %}

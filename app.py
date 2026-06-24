@@ -1514,6 +1514,10 @@ class MonitorParam(db.Model):
     action_high  = db.Column(db.String(200))
     periodic     = db.Column(db.Boolean, default=False)   # μόνο πρωί/πρώτη βάρδια
     sort         = db.Column(db.Integer, default=0)
+    # v12.270 — Φ3 Βιβλιοθήκη Μετρήσεων (A1: μία κοινή): είδος εισόδου, κατηγορία, ενεργό
+    kind         = db.Column(db.String(10))               # 'num' | 'bool' | 'text' (κενό = heuristic)
+    category     = db.Column(db.String(40), default='')   # ομαδοποίηση παλέτας (Πισίνα/Νερό/Γενικό)
+    is_active    = db.Column(db.Boolean, default=True)
 
 class Area(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
@@ -4164,6 +4168,10 @@ def ensure_columns():
     _add_col('area', 'legacy_id', 'legacy_id INTEGER')
     _add_col('reading', 'source_kind', 'source_kind VARCHAR(10)')
     _add_col('reading', 'source_id', 'source_id INTEGER')
+    # v12.270 — Φ3 Βιβλιοθήκη Μετρήσεων (A1)
+    _add_col('monitor_param', 'kind', 'kind VARCHAR(10)')
+    _add_col('monitor_param', 'category', "category VARCHAR(40)")
+    _add_col('monitor_param', 'is_active', f'is_active BOOLEAN DEFAULT {truth}')
 
 def init_db():
     with app.app_context():
