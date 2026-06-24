@@ -498,9 +498,11 @@ def measurements_today():
     today = date.today()
     aids = [a.id for a in points]
     done = {}
+    cnt = {}
     if aids:
         for r in Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date == today).all():
             done.setdefault(r.area_id, {})[r.period] = r
+            cnt[r.area_id] = cnt.get(r.area_id, 0) + 1
     hmap = {h.id: h.name for h in Hotel.query.all()}
     _pcache = {}
 
@@ -515,9 +517,9 @@ def measurements_today():
 
     def _cat(tk):
         if tk == 'pool':
-            return ('Πισίνες', 'ti-pool', 1)
+            return (tname.get('pool') or 'Πισίνες', 'ti-pool', 1)
         if tk in _ZNX:
-            return ('Νερά Χρήσης', 'ti-droplet', 2)
+            return (tname.get('znx') or 'Νερά Χρήσης', 'ti-droplet', 2)
         return (tname.get(tk) or 'Λοιπά', 'ti-checklist', 5)
 
     by_hotel = {}
@@ -540,7 +542,7 @@ def measurements_today():
         cat, icon, order = _cat(a.template_key)
         groups = by_hotel.setdefault(a.hotel_id, {})
         g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
-        g['areas'].append({'area': a, 'slots': slots})
+        g['areas'].append({'area': a, 'slots': slots, 'count': cnt.get(a.id, 0)})
     today_by_hotel = []
     for hid, groups in by_hotel.items():
         glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
