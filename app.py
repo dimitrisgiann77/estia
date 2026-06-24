@@ -299,8 +299,9 @@ def send_fault_email(fr):
 
 
 # ── ROLES & PERMISSIONS ──
-ROLE_RANK = {'viewer': 0, 'staff': 1, 'manager': 2, 'admin': 3, 'masteradmin': 4}
-ROLE_LABELS = {'staff': 'Staff (καταγραφή)', 'manager': 'Manager (επόπτης)', 'admin': 'Admin', 'masteradmin': 'Master Admin'}
+ROLE_RANK = {'viewer': 0, 'accountant': 1, 'staff': 1, 'manager': 2, 'admin': 3, 'masteradmin': 4}
+ROLE_LABELS = {'masteradmin': 'Masteradmin / Διοίκηση', 'admin': 'Admin', 'manager': 'Manager (επόπτης)',
+               'accountant': 'Λογιστήριο', 'staff': 'Staff (καταγραφή)', 'viewer': 'Viewer (προβολή)'}
 
 def role_rank(role):
     return ROLE_RANK.get(role, 0)
@@ -338,11 +339,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.242'
-APP_BUILD   = '523'
+APP_VERSION = '12.243'
+APP_BUILD   = '524'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.243', 'b': '524', 'date': '24/06/2026', 'time': '14:15', 'title': 'Ρόλοι: «Masteradmin / Διοίκηση» στο ⚙ μενού + πλήρης λίστα ρόλων στους Χρήστες',
+     'items': ['Στη «Διαμόρφωση μενού» (⚙ ορατότητας) προστέθηκε ο ρόλος «Masteradmin / Διοίκηση».',
+               'Στους Χρήστες, το πεδίο ρόλου περιλαμβάνει πλέον όλους τους ρόλους: Masteradmin/Διοίκηση, Admin, Manager, Λογιστήριο, Staff, Viewer (με αντίστοιχα badges).']},
     {'v': '12.242', 'b': '523', 'date': '24/06/2026', 'time': '14:00', 'title': 'Διαμόρφωση μενού: εναλλαγή κάθετα/πλάι-πλάι + ρυθμιζόμενο πλάτος',
      'items': ['Κουμπί «↔ Πλάι-πλάι / ↕ Κάθετα» αλλάζει τη διάταξη των στοιχείων. Στην πλάι-πλάι, slider «Πλάτος» ρυθμίζει πόσο φαρδιά είναι τα chip (πόσα χωράνε ανά σειρά).',
                'Η επιλογή σου (διάταξη + πλάτος) θυμάται για την επόμενη φορά.']},

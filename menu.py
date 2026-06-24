@@ -161,7 +161,7 @@ def save_layout(groups):
 # ── v12.238 — Μενού ανά workspace × ρόλο (master = admin) ─────────────────────
 WS_OPTS   = [('operations', 'Operations'), ('staffhub', 'Staff HUB'),
              ('guestapp', 'Guest App'), ('admin', 'Admin')]
-ROLE_OPTS = [('manager', 'Manager'), ('staff', 'Staff'), ('accountant', 'Λογιστήριο'), ('viewer', 'Viewer')]
+ROLE_OPTS = [('masteradmin', 'Masteradmin / Διοίκηση'), ('manager', 'Manager'), ('staff', 'Staff'), ('accountant', 'Λογιστήριο'), ('viewer', 'Viewer')]
 
 def get_meta():
     """{item_id: {'ws': [...], 'roles': [...]}} — workspace + ρόλοι ανά στοιχείο."""
