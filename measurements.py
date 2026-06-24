@@ -485,114 +485,6 @@ def measurements_entry_save():
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
 
 
-# ── Συγκεντρωτική καταχώρηση ανά ξενοδοχείο (όλα τα σημεία μαζί) ──────────────
-@app.route('/dashboard/measurements/entry-all')
-def measurements_entry_all():
-    if 'user_id' not in session or not can_log():
-        return redirect(url_for('login'))
-    user = current_user()
-    points = _entry_points()
-    if not is_admin():
-        _hids = scoped_hotel_ids(user)
-        points = [a for a in points if a.hotel_id in _hids]
-    hmap = {h.id: h.name for h in Hotel.query.all()}
-    hotels_with = sorted({a.hotel_id for a in points})
-    hsel = request.args.get('hotel')
-    try:
-        hsel = int(hsel) if hsel else None
-    except (ValueError, TypeError):
-        hsel = None
-    if hsel is None and len(hotels_with) == 1:
-        hsel = hotels_with[0]
-    shown = [a for a in points if (hsel is not None and a.hotel_id == hsel)]
-
-    _ZNX = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
-    tname = {t.key: t.name for t in MonitorTemplate.query.all()}
-
-    def _cat(tk):
-        if tk == 'pool':
-            return (tname.get('pool') or 'Πισίνες', 'ti-pool', 1)
-        if tk in _ZNX:
-            return (tname.get('znx') or 'Νερά Χρήσης', 'ti-droplet', 2)
-        return (tname.get(tk) or 'Λοιπά', 'ti-checklist', 5)
-
-    pcache = {}
-
-    def _params(tk):
-        if tk not in pcache:
-            t = MonitorTemplate.query.get(tk)
-            pcache[tk] = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
-                           'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
-                           'kind': _param_input_kind(p.pkey)} for p in (t.params if t else [])]
-        return pcache[tk]
-
-    groups = {}
-    for a in shown:
-        cat, icon, order = _cat(a.template_key)
-        g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
-        g['areas'].append({'area': a, 'params': _params(a.template_key)})
-    glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
-
-    pk = {}
-    for a in shown:
-        for pr in MonitorPeriod.query.filter_by(template_key=a.template_key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all():
-            pk.setdefault(pr.key, {'key': pr.key, 'label': pr.label, 'time': pr.time, 'sort': pr.sort or 0})
-    periods = sorted(pk.values(), key=lambda x: (x['sort'], x['key']))
-
-    return render_template('measurements_entry_all.html', hsel=hsel,
-                           hotel_name=hmap.get(hsel, '—'),
-                           hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with],
-                           groups=glist, periods=periods, saved=request.args.get('ok'))
-
-
-@app.route('/dashboard/measurements/entry-all/save', methods=['POST'])
-def measurements_entry_all_save():
-    if 'user_id' not in session or not can_log():
-        return redirect(url_for('login'))
-    f = request.form
-    period = (f.get('period') or 'day').strip()
-    try:
-        hid = int(f.get('hotel_id')) if f.get('hotel_id') else None
-    except (ValueError, TypeError):
-        hid = None
-    points = _entry_points()
-    if not is_admin():
-        _hids = scoped_hotel_ids(current_user())
-        points = [a for a in points if a.hotel_id in _hids]
-    saved = 0
-    for a in points:
-        if hid is not None and a.hotel_id != hid:
-            continue
-        tpl = MonitorTemplate.query.get(a.template_key)
-        vals = {}
-        for p in (tpl.params if tpl else []):
-            kind = _param_input_kind(p.pkey)
-            raw = f.get('v_%d_%s' % (a.id, p.pkey))
-            if kind == 'bool':
-                if raw:
-                    vals[p.pkey] = True
-            elif kind == 'text':
-                if raw and raw.strip():
-                    vals[p.pkey] = raw.strip()
-            else:
-                if raw not in (None, ''):
-                    try:
-                        vals[p.pkey] = float(str(raw).replace(',', '.'))
-                    except (ValueError, TypeError):
-                        pass
-        if vals:
-            db.session.add(Reading(area_id=a.id, template_key=a.template_key, user_id=current_user().id,
-                                   record_date=date.today(), period=period, values=_json.dumps(vals),
-                                   notes=(f.get('notes_%d' % a.id) or '').strip()))
-            saved += 1
-    db.session.commit()
-    log_activity('meas_entry_all', '%d σημεία/%s' % (saved, period))
-    url = url_for('measurements_entry_all') + '?ok=%d' % saved
-    if hid:
-        url += '&hotel=%d' % hid
-    return redirect(url)
-
-
 # ── Φ3c-2b: ΕΝΙΑΙΑ «Σήμερα» (engine) — σημεία ανά περιοχή + status ημέρας ─────
 @app.route('/dashboard/measurements/today')
 def measurements_today():
@@ -654,7 +546,7 @@ def measurements_today():
     today_by_hotel = []
     for hid, groups in by_hotel.items():
         glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
-        today_by_hotel.append({'hotel': hmap.get(hid, '—'), 'hotel_id': hid, 'groups': glist})
+        today_by_hotel.append({'hotel': hmap.get(hid, '—'), 'groups': glist})
     return render_template('measurements_today.html', today_by_hotel=today_by_hotel,
                            alerts=alerts, total=total, donen=donen)
 
