@@ -40,6 +40,9 @@ tr:last-child td { border-bottom:none; }
 .tab { padding:8px 16px; border-radius:8px; font-size:13px; text-decoration:none; color:#33454d; background:#fff; border:1px solid #d6eef3; }
 .tab.active { background:#193847; color:#fff; border-color:#193847; font-weight:600; }
 .muted { color:#999; }
+.vals { display:flex; flex-wrap:wrap; gap:5px; max-width:420px; }
+.vchip { display:inline-flex; align-items:baseline; gap:4px; background:#eef6fb; border:1px solid #d9ebf5; border-radius:6px; padding:2px 7px; font-size:11.5px; color:#1f3a45; white-space:nowrap; }
+.vchip b { font-weight:700; } .vchip .u { color:#7c93a0; font-size:10px; }
 .exp { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#fff; background:#193847; border:none; cursor:pointer; }
 .exp.xlsx { background:#15803d; }
 </style>
@@ -95,6 +98,7 @@ tr:last-child td { border-bottom:none; }
             <th>Βάρδια</th>
             <th>Ξενοδοχείο</th>
             <th>Πισίνα / Δίκτυο / Τομέας</th>
+            <th>Μετρήσεις</th>
             <th>Υπεύθυνος</th>
             <th></th>
             <th></th>
@@ -109,6 +113,7 @@ tr:last-child td { border-bottom:none; }
             <td>{% if it.period == 'morning' %}<span class="badge badge-am">Πρωί</span>{% elif it.period == 'afternoon' %}<span class="badge badge-pm">Απόγ.</span>{% else %}<span class="badge" style="background:#eef2f5;color:#556;">Ημέρα</span>{% endif %}</td>
             <td>{{ it.hotel }}</td>
             <td>{{ it.place }}</td>
+            <td>{% if it.values %}<div class="vals">{% for v in it.values %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
             <td>{{ it.user }}</td>
             <td>{% if it.updated %}<span class="badge badge-upd" title="Έχει ενημερωθεί μετά την αρχική υποβολή">διορθώθηκε</span>{% endif %}</td>
             <td style="white-space:nowrap;">
@@ -118,7 +123,7 @@ tr:last-child td { border-bottom:none; }
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px;">Δεν υπάρχουν υποβολές ακόμα</td></tr>
+          <tr><td colspan="10" style="text-align:center;color:#aaa;padding:24px;">Δεν υπάρχουν υποβολές ακόμα</td></tr>
           {% endif %}
         </tbody>
       </table>

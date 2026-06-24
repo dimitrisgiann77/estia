@@ -339,11 +339,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.259'
-APP_BUILD   = '540'
+APP_VERSION = '12.260'
+APP_BUILD   = '541'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.260', 'b': '541', 'date': '24/06/2026', 'time': '20:45', 'title': 'Καταγραφές - Μετρήσεις: εμφάνιση των τιμών κάθε καταχώρησης',
+     'items': ['Στη λίστα «Καταγραφές - Μετρήσεις» (/records) προστέθηκε στήλη «Μετρήσεις» που δείχνει τις πραγματικές τιμές κάθε καταχώρησης (π.χ. Ελ. χλώριο 0.8 mg/L · pH 7.2 · Θερμοκρασία 26°C) — για μηχανή (Reading) και legacy πισίνες/νερά.']},
     {'v': '12.259', 'b': '540', 'date': '24/06/2026', 'time': '20:15', 'title': 'Βλάβες · Ρυθμίσεις: κύριες κατηγορίες σε οριζόντιες μπάντες',
      'items': ['Στο board κατηγοριών, κάθε κύριος κλάδος είναι πλέον οριζόντια μπάντα πλήρους πλάτους και οι υποκατηγορίες παρατάσσονται πλάι-πλάι μέσα του (αντί για στενές κατακόρυφες στήλες). Το drag & drop παραμένει ίδιο.']},
     {'v': '12.258', 'b': '539', 'date': '24/06/2026', 'time': '20:00', 'title': 'Βλάβες · Ρυθμίσεις: γενικό polish (τυπογραφία, κάρτες, badges, hover)',
@@ -2741,6 +2743,50 @@ _RECORDS_TYPE_LABEL = {'all': 'Όλες οι υποβολές', 'pools': 'Πισ
 _RECORDS_KIND_LABEL = {'pool': 'Πισίνα', 'water': 'Νερά', 'area': 'Τομέας'}
 _RECORDS_PERIOD_LABEL = {'morning': 'Πρωί', 'afternoon': 'Απόγευμα', 'day': 'Ημέρα'}
 
+_POOL_VAL_LABELS = [
+    ('free_chlorine', 'Ελ. χλώριο', 'mg/L'), ('combined_chlorine', 'Δεσμ. χλώριο', 'mg/L'),
+    ('ph', 'pH', ''), ('temp', 'Θερμοκρασία', '°C'), ('turbidity', 'Θολότητα', 'NTU'),
+    ('cyanuric_acid', 'Κυανουρικό', 'mg/L'), ('total_alkalinity', 'Αλκαλικότητα', 'mg/L'), ('orp', 'ORP', 'mV'),
+]
+_WATER_VAL_LABELS = [
+    ('clo2_tank', 'ClO₂ δεξαμενή', 'ppm'), ('clo2_kitchen', 'ClO₂ κουζίνα', 'ppm'), ('clo2_remote', 'ClO₂ απομακρ.', 'ppm'),
+    ('clo2_dhw_out', 'ClO₂ ΖΝΧ προσαγ.', 'ppm'), ('clo2_dhw_return', 'ClO₂ ΖΝΧ επιστρ.', 'ppm'), ('clo2_ro', 'ClO₂ αντ.όσμωση', 'ppm'),
+    ('ph_tank', 'pH δεξαμενή', ''),
+    ('temp_tank', 'Θ δεξαμενή', '°C'), ('temp_dhw_out', 'Θ ΖΝΧ προσαγ.', '°C'), ('temp_dhw_return', 'Θ ΖΝΧ επιστρ.', '°C'),
+    ('temp_ro', 'Θ RO', '°C'), ('temp_kitchen_cold', 'Θ κουζίνα κρύο', '°C'), ('temp_kitchen_hot', 'Θ κουζίνα ζεστό', '°C'),
+    ('temp_remote_cold', 'Θ απομ. κρύο', '°C'), ('temp_remote_hot', 'Θ απομ. ζεστό', '°C'),
+]
+
+def _vals_from_cols(r, label_map):
+    out = []
+    for attr, lbl, unit in label_map:
+        v = getattr(r, attr, None)
+        if v is None:
+            continue
+        out.append({'label': lbl, 'value': v, 'unit': unit})
+    return out
+
+def _reading_values(r):
+    try:
+        vals = json.loads(r.values or '{}')
+    except Exception:
+        vals = {}
+    out = []
+    tpl = MonitorTemplate.query.get(r.template_key) if r.template_key else None
+    if tpl:
+        for p in tpl.params:
+            v = vals.get(p.pkey)
+            if v in (None, ''):
+                continue
+            out.append({'label': p.label, 'value': v, 'unit': p.unit or ''})
+    else:
+        for k, v in vals.items():
+            if v in (None, ''):
+                continue
+            out.append({'label': k, 'value': v, 'unit': ''})
+    return out
+
+
 def _records_items(user, ftype='all'):
     """Κοινός builder της λίστας Records (page + εξαγωγές PDF/XLSX)."""
     hids = scoped_hotel_ids(user)
@@ -2757,6 +2803,7 @@ def _records_items(user, ftype='all'):
                 'user': r.user.full_name if r.user else '—',
                 'updated': bool(r.updated_at),
                 'edit_url': '/pools/edit/%d' % r.id,
+                'values': _vals_from_cols(r, _POOL_VAL_LABELS),
             })
     if ftype in ('all', 'water'):
         sids = [s.id for s in WaterSystem.query.all() if s.hotel_id in hids]
@@ -2771,6 +2818,7 @@ def _records_items(user, ftype='all'):
                 'user': r.user.full_name if r.user else '—',
                 'updated': bool(r.updated_at),
                 'edit_url': '/edit/%d' % r.id,
+                'values': _vals_from_cols(r, _WATER_VAL_LABELS),
             })
     # v12.225 (Φ3c-1) — γνήσιες καταχωρήσεις ΜΗΧΑΝΗΣ (Reading, ΟΧΙ migrated αντίγραφα):
     #   εμφανίζονται μαζί με τα legacy, ΧΩΡΙΣ διπλά (source_kind IS NULL). Κατηγοριοποίηση ανά template.
@@ -2793,6 +2841,7 @@ def _records_items(user, ftype='all'):
             'user': r.user.full_name if r.user else '—',
             'updated': bool(r.updated_at),
             'edit_url': None,
+            'values': _reading_values(r),
         })
     items.sort(key=lambda x: x['when'] or datetime.min, reverse=True)
     return items
