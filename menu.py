@@ -13,6 +13,7 @@ MENU_CATALOG = [
     ('records',     'Καταγραφές - Μετρήσεις', 'ti-clipboard-data',   '/records',                     False),
     ('meas_console','Μετρήσεις · Ρυθμίσεις',   'ti-adjustments-cog',  '/dashboard/measurements',      False),
     ('meas_entry',  'Μετρήσεις · Καταχώρηση',  'ti-pencil-plus',      '/dashboard/measurements/entry', False),
+    ('meas_entry_all','Μετρήσεις · Συγκεντρωτική','ti-clipboard-plus', '/dashboard/measurements/entry-all', False),
     ('meas_stats',  'Μετρήσεις · Στατιστικά',  'ti-chart-histogram',  '/dashboard/measurements/stats', False),
     ('faults_board','Πίνακας Βλαβών',         'ti-alert-triangle',   '/dashboard/faults',            False),
     ('fault_submit','Δήλωση βλάβης',          'ti-tool',             '/fault',                       False),

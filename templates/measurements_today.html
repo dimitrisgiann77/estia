@@ -15,7 +15,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .container{max-width:900px;margin:0 auto;padding:24px;}
 .card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid #e0f0ff;margin-bottom:14px;}
 .htitle{font-size:13px;font-weight:700;color:#193847;margin:12px 0 6px;}
-.hotel{font-size:18px;font-weight:800;color:#16323f;margin:18px 0 6px;}
+.hotel{font-size:18px;font-weight:800;color:#16323f;margin:18px 0 6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.allbtn{font-size:12px;font-weight:600;text-decoration:none;color:#fff;background:var(--brand,#193847);padding:7px 13px;border-radius:9px;display:inline-flex;align-items:center;gap:6px;}
 .section{background:#eef5fb;border:1px solid #d9e7f1;border-radius:14px;padding:10px 12px;margin-bottom:14px;}
 .sechead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--brand,#193847);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
 .sechead i{font-size:16px;}
@@ -62,7 +63,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   {% endif %}
 
   {% for h in today_by_hotel %}
-    <div class="hotel">{{ h.hotel }}</div>
+    <div class="hotel">{{ h.hotel }}<a class="allbtn" href="/dashboard/measurements/entry-all?hotel={{ h.hotel_id }}"><i class="ti ti-clipboard-plus"></i> Συγκεντρωτική καταχώρηση</a></div>
     {% for g in h.groups %}
     <div class="section">
       <div class="sechead"><i class="ti {{ g.icon }}"></i> {{ g.title }} <span class="secn">{{ g.areas|length }}</span></div>
