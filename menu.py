@@ -75,6 +75,68 @@ DEFAULT_LAYOUT = [
     {'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'whatsnew', 'feedback']},
 ]
 
+# v12.239 — Προεπιλεγμένη ανάθεση workspace + ρόλων ανά στοιχείο (πλάνο μενού v3).
+# admin = πάντα όλα (master). roles=[] => μόνο admin. Διακόπτης «master για όλα» ελέγχει αν ισχύει για μη-admin.
+DEFAULT_META = {
+    # 🟦 OPERATIONS — εργαλεία δουλειάς
+    'today':          {'ws': ['operations'], 'roles': ['staff', 'manager']},
+    'meas_entry':     {'ws': ['operations'], 'roles': ['staff', 'manager']},
+    'areas_rec':      {'ws': ['operations'], 'roles': ['staff', 'manager']},
+    'fault_submit':   {'ws': ['operations'], 'roles': ['staff', 'manager']},
+    'faults_board':   {'ws': ['operations'], 'roles': ['manager']},
+    'records':        {'ws': ['operations'], 'roles': ['manager']},
+    'meas_stats':     {'ws': ['operations'], 'roles': ['manager']},
+    'areas_dash':     {'ws': ['operations'], 'roles': ['manager']},
+    'surveys':        {'ws': ['operations'], 'roles': ['manager']},
+    'sched':          {'ws': ['operations'], 'roles': ['manager']},
+    'sched_monthly':  {'ws': ['operations'], 'roles': ['manager']},
+    'sched_oversight':{'ws': ['operations'], 'roles': ['manager']},
+    'evals':          {'ws': ['operations'], 'roles': ['manager']},
+    # 🟩 STAFF HUB — εργαζόμενος (κυρίως μελλοντικό)
+    'whatsnew':       {'ws': ['staffhub', 'operations'], 'roles': ['staff', 'manager']},
+    # 🟥 ADMIN — HR back-office (admin only)
+    'people':         {'ws': ['admin'], 'roles': []},
+    'pay_mitroo':     {'ws': ['admin'], 'roles': []},
+    'org':            {'ws': ['admin'], 'roles': []},
+    'sched_identify': {'ws': ['admin'], 'roles': []},
+    'sched_imported': {'ws': ['admin'], 'roles': []},
+    'dups':           {'ws': ['admin'], 'roles': []},
+    'sched_staff':    {'ws': ['admin'], 'roles': []},
+    # 🟥 ADMIN — Μισθοδοσία (accountant)
+    'pay_runs':       {'ws': ['admin'], 'roles': ['accountant']},
+    'pay_control':    {'ws': ['admin'], 'roles': ['accountant']},
+    'pay_grid':       {'ws': ['admin'], 'roles': ['accountant']},
+    'rates':          {'ws': ['admin'], 'roles': ['accountant']},
+    'companies':      {'ws': ['admin'], 'roles': ['accountant']},
+    'attention':      {'ws': ['admin'], 'roles': ['accountant']},
+    'sched_sub':      {'ws': ['admin'], 'roles': ['accountant']},
+    # 🟥 ADMIN — ρυθμίσεις/δεδομένα/πλατφόρμα (admin only)
+    'meas_console':   {'ws': ['admin'], 'roles': []},
+    'sched_set':      {'ws': ['admin'], 'roles': []},
+    'fault_set':      {'ws': ['admin'], 'roles': []},
+    'fault_cat':      {'ws': ['admin'], 'roles': []},
+    'templates':      {'ws': ['admin'], 'roles': []},
+    'hotels':         {'ws': ['admin'], 'roles': []},
+    'areas_admin':    {'ws': ['admin'], 'roles': []},
+    'email':          {'ws': ['admin'], 'roles': []},
+    'theme':          {'ws': ['admin'], 'roles': []},
+    'ai':             {'ws': ['admin'], 'roles': []},
+    'menu_roles':     {'ws': ['admin'], 'roles': []},
+    'menu_builder':   {'ws': ['admin'], 'roles': []},
+    'activity':       {'ws': ['admin'], 'roles': []},
+    'feedback_adm':   {'ws': ['admin'], 'roles': []},
+    'imports':        {'ws': ['admin'], 'roles': []},
+    'backup':         {'ws': ['admin'], 'roles': []},
+    'diag':           {'ws': ['admin'], 'roles': []},
+    'users':          {'ws': ['admin'], 'roles': []},
+    'dashboard':      {'ws': ['admin'], 'roles': []},
+    # ⬜ ΕΝΗΜΕΡΩΣΗ — παντού
+    'search':         {'ws': ['operations', 'admin'], 'roles': ['manager']},
+    'roadmap':        {'ws': ['operations', 'admin'], 'roles': ['manager']},
+    'help':           {'ws': ['operations', 'staffhub', 'admin'], 'roles': ['staff', 'manager']},
+    'feedback':       {'ws': ['operations', 'staffhub', 'admin'], 'roles': ['staff', 'manager']},
+}
+
 def get_layout():
     st = Setting.query.filter_by(key='menu_layout').first()
     if st and st.value:
@@ -117,6 +179,22 @@ def master_ws_on():
     """Αν ON: το master μενού (admin) οδηγεί ΟΛΑ τα workspaces/ρόλους. Default OFF (καμία αλλαγή)."""
     st = Setting.query.filter_by(key='menu_master_ws').first()
     return bool(st and str(st.value) == '1')
+
+def seed_menu_meta(force=False):
+    """Seed προεπιλεγμένων workspace+ρόλων (DEFAULT_META). force=True ξαναγράφει (π.χ. στην Επαναφορά).
+    Καλείται και στο boot (module-level) -> app context."""
+    with app.app_context():
+        try:
+            st = Setting.query.filter_by(key='menu_meta').first()
+            if st and st.value and not force:
+                return
+            if not st:
+                st = Setting(key='menu_meta'); db.session.add(st)
+            st.value = json.dumps(DEFAULT_META, ensure_ascii=False)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f'[menu] seed_menu_meta skipped: {e}')
 
 
 @app.context_processor
@@ -233,6 +311,7 @@ def menu_builder_reset():
     st = Setting.query.filter_by(key='menu_layout').first()
     if st:
         db.session.delete(st); db.session.commit()
+    seed_menu_meta(force=True)   # v12.239 — Επαναφορά: καθαρό layout + προεπιλεγμένα workspace/ρόλοι
     log_activity('menu_builder_reset', '')
     return redirect(url_for('menu_builder') + '?embed=1')
 

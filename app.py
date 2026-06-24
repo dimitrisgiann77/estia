@@ -338,11 +338,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.238'
-APP_BUILD   = '519'
+APP_VERSION = '12.239'
+APP_BUILD   = '520'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.239', 'b': '520', 'date': '24/06/2026', 'time': '12:00', 'title': 'Μενού: εφαρμογή πλάνου — αυτόματη ανάθεση workspace & ρόλων σε όλα τα στοιχεία',
+     'items': ['Όλα τα στοιχεία πήραν προεπιλεγμένο workspace + ρόλους κατά το πλάνο (Operations=εργαλεία δουλειάς· Staff HUB=σημείο εργαζομένου· Admin=διοίκηση/πλατφόρμα).',
+               'Η «Διαμόρφωση μενού → Επαναφορά προεπιλογής» τα εφαρμόζει όλα μαζί (καθαρό layout + workspace/ρόλοι). Ο διακόπτης «master για όλα» μένει κλειστός μέχρι να τον ανοίξεις.']},
     {'v': '12.238', 'b': '519', 'date': '24/06/2026', 'time': '10:30', 'title': 'Μενού: αναδιοργάνωση + ορατότητα ανά workspace & ρόλο (master = admin)',
      'items': ['Καθαρότερη προεπιλεγμένη δομή μενού (μικρές εστιασμένες ομάδες· Μετρήσεις όλες μαζί). Υιοθέτησέ τη με «Διαμόρφωση μενού → Επαναφορά προεπιλογής».',
                'Στη «Διαμόρφωση μενού», κάθε στοιχείο έχει ⚙ για ορισμό σε ποια workspaces & ρόλους εμφανίζεται. Φτιάχνεις το master (admin) και διαλέγεις τι βγαίνει αλλού.',
@@ -4238,6 +4241,7 @@ if schedule: schedule.seed_schedule()
 if payroll:  payroll.ensure_payroll_columns()
 if payroll:  payroll.seed_payroll()
 if measurements: measurements.seed_measurement_engine()   # Φ1: seed templates Πισίνα/ΖΝΧ + περίοδοι (idempotent)
+if menu: menu.seed_menu_meta()   # v12.239: seed workspace+ρόλοι μενού (μόνο αν λείπει)
 start_scheduler()
 if backup:   backup.start_backup_scheduler()
 if payroll:  payroll.start_master_sync_scheduler()
