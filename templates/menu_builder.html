@@ -15,13 +15,9 @@
  .ghandle{cursor:grab;color:#94a3b8;}
  .gtitle{font-weight:700;color:#185FA5;border:1px dashed transparent;border-radius:6px;padding:3px 6px;font-size:14px;flex:1;}
  .gtitle:focus{border-color:#cbd5e1;outline:none;background:#f8fafc;}
- .items{min-height:36px;display:flex;flex-direction:column;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
- .chip{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:grab;color:#334155;}
- .chip .lbl{flex:1;}
+ .items{min-height:36px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
+ .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:grab;color:#334155;}
  .chip i{color:#64748b;}
- /* πλάι-πλάι (grid) — ρυθμιζόμενο πλάτος στηλών */
- body.cols-h .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--chipw,180px),1fr));}
- body.cols-h .chip{display:inline-flex;}
  .chip .rb{font-size:9px;color:#166534;background:#dcfce7;border-radius:4px;padding:1px 4px;}
  .chip .cfg{cursor:pointer;color:#94a3b8;font-size:13px;}
  .chip .cfg:hover{color:#185FA5;}
@@ -47,8 +43,6 @@
 
   <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
     <button class="b" onclick="save()">💾 Αποθήκευση</button>
-    <button class="gh2" id="laybtn" onclick="toggleLayout()">↔ Πλάι-πλάι</button>
-    <label id="wbox" class="muted" style="display:none;align-items:center;gap:6px;">Πλάτος <input type="range" id="chipw" min="120" max="320" step="10" value="180" oninput="setW(this.value)"></label>
     <form method="POST" action="/dashboard/menu-builder/reset?embed=1" style="display:inline;" onsubmit="return confirm('Επαναφορά στο προεπιλεγμένο μενού;');"><button class="gh2" type="submit">↺ Επαναφορά προεπιλογής</button></form>
   </div>
 
@@ -152,19 +146,6 @@ function save(){
   document.getElementById('masterws').value=document.getElementById('mwchk').checked?'1':'';
   document.getElementById('f').submit();
 }
-function setW(v){ document.body.style.setProperty('--chipw', v+'px'); try{localStorage.setItem('mb_chipw',v);}catch(e){} }
-function applyLayout(h){
-  document.body.classList.toggle('cols-h', h);
-  document.getElementById('laybtn').textContent = h ? '↕ Κάθετα' : '↔ Πλάι-πλάι';
-  document.getElementById('wbox').style.display = h ? 'inline-flex' : 'none';
-  try{localStorage.setItem('mb_cols_h', h?'1':'');}catch(e){}
-}
-function toggleLayout(){ applyLayout(!document.body.classList.contains('cols-h')); }
-function initLayout(){
-  var w=180, h=false;
-  try{ w=parseInt(localStorage.getItem('mb_chipw')||'180',10)||180; h=localStorage.getItem('mb_cols_h')==='1'; }catch(e){}
-  document.getElementById('chipw').value=w; setW(w); applyLayout(h);
-}
-document.addEventListener('DOMContentLoaded',function(){ initAll(); initLayout(); });
+document.addEventListener('DOMContentLoaded',initAll);
 </script>
 </body></html>
