@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Εστία — Μετρήσεις: Ρυθμίσεις</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <link rel="stylesheet" href="/static/estia-theme.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -28,6 +29,19 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 .tag{font-size:11px;color:#667;background:#eef6fb;border-radius:5px;padding:1px 6px;}
 .off{opacity:.5;}
 .lbl{font-size:11px;color:#889;display:block;margin-bottom:2px;}
+/* Φ2 — βιβλιοθήκη + chips ανά σημείο */
+.libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
+.libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+.libwrap{display:flex;flex-wrap:wrap;gap:6px;}
+.mchip{display:inline-flex;align-items:baseline;gap:5px;background:#fff;border:1px solid #dbe6ef;border-radius:7px;padding:4px 9px;font-size:12px;cursor:grab;box-shadow:0 1px 2px rgba(20,58,82,.04);}
+.mchip .u{color:#9aa7ad;font-size:10px;}
+.mchip .x{cursor:pointer;color:#cbd5e1;font-weight:700;margin-left:2px;}
+.mchip .x:hover{color:#dc2626;}
+.ptbox{background:#f6fafd;border:1px solid #e3edf4;border-radius:9px;padding:8px;margin:2px 0 10px;}
+.ptbox-h{font-size:11px;color:#7c93a0;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.ptzone{display:flex;flex-wrap:wrap;gap:6px;min-height:26px;}
+.ptzone .ph{color:#b6c4cd;font-size:12px;font-style:italic;}
+.savedok{color:#16a34a;font-size:11px;font-weight:600;}
 :root{--brand:{{ theme.primary if theme else '#193847' }};}
 .topbar{background:var(--brand)!important;}
 </style>
@@ -55,6 +69,14 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
       <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αυτο-δημιουργία σημείων ανά περιοχή</button>
       <span class="muted"> Σπάει το δίκτυο σε σημεία ανά χώρο. Τα coarse «ΖΝΧ» γίνονται ιστορικό.</span>
     </form>
+
+    <div class="libcard">
+      <div class="libtitle"><i class="ti ti-flask"></i> Βιβλιοθήκη μετρήσεων — σύρε σε ένα σημείο</div>
+      <div class="libwrap" id="measlib">
+        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Παράμετροι».</span>{% endfor %}
+      </div>
+    </div>
+
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
       {% for a in g.areas %}
@@ -66,6 +88,12 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
         <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i></button>
         <button class="btn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle">{{ 'Απενεργοποίηση' if a.is_active else 'Ενεργοποίηση' }}</button>
       </form>
+      <div class="ptbox">
+        <div class="ptbox-h"><i class="ti ti-arrow-down-right"></i> Μετρήσεις του σημείου (σύρε από τη βιβλιοθήκη· × αφαιρεί) <span class="savedok" id="ok{{ a.id }}"></span></div>
+        <div class="ptzone" data-area="{{ a.id }}">
+          {% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}
+        </div>
+      </div>
       {% endfor %}
     {% endfor %}
     {% if not points_by_hotel %}<div class="muted" style="padding-top:8px;">Κανένα σημείο ακόμη — πάτα «Αυτο-δημιουργία».</div>{% endif %}
@@ -148,5 +176,41 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
   {% endif %}
 
 </div>
+<script>
+(function(){
+  var lib=document.getElementById('measlib');
+  if(!lib || !window.Sortable) return;
+  new Sortable(lib,{group:{name:'meas',pull:'clone',put:false},sort:false,animation:130});
+  function ensureX(chip){
+    if(chip.querySelector('.x')) return;
+    var x=document.createElement('span'); x.className='x'; x.textContent='×';
+    x.onclick=function(){ chip.remove(); ptSave(chip.closest('.ptzone')); };
+    chip.appendChild(x);
+  }
+  document.querySelectorAll('.ptzone').forEach(function(z){
+    new Sortable(z,{group:{name:'meas',pull:true,put:true},animation:130,
+      onAdd:function(e){
+        var z2=e.to, chip=e.item, k=chip.dataset.pkey;
+        if(z2.querySelectorAll('.mchip[data-pkey="'+k+'"]').length>1){ chip.remove(); return; }
+        ensureX(chip); ptSave(z2);
+      },
+      onUpdate:function(e){ ptSave(e.to); }
+    });
+  });
+  var _t={};
+  window.ptSave=function(z){
+    if(!z) return;
+    var aid=z.dataset.area;
+    var keys=[].map.call(z.querySelectorAll('.mchip'),function(c){return c.dataset.pkey;});
+    clearTimeout(_t[aid]);
+    _t[aid]=setTimeout(function(){
+      fetch('/dashboard/measurements/point/'+aid+'/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkeys:keys})})
+        .then(function(r){return r.json();}).then(function(d){
+          var o=document.getElementById('ok'+aid); if(o){ o.textContent=d.ok?'✓ αποθηκεύτηκε':'σφάλμα'; setTimeout(function(){o.textContent='';},2000); }
+        }).catch(function(){ var o=document.getElementById('ok'+aid); if(o) o.textContent='σφάλμα δικτύου'; });
+    },500);
+  };
+})();
+</script>
 </body>
 </html>

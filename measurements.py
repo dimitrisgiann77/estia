@@ -12,7 +12,7 @@ Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: cre
 Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
 from datetime import date, timedelta
-from flask import request, redirect, url_for, render_template, session, Response
+from flask import request, redirect, url_for, render_template, session, Response, jsonify
 from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
                  PoolRecord, WaterRecord, Area, Reading, FREQ_LABEL)
@@ -315,6 +315,17 @@ def measurements_console():
     for a in pts:
         by_hotel.setdefault(a.hotel_id, []).append(a)
     points_by_hotel = [{'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in by_hotel.items()]
+    # Φ2 — βιβλιοθήκη μετρήσεων (μία κοινή, distinct ανά pkey) + ανατεθειμένες ανά σημείο
+    seen = set()
+    library = []
+    for p in MonitorParam.query.order_by(MonitorParam.template_key, MonitorParam.sort).all():
+        if p.pkey in seen:
+            continue
+        seen.add(p.pkey)
+        library.append({'pkey': p.pkey, 'label': p.label, 'unit': p.unit or ''})
+    area_chips = {}
+    for a in pts:
+        area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
     # periods
     tpl_periods = []
     for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
@@ -327,7 +338,30 @@ def measurements_console():
                            all_hotels=Hotel.query.order_by(Hotel.name).all(),
                            all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
-                           freq_label=FREQ_LABEL)
+                           freq_label=FREQ_LABEL, library=library, area_chips=area_chips)
+
+
+@app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
+def measurements_point_params(area_id):
+    """Φ2: αποθήκευση μετρήσεων ενός σημείου (drag&drop) → ξαναχτίζει AreaParam."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    area = Area.query.get(area_id)
+    if not area:
+        return jsonify(ok=False), 404
+    data = request.get_json(silent=True) or {}
+    keys, seen = [], set()
+    for k in (data.get('pkeys') or []):
+        k = str(k)[:40]
+        if k and k not in seen:
+            seen.add(k)
+            keys.append(k)
+    AreaParam.query.filter_by(area_id=area_id).delete()
+    for i, k in enumerate(keys):
+        db.session.add(AreaParam(area_id=area_id, pkey=k, sort=i))
+    db.session.commit()
+    log_activity('meas_point_params', '%s: %d' % (area.name, len(keys)))
+    return jsonify(ok=True, n=len(keys))
 
 
 @app.route('/dashboard/measurements/autocreate', methods=['POST'])
