@@ -510,6 +510,16 @@ def measurements_today():
                 MonitorPeriod.sort, MonitorPeriod.id).all()
         return _pcache[tk]
 
+    _ZNX = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
+    tname = {t.key: t.name for t in MonitorTemplate.query.all()}
+
+    def _cat(tk):
+        if tk == 'pool':
+            return ('Πισίνες', 'ti-pool', 1)
+        if tk in _ZNX:
+            return ('Νερά Χρήσης', 'ti-droplet', 2)
+        return (tname.get(tk) or 'Λοιπά', 'ti-checklist', 5)
+
     by_hotel = {}
     alerts = []
     total = donen = 0
@@ -527,8 +537,14 @@ def measurements_today():
                         alerts.append({'point': a.name, 'label': act.get('label'), 'action': act.get('action')})
                 except Exception:
                     pass
-        by_hotel.setdefault(a.hotel_id, []).append({'area': a, 'slots': slots})
-    today_by_hotel = [{'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in by_hotel.items()]
+        cat, icon, order = _cat(a.template_key)
+        groups = by_hotel.setdefault(a.hotel_id, {})
+        g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
+        g['areas'].append({'area': a, 'slots': slots})
+    today_by_hotel = []
+    for hid, groups in by_hotel.items():
+        glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
+        today_by_hotel.append({'hotel': hmap.get(hid, '—'), 'groups': glist})
     return render_template('measurements_today.html', today_by_hotel=today_by_hotel,
                            alerts=alerts, total=total, donen=donen)
 
