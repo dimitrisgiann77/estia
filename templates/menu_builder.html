@@ -8,6 +8,7 @@
  #wsroot{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;align-items:start;}
  .ws{background:#f1f5f9;border:1px solid #dbe4ec;border-radius:14px;padding:12px 14px;}
  .wshead{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+ .wshandle{cursor:grab;color:#94a3b8;font-size:15px;}
  .wstitle{font-weight:800;color:#0f4c81;font-size:16px;flex:1;}
  .wstag{font-size:10px;background:#0f4c81;color:#fff;border-radius:5px;padding:2px 7px;letter-spacing:.04em;}
  .gwrap{display:flex;flex-direction:column;gap:10px;min-height:30px;}
@@ -51,7 +52,7 @@
   <div id="wsroot">
     {% for wk in ws_order %}
     <div class="ws" data-ws="{{ wk }}">
-      <div class="wshead"><span class="wstag">{{ wk }}</span><span class="wstitle">{{ ws_label[wk] }}</span><button class="gh2" onclick="addGroup(this)">+ Ομάδα</button></div>
+      <div class="wshead"><span class="wshandle" title="Σύρε για αναδιάταξη">⠿</span><span class="wstag">{{ wk }}</span><span class="wstitle">{{ ws_label[wk] }}</span><button class="gh2" onclick="addGroup(this)">+ Ομάδα</button></div>
       <div class="gwrap">
         {% for g in layout if (g.ws or 'operations') == wk %}
         <div class="group">
@@ -95,9 +96,25 @@ function badge(chip){
 function badgeAll(){ document.querySelectorAll('.chip[data-id]').forEach(badge); }
 function initItems(el){ new Sortable(el,{group:'mitems',animation:120,ghostClass:'muted',filter:'.cfg',preventOnFilter:false}); }
 function initGroups(el){ new Sortable(el,{group:'mgroups',handle:'.ghandle',animation:120}); }
+function saveWsOrder(){
+  var ks=[].map.call(document.querySelectorAll('#wsroot .ws'),function(w){return w.dataset.ws;});
+  try{ localStorage.setItem('mb_ws_order', JSON.stringify(ks)); }catch(e){}
+}
+function initWsOrder(){
+  var root=document.getElementById('wsroot'), ord=null;
+  try{ ord=JSON.parse(localStorage.getItem('mb_ws_order')||'null'); }catch(e){}
+  if(ord && ord.length){
+    ord.forEach(function(k){
+      var el=root.querySelector('.ws[data-ws="'+k+'"]');
+      if(el) root.appendChild(el);
+    });
+  }
+  new Sortable(root,{handle:'.wshandle',animation:140,onEnd:saveWsOrder});
+}
 function initAll(){
   document.querySelectorAll('.items').forEach(initItems);
   document.querySelectorAll('.gwrap').forEach(initGroups);
+  initWsOrder();
   badgeAll();
 }
 function addGroup(btn){
