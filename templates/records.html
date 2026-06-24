@@ -8,65 +8,82 @@
 <script>(function(){try{var m=(document.cookie.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||'system';var d=m==='dark'||(m==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <link rel="stylesheet" href="/static/estia-theme.css">
 <style>
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:#f0f7ff; color:#1a1a1a; }
-.topbar { background:#193847; color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
-.topbar-title { font-size:16px; font-weight:600; }
-.topbar-sub { font-size:12px; opacity:0.7; margin-top:2px; }
-.container { max-width:1100px; margin:0 auto; padding:24px; }
-.card { background:white; border-radius:12px; padding:20px; border:1px solid #e0f0ff; margin-bottom:20px; }
-.card-title { font-size:14px; font-weight:600; color:#333; margin-bottom:16px; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th { text-align:left; padding:8px; color:#888; font-weight:500; border-bottom:1px solid #eee; }
-td { padding:8px; border-bottom:1px solid #f5f5f5; }
-tr:last-child td { border-bottom:none; }
-.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; }
-.badge-am { background:#e0f2fe; color:#193847; }
-.badge-pm { background:#fef3c7; color:#d97706; }
-.badge-pool { background:#e0f2fe; color:#0369a1; }
-.badge-water { background:#dcfce7; color:#15803d; }
-.badge-area { background:#fef9c3; color:#a16207; }
-.newbtn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#193847; background:#eef6fb; border:1px solid #d6eef3; cursor:pointer; }
-.newbtn:hover { background:#dcedf7; }
-.newbtn.primary { background:var(--brand,#193847); color:#fff; border-color:var(--brand,#193847); }
-.newwrap { position:relative; display:inline-block; }
-.newmenu { position:absolute; top:calc(100% + 6px); left:0; z-index:50; min-width:200px; background:#fff; border:1px solid #d6eef3; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:6px; display:none; }
-.newmenu.open { display:block; }
-.newmenu a { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; text-decoration:none; color:#1f3a45; }
-.newmenu a:hover { background:#eef6fb; }
-.newmenu a i { font-size:16px; color:var(--brand,#193847); }
-.badge-upd { background:#f3e8ff; color:#7e22ce; }
-.tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
-.tab { padding:8px 16px; border-radius:8px; font-size:13px; text-decoration:none; color:#33454d; background:#fff; border:1px solid #d6eef3; }
-.tab.active { background:#193847; color:#fff; border-color:#193847; font-weight:600; }
-.muted { color:#999; }
-.vals { display:flex; flex-wrap:wrap; gap:5px; max-width:420px; }
-.vchip { display:inline-flex; align-items:baseline; gap:4px; background:#eef6fb; border:1px solid #d9ebf5; border-radius:6px; padding:2px 7px; font-size:11.5px; color:#1f3a45; white-space:nowrap; }
-.vchip b { font-weight:700; } .vchip .u { color:#7c93a0; font-size:10px; }
-.exp { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:500; text-decoration:none; color:#fff; background:#193847; border:none; cursor:pointer; }
-.exp.xlsx { background:#15803d; }
+:root{ --brand:{{ theme.primary }}; --accent:{{ theme.accent }}; --ink:#16323f; --muted:#7c93a0; --line:#e6f0f6; }
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:linear-gradient(180deg,#f3f9fd,#eaf3fa); color:#16323f; min-height:100vh; }
+.topbar{ background:var(--brand); color:#fff; padding:14px 24px; }
+.topbar-title{ font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.topbar-sub{ font-size:12px; opacity:.75; margin-top:2px; }
+.container{ max-width:none; margin:0; padding:22px 30px 60px; }
+.pagehead{ margin-bottom:16px; }
+.pagehead h1{ font-size:20px; font-weight:800; color:var(--ink); letter-spacing:-.2px; display:flex; align-items:center; gap:9px; }
+.pagehead p{ color:var(--muted); font-size:13px; margin-top:4px; }
+.card{ background:#fff; border-radius:16px; padding:18px 20px; border:1px solid var(--line); box-shadow:0 1px 3px rgba(20,58,82,.05),0 8px 24px rgba(20,58,82,.04); }
+.toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+.tabs{ display:flex; gap:6px; flex-wrap:wrap; }
+.tab{ display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:9px; font-size:13px; text-decoration:none; color:#33454d; background:#f1f7fb; border:1px solid #dcebf4; transition:background .12s; }
+.tab:hover{ background:#e6f1f9; }
+.tab.active{ background:var(--brand); color:#fff; border-color:var(--brand); font-weight:600; }
+.spacer{ flex:1; }
+.exp{ display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:9px; font-size:12.5px; font-weight:600; text-decoration:none; color:#fff; background:#193847; transition:filter .12s; }
+.exp:hover{ filter:brightness(1.08); }
+.exp.xlsx{ background:#15803d; }
+.newbtn{ display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:9px; font-size:13px; font-weight:600; text-decoration:none; cursor:pointer; background:var(--brand); color:#fff; border:none; }
+.newbtn:hover{ filter:brightness(1.08); }
+.newwrap{ position:relative; display:inline-block; }
+.newmenu{ position:absolute; top:calc(100% + 6px); left:0; z-index:50; min-width:210px; background:#fff; border:1px solid #d6eef3; border-radius:11px; box-shadow:0 12px 30px rgba(0,0,0,.14); padding:6px; display:none; }
+.newmenu.open{ display:block; }
+.newmenu a{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; text-decoration:none; color:#1f3a45; }
+.newmenu a:hover{ background:#eef6fb; }
+.newmenu a i{ font-size:16px; color:var(--brand); }
+.tbl-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; }
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+thead th{ position:sticky; top:0; background:#f4f9fc; text-align:left; padding:11px 12px; color:#5b7686; font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.03em; border-bottom:1px solid #e1edf4; white-space:nowrap; z-index:1; }
+tbody td{ padding:10px 12px; border-bottom:1px solid #f1f6f9; vertical-align:top; }
+tbody tr:hover{ background:#f7fbfe; }
+tbody tr:last-child td{ border-bottom:none; }
+.badge{ display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge-am{ background:#e0f2fe; color:#0369a1; } .badge-pm{ background:#fef3c7; color:#d97706; }
+.badge-day{ background:#eef2f5; color:#55707e; }
+.badge-pool{ background:#e0f2fe; color:#0369a1; } .badge-water{ background:#dcfce7; color:#15803d; } .badge-area{ background:#fef9c3; color:#a16207; }
+.badge-upd{ background:#f3e8ff; color:#7e22ce; }
+.muted{ color:var(--muted); }
+.vals{ display:flex; flex-wrap:wrap; gap:5px; max-width:520px; }
+.vchip{ display:inline-flex; align-items:baseline; gap:4px; background:#eef6fb; border:1px solid #d9ebf5; border-radius:7px; padding:2px 8px; font-size:11.5px; color:#1f3a45; white-space:nowrap; }
+.vchip b{ font-weight:700; } .vchip .u{ color:#7c93a0; font-size:10px; }
+.iact{ display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:7px; border:none; cursor:pointer; text-decoration:none; }
+.iact.edit{ background:#e0f2fe; color:#0369a1; } .iact.del{ background:#fee2e2; color:#b91c1c; }
+.iact:hover{ filter:brightness(.96); }
+.foot{ color:var(--muted); font-size:11.5px; margin-top:12px; }
+.empty{ text-align:center; color:#9fb2bd; padding:30px; font-style:italic; }
 </style>
-<style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
-.app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
-.tab.active{background:var(--brand)!important;border-color:var(--brand)!important;}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
-<style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}.embed .container{padding-top:8px;}</style>
 </head>
 <body>
-
 <div class="topbar">
-  <div>
-    <div class="topbar-title"><img src="/static/img/logo-white.svg" style="height:22px;vertical-align:middle;margin-right:8px;"> ΕΣΤΙΑ — Καταγραφές / Μετρήσεις</div>
-    <div class="topbar-sub">Κεντρική διαχείριση όλων των καταγραφών — Πισίνες · Νερά Χρήσης · Τομείς</div>
-  </div>
+  <div class="topbar-title"><i class="ti ti-clipboard-data"></i> ΕΣΤΙΑ — Καταγραφές / Μετρήσεις</div>
+  <div class="topbar-sub">Όλες οι μετρήσεις — Πισίνες · Νερά Χρήσης · Τομείς</div>
 </div>
-
 <div class="container">
+  <div class="pagehead">
+    <h1><i class="ti ti-clipboard-data"></i> Log Μετρήσεων</h1>
+    <p>Κάθε καταχώρηση με τις τιμές της, σε σειρά ώρας. Φίλτραρε ανά τύπο και εξήγαγε σε PDF/Excel.</p>
+  </div>
 
   <div class="card">
-    <div style="margin-bottom:14px;">
+    <div class="toolbar">
+      <div class="tabs">
+        <a class="tab {{ 'active' if ftype == 'all' }}" href="/records?type=all"><i class="ti ti-list-details"></i> Όλα</a>
+        <a class="tab {{ 'active' if ftype == 'pools' }}" href="/records?type=pools"><i class="ti ti-pool"></i> Πισίνες</a>
+        <a class="tab {{ 'active' if ftype == 'water' }}" href="/records?type=water"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
+        <a class="tab {{ 'active' if ftype == 'area' }}" href="/records?type=area"><i class="ti ti-checklist"></i> Τομείς</a>
+      </div>
+      <div class="spacer"></div>
+      <a class="exp" href="/records/export.pdf?type={{ ftype }}"><i class="ti ti-file-type-pdf"></i> PDF</a>
+      <a class="exp xlsx" href="/records/export.xlsx?type={{ ftype }}"><i class="ti ti-file-type-xls"></i> Excel</a>
       <div class="newwrap">
-        <button type="button" class="newbtn primary" onclick="toggleNewMenu(event)"><i class="ti ti-plus"></i> Νέα καταγραφή <i class="ti ti-chevron-down" style="font-size:14px;"></i></button>
+        <button type="button" class="newbtn" onclick="toggleNewMenu(event)"><i class="ti ti-plus"></i> Νέα καταγραφή <i class="ti ti-chevron-down" style="font-size:14px;"></i></button>
         <div class="newmenu" id="newmenu">
           <a href="/pools"><i class="ti ti-pool"></i> Πισίνες</a>
           <a href="/app"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
@@ -75,62 +92,37 @@ tr:last-child td { border-bottom:none; }
       </div>
     </div>
 
-    <div class="tabs">
-      <a class="tab {{ 'active' if ftype == 'all' }}" href="/records?type=all"><i class="ti ti-list-details"></i> Όλα</a>
-      <a class="tab {{ 'active' if ftype == 'pools' }}" href="/records?type=pools"><i class="ti ti-pool"></i> Πισίνες</a>
-      <a class="tab {{ 'active' if ftype == 'water' }}" href="/records?type=water"><i class="ti ti-droplet"></i> Νερά Χρήσης</a>
-      <a class="tab {{ 'active' if ftype == 'area' }}" href="/records?type=area"><i class="ti ti-checklist"></i> Τομείς</a>
-    </div>
-
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
-      <span class="muted" style="font-size:12px;">Εξαγωγή (έτοιμη προς εκτύπωση):</span>
-      <a class="exp" href="/records/export.pdf?type={{ ftype }}"><i class="ti ti-file-type-pdf"></i> PDF</a>
-      <a class="exp xlsx" href="/records/export.xlsx?type={{ ftype }}"><i class="ti ti-file-type-xls"></i> Excel</a>
-    </div>
-
-    <div style="overflow-x:auto;">
+    <div class="tbl-wrap">
       <table>
         <thead>
           <tr>
-            <th>Ημ/νία</th>
-            <th>Ώρα</th>
-            <th>Τύπος</th>
-            <th>Βάρδια</th>
-            <th>Ξενοδοχείο</th>
-            <th>Πισίνα / Δίκτυο / Τομέας</th>
-            <th>Μετρήσεις</th>
-            <th>Υπεύθυνος</th>
-            <th></th>
-            <th></th>
+            <th>Ημ/νία</th><th>Ώρα</th><th>Τύπος</th><th>Βάρδια</th>
+            <th>Ξενοδοχείο</th><th>Σημείο</th><th>Μετρήσεις</th><th>Υπεύθυνος</th><th></th><th></th>
           </tr>
         </thead>
         <tbody>
           {% for it in items %}
           <tr>
-            <td>{{ it.date.strftime('%d/%m/%Y') }}</td>
-            <td class="muted">{{ it.when|gr('%H:%M') if it.when else '—' }}</td>
+            <td style="white-space:nowrap;">{{ it.date.strftime('%d/%m/%Y') }}</td>
+            <td class="muted" style="white-space:nowrap;">{{ it.when|gr('%H:%M') if it.when else '—' }}</td>
             <td>{% if it.kind == 'pool' %}<span class="badge badge-pool"><i class="ti ti-pool"></i> Πισίνα</span>{% elif it.kind == 'area' %}<span class="badge badge-area"><i class="ti ti-checklist"></i> Τομέας</span>{% else %}<span class="badge badge-water"><i class="ti ti-droplet"></i> Νερά</span>{% endif %}</td>
-            <td>{% if it.period == 'morning' %}<span class="badge badge-am">Πρωί</span>{% elif it.period == 'afternoon' %}<span class="badge badge-pm">Απόγ.</span>{% else %}<span class="badge" style="background:#eef2f5;color:#556;">Ημέρα</span>{% endif %}</td>
+            <td>{% if it.period == 'morning' %}<span class="badge badge-am">Πρωί</span>{% elif it.period == 'afternoon' %}<span class="badge badge-pm">Απόγ.</span>{% else %}<span class="badge badge-day">Ημέρα</span>{% endif %}</td>
             <td>{{ it.hotel }}</td>
             <td>{{ it.place }}</td>
             <td>{% if it.mvals %}<div class="vals">{% for v in it.mvals %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
-            <td>{{ it.user }}</td>
-            <td>{% if it.updated %}<span class="badge badge-upd" title="Έχει ενημερωθεί μετά την αρχική υποβολή">διορθώθηκε</span>{% endif %}</td>
-            <td style="white-space:nowrap;">
-              {% if it.edit_url %}<a href="{{ it.edit_url }}" class="badge badge-am" style="text-decoration:none;" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}
-              {% if is_admin %}<form method="POST" action="{% if it.src=='reading' %}/areas/reading/{{ it.id }}/delete{% elif it.kind=='pool' %}/pools/record/{{ it.id }}/delete{% else %}/water/record/{{ it.id }}/delete{% endif %}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="badge" style="background:#fee2e2;color:#b91c1c;border:none;cursor:pointer;text-decoration:none;" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}
-            </td>
+            <td style="white-space:nowrap;">{{ it.user }}{% if it.updated %} <span class="badge badge-upd" title="Ενημερώθηκε μετά την αρχική υποβολή">διορθ.</span>{% endif %}</td>
+            <td>{% if it.edit_url %}<a href="{{ it.edit_url }}" class="iact edit" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}</td>
+            <td>{% if is_admin %}<form method="POST" action="{% if it.src=='reading' %}/areas/reading/{{ it.id }}/delete{% elif it.kind=='pool' %}/pools/record/{{ it.id }}/delete{% else %}/water/record/{{ it.id }}/delete{% endif %}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="iact del" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}</td>
           </tr>
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="10" style="text-align:center;color:#aaa;padding:24px;">Δεν υπάρχουν υποβολές ακόμα</td></tr>
+          <tr><td colspan="10" class="empty">Δεν υπάρχουν υποβολές ακόμα</td></tr>
           {% endif %}
         </tbody>
       </table>
     </div>
-    <p class="muted" style="font-size:11px;margin-top:10px;">Σύνολο {{ items|length }} καταγραφές (όλο το προσωπικό των ξενοδοχείων σου), με σειρά ώρας υποβολής. Για παλαιότερες/συγκεκριμένη περίοδο, χρησιμοποίησε τον επιλογέα περιόδου.</p>
+    <p class="foot">Σύνολο {{ items|length }} καταγραφές (όλο το προσωπικό των ξενοδοχείων σου), με σειρά ώρας υποβολής. Για παλαιότερες/συγκεκριμένη περίοδο, χρησιμοποίησε τον επιλογέα περιόδου.</p>
   </div>
-
 </div>
 <script>
 function toggleNewMenu(e){ if(e){e.stopPropagation();} var m=document.getElementById('newmenu'); if(m){ m.classList.toggle('open'); } }
