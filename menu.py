@@ -218,6 +218,9 @@ def _inject_menu_custom():
     def _roles(iid):
         return [r for r in ((meta.get(iid) or {}).get('roles') or []) if r]
 
+    def _label(iid, it):
+        return (meta.get(iid) or {}).get('label') or it['label']
+
     groups = []
     present = set()
     for g in layout:
@@ -231,11 +234,11 @@ def _inject_menu_custom():
             if it['master'] and not master:
                 continue
             if admin:
-                it2 = dict(it); it2['ws'] = gws + ' admin'; items.append(it2)
+                it2 = dict(it); it2['ws'] = gws + ' admin'; it2['label'] = _label(iid, it); items.append(it2)
             else:
                 if role not in _roles(iid):
                     continue
-                it2 = dict(it); it2['ws'] = gws; items.append(it2)
+                it2 = dict(it); it2['ws'] = gws; it2['label'] = _label(iid, it); items.append(it2)
         if items:
             groups.append({'title': g.get('title', ''), 'items': items,
                            'ws': (gws + ' admin') if admin else gws})
@@ -283,6 +286,9 @@ def menu_builder():
                         continue
                     clean[iid] = {'ws': [w for w in (m.get('ws') or []) if w in wsk],
                                   'roles': [r for r in (m.get('roles') or []) if r in rk]}
+                    lbl = str(m.get('label') or '').strip()[:40]
+                    if lbl:
+                        clean[iid]['label'] = lbl
             save_meta(clean)
             # flag: master για όλα τα workspaces
             mw = '1' if request.form.get('master_ws') else '0'

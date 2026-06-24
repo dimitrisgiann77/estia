@@ -1,5 +1,5 @@
 {% import '_monitoring.html' as mp %}
-{% macro chip(iid) %}<div class="chip" data-id="{{ iid }}" data-roles="{{ (meta.get(iid, {}).get('roles') or [])|join(' ') }}"><i class="ti {{ cat[iid].icon }}"></i><span class="lbl">{{ cat[iid].label }}</span><span class="rb"></span><span class="cfg" title="Ποιοι ρόλοι το βλέπουν" onclick="cfg(event,this)">⚙</span><span class="rm" title="Αφαίρεση (στα κρυμμένα)" onclick="rmChip(event,this)">✕</span></div>{% endmacro %}
+{% macro chip(iid) %}<div class="chip" data-id="{{ iid }}" data-roles="{{ (meta.get(iid, {}).get('roles') or [])|join(' ') }}" data-deflabel="{{ cat[iid].label }}"><span class="chandle" title="Σύρε">⠿</span><i class="ti {{ cat[iid].icon }}"></i><span class="lbl" contenteditable="true" spellcheck="false" title="Κλικ για μετονομασία">{{ meta.get(iid, {}).get('label') or cat[iid].label }}</span><span class="rb"></span><span class="cfg" title="Ποιοι ρόλοι το βλέπουν" onclick="cfg(event,this)">⚙</span><span class="rm" title="Αφαίρεση (στα κρυμμένα)" onclick="rmChip(event,this)">✕</span></div>{% endmacro %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Διαμόρφωση μενού', theme.primary) }}
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
@@ -20,7 +20,9 @@
  .items{min-height:36px;display:flex;flex-direction:column;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
  .chip{display:flex;width:100%;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:6px 10px;font-size:12.5px;cursor:grab;color:#334155;}
  .chip i{color:#64748b;}
- .chip .lbl{flex:1;}
+ .chip .chandle{cursor:grab;color:#cbd5e1;font-size:12px;}
+ .chip .lbl{flex:1;border:1px dashed transparent;border-radius:5px;padding:1px 4px;}
+ .chip .lbl:focus{outline:none;border-color:#cbd5e1;background:#f8fafc;}
  .chip .rb{font-size:9px;color:#166534;background:#dcfce7;border-radius:4px;padding:1px 4px;}
  .chip .cfg{cursor:pointer;color:#94a3b8;font-size:13px;}
  .chip .cfg:hover{color:#185FA5;}
@@ -95,8 +97,11 @@ function badge(chip){
   b.textContent = roles.length ? roles.join('·') : 'admin';
 }
 function badgeAll(){ document.querySelectorAll('.chip[data-id]').forEach(badge); }
-function initItems(el){ new Sortable(el,{group:'mitems',animation:120,ghostClass:'muted',filter:'.cfg,.rm',preventOnFilter:false}); }
+function initItems(el){ new Sortable(el,{group:'mitems',handle:'.chandle',animation:120,ghostClass:'muted'}); }
 function rmChip(e,el){ e.stopPropagation(); e.preventDefault(); var c=el.closest('.chip'); document.getElementById('pool').appendChild(c); }
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter' && e.target.classList && e.target.classList.contains('lbl')){ e.preventDefault(); e.target.blur(); }
+});
 function initGroups(el){ new Sortable(el,{group:'mgroups',handle:'.ghandle',animation:120}); }
 function saveWsOrder(){
   var ks=[].map.call(document.querySelectorAll('#wsroot .ws'),function(w){return w.dataset.ws;});
@@ -160,7 +165,11 @@ function save(){
   });
   document.querySelectorAll('.chip[data-id]').forEach(function(c){
     var roles=(c.dataset.roles||'').split(' ').filter(Boolean);
-    if(roles.length) meta[c.dataset.id]={roles:roles};
+    var lblEl=c.querySelector('.lbl'), lbl=(lblEl?lblEl.innerText:'').trim();
+    var m={};
+    if(roles.length) m.roles=roles;
+    if(lbl && lbl!==(c.dataset.deflabel||'')) m.label=lbl;
+    if(Object.keys(m).length) meta[c.dataset.id]=m;
   });
   document.getElementById('layout').value=JSON.stringify(out);
   document.getElementById('meta').value=JSON.stringify(meta);
