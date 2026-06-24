@@ -37,6 +37,19 @@ class AreaParam(db.Model):
     pkey    = db.Column(db.String(40), nullable=False)
     sort    = db.Column(db.Integer, default=0)
 
+# ── Φ-Α: Δομή δικτύων ως ιεραρχία-δέντρο (κόμβος με γονέα, απεριόριστο βάθος) ──
+# Καθολικός κατάλογος-αναφορά. Τα σημεία (Area.node_id) κρέμονται από οποιονδήποτε
+# κόμβο. Area.node_id = null → σημερινή συμπεριφορά (καμία ορατή αλλαγή).
+class MonitorNode(db.Model):
+    id        = db.Column(db.Integer, primary_key=True)
+    key       = db.Column(db.String(40), unique=True)
+    parent_id = db.Column(db.Integer, db.ForeignKey('monitor_node.id'))
+    name      = db.Column(db.String(80), nullable=False)
+    node_kind = db.Column(db.String(20))                 # 'group' | 'subgroup' (ενημερωτικό)
+    icon      = db.Column(db.String(40), default='')
+    sort      = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+
 
 _CLO2_LOW  = 'ClO2 {n} <1 ppm: αύξησε τη δοσομέτρηση ClO2· έλεγξε δοσομετρική αντλία/απόθεμα.'
 _CLO2_HIGH = 'ClO2 {n} >2 ppm: μείωσε τη δοσομέτρηση ClO2.'
@@ -137,6 +150,53 @@ def seed_measurement_engine():
         except Exception as e:
             db.session.rollback()
             print(f'[measurements] seed skipped: {e}')
+
+
+# ── Φ-Α: seed καταλόγου-αναφοράς δέντρου (ομάδα/υποομάδα) ─────────────────────
+# (key, parent_key, name, node_kind, icon, sort) — γονείς ΠΡΙΝ τα παιδιά.
+NODE_CATALOG = [
+    ('water',           None,              'Δίκτυο Νερού (πόσιμο/οικιακό)',       'group',    'ti-droplet',  1),
+    ('water_source',    'water',           'Πηγή / τροφοδοσία',                  'subgroup', '',            1),
+    ('water_treatment', 'water',           'Επεξεργασία',                        'subgroup', '',            2),
+    ('water_ro',        'water_treatment', 'Όσμωση (RO)',                        'subgroup', '',            1),
+    ('water_storage',   'water',           'Αποθήκευση (δεξαμενές/calorifiers)', 'subgroup', '',            3),
+    ('water_cold',      'water',           'Κρύο νερό (ΨΝΧ)',                    'subgroup', '',            4),
+    ('water_hot',       'water',           'Ζεστό νερό (ΖΝΧ)',                   'subgroup', '',            5),
+    ('aerosol',         None,              'Αερόλυμα / υψηλού κινδύνου',         'group',    'ti-wind',     2),
+    ('aer_spa',         'aerosol',         'Spa / jacuzzi',                      'subgroup', '',            1),
+    ('aer_cooling',     'aerosol',         'Πύργοι ψύξης',                       'subgroup', '',            2),
+    ('aer_misting',     'aerosol',         'Misting / δροσισμός',                'subgroup', '',            3),
+    ('aer_fountain',    'aerosol',         'Σιντριβάνια',                        'subgroup', '',            4),
+    ('aer_ice',         'aerosol',         'Παγομηχανές',                        'subgroup', '',            5),
+    ('pools',           None,              'Πισίνες',                            'group',    'ti-pool',     3),
+    ('irrigation',      None,              'Άρδευση',                            'group',    'ti-plant-2',  4),
+    ('sewage',          None,              'Λύματα / βιολογικός',                'group',    'ti-recycle',  5),
+]
+
+
+def seed_node_catalog():
+    """Φ-Α (boot, idempotent): σπέρνει τον κατάλογο-αναφορά κόμβων (ομάδα/υποομάδα).
+    ΔΕΝ αναθέτει σημεία — καμία ορατή αλλαγή. Γονείς πριν τα παιδιά."""
+    with app.app_context():
+        try:
+            created = 0
+            for key, pkey, name, kind, icon, sort in NODE_CATALOG:
+                if MonitorNode.query.filter_by(key=key).first():
+                    continue
+                parent_id = None
+                if pkey:
+                    par = MonitorNode.query.filter_by(key=pkey).first()
+                    parent_id = par.id if par else None
+                db.session.add(MonitorNode(key=key, parent_id=parent_id, name=name,
+                                           node_kind=kind, icon=icon or '', sort=sort, is_active=True))
+                db.session.flush()
+                created += 1
+            if created:
+                db.session.commit()
+                print(f'[measurements] Φ-Α seed: {created} κόμβοι δικτύων OK')
+        except Exception as e:
+            db.session.rollback()
+            print(f'[measurements] node catalog seed skipped: {e}')
 
 
 # ── Φ2: σημεία (coarse) + αντιγραφή legacy ───────────────────────────────────

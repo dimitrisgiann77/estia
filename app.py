@@ -339,11 +339,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.270'
-APP_BUILD   = '551'
+APP_VERSION = '12.271'
+APP_BUILD   = '552'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.271', 'b': '552', 'date': '25/06/2026', 'time': '01:00', 'title': 'Δομή Δικτύων Φ-Α: υποδομή ιεραρχίας (αόρατη αλλαγή)',
+     'items': ['Βάση για τη νέα «Δομή Δικτύων» (Δίκτυο Νερού → υπο-δίκτυα → σημεία): νέος πίνακας κόμβων-δέντρου + σύνδεση σημείου με κόμβο. Σπάρθηκε ο κατάλογος-αναφορά (Δίκτυο Νερού, Αερόλυμα/υψηλού κινδύνου, Πισίνες, Άρδευση, Λύματα).',
+               'ΚΑΜΙΑ ορατή αλλαγή — όσο ένα σημείο δεν έχει κόμβο, δουλεύει ακριβώς όπως πριν. Καμία αλλαγή σε καταχωρήσεις, μετρήσεις ή οδηγίες. Το UI της δομής έρχεται σε επόμενη φάση.']},
     {'v': '12.270', 'b': '551', 'date': '25/06/2026', 'time': '00:30', 'title': 'Μετρήσεις Φ3: Βιβλιοθήκη Μετρήσεων (μία κοινή) με πλήρη επεξεργασία',
      'items': ['Το tab «Παράμετροι» στο «Μετρήσεις · Ρυθμίσεις» έγινε «Βιβλιοθήκη»: μία κοινή λίστα όλων των μετρήσεων, ομαδοποιημένη ανά κατηγορία (Πισίνα/Νερό/…).',
                'Πλήρης επεξεργασία κάθε μέτρησης επιτόπου: όνομα, μονάδα, κάτω/άνω όριο, ενέργεια αν χαμηλό/υψηλό, είδος εισόδου (αριθμός/ναι-όχι/κείμενο), κατηγορία. Προσθήκη νέας μέτρησης & ενεργοποίηση/απενεργοποίηση.',
@@ -1534,6 +1537,7 @@ class Area(db.Model):
     engine_only  = db.Column(db.Boolean, default=False)   # Φ2: σημείο ενιαίας μηχανής (κρυφό από legacy «Τομείς» μέχρι Φ3)
     legacy_kind  = db.Column(db.String(10))               # Φ2: 'pool' | 'water' (προέλευση)
     legacy_id    = db.Column(db.Integer)                  # Φ2: Pool.id / WaterSystem.id
+    node_id      = db.Column(db.Integer)                  # Φ-Α: κόμβος δέντρου δικτύων (MonitorNode.id· null=σημερινή συμπεριφορά)
     hotel        = db.relationship('Hotel')
     template     = db.relationship('MonitorTemplate')
 
@@ -4176,6 +4180,8 @@ def ensure_columns():
     _add_col('monitor_param', 'kind', 'kind VARCHAR(10)')
     _add_col('monitor_param', 'category', "category VARCHAR(40)")
     _add_col('monitor_param', 'is_active', f'is_active BOOLEAN DEFAULT {truth}')
+    # v12.271 — Φ-Α δομή δικτύων (δέντρο)
+    _add_col('area', 'node_id', 'node_id INTEGER')
 
 def init_db():
     with app.app_context():
@@ -4385,6 +4391,7 @@ if schedule: schedule.seed_schedule()
 if payroll:  payroll.ensure_payroll_columns()
 if payroll:  payroll.seed_payroll()
 if measurements: measurements.seed_measurement_engine()   # Φ1: seed templates Πισίνα/ΖΝΧ + περίοδοι (idempotent)
+if measurements: measurements.seed_node_catalog()         # Φ-Α: κατάλογος-αναφορά δέντρου δικτύων (idempotent)
 if menu: menu.seed_menu_meta()   # v12.239: seed workspace+ρόλοι μενού (μόνο αν λείπει)
 start_scheduler()
 if backup:   backup.start_backup_scheduler()
