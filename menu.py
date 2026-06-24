@@ -212,10 +212,8 @@ def _inject_menu_custom():
     admin = is_admin()
     role = cu.role if cu else None
     meta = get_meta()
-    mon = master_ws_on()
-    # Custom μενού: admin ΠΑΝΤΑ (master)· μη-admin ΜΟΝΟ αν είναι ενεργό το «master για όλα τα workspaces».
-    if not admin and not mon:
-        return {'menu_custom': False, 'menu_groups': []}
+    # Το custom μενού (Διαμόρφωση μενού) ισχύει ΠΑΝΤΑ για όλους: admin βλέπει τα πάντα·
+    # οι υπόλοιποι βλέπουν μόνο όσα στοιχεία έχουν τον ρόλο τους στο ⚙.
 
     def _roles(iid):
         return [r for r in ((meta.get(iid) or {}).get('roles') or []) if r]

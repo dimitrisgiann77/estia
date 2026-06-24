@@ -43,8 +43,7 @@
   <p class="muted">Σύρε τα στοιχεία στο <b>workspace</b> που ανήκουν (κάθε στοιχείο σε ένα σημείο). Μέσα σε κάθε workspace φτιάχνεις <b>ομάδες</b>. Το <b>⚙</b> κάθε στοιχείου ορίζει ποιοι <b>ρόλοι</b> το βλέπουν (πολλαπλοί). «Κρυμμένα» = δεν εμφανίζονται πουθενά.</p>
 
   <div class="mwbar">
-    <label><input type="checkbox" id="mwchk" {{ 'checked' if master_ws }}> <b>Εφαρμογή σε όλους τους ρόλους (όχι μόνο admin)</b></label>
-    <div class="muted" style="margin-top:4px;">Κλειστό = ισχύει μόνο για admin· οι υπόλοιποι κρατούν το προεπιλεγμένο μενού. Ανοιχτό = ο καθένας βλέπει, στο workspace του, μόνο όσα του όρισες με το ⚙.</div>
+    <div class="muted">Αυτό το μενού ισχύει για <b>όλους</b>: ο admin βλέπει τα πάντα· οι υπόλοιποι βλέπουν, στο workspace τους, μόνο όσα στοιχεία έχουν τον ρόλο τους στο ⚙. <b>Προσοχή:</b> ρόλος χωρίς κανένα στοιχείο = κενό μενού.</div>
   </div>
 
   <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
@@ -80,7 +79,6 @@
   <form method="POST" action="/dashboard/menu-builder?embed=1" id="f">
     <input type="hidden" name="layout" id="layout">
     <input type="hidden" name="meta" id="meta">
-    <input type="hidden" name="master_ws" id="masterws">
   </form>
 </div>
 
@@ -166,7 +164,6 @@ function save(){
   });
   document.getElementById('layout').value=JSON.stringify(out);
   document.getElementById('meta').value=JSON.stringify(meta);
-  document.getElementById('masterws').value=document.getElementById('mwchk').checked?'1':'';
   document.getElementById('f').submit();
 }
 document.addEventListener('DOMContentLoaded',initAll);
