@@ -1,0 +1,81 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Μενού ανά ρόλο', theme.primary) }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<style>
+ .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;}
+ .gh2{background:#eef5f8;color:#185FA5;border:none;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block;}
+ .muted{color:#94a3b8;font-size:12px;} .ok{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;}
+ .pool{background:#fff7ed;border:1px solid #fde7c8;border-radius:12px;padding:10px 12px;margin:10px 0;}
+ .cols{display:flex;gap:12px;flex-wrap:wrap;}
+ .col{flex:1;min-width:210px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;}
+ .col h4{margin:0 0 8px;color:#185FA5;font-size:14px;}
+ .lst{min-height:60px;display:flex;flex-direction:column;gap:6px;padding:6px;background:#f8fafc;border-radius:8px;}
+ .pl{display:flex;flex-wrap:wrap;gap:6px;padding:6px;}
+ .chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe3ea;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:grab;color:#334155;}
+ .chip i{color:#64748b;} .chip .x{cursor:pointer;color:#dc2626;font-weight:700;margin-left:2px;}
+ .mwbar{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin:10px 0;}
+</style></head><body>
+{{ mp.topbar('users-cog', 'ΕΣΤΙΑ — Μενού ανά ρόλο') }}
+<div class="container">
+  {% if saved %}<div class="ok">✓ Αποθηκεύτηκε. Κάνε refresh για να δεις το μενού.</div>{% endif %}
+  <p class="muted">Σύρε κάθε λειτουργία από τα «Διαθέσιμα» στη στήλη του ρόλου που πρέπει να τη βλέπει. Ένα στοιχείο μπορεί να μπει σε πολλούς ρόλους. Το <b>×</b> το αφαιρεί. (admin/masteradmin βλέπουν πάντα τα πάντα.) Το <b>workspace</b> ορίζεται στη «Διαμόρφωση μενού» (⚙).</p>
+
+  <div class="mwbar">
+    <label><input type="checkbox" id="mwchk" {{ 'checked' if master_ws }}> <b>Χρήση αυτού του μενού για ΟΛΑ τα workspaces / ρόλους</b></label>
+    <div class="muted" style="margin-top:4px;">Κλειστό = ισχύει μόνο για admin. Ανοιχτό = ισχύουν οι παραπάνω αναθέσεις ανά ρόλο.</div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
+    <button class="b" onclick="save()">💾 Αποθήκευση</button>
+    <a class="gh2" href="/dashboard/menu-builder?embed=1">↳ Ομάδες & workspace (⚙)</a>
+  </div>
+
+  <div class="pool">
+    <div style="font-weight:700;color:#b45309;margin-bottom:6px;">Διαθέσιμα (σύρε από εδώ)</div>
+    <div class="pl" id="pool">
+      {% for iid in all_ids %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}</div>{% endif %}{% endfor %}
+    </div>
+  </div>
+
+  <div class="cols">
+    {% for r,lbl in role_opts %}
+    <div class="col">
+      <h4>{{ lbl }}</h4>
+      <div class="lst" data-role="{{ r }}">
+        {% for iid in role_items[r] %}{% if iid in cat %}<div class="chip" data-id="{{ iid }}"><i class="ti {{ cat[iid].icon }}"></i>{{ cat[iid].label }}<span class="x" onclick="this.closest('.chip').remove()">×</span></div>{% endif %}{% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <form method="POST" action="/dashboard/menu/by-role?embed=1" id="f">
+    <input type="hidden" name="rolemap" id="rolemap">
+    <input type="hidden" name="master_ws" id="masterws">
+  </form>
+</div>
+<script>
+function ensureX(chip){
+  if(chip.querySelector('.x')) return;
+  var x=document.createElement('span'); x.className='x'; x.textContent='×';
+  x.onclick=function(){ chip.remove(); }; chip.appendChild(x);
+}
+function onAdd(evt){
+  var col=evt.to, chip=evt.item, id=chip.dataset.id;
+  if(col.querySelectorAll('.chip[data-id="'+id+'"]').length>1){ chip.remove(); return; }
+  ensureX(chip);
+}
+new Sortable(document.getElementById('pool'),{group:{name:'mr',pull:'clone',put:false},sort:false,animation:120});
+document.querySelectorAll('.lst').forEach(function(el){
+  new Sortable(el,{group:{name:'mr',pull:true,put:true},animation:120,onAdd:onAdd});
+});
+function save(){
+  var rolemap={};
+  document.querySelectorAll('.lst').forEach(function(el){
+    rolemap[el.dataset.role]=[].map.call(el.querySelectorAll('.chip'),function(c){return c.dataset.id;});
+  });
+  document.getElementById('rolemap').value=JSON.stringify(rolemap);
+  document.getElementById('masterws').value=document.getElementById('mwchk').checked?'1':'';
+  document.getElementById('f').submit();
+}
+</script>
+</body></html>

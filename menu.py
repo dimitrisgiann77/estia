@@ -62,17 +62,22 @@ MENU_CATALOG = [
 ]
 CAT = {i[0]: {'id': i[0], 'label': i[1], 'icon': i[2], 'url': i[3], 'master': i[4]} for i in MENU_CATALOG}
 
+WS_ORDER = ['operations', 'staffhub', 'guestapp', 'admin']
+WS_LABEL = {'operations': 'Operations', 'staffhub': 'Staff HUB', 'guestapp': 'Guest App', 'admin': 'Admin'}
+
+# Κάθε ΟΜΑΔΑ ανήκει σε ΕΝΑ workspace (ws). Τα στοιχεία της κληρονομούν το ws της ομάδας.
+# Οι ΡΟΛΟΙ ορίζονται ανά στοιχείο (⚙ → menu_meta.roles).
 DEFAULT_LAYOUT = [
-    {'title': 'Επισκόπηση', 'items': ['dashboard']},
-    {'title': 'Μετρήσεις & Καταγραφές', 'items': ['today', 'meas_entry', 'areas_rec', 'records', 'meas_stats', 'areas_dash', 'meas_console']},
-    {'title': 'Βλάβες', 'items': ['fault_submit', 'faults_board']},
-    {'title': 'Πρόγραμμα Εργασίας', 'items': ['sched', 'sched_monthly', 'sched_oversight', 'sched_sub', 'sched_set']},
-    {'title': 'Προσωπικό', 'items': ['people', 'org', 'pay_mitroo', 'evals', 'sched_identify', 'sched_imported', 'sched_staff', 'dups']},
-    {'title': 'Μισθοδοσία', 'items': ['pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention']},
-    {'title': 'Υποδοχή', 'items': ['surveys']},
-    {'title': 'Δεδομένα & Εισαγωγές', 'items': ['imports', 'backup', 'diag']},
-    {'title': 'Ρυθμίσεις συστήματος', 'items': ['users', 'hotels', 'areas_admin', 'templates', 'fault_set', 'fault_cat', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder', 'activity', 'feedback_adm']},
-    {'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'whatsnew', 'feedback']},
+    {'ws': 'operations', 'title': 'Συντήρηση', 'items': ['today', 'meas_entry', 'areas_rec', 'fault_submit', 'faults_board', 'records', 'meas_stats', 'areas_dash']},
+    {'ws': 'operations', 'title': 'Υποδοχή', 'items': ['surveys']},
+    {'ws': 'operations', 'title': 'Πρόγραμμα & Αξιολόγηση', 'items': ['sched', 'sched_monthly', 'sched_oversight', 'evals']},
+    {'ws': 'operations', 'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'feedback']},
+    {'ws': 'staffhub', 'title': 'Ο χώρος μου', 'items': ['whatsnew']},
+    {'ws': 'admin', 'title': 'Επισκόπηση', 'items': ['dashboard']},
+    {'ws': 'admin', 'title': 'Προσωπικό (HR)', 'items': ['people', 'org', 'pay_mitroo', 'sched_identify', 'sched_imported', 'dups', 'sched_staff']},
+    {'ws': 'admin', 'title': 'Μισθοδοσία', 'items': ['pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention', 'sched_sub']},
+    {'ws': 'admin', 'title': 'Ρυθμίσεις', 'items': ['meas_console', 'sched_set', 'fault_set', 'fault_cat', 'templates', 'hotels', 'areas_admin', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder']},
+    {'ws': 'admin', 'title': 'Δεδομένα & Σύστημα', 'items': ['imports', 'backup', 'diag', 'users', 'activity', 'feedback_adm']},
 ]
 
 # v12.239 — Προεπιλεγμένη ανάθεση workspace + ρόλων ανά στοιχείο (πλάνο μενού v3).
@@ -156,7 +161,7 @@ def save_layout(groups):
 # ── v12.238 — Μενού ανά workspace × ρόλο (master = admin) ─────────────────────
 WS_OPTS   = [('operations', 'Operations'), ('staffhub', 'Staff HUB'),
              ('guestapp', 'Guest App'), ('admin', 'Admin')]
-ROLE_OPTS = [('manager', 'Manager'), ('staff', 'Staff'), ('viewer', 'Viewer')]
+ROLE_OPTS = [('manager', 'Manager'), ('staff', 'Staff'), ('accountant', 'Λογιστήριο'), ('viewer', 'Viewer')]
 
 def get_meta():
     """{item_id: {'ws': [...], 'roles': [...]}} — workspace + ρόλοι ανά στοιχείο."""
@@ -212,53 +217,41 @@ def _inject_menu_custom():
     if not admin and not mon:
         return {'menu_custom': False, 'menu_groups': []}
 
-    def _item(iid):
-        it = CAT.get(iid)
-        if not it:
-            return None
-        if it['master'] and not master:
-            return None
-        m = meta.get(iid) or {}
-        ws = [w for w in (m.get('ws') or []) if w]
-        roles = [r for r in (m.get('roles') or []) if r]
-        if admin:
-            wsv = ' '.join(sorted(set(ws) | {'operations', 'admin'}))
-            out = dict(it); out['ws'] = wsv or 'operations admin'; return out
-        if role not in roles:
-            return None
-        wsv = ' '.join(ws)
-        if not wsv:
-            return None
-        out = dict(it); out['ws'] = wsv; return out
-
-    def _gws(items):
-        s = set()
-        for it in items:
-            for w in (it.get('ws') or '').split():
-                s.add(w)
-        return ' '.join(sorted(s)) or 'operations admin'
+    def _roles(iid):
+        return [r for r in ((meta.get(iid) or {}).get('roles') or []) if r]
 
     groups = []
     present = set()
     for g in layout:
+        gws = (g.get('ws') or 'operations').strip() or 'operations'
         items = []
         for iid in g.get('items', []):
             present.add(iid)
-            x = _item(iid)
-            if x:
-                items.append(x)
+            it = CAT.get(iid)
+            if not it:
+                continue
+            if it['master'] and not master:
+                continue
+            if admin:
+                it2 = dict(it); it2['ws'] = gws + ' admin'; items.append(it2)
+            else:
+                if role not in _roles(iid):
+                    continue
+                it2 = dict(it); it2['ws'] = gws; items.append(it2)
         if items:
-            groups.append({'title': g.get('title', ''), 'items': items, 'ws': _gws(items)})
+            groups.append({'title': g.get('title', ''), 'items': items,
+                           'ws': (gws + ' admin') if admin else gws})
     if admin:
         extra = []
         for k in CAT:
             if k in present:
                 continue
-            x = _item(k)
-            if x:
-                extra.append(x)
+            it = CAT[k]
+            if it['master'] and not master:
+                continue
+            it2 = dict(it); it2['ws'] = 'operations admin'; extra.append(it2)
         if extra:
-            groups.append({'title': '🆕 Νέα', 'items': extra, 'ws': _gws(extra)})
+            groups.append({'title': '🆕 Νέα', 'items': extra, 'ws': 'operations admin'})
     return {'menu_custom': True, 'menu_groups': groups}
 
 
@@ -268,8 +261,16 @@ def menu_builder():
         return redirect(url_for('login'))
     if request.method == 'POST':
         try:
-            groups = json.loads(request.form.get('layout') or '[]')
-            groups = [{'title': str(g.get('title', ''))[:60], 'items': [i for i in g.get('items', []) if i in CAT]} for g in groups if g.get('title')]
+            raw_g = json.loads(request.form.get('layout') or '[]')
+            wsk0 = {w for w, _ in WS_OPTS}
+            groups = []
+            for g in (raw_g if isinstance(raw_g, list) else []):
+                if not isinstance(g, dict) or not g.get('title'):
+                    continue
+                gws = g.get('ws') if g.get('ws') in wsk0 else 'operations'
+                items = [i for i in (g.get('items') or []) if i in CAT]
+                if items:
+                    groups.append({'ws': gws, 'title': str(g.get('title', ''))[:60], 'items': items})
             save_layout(groups)
             # v12.238 — meta (workspace + ρόλοι ανά στοιχείο)
             try:
@@ -294,14 +295,16 @@ def menu_builder():
             log_activity('menu_builder_save', '%d ομάδες' % len(groups))
         except Exception as e:
             return render_template('menu_builder.html', layout=get_layout() or DEFAULT_LAYOUT, cat=CAT, err=str(e), is_admin=is_admin(),
-                                   meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on())
+                                   meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on(),
+                                   ws_order=WS_ORDER, ws_label=WS_LABEL)
         return redirect(url_for('menu_builder') + '?embed=1&saved=1')
     layout = get_layout() or DEFAULT_LAYOUT
     used = {i for g in layout for i in g.get('items', [])}
     unused = [iid for iid, _ in [(i[0], i) for i in MENU_CATALOG] if iid not in used]
     return render_template('menu_builder.html', layout=layout, cat=CAT, unused=unused,
                            saved=request.args.get('saved'), is_admin=is_admin(),
-                           meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on())
+                           meta=get_meta(), ws_opts=WS_OPTS, role_opts=ROLE_OPTS, master_ws=master_ws_on(),
+                           ws_order=WS_ORDER, ws_label=WS_LABEL)
 
 
 @app.route('/dashboard/menu-builder/reset', methods=['POST'])
