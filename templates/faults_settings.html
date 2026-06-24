@@ -13,24 +13,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; backg
 .topbar-title { font-size:16px; font-weight:600; }
 .topbar a { color:#fff; text-decoration:none; font-size:13px; }
 .container { max-width:none; margin:0; padding:20px 28px; }
-/* D&D boards */
-.board { display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; align-items:flex-start; }
-.col { flex:0 0 270px; background:#f4f9fc; border:1px solid #dbeaf2; border-radius:12px; padding:10px; }
-.col-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#193847; margin-bottom:8px; font-size:13px; }
-.col-head .nm { flex:1; }
-.grip { cursor:grab; color:#9aa7ad; }
-.zone { min-height:30px; display:flex; flex-direction:column; gap:6px; }
-.zone.sub { margin:6px 0 0 16px; border-left:2px dashed #dbeaf2; padding-left:8px; }
-.citem { background:#fff; border:1px solid #dbe3ea; border-radius:8px; padding:6px 9px; font-size:12.5px; }
-.citem-head { display:flex; align-items:center; gap:6px; }
-.citem-head .nm { flex:1; }
-.citem.off { opacity:.45; }
-.mchip { display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid #dbe3ea; border-radius:7px; padding:5px 9px; font-size:12px; cursor:grab; }
-.mchip .x { cursor:pointer; color:#cbd5e1; font-weight:700; }
-.mchip .x:hover { color:#dc2626; }
-.mappool { flex:0 0 260px; background:#fff7ed; border:1px solid #fde7c8; border-radius:12px; padding:10px; max-height:420px; overflow:auto; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; }
-.savebtn { margin-left:auto; }
-.okmsg { color:#16a34a; font-size:12px; margin-left:8px; }
 .card { background:white; border-radius:12px; padding:18px; border:1px solid #e0f0ff; margin-bottom:18px; }
 .card-title { font-size:14px; font-weight:600; color:#333; margin-bottom:14px; display:flex; align-items:center; gap:7px; }
 .chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:20px; background:#eef5f8; font-size:13px; margin:0 6px 6px 0; }
@@ -38,10 +20,30 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; backg
 .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 input, select { padding:8px 10px; border:1px solid #d6eef3; border-radius:8px; font-size:14px; }
 .btn { padding:8px 13px; border:none; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; background:#193847; color:#fff; }
-.mini { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:15px; }
+.mini { background:none; border:none; cursor:pointer; color:#94a3b8; font-size:14px; }
 .saved { background:#dcfce7; color:#16a34a; padding:9px 13px; border-radius:8px; margin-bottom:14px; font-size:13px; }
 table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px 6px; border-bottom:1px solid #f0f4f7; }
 .muted { color:#9aa7ad; font-size:12px; }
+/* ── D&D boards (στυλ «Διαμόρφωση μενού») ── */
+.board { display:flex; gap:12px; overflow-x:auto; padding-bottom:6px; align-items:flex-start; }
+.col { flex:0 0 280px; background:#eef5fb; border:1px solid #d7e6f2; border-radius:12px; padding:10px; }
+.col-head { display:flex; align-items:center; gap:6px; font-weight:700; color:#143a52; margin-bottom:8px; font-size:13px; }
+.col-head .nm { flex:1; }
+.groups { display:flex; flex-direction:column; gap:8px; min-height:26px; }
+.gcard { background:#fff; border:1px solid #dbe6ef; border-radius:10px; padding:8px; }
+.gcard-head { display:flex; align-items:center; gap:6px; font-weight:600; font-size:12.5px; color:#26485c; margin-bottom:6px; }
+.gcard-head .nm { flex:1; }
+.chips { display:flex; flex-direction:column; gap:5px; min-height:16px; }
+.cchip { display:flex; align-items:center; gap:6px; background:#f6fafd; border:1px solid #e3edf4; border-radius:7px; padding:4px 8px; font-size:12px; }
+.cchip .nm { flex:1; }
+.grip { cursor:grab; color:#9aa7ad; }
+.off { opacity:.45; }
+.ctl { display:inline; } .ctl .cf { display:flex; gap:6px; margin:4px 0; }
+.mchip { display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid #dbe3ea; border-radius:7px; padding:5px 9px; font-size:12px; cursor:grab; }
+.mchip .x { cursor:pointer; color:#cbd5e1; font-weight:700; }
+.mchip .x:hover { color:#dc2626; }
+.mappool { flex:0 0 260px; background:#fff7ed; border:1px solid #fde7c8; border-radius:12px; padding:10px; max-height:440px; overflow:auto; display:flex; flex-wrap:wrap; gap:6px; align-content:flex-start; }
+.savebtn { margin-left:auto; } .okmsg { color:#16a34a; font-size:12px; margin-left:8px; }
 </style>
 <style>:root{--brand:{{ theme.primary }};}.topbar{background:var(--brand)!important;}.btn{background:var(--brand)!important;}</style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
@@ -50,50 +52,40 @@ table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px
 <body>
 <div class="topbar">
   <div class="topbar-title"><i class="ti ti-settings"></i> ΕΣΤΙΑ — Βλάβες · Ρυθμίσεις</div>
-  <div><a href="/dashboard/faults/categories?embed=1"><i class="ti ti-list-tree"></i> Κατηγορίες</a></div>
 </div>
 <div class="container">
   {% if request.args.get('saved') %}<div class="saved">Αποθηκεύτηκε!</div>{% endif %}
 
-  {% macro catnode(it) %}
-    <div class="citem {{ '' if it.node.is_active else 'off' }}" data-id="{{ it.node.id }}">
-      <div class="citem-head">
-        <span class="grip">⠿</span><span class="nm">{{ it.node.name }}</span>
-        <details><summary class="mini" title="Μετονομασία" style="list-style:none;"><i class="ti ti-pencil"></i></summary>
-          <form method="POST" action="/dashboard/faults/category/{{ it.node.id }}/rename?embed=1" style="display:flex;gap:6px;margin:4px 0;">
-            <input type="text" name="name" value="{{ it.node.name }}" required><button class="btn" type="submit" style="padding:4px 9px;">OK</button>
-          </form>
-        </details>
-        <form method="POST" action="/dashboard/faults/category/{{ it.node.id }}/toggle?embed=1" style="display:inline;"><button class="mini" type="submit" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>
-      </div>
-      <div class="zone sub" data-parent="{{ it.node.id }}">{% for ch in it.children %}{{ catnode(ch) }}{% endfor %}</div>
-    </div>
-  {% endmacro %}
+  {% macro ctl(node) %}<details class="ctl"><summary class="mini" title="Μετονομασία" style="list-style:none;"><i class="ti ti-pencil"></i></summary><form method="POST" action="/dashboard/faults/category/{{ node.id }}/rename?embed=1" class="cf"><input type="text" name="name" value="{{ node.name }}" required><button class="btn" type="submit" style="padding:4px 9px;">OK</button></form></details><form method="POST" action="/dashboard/faults/category/{{ node.id }}/toggle?embed=1" style="display:inline;"><button class="mini" type="submit" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>{% endmacro %}
 
   <div class="card">
-    <div class="card-title"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών — οργάνωση (σύρε για αναδιάταξη/μετακίνηση)
+    <div class="card-title"><i class="ti ti-list-tree"></i> Κατηγορίες βλαβών — οργάνωση (σύρε όπως στη «Διαμόρφωση μενού»)
       <button class="btn savebtn" onclick="saveCats()"><i class="ti ti-device-floppy"></i> Αποθήκευση δομής</button><span id="catmsg" class="okmsg"></span></div>
-    <form class="row" method="POST" action="/dashboard/faults/category/add?embed=1" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <select name="parent_id" style="max-width:340px;"><option value="">— Κύριος κλάδος (L1) —</option>{% for c in allcats %}<option value="{{ c.id }}">{{ '· '*(c.level-1) }}{{ c.name }}</option>{% endfor %}</select>
+    <form class="row" method="POST" action="/dashboard/faults/category/add?embed=1" style="margin-bottom:12px;">
+      <select name="parent_id" style="max-width:340px;"><option value="">— Κύριος κλάδος (στήλη) —</option>{% for c in allcats %}<option value="{{ c.id }}">{{ '· '*(c.level-1) }}{{ c.name }}</option>{% endfor %}</select>
       <input type="text" name="name" placeholder="Όνομα νέας κατηγορίας" required>
       <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
     <div class="board" id="catboard">
       {% for it in forest %}
-      <div class="col" data-id="{{ it.node.id }}">
-        <div class="col-head"><span class="grip colgrip">⠿</span><span class="nm">{{ it.node.name }}</span>
-          <details><summary class="mini" title="Μετονομασία" style="list-style:none;"><i class="ti ti-pencil"></i></summary>
-            <form method="POST" action="/dashboard/faults/category/{{ it.node.id }}/rename?embed=1" style="display:flex;gap:6px;margin:4px 0;">
-              <input type="text" name="name" value="{{ it.node.name }}" required><button class="btn" type="submit" style="padding:4px 9px;">OK</button>
-            </form>
-          </details>
-          <form method="POST" action="/dashboard/faults/category/{{ it.node.id }}/toggle?embed=1" style="display:inline;"><button class="mini" type="submit" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button></form>
+      <div class="col {{ '' if it.node.is_active else 'off' }}" data-id="{{ it.node.id }}">
+        <div class="col-head"><span class="grip colgrip">⠿</span><span class="nm">{{ it.node.name }}</span>{{ ctl(it.node) }}</div>
+        <div class="groups" data-parent="{{ it.node.id }}">
+          {% for g in it.children %}
+          <div class="gcard {{ '' if g.node.is_active else 'off' }}" data-id="{{ g.node.id }}">
+            <div class="gcard-head"><span class="grip ggrip">⠿</span><span class="nm">{{ g.node.name }}</span>{{ ctl(g.node) }}</div>
+            <div class="chips" data-parent="{{ g.node.id }}">
+              {% for ch in g.children %}
+              <div class="cchip {{ '' if ch.node.is_active else 'off' }}" data-id="{{ ch.node.id }}"><span class="grip cgrip">⠿</span><span class="nm">{{ ch.node.name }}</span>{{ ctl(ch.node) }}</div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
         </div>
-        <div class="zone" data-parent="{{ it.node.id }}">{% for ch in it.children %}{{ catnode(ch) }}{% endfor %}</div>
       </div>
-      {% else %}<span class="muted">Καμία κατηγορία.</span>{% endfor %}
+      {% else %}<span class="muted">Καμία κατηγορία ακόμη — πρόσθεσε από τη φόρμα.</span>{% endfor %}
     </div>
-    <div class="muted" style="margin-top:8px;">Οι <b>κύριοι κλάδοι</b> είναι οι στήλες· σύρε υποκατηγορίες μέσα/ανάμεσά τους. Νέος κύριος κλάδος: από τη φόρμα με κενό «Κύριο κλάδο». Πάτα «Αποθήκευση δομής».</div>
+    <div class="muted" style="margin-top:8px;">Στήλη = κύριος κλάδος · κάρτα = υποκατηγορία · chip = επιμέρους. Σύρε chips ανάμεσα σε κάρτες, κάρτες ανάμεσα σε στήλες, στήλες για σειρά. Μετά «Αποθήκευση δομής».</div>
   </div>
 
   <div class="card">
@@ -138,7 +130,7 @@ table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px
   <div class="card">
     <div class="card-title"><i class="ti ti-arrows-split"></i> Χάρτης Κατηγορία → Ειδικότητα (σύρε κατηγορίες στις ειδικότητες)
       <button class="btn savebtn" onclick="saveMap()"><i class="ti ti-device-floppy"></i> Αποθήκευση χάρτη</button><span id="mapmsg" class="okmsg"></span></div>
-    <div class="muted" style="margin-bottom:10px;">Σύρε μια κατηγορία από τα «Διαθέσιμα» σε μια ειδικότητα. Το <b>×</b> την αφαιρεί. Οι βλάβες χωρίς αντιστοίχιση πάνε σε «Αναμένει ανάθεση».</div>
+    <div class="muted" style="margin-bottom:10px;">Σύρε μια κατηγορία από τα «Διαθέσιμα» σε μια ειδικότητα. Το × την αφαιρεί. Οι βλάβες χωρίς αντιστοίχιση πάνε σε «Αναμένει ανάθεση».</div>
     <div class="board">
       <div class="mappool" id="mappool">
         {% for c in allcats %}<span class="mchip" data-id="{{ c.id }}">{{ '· '*(c.level-1) }}{{ c.name }}</span>{% endfor %}
@@ -146,7 +138,7 @@ table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px
       {% for s in active_specs %}
       <div class="col" data-spec="{{ s }}">
         <div class="col-head"><i class="ti ti-tools"></i> <span class="nm">{{ s }}</span></div>
-        <div class="zone mapzone">
+        <div class="chips mapzone">
           {% for cid in map_by_spec.get(s, []) %}<span class="mchip" data-id="{{ cid }}">{{ catname.get(cid, '?') }} <span class="x" onclick="this.parentNode.remove()">×</span></span>{% endfor %}
         </div>
       </div>
@@ -157,23 +149,23 @@ table { width:100%; border-collapse:collapse; font-size:13px; } td { padding:7px
 </div>
 <script>
 var _emb = new URLSearchParams(location.search).get('embed')==='1' ? '?embed=1' : '';
-// ── Κατηγορίες: στήλες (L1) + nested zones ──
 function initCats(){
   var board=document.getElementById('catboard'); if(!board) return;
-  new Sortable(board,{group:'catcols',handle:'.colgrip',animation:140,draggable:'.col'});
-  board.querySelectorAll('.zone').forEach(function(z){
-    new Sortable(z,{group:'cats',handle:'.grip',animation:130,draggable:'.citem',filter:'.colgrip'});
-  });
+  new Sortable(board,{group:'cols',handle:'.colgrip',draggable:'.col',animation:140});
+  board.querySelectorAll('.groups').forEach(function(z){ new Sortable(z,{group:'groups',handle:'.ggrip',draggable:'.gcard',animation:130}); });
+  board.querySelectorAll('.chips').forEach(function(z){ new Sortable(z,{group:'chips',handle:'.cgrip',draggable:'.cchip',animation:120}); });
 }
 function collectCats(){
   var out=[];
   document.querySelectorAll('#catboard > .col').forEach(function(col,ci){
     out.push({id:+col.dataset.id, parent_id:null, sort:ci});
-  });
-  document.querySelectorAll('#catboard .zone').forEach(function(z){
-    var pid=+z.dataset.parent, i=0;
-    [].forEach.call(z.children, function(el){
-      if(el.classList && el.classList.contains('citem')){ out.push({id:+el.dataset.id, parent_id:pid, sort:i}); i++; }
+    var gi=0;
+    col.querySelectorAll(':scope > .groups > .gcard').forEach(function(g){
+      out.push({id:+g.dataset.id, parent_id:+col.dataset.id, sort:gi}); gi++;
+      var k=0;
+      g.querySelectorAll(':scope > .chips > .cchip').forEach(function(ch){
+        out.push({id:+ch.dataset.id, parent_id:+g.dataset.id, sort:k}); k++;
+      });
     });
   });
   return out;
@@ -184,7 +176,6 @@ function saveCats(){
       var m=document.getElementById('catmsg'); m.textContent=d.ok?'✓ Αποθηκεύτηκε':'Σφάλμα'; setTimeout(function(){m.textContent='';},2500);
     }).catch(function(){document.getElementById('catmsg').textContent='Σφάλμα δικτύου';});
 }
-// ── Χάρτης: pool (clone) → ειδικότητες ──
 function ensureX(chip){
   if(chip.querySelector('.x')) return;
   var x=document.createElement('span'); x.className='x'; x.textContent='×';
