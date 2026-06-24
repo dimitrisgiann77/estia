@@ -48,7 +48,6 @@ MENU_CATALOG = [
     ('feedback_adm','Feedback χρηστών',       'ti-messages',         '/dashboard/feedback',          False),
     ('hotels',      'Ξενοδοχεία & Πισίνες',   'ti-building',         '/dashboard/hotels',            False),
     ('areas_admin', 'Διαχείριση τομέων',      'ti-map-pin',          '/dashboard/areas',             False),
-    ('templates',   'Templates',              'ti-template',         '/dashboard/templates',         False),
     ('fault_set',   'Βλάβες · Ρυθμίσεις',     'ti-settings-cog',     '/dashboard/faults/settings',   False),
     ('fault_cat',   'Κατηγορίες βλαβών',      'ti-list-tree',        '/dashboard/faults/categories', False),
     ('email',       'Email',                  'ti-mail',             '/dashboard/email',             False),
@@ -76,7 +75,7 @@ DEFAULT_LAYOUT = [
     {'ws': 'admin', 'title': 'Επισκόπηση', 'items': ['dashboard']},
     {'ws': 'admin', 'title': 'Προσωπικό (HR)', 'items': ['people', 'org', 'pay_mitroo', 'sched_identify', 'sched_imported', 'dups', 'sched_staff']},
     {'ws': 'admin', 'title': 'Μισθοδοσία', 'items': ['pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention', 'sched_sub']},
-    {'ws': 'admin', 'title': 'Ρυθμίσεις', 'items': ['meas_console', 'sched_set', 'fault_set', 'fault_cat', 'templates', 'hotels', 'areas_admin', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder']},
+    {'ws': 'admin', 'title': 'Ρυθμίσεις', 'items': ['meas_console', 'sched_set', 'fault_set', 'fault_cat', 'hotels', 'areas_admin', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder']},
     {'ws': 'admin', 'title': 'Δεδομένα & Σύστημα', 'items': ['imports', 'backup', 'diag', 'users', 'activity', 'feedback_adm']},
 ]
 
@@ -120,7 +119,6 @@ DEFAULT_META = {
     'sched_set':      {'ws': ['admin'], 'roles': []},
     'fault_set':      {'ws': ['admin'], 'roles': []},
     'fault_cat':      {'ws': ['admin'], 'roles': []},
-    'templates':      {'ws': ['admin'], 'roles': []},
     'hotels':         {'ws': ['admin'], 'roles': []},
     'areas_admin':    {'ws': ['admin'], 'roles': []},
     'email':          {'ws': ['admin'], 'roles': []},
