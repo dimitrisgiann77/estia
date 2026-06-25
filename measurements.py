@@ -882,6 +882,26 @@ def measurements_point_save():
     return redirect(url_for('measurements_console') + '?tab=points' + (('&nh=' + _nh) if _nh else ''))
 
 
+@app.route('/dashboard/measurements/point/<int:pid>/delete', methods=['POST'])
+def measurements_point_delete(pid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    _nh = (request.form.get('nh') or '').strip()
+    def go(m=''):
+        return redirect(url_for('measurements_console') + '?tab=points' + (('&nh=' + _nh) if _nh else '') + (('&msg=' + m) if m else ''))
+    a = Area.query.get(pid)
+    if not a:
+        return go()
+    if Reading.query.filter_by(area_id=pid).first():
+        return go('Το σημείο έχει καταγραφές — απενεργοποίησέ το αντί να το διαγράψεις.')
+    AreaParam.query.filter_by(area_id=pid).delete()
+    nm = a.name
+    db.session.delete(a)
+    db.session.commit()
+    log_activity('meas_point_delete', nm)
+    return go('Διαγράφηκε: ' + nm)
+
+
 @app.route('/dashboard/measurements/point/<int:pid>/toggle', methods=['POST'])
 def measurements_point_toggle(pid):
     if not is_admin():

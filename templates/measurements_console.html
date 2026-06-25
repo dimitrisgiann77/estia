@@ -89,6 +89,7 @@ select.in-kind{width:120px;}
 .ptrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eef2f5;border-radius:8px;padding:6px 8px;flex-wrap:wrap;}
 .ptrow .grip{cursor:grab;color:#9fb3bf;font-size:15px;}
 .ptrows .ph{color:#b6c4cd;font-size:12px;font-style:italic;padding:2px;}
+.addpt{margin-top:8px;}
 .treerow{gap:8px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
@@ -166,18 +167,8 @@ select.in-kind{width:120px;}
   {% endif %}
   {% if nh %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-plus"></i> Νέο σημείο</div>
-    <form method="POST" action="/dashboard/measurements/point/save" class="row" style="border:none;">
-      <input type="hidden" name="hotel_id" value="{{ nh }}">
-      <input type="hidden" name="nh" value="{{ nh }}">
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Κουζίνα - ζεστό" required></div>
-      <div><span class="lbl">Χώρος</span><input class="in-loc" type="text" name="location" list="spaces" placeholder="π.χ. Κουζίνα"></div>
-      <div><span class="lbl">Δίκτυο (προαιρετικά)</span><select name="node_id"><option value="">— (καμία)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
-      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία ανά δίκτυο — σύρε ένα σημείο (από τη λαβή <i class="ti ti-grip-vertical"></i>) σε άλλο δίκτυο</div>
+    <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία ανά δίκτυο</div>
+    <p class="muted" style="margin-bottom:10px;">Σύρε ένα σημείο από τη λαβή <i class="ti ti-grip-vertical"></i> σε άλλο δίκτυο. Άλλαξε όνομα/χώρο και πάτα <i class="ti ti-device-floppy"></i>. <i class="ti ti-plus"></i> = νέο σημείο στο δίκτυο. Οι μετρήσεις ορίζονται στην καρτέλα «Μετρήσεις».</p>
     <div class="netsec">
       <div class="htitle"><i class="ti ti-inbox"></i> Χωρίς δίκτυο</div>
       <div class="ptrows netdrop" data-node="">
@@ -188,10 +179,12 @@ select.in-kind{width:120px;}
           <input class="in-name" type="text" name="name" value="{{ a.name }}">
           <input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="Χώρος">
           <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-          <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
+          <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
+          <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
         </form>
         {% else %}<span class="ph">— κανένα αταξινόμητο σημείο</span>{% endfor %}
       </div>
+      <button class="btn ghost addpt" type="button" onclick="addpoint('',{{ nh }})"><i class="ti ti-plus"></i> Νέο σημείο</button>
     </div>
     {% for row in node_tree %}{% if nh in row.hotels %}
     <div class="netsec" style="margin-left:{{ row.depth*18 }}px;">
@@ -204,10 +197,12 @@ select.in-kind{width:120px;}
           <input class="in-name" type="text" name="name" value="{{ a.name }}">
           <input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="Χώρος">
           <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-          <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
+          <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
+          <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
         </form>
-        {% else %}<span class="ph">σύρε σημείο εδώ</span>{% endfor %}
+        {% else %}<span class="ph">σύρε σημείο εδώ ή πρόσθεσε νέο</span>{% endfor %}
       </div>
+      <button class="btn ghost addpt" type="button" onclick="addpoint({{ row.n.id }},{{ nh }})"><i class="ti ti-plus"></i> Νέο σημείο εδώ</button>
     </div>
     {% endif %}{% endfor %}
   </div>
@@ -380,6 +375,7 @@ function gexp(id){ var p=document.getElementById(id); if(!p) return; p.style.dis
 function _mknode(name,parent,nh){ var f=document.createElement("form"); f.method="POST"; f.action="/dashboard/measurements/node/save"; [["name",name],["parent_id",parent||""],["nh",nh||""]].forEach(function(kv){var i=document.createElement("input");i.name=kv[0];i.value=kv[1];f.appendChild(i);}); document.body.appendChild(f); f.submit(); }
 function gaddgroup(nh){ var n=prompt("Όνομα νέας ομάδας (δικτύου);"); if(n) _mknode(n,"",nh); }
 function addsub(pid,nh){ var n=prompt("Όνομα νέας υποομάδας;"); if(n) _mknode(n,pid,nh); }
+function addpoint(node,nh){ var n=prompt("Όνομα νέου σημείου;"); if(!n) return; var f=document.createElement("form"); f.method="POST"; f.action="/dashboard/measurements/point/save"; [["name",n],["hotel_id",nh],["node_id",node||""],["nh",nh]].forEach(function(kv){var i=document.createElement("input");i.name=kv[0];i.value=kv[1];f.appendChild(i);}); document.body.appendChild(f); f.submit(); }
 function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }
 function nallow(e){ e.preventDefault(); e.currentTarget.classList.add("over"); }
 function nleave(e){ e.currentTarget.classList.remove("over"); }
