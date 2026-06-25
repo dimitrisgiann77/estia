@@ -22,6 +22,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .pt{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:8px;border:1px solid #d6eef3;text-decoration:none;color:#1f3a45;font-size:13px;margin:0 8px 8px 0;background:#fff;}
 .pt.sel{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);}
 .htitle{font-size:13px;font-weight:700;color:#193847;margin:12px 0 6px;}
+.sub{font-size:12px;font-weight:600;color:#3a6b82;margin:8px 0 2px;padding-left:4px;}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin:12px 0;}
 .f label{display:block;font-size:12px;color:#556;margin-bottom:4px;}
 .f input,.f select{width:100%;padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:14px;}
@@ -56,8 +57,11 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
     </div>
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
-      {% for a in g.areas %}
+      {% for sub in g.groups %}
+        {% if sub.title %}<div class="sub"><i class="ti ti-sitemap"></i> {{ sub.title }}</div>{% endif %}
+        {% for a in sub.areas %}
         <a class="pt" href="/dashboard/measurements/entry?point={{ a.id }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> {{ a.name }}</a>
+        {% endfor %}
       {% endfor %}
     {% endfor %}
     {% if not points_by_hotel %}<div class="muted">Δεν υπάρχουν σημεία. Πήγαινε «Μετρήσεις · Ρυθμίσεις → Σημεία → Αυτο-δημιουργία».</div>{% endif %}

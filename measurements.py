@@ -460,6 +460,26 @@ def _unique_node_key(name):
     return k
 
 
+def _node_pathmap():
+    """Φ-Δ-2: node_id -> {'path': 'Δίκτυο Νερού › ΖΝΧ', 'order': tree_index, 'icon': ...}.
+    Χρησιμοποιείται για ομαδοποίηση «Σήμερα»/«Καταγραφή» ανά δέντρο."""
+    nodes = MonitorNode.query.all()
+    nm = {n.id: n.name for n in nodes}
+    pm = {n.id: n.parent_id for n in nodes}
+    def path(nid):
+        parts, cur, s = [], nid, 0
+        while cur is not None and s < 50:
+            parts.append(nm.get(cur, '?'))
+            cur = pm.get(cur)
+            s += 1
+        return ' › '.join(reversed(parts))
+    out = {}
+    for i, row in enumerate(_node_tree()):
+        out[row['n'].id] = {'path': path(row['n'].id), 'order': i,
+                            'icon': (row['n'].icon or 'ti-sitemap')}
+    return out
+
+
 def _node_compliance(rows):
     """Φ-Δ: roll-up % συμμόρφωσης ανά κόμβο (κάθε κόμβος = δικά του + απογόνων).
     Επιστρέφει ordered λίστα (tree) μόνο κόμβων με δεδομένα στην περίοδο."""
@@ -888,7 +908,20 @@ def measurements_entry():
     grouped = {}
     for a in shown:
         grouped.setdefault(a.hotel_id, []).append(a)
-    points_by_hotel = [{'hotel_id': hid, 'hotel': hmap.get(hid, '—'), 'areas': items} for hid, items in grouped.items()]
+    _pmap = _node_pathmap()
+    def _grp_e(a):
+        nid = getattr(a, 'node_id', None)
+        if nid and nid in _pmap:
+            return (_pmap[nid]['order'], _pmap[nid]['path'])
+        return (999, None)
+    points_by_hotel = []
+    for hid, items in grouped.items():
+        subs = {}
+        for a in items:
+            subs.setdefault(_grp_e(a), []).append(a)
+        groups = [{'title': t, 'areas': sorted(ar, key=lambda x: x.name)}
+                  for (o, t), ar in sorted(subs.items(), key=lambda kv: kv[0][0])]
+        points_by_hotel.append({'hotel_id': hid, 'hotel': hmap.get(hid, '—'), 'groups': groups})
 
     sel = tpl = params = periods = None
     recent = []
@@ -986,6 +1019,15 @@ def measurements_today():
             return (tname.get('znx') or 'Νερά Χρήσης', 'ti-droplet', 2)
         return (tname.get(tk) or 'Λοιπά', 'ti-checklist', 5)
 
+    _pmap = _node_pathmap()
+    def _grp(a):
+        nid = getattr(a, 'node_id', None)
+        if nid and nid in _pmap:
+            pm = _pmap[nid]
+            return (pm['path'], pm['icon'], pm['order'])
+        t, i, o = _cat(a.template_key)
+        return (t, i, 100 + o)
+
     by_hotel = {}
     alerts = []
     total = donen = 0
@@ -1003,7 +1045,7 @@ def measurements_today():
                         alerts.append({'point': a.name, 'label': act.get('label'), 'action': act.get('action')})
                 except Exception:
                     pass
-        cat, icon, order = _cat(a.template_key)
+        cat, icon, order = _grp(a)
         groups = by_hotel.setdefault(a.hotel_id, {})
         g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
         g['areas'].append({'area': a, 'slots': slots, 'count': cnt.get(a.id, 0)})
