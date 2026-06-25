@@ -953,7 +953,11 @@ def measurements_entry():
     for a in shown:
         grouped.setdefault(a.hotel_id, []).append(a)
     _pmap = _node_pathmap()
+    view = (request.args.get('view') or 'net').strip()
     def _grp_e(a):
+        if view == 'space':
+            loc = (a.location or '').strip()
+            return (loc.lower() or 'zzzz', loc or 'Χωρίς χώρο')
         nid = getattr(a, 'node_id', None)
         if nid and nid in _pmap:
             return (_pmap[nid]['order'], _pmap[nid]['path'])
@@ -989,7 +993,7 @@ def measurements_entry():
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
                            hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
                            recent=recent, actions=actions, today=date.today().isoformat(),
-                           now_time=datetime.now().strftime('%H:%M'))
+                           now_time=datetime.now().strftime('%H:%M'), view=view)
 
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])

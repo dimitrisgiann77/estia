@@ -55,10 +55,14 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
       <a class="chip {{ 'active' if hsel is none }}" href="/dashboard/measurements/entry">Όλα</a>
       {% for hid,hname in hotel_opts %}<a class="chip {{ 'active' if hsel==hid }}" href="/dashboard/measurements/entry?hotel={{ hid }}">{{ hname }}</a>{% endfor %}
     </div>
+    <div class="hsel" style="margin-top:8px;">
+      <a class="chip {{ 'active' if view!='space' }}" href="/dashboard/measurements/entry?view=net{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-sitemap"></i> Ανά δίκτυο</a>
+      <a class="chip {{ 'active' if view=='space' }}" href="/dashboard/measurements/entry?view=space{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> Ανά χώρο</a>
+    </div>
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
       {% for sub in g.groups %}
-        {% if sub.title %}<div class="sub"><i class="ti ti-sitemap"></i> {{ sub.title }}</div>{% endif %}
+        {% if sub.title %}<div class="sub"><i class="ti {{ 'ti-map-pin' if view=='space' else 'ti-sitemap' }}"></i> {{ sub.title }}</div>{% endif %}
         {% for a in sub.areas %}
         <a class="pt" href="/dashboard/measurements/entry?point={{ a.id }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> {{ a.name }}</a>
         {% endfor %}
