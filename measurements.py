@@ -778,24 +778,9 @@ def measurements_console():
             row['hotels'] = _hotels_set(row['n'])
     group_points = {}
     if tab == 'structure' and nh:
-        _pmg = {x.id: x.parent_id for x in MonitorNode.query.all()}
-        _pathm = _node_pathmap()
-        def _top(nid):
-            cur, seen = nid, 0
-            while cur is not None and seen < 60:
-                p = _pmg.get(cur)
-                if p is None:
-                    return cur
-                cur, seen = p, seen + 1
-            return cur
-        _tmp = {}
         for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
             if getattr(a, 'node_id', None):
-                top = _top(a.node_id)
-                sub = (_pathm.get(a.node_id) or {}).get('path', '—')
-                _tmp.setdefault(top, {}).setdefault(sub, []).append(a)
-        for top, subs in _tmp.items():
-            group_points[top] = [{'sub': k, 'areas': v} for k, v in subs.items()]
+                group_points.setdefault(a.node_id, []).append(a)
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
     area_chips = {}

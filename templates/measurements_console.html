@@ -57,6 +57,10 @@ select.in-kind{width:120px;}
 .gchip.on .gtog{background:var(--brand,#193847);color:#fff;}
 .gchip.gadd{border-style:dashed;color:#7c93a0;cursor:pointer;font-size:12px;padding:6px 12px;font-weight:600;}
 .gpanel{display:none;background:#f6fafd;border:1px solid #e3edf4;border-radius:10px;padding:12px 14px;margin:2px 0 14px;}
+.gtree{display:flex;flex-direction:column;gap:5px;}
+.gnode{}
+.gchip.sub{background:#fbfdff;}
+.gchip.sub .gdot{background:#9fc4d2;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -106,32 +110,29 @@ select.in-kind{width:120px;}
     <p class="muted" style="margin-bottom:8px;">{% if nh %}Πάτα «+/✓» σε κάθε κόμβο για σύνδεση/αποσύνδεση με το επιλεγμένο ξενοδοχείο.{% else %}Διάλεξε ξενοδοχείο πάνω για να ορίσεις ποια δίκτυα έχει.{% endif %}</p>
     {% if nh %}
     <div class="libcard">
-      <div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — άνοιξε μια ομάδα και σύρε μετρήσεις στα σημεία της</div>
+      <div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — άνοιξε ένα δίκτυο/υποδίκτυο και σύρε μετρήσεις στα σημεία του</div>
       <div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση.</span>{% endfor %}</div>
     </div>
-    <div class="gpick">
-      {% for row in node_tree %}{% if row.depth==0 %}
-      <span class="gchip {{ 'on' if nh in row.hotels }}">
-        <button type="button" class="gname" onclick="gexp('g{{ row.n.id }}')"><span class="gdot"></span>{{ row.n.name }} <span class="gn">{{ (group_points.get(row.n.id, []))|length }}</span></button>
-        <button type="button" class="gtog" title="Σύνδεση/αποσύνδεση με το ξενοδοχείο" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span></button>
-      </span>
-      {% endif %}{% endfor %}
-      <button type="button" class="gchip gadd" onclick="gaddgroup()"><i class="ti ti-plus"></i> Νέα ομάδα</button>
-    </div>
-    {% for row in node_tree %}{% if row.depth==0 %}
-    <div class="gpanel" id="g{{ row.n.id }}">
-      <div class="muted" style="margin-bottom:8px;"><b>{{ row.n.name }}</b> — σύρε μετρήσεις από την παλέτα στο κάθε σημείο (× αφαιρεί· αποθηκεύεται αυτόματα):</div>
-      {% for sub in group_points.get(row.n.id, []) %}
-      <div class="htitle">{{ sub.sub }}</div>
-      {% for a in sub.areas %}
-      <div class="ptbox">
-        <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
-        <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
+    <div class="gtree">
+      {% for row in node_tree %}
+      <div class="gnode" style="margin-left:{{ row.depth*22 }}px;">
+        <span class="gchip {{ 'on' if nh in row.hotels }} {{ 'sub' if row.depth }}">
+          <button type="button" class="gname" onclick="gexp('g{{ row.n.id }}')"><span class="gdot"></span>{{ row.n.name }} <span class="gn">{{ (group_points.get(row.n.id, []))|length }}</span></button>
+          <button type="button" class="gtog" title="Σύνδεση/αποσύνδεση με το ξενοδοχείο" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span></button>
+        </span>
+        <div class="gpanel" id="g{{ row.n.id }}">
+          <div class="muted" style="margin-bottom:8px;"><b>{{ row.n.name }}</b> — σύρε μετρήσεις από την παλέτα στο κάθε σημείο (× αφαιρεί· αποθηκεύεται αυτόματα):</div>
+          {% for a in group_points.get(row.n.id, []) %}
+          <div class="ptbox">
+            <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
+            <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
+          </div>
+          {% else %}<div class="muted">Κανένα σημείο εδώ. Πρόσθεσε από την καρτέλα «Σημεία» (διάλεξε αυτό το δίκτυο ως κόμβο).</div>{% endfor %}
+        </div>
       </div>
       {% endfor %}
-      {% else %}<div class="muted">Κανένα σημείο σε αυτό το δίκτυο για το ξενοδοχείο. Πρόσθεσε από την καρτέλα «Σημεία».</div>{% endfor %}
+      <button type="button" class="gchip gadd" onclick="gaddgroup()"><i class="ti ti-plus"></i> Νέα ομάδα</button>
     </div>
-    {% endif %}{% endfor %}
     {% endif %}
   <div class="card">
     <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
