@@ -57,6 +57,12 @@ select.in-kind{width:120px;}
 .gchip.on .gtog{background:var(--brand,#193847);color:#fff;}
 .gchip.gadd{border-style:dashed;color:#7c93a0;cursor:pointer;font-size:12px;padding:6px 12px;font-weight:600;}
 .gpanel{display:none;background:#f6fafd;border:1px solid #e3edf4;border-radius:10px;padding:12px 14px;margin:2px 0 14px;}
+.netsec{margin:6px 0 12px;}
+.netzone{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;border:1px dashed #cbd9e2;border-radius:8px;padding:8px;background:#fbfdff;}
+.netzone.over{background:#eef6fb;border-color:#9fc4d2;}
+.pchip{display:inline-flex;align-items:center;gap:4px;background:#fff;border:1px solid #dbe6ef;border-radius:7px;padding:4px 9px;font-size:12px;cursor:grab;}
+.pchip .u{color:#9aa7ad;font-size:10px;}
+.netzone .ph{color:#b6c4cd;font-size:12px;font-style:italic;}
 .gtree{display:flex;flex-direction:column;gap:5px;}
 .gnode{}
 .gchip.sub{background:#fbfdff;}
@@ -94,56 +100,52 @@ select.in-kind{width:120px;}
   </div>
 
   {% if tab=='structure' %}
-  <div class="card">
-    <div class="card-title"><i class="ti ti-wand"></i> Αυτόματη αντιστοίχιση σημείων</div>
-    <p class="muted" style="margin-bottom:8px;">Βάζει κάθε υπάρχον σημείο κάτω από τον σωστό κόμβο βάσει του τύπου του (Πισίνες· ΖΝΧ → Ζεστό νερό· Όσμωση → Επεξεργασία). Τρέχει ΜΟΝΟ σε σημεία χωρίς κόμβο. Idempotent.</p>
-    <form method="POST" action="/dashboard/measurements/nodes/automap" onsubmit="return confirm('Αυτόματη αντιστοίχιση σημείων (χωρίς κόμβο) στο δέντρο;');">
-      <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αντιστοίχιση τώρα</button>
-    </form>
+  <div class="hpick">
+    {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
   </div>
+  {% if not nh %}
+  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο πάνω για να ορίσεις τη δομή του δικτύου του και να σύρεις σημεία/μετρήσεις.</div></div>
+  {% endif %}
+  {% if nh %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
-    <p class="muted" style="margin-bottom:8px;">Διάλεξε ξενοδοχείο, σύνδεσε με ✓ τις ομάδες (δίκτυα) που έχει, και πάτα μια ομάδα για να ανοίξει — μέσα σύρε τις μετρήσεις στο κάθε σημείο. Οι υπάρχουσες μετρήσεις φαίνονται ήδη.</p>
-    <div class="hpick">
-      {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
-    </div>
-    <p class="muted" style="margin-bottom:8px;">{% if nh %}Πάτα «+/✓» σε κάθε κόμβο για σύνδεση/αποσύνδεση με το επιλεγμένο ξενοδοχείο.{% else %}Διάλεξε ξενοδοχείο πάνω για να ορίσεις ποια δίκτυα έχει.{% endif %}</p>
-    {% if nh %}
-    <div class="libcard">
-      <div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — άνοιξε ένα δίκτυο/υποδίκτυο και σύρε μετρήσεις στα σημεία του</div>
-      <div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση.</span>{% endfor %}</div>
-    </div>
-    <div class="gtree">
-      {% for row in node_tree %}
-      <div class="gnode" style="margin-left:{{ row.depth*22 }}px;">
-        <span class="gchip {{ 'on' if nh in row.hotels }} {{ 'sub' if row.depth }}">
-          <button type="button" class="gname" onclick="gexp('g{{ row.n.id }}')"><span class="gdot"></span>{{ row.n.name }} <span class="gn">{{ (group_points.get(row.n.id, []))|length }}</span></button>
-          <button type="button" class="gtog" title="Σύνδεση/αποσύνδεση με το ξενοδοχείο" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span></button>
-        </span>
-        <div class="gpanel" id="g{{ row.n.id }}">
-          <div class="muted" style="margin-bottom:8px;"><b>{{ row.n.name }}</b> — σύρε μετρήσεις από την παλέτα στο κάθε σημείο (× αφαιρεί· αποθηκεύεται αυτόματα):</div>
-          {% for a in group_points.get(row.n.id, []) %}
-          <div class="ptbox">
-            <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
-            <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
-          </div>
-          {% else %}<div class="muted">Κανένα σημείο εδώ. Πρόσθεσε από την καρτέλα «Σημεία» (διάλεξε αυτό το δίκτυο ως κόμβο).</div>{% endfor %}
-        </div>
-      </div>
-      {% endfor %}
+    <div class="card-title"><i class="ti ti-sitemap"></i> Δίκτυα αυτού του ξενοδοχείου</div>
+    <p class="muted" style="margin-bottom:8px;">Πάτα ✓ στα δίκτυα/υποδίκτυα που έχει αυτό το ξενοδοχείο. «+ Νέα ομάδα» για προσθήκη. (Αυτόματη αντιστοίχιση υπαρχόντων σημείων: <a href="#" onclick="document.getElementById('automapf').submit();return false;">εδώ</a>.)</p>
+    <form id="automapf" method="POST" action="/dashboard/measurements/nodes/automap" style="display:none;"></form>
+    <div class="gpick">
+      {% for row in node_tree %}<span class="gchip {{ 'on' if nh in row.hotels }} {{ 'sub' if row.depth }}" title="{{ row.n.name }}"><span class="gdot"></span>{{ row.n.name }}<button type="button" class="gtog" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span></button></span>{% endfor %}
       <button type="button" class="gchip gadd" onclick="gaddgroup()"><i class="ti ti-plus"></i> Νέα ομάδα</button>
     </div>
-    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-flask"></i> Σημεία &amp; μετρήσεις — σύρε σημεία στα δίκτυα, μετρήσεις στα σημεία</div>
+    <div class="libcard"><div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — σύρε σε ένα σημείο</div><div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% endfor %}</div></div>
+    <div class="ptbox" style="background:#fffdf6;border-color:#f0e2c0;">
+      <div class="ptbox-h"><i class="ti ti-inbox"></i> Διαθέσιμα σημεία (χωρίς δίκτυο) — σύρε σε ένα δίκτυο πιο κάτω</div>
+      <div class="netzone netdrop" data-node="">{% for a in pool_points %}<span class="pchip" data-pid="{{ a.id }}"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="u">{{ a.location }}</span>{% endif %}</span>{% else %}<span class="ph">— κανένα αταξινόμητο σημείο</span>{% endfor %}</div>
+    </div>
+    {% for row in node_tree %}{% if nh in row.hotels %}
+    <div class="netsec" style="margin-left:{{ row.depth*18 }}px;">
+      <div class="htitle"><span class="gdot"></span> {{ row.n.name }}</div>
+      <div class="netzone netdrop" data-node="{{ row.n.id }}"><span class="ph">σύρε σημείο εδώ</span></div>
+      {% for a in group_points.get(row.n.id, []) %}
+      <div class="ptbox">
+        <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
+        <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}{% endfor %}
+  </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
     <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
       <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
-      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span>
-        <select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Γονέας (κενό = κορυφή)</span><select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
       <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
       <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
   </div>
+  {% endif %}
   {% endif %}
 
   {% if tab=='points' %}
@@ -331,6 +333,15 @@ function nhtoggle(btn,nid,hid){
     .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); var gc=btn.closest(".gchip"); if(gc) gc.classList.toggle("on", j.on); var c=btn.querySelector(".chk"); if(c) c.textContent=j.on?"✓":"+"; } else alert((j&&j.msg)||"Σφάλμα"); })
     .catch(function(){ alert("Σφάλμα."); });
 }
+(function(){ if(!window.Sortable) return;
+  document.querySelectorAll(".netdrop").forEach(function(z){
+    new Sortable(z,{group:{name:"pts",pull:true,put:true},animation:130,
+      onAdd:function(e){ var pid=e.item.dataset.pid; var node=e.to.dataset.node||"";
+        var fd=new FormData(); fd.append("node_id",node);
+        fetch("/dashboard/measurements/point/"+pid+"/node",{method:"POST",body:fd}).then(function(){location.reload();}).catch(function(){alert("Σφάλμα μετακίνησης");}); }
+    });
+  });
+})();
 function gexp(id){ var p=document.getElementById(id); if(!p) return; p.style.display=(p.style.display==="block"?"none":"block"); }
 function gaddgroup(){ var n=prompt("Όνομα νέας ομάδας (δικτύου);"); if(!n) return; var f=document.createElement("form"); f.method="POST"; f.action="/dashboard/measurements/node/save"; var i1=document.createElement("input"); i1.name="name"; i1.value=n; var i2=document.createElement("input"); i2.name="parent_id"; i2.value=""; f.appendChild(i1); f.appendChild(i2); document.body.appendChild(f); f.submit(); }
 function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }

@@ -777,10 +777,13 @@ def measurements_console():
             row['points'] = _npts.get(row['n'].id, [])
             row['hotels'] = _hotels_set(row['n'])
     group_points = {}
+    pool_points = []
     if tab == 'structure' and nh:
         for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
             if getattr(a, 'node_id', None):
                 group_points.setdefault(a.node_id, []).append(a)
+            else:
+                pool_points.append(a)
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
     area_chips = {}
@@ -807,7 +810,7 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
-                           group_points=group_points)
+                           group_points=group_points, pool_points=pool_points)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
