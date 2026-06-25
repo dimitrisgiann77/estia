@@ -460,6 +460,43 @@ def _unique_node_key(name):
     return k
 
 
+def _node_compliance(rows):
+    """Φ-Δ: roll-up % συμμόρφωσης ανά κόμβο (κάθε κόμβος = δικά του + απογόνων).
+    Επιστρέφει ordered λίστα (tree) μόνο κόμβων με δεδομένα στην περίοδο."""
+    direct = {}
+    for r in rows:
+        nid = getattr(r['point'], 'node_id', None)
+        if nid is None:
+            continue
+        n = sum(it['n'] for it in r['params'])
+        o = sum(it['out'] for it in r['params'])
+        d = direct.setdefault(nid, [0, 0])
+        d[0] += n
+        d[1] += o
+    if not direct:
+        return []
+    cmap = _node_children_map()
+    memo = {}
+    def subtree(nid):
+        if nid in memo:
+            return memo[nid]
+        N, O = direct.get(nid, [0, 0])[0], direct.get(nid, [0, 0])[1]
+        for ch in cmap.get(nid, []):
+            cn, co = subtree(ch.id)
+            N += cn
+            O += co
+        memo[nid] = (N, O)
+        return memo[nid]
+    out = []
+    for row in _node_tree():
+        N, O = subtree(row['n'].id)
+        if N == 0:
+            continue
+        out.append({'name': row['n'].name, 'depth': row['depth'], 'n': N, 'out': O,
+                    'comp': round(100.0 * (N - O) / N) if N else 100})
+    return out
+
+
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
 def measurements_node_save():
     """Προσθήκη/επεξεργασία κόμβου (ομάδα/υποομάδα) + reparent με έλεγχο κύκλου."""
@@ -1184,6 +1221,7 @@ def measurements_stats():
     charts = {'pt_labels': pt_labels, 'pt_comp': pt_comp,
               'po_labels': [k for k, _ in po], 'po_vals': [v for _, v in po]}
     return render_template('measurements_stats.html', rows=rows, cov=cov, kpis=kpis, charts=charts,
+                           node_comp=_node_compliance(rows),
                            dfrom=dfrom.isoformat(), dto=dto.isoformat(),
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotel_ids],
                            hsel=hsel, hotel_name=hotel_name, cur_range=request.args.get('range', ''))

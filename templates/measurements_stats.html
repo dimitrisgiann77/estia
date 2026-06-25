@@ -83,6 +83,23 @@ td.num{text-align:right;}
     <div class="kpi {{ 'bad' if kpis.missing }}"><div class="kn">{{ kpis.missing }}</div><div class="kl">Λείπουν (κάλυψη)</div></div>
   </div>
 
+  {% if node_comp %}
+  <div class="card">
+    <div class="pname"><i class="ti ti-sitemap"></i> Συμμόρφωση ανά δίκτυο</div>
+    <table>
+      <tr><th>Δίκτυο / Ομάδα</th><th>Μετρήσεις</th><th>Εκτός ορίων</th><th>Συμμόρφωση</th></tr>
+      {% for nc in node_comp %}
+      <tr>
+        <td style="padding-left:{{ nc.depth*18 }}px;">{{ nc.name }}</td>
+        <td class="num">{{ nc.n }}</td>
+        <td class="num {{ 'out' if nc.out }}">{{ nc.out }}</td>
+        <td class="num {{ 'comp-ok' if nc.comp >= 90 else 'comp-bad' }}">{{ nc.comp }}%</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+
   {% if rows %}
   <div class="charts">
     <div class="chartbox"><div class="ct">Συμμόρφωση ανά σημείο (%)</div><canvas id="chComp" height="170"></canvas></div>
