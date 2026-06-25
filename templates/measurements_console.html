@@ -247,6 +247,16 @@ select.in-kind{width:120px;}
     </form>
   </div>
   <div class="card">
+    <div class="card-title"><i class="ti ti-map-pin-plus"></i> Νέο σημείο μέτρησης (σε κόμβο)</div>
+    <p class="muted" style="margin-bottom:8px;">Φτιάξε ένα σημείο κάτω από οποιαδήποτε ομάδα/υποομάδα. Μετά πρόσθεσέ του μετρήσεις από την καρτέλα «Σημεία» (σύρσιμο από τη βιβλιοθήκη).</p>
+    <form method="POST" action="/dashboard/measurements/node/point/add" class="row" style="border:none;">
+      <div><span class="lbl">Κόμβος</span><select name="node_id" required><option value="">— διάλεξε —</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Ξενοδοχείο</span><select name="hotel_id" required>{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Κουζίνα - ζεστό" required></div>
+      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη σημείου</button>
+    </form>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-map-pin"></i> Ανάθεση σημείων σε κόμβο</div>
     <p class="muted" style="margin-bottom:8px;">Διάλεξε σε ποια ομάδα/υποομάδα ανήκει κάθε σημείο. Όσα μένουν «— (καμία)» δουλεύουν ακριβώς όπως σήμερα.</p>
     {% for p in assign_points %}

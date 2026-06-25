@@ -141,8 +141,9 @@ def seed_measurement_engine():
             created = False
             created = _seed_template('pool', 'Πισίνα', 'ti-pool', POOL_PARAMS) or created
             created = _seed_template('znx', 'ΖΝΧ / Δίκτυο νερού', 'ti-droplet', ZNX_PARAMS) or created
+            created = _seed_template('generic', 'Σημείο μέτρησης', 'ti-map-pin', []) or created
             db.session.commit()
-            for key in ('pool', 'znx'):
+            for key in ('pool', 'znx', 'generic'):
                 _seed_periods(key)
             db.session.commit()
             if created:
@@ -657,6 +658,27 @@ def automap_points_to_nodes(overwrite=False):
     if n:
         db.session.commit()
     return n
+
+
+@app.route('/dashboard/measurements/node/point/add', methods=['POST'])
+def measurements_node_point_add():
+    """#5: δημιουργία σημείου μέτρησης κάτω από οποιονδήποτε κόμβο (γενικός τύπος).
+    Μετρήσεις προστίθενται μετά με σύρσιμο από την καρτέλα «Σημεία»."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    nid = f.get('node_id')
+    hid = f.get('hotel_id')
+    name = (f.get('name') or '').strip()[:120]
+    def go(m=''):
+        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+    if not (nid and hid and name):
+        return go('Συμπλήρωσε κόμβο, ξενοδοχείο και όνομα.')
+    db.session.add(Area(hotel_id=int(hid), template_key='generic', name=name, location='',
+                        is_active=True, engine_only=True, node_id=int(nid)))
+    db.session.commit()
+    log_activity('meas_node_point_add', '%s @node %s' % (name, nid))
+    return go('Προστέθηκε σημείο: ' + name)
 
 
 @app.route('/dashboard/measurements/nodes/automap', methods=['POST'])
