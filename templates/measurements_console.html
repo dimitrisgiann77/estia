@@ -47,6 +47,7 @@ select.in-kind{width:120px;}
 .hbtn{padding:6px 12px;border-radius:8px;font-size:12px;text-decoration:none;color:#33454d;background:#fff;border:1px solid #d6eef3;}
 .hbtn.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
 .hchip .chk{font-weight:700;margin-right:2px;}
+.gpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px;padding:9px 11px;background:#f6fafd;border:1px solid #e3edf4;border-radius:9px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -94,6 +95,12 @@ select.in-kind{width:120px;}
       {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
     </div>
     <p class="muted" style="margin-bottom:8px;">{% if nh %}Πάτα «+/✓» σε κάθε κόμβο για σύνδεση/αποσύνδεση με το επιλεγμένο ξενοδοχείο.{% else %}Διάλεξε ξενοδοχείο πάνω για να ορίσεις ποια δίκτυα έχει.{% endif %}</p>
+    {% if nh %}
+    <div class="gpick">
+      <span class="muted">Ομάδες (δίκτυα) αυτού του ξενοδοχείου:</span>
+      {% for row in node_tree %}{% if row.depth==0 %}<button type="button" class="hchip {{ 'on' if nh in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span> {{ row.n.name }}</button>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
     <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
     {% for row in node_tree %}
     <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
