@@ -204,6 +204,13 @@ select.in-kind{width:120px;}
 
   {% if tab=='structure' %}
   <div class="card">
+    <div class="card-title"><i class="ti ti-wand"></i> Αυτόματη αντιστοίχιση σημείων</div>
+    <p class="muted" style="margin-bottom:8px;">Βάζει κάθε υπάρχον σημείο κάτω από τον σωστό κόμβο βάσει του τύπου του (Πισίνες· ΖΝΧ → Ζεστό νερό· Όσμωση → Επεξεργασία). Τρέχει ΜΟΝΟ σε σημεία χωρίς κόμβο — δεν πειράζει όσα έχεις αναθέσει χειροκίνητα. Idempotent.</p>
+    <form method="POST" action="/dashboard/measurements/nodes/automap" onsubmit="return confirm('Αυτόματη αντιστοίχιση σημείων (χωρίς κόμβο) στο δέντρο;');">
+      <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αντιστοίχιση τώρα</button>
+    </form>
+  </div>
+  <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
     <p class="muted" style="margin-bottom:8px;">Το δέντρο των δικτύων. Κάθε γραμμή = ομάδα ή υποομάδα. Άλλαξε όνομα/γονέα/σειρά, ενεργοποίησε/απενεργοποίησε, ή πρόσθεσε νέα πιο κάτω. «σημ.» = πόσα σημεία είναι αναρτημένα εκεί.</p>
     {% for row in node_tree %}

@@ -544,6 +544,52 @@ def measurements_point_node(pid):
     return redirect(url_for('measurements_console') + '?tab=structure')
 
 
+# ── Φ-Γ: αυτόματη αντιστοίχιση υπαρχόντων σημείων σε κόμβους (conservative) ───
+# Συντηρητικό: όλα τα ΖΝΧ μαζί (Ζεστό νερό), Όσμωση χωριστά (Επεξεργασία),
+# Πισίνες στις Πισίνες. ΔΕΝ τρέχει στο boot (αλλάζει δεδομένα) — μόνο με κουμπί.
+TEMPLATE_NODE_MAP = {
+    'pool':        'pools',
+    'znx':         'water_hot',
+    'znx_tank':    'water_hot',
+    'znx_kitchen': 'water_hot',
+    'znx_remote':  'water_hot',
+    'znx_dhw':     'water_hot',
+    'znx_ro':      'water_ro',
+}
+
+
+def automap_points_to_nodes(overwrite=False):
+    """Θέτει Area.node_id βάσει template_key. Idempotent· από προεπιλογή ΜΟΝΟ
+    σε σημεία χωρίς κόμβο (διατηρεί χειροκίνητες αναθέσεις). Καμία διαγραφή."""
+    cache = {}
+    def node_for(key):
+        if key not in cache:
+            cache[key] = MonitorNode.query.filter_by(key=key).first()
+        return cache[key]
+    n = 0
+    for a in Area.query.filter(Area.engine_only.is_(True)).all():
+        if (not overwrite) and getattr(a, 'node_id', None):
+            continue
+        nk = TEMPLATE_NODE_MAP.get(a.template_key)
+        node = node_for(nk) if nk else None
+        if node and a.node_id != node.id:
+            a.node_id = node.id
+            n += 1
+    if n:
+        db.session.commit()
+    return n
+
+
+@app.route('/dashboard/measurements/nodes/automap', methods=['POST'])
+def measurements_nodes_automap():
+    if not is_admin():
+        return redirect(url_for('login'))
+    n = automap_points_to_nodes(overwrite=False)
+    log_activity('meas_nodes_automap', '%d points' % n)
+    return redirect(url_for('measurements_console') + '?tab=structure&msg=' +
+                    ('Αντιστοιχίστηκαν %d σημεία στο δέντρο.' % n if n else 'Όλα τα σημεία ήταν ήδη αντιστοιχισμένα.'))
+
+
 # ── ΕΝΙΑΙΑ ΚΟΝΣΟΛΑ ΡΥΘΜΙΣΕΩΝ ─────────────────────────────────────────────────
 @app.route('/dashboard/measurements')
 def measurements_console():
