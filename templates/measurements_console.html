@@ -40,6 +40,9 @@ select.in-kind{width:120px;}
 .droproot{border:1px dashed #cbd9e2;border-radius:8px;padding:6px 10px;color:#7c93a0;font-size:12px;margin-bottom:8px;}
 .droproot.over{background:#eef6fb;border-color:#9fc4d2;color:#193847;}
 .ptunder{font-size:12px;color:#33454d;border-top:1px dashed #eef2f5;padding:3px 0;display:flex;align-items:center;gap:6px;}
+.nhotels{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:2px 0 6px;}
+.hchip{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid #d6eef3;background:#fff;color:#5a6b73;cursor:pointer;}
+.hchip.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -97,6 +100,11 @@ select.in-kind{width:120px;}
         <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
         <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
       </form>
+    </div>
+    <div class="nhotels" style="padding-left:{{ row.depth*22 + 34 }}px;">
+      <span class="muted">Ξενοδοχεία:</span>
+      {% for h in all_hotels %}<button type="button" class="hchip {{ 'on' if h.id in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ h.id }})">{{ h.name }}</button>{% endfor %}
+      {% if not all_hotels %}<span class="muted">—</span>{% endif %}
     </div>
     {% for a in row.points %}
     <div class="ptunder" style="padding-left:{{ row.depth*22 + 34 }}px;"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.hotel %} <span class="muted">· {{ a.hotel.name }}</span>{% endif %}{% if a.location %} <span class="tag">{{ a.location }}</span>{% endif %}</div>
@@ -296,6 +304,12 @@ select.in-kind{width:120px;}
 })();
 </script>
 <script>
+function nhtoggle(btn,nid,hid){
+  fetch("/dashboard/measurements/node/"+nid+"/hotel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hotel_id:hid})})
+    .then(function(r){return r.json();})
+    .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); } else alert((j&&j.msg)||"Σφάλμα"); })
+    .catch(function(){ alert("Σφάλμα."); });
+}
 function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }
 function nallow(e){ e.preventDefault(); e.currentTarget.classList.add("over"); }
 function nleave(e){ e.currentTarget.classList.remove("over"); }

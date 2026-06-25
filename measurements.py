@@ -49,6 +49,7 @@ class MonitorNode(db.Model):
     icon      = db.Column(db.String(40), default='')
     sort      = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+    hotels    = db.Column(db.String(120))   # Φ: λίστα hotel ids που «έχουν» τον κόμβο (κενό=όλα)
 
 
 _CLO2_LOW  = 'ClO2 {n} <1 ppm: αύξησε τη δοσομέτρηση ClO2· έλεγξε δοσομετρική αντλία/απόθεμα.'
@@ -518,6 +519,40 @@ def _node_compliance(rows):
     return out
 
 
+def _hotels_set(n):
+    raw = getattr(n, 'hotels', '') or ''
+    out = set()
+    for x in raw.split(','):
+        x = x.strip()
+        if x.isdigit():
+            out.add(int(x))
+    return out
+
+
+@app.route('/dashboard/measurements/node/<int:nid>/hotel', methods=['POST'])
+def measurements_node_hotel(nid):
+    """Σύνδεση/αποσύνδεση ξενοδοχείου σε κόμβο (ποια ξενοδοχεία «έχουν» το δίκτυο)."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    n = MonitorNode.query.get(nid)
+    if not n:
+        return jsonify(ok=False), 404
+    data = request.get_json(silent=True) or {}
+    try:
+        hid = int(data.get('hotel_id'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False), 400
+    cur = _hotels_set(n)
+    if hid in cur:
+        cur.discard(hid); on = False
+    else:
+        cur.add(hid); on = True
+    n.hotels = ','.join(str(x) for x in sorted(cur))
+    db.session.commit()
+    log_activity('meas_node_hotel', '%s h%s=%s' % (nid, hid, on))
+    return jsonify(ok=True, on=on)
+
+
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
 def measurements_node_save():
     """Προσθήκη/επεξεργασία κόμβου (ομάδα/υποομάδα) + reparent με έλεγχο κύκλου."""
@@ -718,6 +753,7 @@ def measurements_console():
                 _npts.setdefault(a.node_id, []).append(a)
         for row in node_tree:
             row['points'] = _npts.get(row['n'].id, [])
+            row['hotels'] = _hotels_set(row['n'])
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
     area_chips = {}
