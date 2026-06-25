@@ -39,6 +39,7 @@ select.in-kind{width:120px;}
 .grip{cursor:grab;color:#9fb3bf;font-size:15px;}
 .droproot{border:1px dashed #cbd9e2;border-radius:8px;padding:6px 10px;color:#7c93a0;font-size:12px;margin-bottom:8px;}
 .droproot.over{background:#eef6fb;border-color:#9fc4d2;color:#193847;}
+.ptunder{font-size:12px;color:#33454d;border-top:1px dashed #eef2f5;padding:3px 0;display:flex;align-items:center;gap:6px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -65,90 +66,94 @@ select.in-kind{width:120px;}
 <div class="container">
   {% if msg %}<div class="ok"><i class="ti ti-check"></i> {{ msg }}</div>{% endif %}
   <div class="tabs">
-    <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-map-pin"></i> Σημεία</a>
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή</a>
+    <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-map-pin"></i> Σημεία</a>
     <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Μετρήσεις</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Περίοδοι</a>
   </div>
 
-  {% if tab=='points' %}
+  {% if tab=='structure' %}
   <div class="card">
-    <div class="card-title">Σημεία μέτρησης ανά περιοχή</div>
-    <form method="POST" action="/dashboard/measurements/autocreate" onsubmit="return confirm('Αυτο-δημιουργία σημείων ανά περιοχή (ΖΝΧ: Δεξαμενή/Κουζίνα/Απομακρυσμένο/Αναχ.-Επιστρ./Αντ.Όσμωση + πισίνες); Idempotent.');">
-      <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αυτο-δημιουργία σημείων ανά περιοχή</button>
-      <span class="muted"> Σπάει το δίκτυο σε σημεία ανά χώρο. Τα coarse «ΖΝΧ» γίνονται ιστορικό.</span>
+    <div class="card-title"><i class="ti ti-wand"></i> Αυτόματη αντιστοίχιση σημείων</div>
+    <p class="muted" style="margin-bottom:8px;">Βάζει κάθε υπάρχον σημείο κάτω από τον σωστό κόμβο βάσει του τύπου του (Πισίνες· ΖΝΧ → Ζεστό νερό· Όσμωση → Επεξεργασία). Τρέχει ΜΟΝΟ σε σημεία χωρίς κόμβο. Idempotent.</p>
+    <form method="POST" action="/dashboard/measurements/nodes/automap" onsubmit="return confirm('Αυτόματη αντιστοίχιση σημείων (χωρίς κόμβο) στο δέντρο;');">
+      <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αντιστοίχιση τώρα</button>
     </form>
-
-    <div class="libcard">
-      <div class="libtitle"><i class="ti ti-flask"></i> Μετρήσεις — σύρε σε ένα σημείο</div>
-      <div class="libwrap" id="measlib">
-        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Μετρήσεις».</span>{% endfor %}
-      </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
+    <p class="muted" style="margin-bottom:8px;">Σύρε μια γραμμή από τη λαβή και άφησέ την πάνω σε άλλη για να γίνει υποομάδα της — ή στη μπάρα «κορυφαίο επίπεδο» για ομάδα. Κάτω από κάθε κόμβο φαίνονται τα σημεία του. Η ανάθεση σημείου σε κόμβο γίνεται στην καρτέλα «Σημεία».</p>
+    <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
+    {% for row in node_tree %}
+    <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
+      <span class="grip" draggable="true" ondragstart="ndrag(event)" title="Σύρε για μετακίνηση"><i class="ti ti-grip-vertical"></i></span>
+      <form method="POST" action="/dashboard/measurements/node/save" class="nform">
+        <input type="hidden" name="id" value="{{ row.n.id }}">
+        <input type="hidden" name="parent_id" value="{{ row.n.parent_id or '' }}">
+        <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
+        <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
+        <span class="tag">{{ row.np }} σημ.</span>
+        <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+        <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
+        <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
+      </form>
     </div>
+    {% for a in row.points %}
+    <div class="ptunder" style="padding-left:{{ row.depth*22 + 34 }}px;"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.hotel %} <span class="muted">· {{ a.hotel.name }}</span>{% endif %}{% if a.location %} <span class="tag">{{ a.location }}</span>{% endif %}</div>
+    {% endfor %}
+    {% else %}
+    <div class="muted" style="padding-top:8px;">Κανένας κόμβος — πρόσθεσε πιο κάτω.</div>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
+    <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
+      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span>
+        <select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
+      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
+    </form>
+  </div>
+  {% endif %}
 
+  {% if tab=='points' %}
+  <datalist id="spaces">{% for s in space_opts %}<option value="{{ s }}">{% endfor %}</datalist>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία μέτρησης</div>
+    <p class="muted" style="margin-bottom:8px;">Κάθε σημείο: όνομα, <b>χώρος</b> (φυσική θέση δειγματοληψίας) και σε ποιον <b>κόμβο της δομής</b> ανήκει. Τις μετρήσεις του τις ορίζεις στην καρτέλα «Μετρήσεις».</p>
     {% for g in points_by_hotel %}
       <div class="htitle">{{ g.hotel }}</div>
       {% for a in g.areas %}
       <form method="POST" action="/dashboard/measurements/point/save" class="row {{ 'off' if not a.is_active }}">
         <input type="hidden" name="point_id" value="{{ a.id }}">
-        <input class="in-name" type="text" name="name" value="{{ a.name }}">
-        <input class="in-loc" type="text" name="location" value="{{ a.location or '' }}" placeholder="θέση">
-        <span class="tag">{{ a.template_key }}</span>
-        <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i></button>
-        <button class="btn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle">{{ 'Απενεργοποίηση' if a.is_active else 'Ενεργοποίηση' }}</button>
+        <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" value="{{ a.name }}"></div>
+        <div><span class="lbl">Χώρος</span><input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="π.χ. Μηχανοστάσιο"></div>
+        <div><span class="lbl">Κόμβος (δίκτυο)</span><select name="node_id"><option value="">— (καμία)</option>{% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==a.node_id }}>{{ o.label }}</option>{% endfor %}</select></div>
+        <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+        <button class="btn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle">{{ 'Απενεργ.' if a.is_active else 'Ενεργ.' }}</button>
       </form>
-      <div class="ptbox">
-        <div class="ptbox-h"><i class="ti ti-arrow-down-right"></i> Μετρήσεις του σημείου (σύρε από τη βιβλιοθήκη· × αφαιρεί) <span class="savedok" id="ok{{ a.id }}"></span></div>
-        <div class="ptzone" data-area="{{ a.id }}">
-          {% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}
-        </div>
-      </div>
       {% endfor %}
     {% endfor %}
-    {% if not points_by_hotel %}<div class="muted" style="padding-top:8px;">Κανένα σημείο ακόμη — πάτα «Αυτο-δημιουργία».</div>{% endif %}
+    {% if not points_by_hotel %}<div class="muted" style="padding-top:8px;">Κανένα σημείο ακόμη — πρόσθεσε πιο κάτω.</div>{% endif %}
   </div>
   <div class="card">
-    <div class="card-title">Νέο σημείο (χειροκίνητα)</div>
+    <div class="card-title"><i class="ti ti-plus"></i> Νέο σημείο</div>
     <form method="POST" action="/dashboard/measurements/point/save" class="row" style="border:none;">
-      <div><span class="lbl">Ξενοδοχείο</span><select name="hotel_id">{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Τύπος</span><select name="template_key">{% for t in all_templates %}<option value="{{ t.key }}">{{ t.name }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" required></div>
-      <div><span class="lbl">Θέση</span><input class="in-loc" type="text" name="location"></div>
-      <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
-  </div>
-  {% endif %}
-
-  {% if tab=='periods' %}
-  {% for r in tpl_periods %}
-  <div class="card">
-    <div class="card-title"><i class="ti {{ r.tpl.icon or 'ti-checklist' }}"></i> {{ r.tpl.name }} <span class="muted">— {{ r.nparams }} παράμετροι</span></div>
-    {% for p in r.periods %}
-    <form method="POST" action="/dashboard/measurements/period/save" class="row">
-      <input type="hidden" name="template_key" value="{{ r.tpl.key }}"><input type="hidden" name="period_id" value="{{ p.id }}">
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" value="{{ p.label }}" required></div>
-      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" value="{{ p.time or '' }}" placeholder="08:00"></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ p.sort or 0 }}"></div>
-      <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i></button>
-      <button class="btn del" type="submit" formaction="/dashboard/measurements/period/{{ p.id }}/delete" onclick="return confirm('Διαγραφή; (οι καταγραφές δεν θίγονται)');"><i class="ti ti-trash"></i></button>
-    </form>
-    {% endfor %}
-    <form method="POST" action="/dashboard/measurements/period/save" class="row">
-      <input type="hidden" name="template_key" value="{{ r.tpl.key }}">
-      <div><span class="lbl">Νέα — Όνομα</span><input class="in-name" type="text" name="label" placeholder="π.χ. Βράδυ" required></div>
-      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" placeholder="20:00"></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ (r.periods|length)+1 }}"></div>
+      <div><span class="lbl">Ξενοδοχείο</span><select name="hotel_id" required>{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Κόμβος (δίκτυο)</span><select name="node_id"><option value="">— (καμία)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Κουζίνα - ζεστό" required></div>
+      <div><span class="lbl">Χώρος</span><input class="in-loc" type="text" name="location" list="spaces" placeholder="π.χ. Κουζίνα"></div>
       <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
   </div>
-  {% endfor %}
   {% endif %}
 
   {% if tab in ['library','templates'] %}
   {% macro kind_opts(k) %}<option value="num"{{ ' selected' if k=='num' }}>Αριθμός</option><option value="bool"{{ ' selected' if k=='bool' }}>Ναι/Όχι</option><option value="text"{{ ' selected' if k=='text' }}>Κείμενο</option>{% endmacro %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Μετρήσεις</div>
-    <p class="muted" style="margin-bottom:6px;">Μία κοινή βιβλιοθήκη — όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Τις σέρνεις σε σημεία από το tab «Σημεία». Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση.</p>
+    <div class="card-title"><i class="ti ti-flask"></i> Μετρήσεις — Βιβλιοθήκη</div>
+    <p class="muted" style="margin-bottom:6px;">Όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση. Πιο κάτω αναθέτεις ποιες μετρήσεις παίρνει κάθε σημείο.</p>
     {% for g in lib_groups %}
       <div class="htitle">{{ g.name }}</div>
       {% for m in g.rows %}
@@ -185,11 +190,33 @@ select.in-kind{width:120px;}
       <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high"></div>
       <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
-    <p class="muted" style="margin-top:8px;">Το «key» είναι το σταθερό αναγνωριστικό (λατινικά, χωρίς κενά). Αν μείνει κενό, παράγεται από το όνομα.</p>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-arrow-down-right"></i> Ανάθεση μετρήσεων σε σημεία</div>
+    <p class="muted" style="margin-bottom:8px;">Σύρε μια μέτρηση από την παλέτα πάνω σε ένα σημείο. Το × αφαιρεί. Αποθηκεύεται αυτόματα.</p>
+    <div class="libcard">
+      <div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — σύρε σε ένα σημείο</div>
+      <div class="libwrap" id="measlib">
+        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε πιο πάνω.</span>{% endfor %}
+      </div>
+    </div>
+    {% for g in points_by_hotel %}
+      <div class="htitle">{{ g.hotel }}</div>
+      {% for a in g.areas %}
+      <div class="ptbox">
+        <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
+        <div class="ptzone" data-area="{{ a.id }}">
+          {% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="muted" style="padding-top:8px;">Κανένα σημείο — φτιάξε σημεία στην καρτέλα «Σημεία».</div>
+    {% endfor %}
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης</div>
-    <p class="muted" style="margin-bottom:6px;">Οι τύποι (Πισίνα/ΖΝΧ/…) είναι το «είδος» κάθε σημείου και ομαδοποιούν τις περιόδους. Οι μετρήσεις τους ορίζονται πλέον από τη Βιβλιοθήκη (πάνω) & ανατίθενται ανά σημείο.</p>
+    <p class="muted" style="margin-bottom:6px;">Οι τύποι (Πισίνα/ΖΝΧ/…) είναι το «είδος» κάθε σημείου και ομαδοποιούν τις περιόδους.</p>
     {% for t in param_templates %}
     <div class="row" style="justify-content:space-between;">
       <span><i class="ti {{ t.icon }}"></i> <b>{{ t.name }}</b> <span class="tag">{{ freq_label.get(t.frequency, t.frequency) }}</span>{% if not t.is_active %} <span class="muted">(ανενεργό)</span>{% endif %}</span>
@@ -206,73 +233,29 @@ select.in-kind{width:120px;}
   </div>
   {% endif %}
 
-  {% if tab=='structure' %}
+  {% if tab=='periods' %}
+  {% for r in tpl_periods %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-wand"></i> Αυτόματη αντιστοίχιση σημείων</div>
-    <p class="muted" style="margin-bottom:8px;">Βάζει κάθε υπάρχον σημείο κάτω από τον σωστό κόμβο βάσει του τύπου του (Πισίνες· ΖΝΧ → Ζεστό νερό· Όσμωση → Επεξεργασία). Τρέχει ΜΟΝΟ σε σημεία χωρίς κόμβο — δεν πειράζει όσα έχεις αναθέσει χειροκίνητα. Idempotent.</p>
-    <form method="POST" action="/dashboard/measurements/nodes/automap" onsubmit="return confirm('Αυτόματη αντιστοίχιση σημείων (χωρίς κόμβο) στο δέντρο;');">
-      <button class="btn alt" type="submit"><i class="ti ti-wand"></i> Αντιστοίχιση τώρα</button>
+    <div class="card-title"><i class="ti {{ r.tpl.icon or 'ti-checklist' }}"></i> {{ r.tpl.name }} <span class="muted">— {{ r.nparams }} παράμετροι</span></div>
+    {% for p in r.periods %}
+    <form method="POST" action="/dashboard/measurements/period/save" class="row">
+      <input type="hidden" name="template_key" value="{{ r.tpl.key }}"><input type="hidden" name="period_id" value="{{ p.id }}">
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" value="{{ p.label }}" required></div>
+      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" value="{{ p.time or '' }}" placeholder="08:00"></div>
+      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ p.sort or 0 }}"></div>
+      <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i></button>
+      <button class="btn del" type="submit" formaction="/dashboard/measurements/period/{{ p.id }}/delete" onclick="return confirm('Διαγραφή; (οι καταγραφές δεν θίγονται)');"><i class="ti ti-trash"></i></button>
     </form>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
-    <p class="muted" style="margin-bottom:8px;">Σύρε μια γραμμή από τη λαβή και άφησέ την πάνω σε άλλη για να γίνει υποομάδα της — ή στη μπάρα «κορυφαίο επίπεδο» για να γίνει ομάδα. Άλλαξε όνομα/σειρά, ενεργοποίησε/απενεργοποίησε, ή πρόσθεσε νέα πιο κάτω. «σημ.» = πόσα σημεία είναι αναρτημένα.</p>
-    <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
-    {% for row in node_tree %}
-    <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
-      <span class="grip" draggable="true" ondragstart="ndrag(event)" title="Σύρε για μετακίνηση"><i class="ti ti-grip-vertical"></i></span>
-      <form method="POST" action="/dashboard/measurements/node/save" class="nform">
-        <input type="hidden" name="id" value="{{ row.n.id }}">
-        <input type="hidden" name="parent_id" value="{{ row.n.parent_id or '' }}">
-        <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
-        <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
-        <span class="tag">{{ row.np }} σημ.</span>
-        <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-        <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
-        <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
-      </form>
-    </div>
-    {% else %}
-    <div class="muted" style="padding-top:8px;">Κανένας κόμβος — πρόσθεσε πιο κάτω.</div>
     {% endfor %}
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
-    <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
-      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span>
-        <select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
+    <form method="POST" action="/dashboard/measurements/period/save" class="row">
+      <input type="hidden" name="template_key" value="{{ r.tpl.key }}">
+      <div><span class="lbl">Νέα — Όνομα</span><input class="in-name" type="text" name="label" placeholder="π.χ. Βράδυ" required></div>
+      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" placeholder="20:00"></div>
+      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ (r.periods|length)+1 }}"></div>
       <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
   </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin-plus"></i> Νέο σημείο μέτρησης (σε κόμβο)</div>
-    <p class="muted" style="margin-bottom:8px;">Φτιάξε ένα σημείο κάτω από οποιαδήποτε ομάδα/υποομάδα. Μετά πρόσθεσέ του μετρήσεις από την καρτέλα «Σημεία» (σύρσιμο από τη βιβλιοθήκη).</p>
-    <form method="POST" action="/dashboard/measurements/node/point/add" class="row" style="border:none;">
-      <div><span class="lbl">Κόμβος</span><select name="node_id" required><option value="">— διάλεξε —</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Ξενοδοχείο</span><select name="hotel_id" required>{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Κουζίνα - ζεστό" required></div>
-      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη σημείου</button>
-    </form>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin"></i> Ανάθεση σημείων σε κόμβο</div>
-    <p class="muted" style="margin-bottom:8px;">Διάλεξε σε ποια ομάδα/υποομάδα ανήκει κάθε σημείο. Όσα μένουν «— (καμία)» δουλεύουν ακριβώς όπως σήμερα.</p>
-    {% for p in assign_points %}
-    <form method="POST" action="/dashboard/measurements/point/{{ p.a.id }}/node" class="row">
-      <span class="tag">{{ p.hotel }}</span>
-      <b>{{ p.a.name }}</b> <span class="muted">{{ p.a.template_key }}</span>
-      <select name="node_id">
-        <option value="">— (καμία)</option>
-        {% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==p.node_id }}>{{ o.label }}</option>{% endfor %}
-      </select>
-      <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-    </form>
-    {% else %}
-    <div class="muted">Κανένα σημείο ακόμη.</div>
-    {% endfor %}
-  </div>
+  {% endfor %}
   {% endif %}
 
 </div>

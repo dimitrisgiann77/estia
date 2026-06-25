@@ -696,7 +696,7 @@ def measurements_nodes_automap():
 def measurements_console():
     if not is_admin():
         return redirect(url_for('login'))
-    tab = request.args.get('tab', 'points')
+    tab = request.args.get('tab', 'structure')
     hmap = {h.id: h.name for h in Hotel.query.all()}
     # points grouped by hotel
     pts = Area.query.filter(Area.engine_only.is_(True)).order_by(Area.hotel_id, Area.template_key, Area.name).all()
@@ -708,12 +708,18 @@ def measurements_console():
     library = _library(include_inactive=False)
     lib_groups = _lib_groups()
     # Φ-Β — δομή δικτύων (υπολογισμός μόνο στο tab)
-    node_tree, node_opts, assign_points = [], [], []
+    node_opts = _node_options()
+    node_tree, space_opts = [], []
     if tab == 'structure':
         node_tree = _node_tree()
-        node_opts = _node_options()
-        for a in Area.query.filter(Area.engine_only.is_(True)).order_by(Area.hotel_id, Area.name).all():
-            assign_points.append({'a': a, 'hotel': hmap.get(a.hotel_id, '—'), 'node_id': getattr(a, 'node_id', None)})
+        _npts = {}
+        for a in Area.query.filter(Area.engine_only.is_(True)).order_by(Area.name).all():
+            if getattr(a, 'node_id', None):
+                _npts.setdefault(a.node_id, []).append(a)
+        for row in node_tree:
+            row['points'] = _npts.get(row['n'].id, [])
+    if tab == 'points':
+        space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -731,7 +737,7 @@ def measurements_console():
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
-                           node_tree=node_tree, node_opts=node_opts, assign_points=assign_points)
+                           node_tree=node_tree, node_opts=node_opts, space_opts=space_opts)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
@@ -774,15 +780,17 @@ def measurements_point_save():
     pid = f.get('point_id')
     name = (f.get('name') or '').strip()
     loc = (f.get('location') or '').strip()
+    _nv = f.get('node_id')
+    node_id = int(_nv) if _nv else None
     if pid:
         a = Area.query.get(int(pid))
         if a and name:
-            a.name = name[:120]; a.location = loc[:120]
+            a.name = name[:120]; a.location = loc[:120]; a.node_id = node_id
     else:
-        hid = f.get('hotel_id'); tk = f.get('template_key')
-        if hid and tk and name:
+        hid = f.get('hotel_id'); tk = (f.get('template_key') or 'generic')
+        if hid and name:
             db.session.add(Area(hotel_id=int(hid), template_key=tk, name=name[:120], location=loc[:120],
-                                is_active=True, engine_only=True))
+                                is_active=True, engine_only=True, node_id=node_id))
     db.session.commit()
     return redirect(url_for('measurements_console') + '?tab=points')
 
