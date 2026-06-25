@@ -410,7 +410,17 @@ def _entry_points():
     pts = (Area.query.filter(Area.is_active == True, Area.engine_only.is_(True),
                              Area.template_key != 'znx')
            .order_by(Area.hotel_id, Area.template_key, Area.name).all())
-    return [a for a in pts if point_params(a)]
+    ncache = {}
+    def _node_ok(a):
+        nid = getattr(a, 'node_id', None)
+        if not nid:
+            return True  # χωρίς κόμβο: δεν φιλτράρεται από σύνδεση δικτύου
+        if nid not in ncache:
+            nn = MonitorNode.query.get(nid)
+            ncache[nid] = _hotels_set(nn) if nn else set()
+        # δείχνεται ΜΟΝΟ αν ο κόμβος είναι συνδεδεμένος στο ξενοδοχείο του σημείου
+        return a.hotel_id in ncache[nid]
+    return [a for a in pts if point_params(a) and _node_ok(a)]
 
 
 # ── Φ-Β: Δομή δικτύων (δεντρική διαχείριση κόμβων + ανάθεση σημείων) ──────────
