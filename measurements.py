@@ -11,7 +11,7 @@ Plug-in: import από το ΤΕΛΟΣ του app.py (ΠΡΙΝ το init_db: cre
   Φ3b-2 — granular σημεία ανά περιοχή (Option B) + ΕΝΙΑΙΑ κονσόλα ρυθμίσεων (tabs)
 Καθαρά προσθετικό· οι legacy φόρμες/κονσόλα παραμένουν.
 """
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from flask import request, redirect, url_for, render_template, session, Response, jsonify
 from app import (app, db, current_user, is_admin, can_log, scoped_hotel_ids, log_activity, area_actions,
                  MonitorTemplate, MonitorParam, Hotel, Pool, WaterSystem,
@@ -988,7 +988,8 @@ def measurements_entry():
     return render_template('measurements_entry.html', points_by_hotel=points_by_hotel,
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
                            hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
-                           recent=recent, actions=actions, today=date.today().isoformat())
+                           recent=recent, actions=actions, today=date.today().isoformat(),
+                           now_time=datetime.now().strftime('%H:%M'))
 
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])
@@ -1025,8 +1026,13 @@ def measurements_entry_save():
         rdate = date.today()
     if rdate > date.today():
         rdate = date.today()
+    _rt = (f.get('record_time') or '').strip()
+    try:
+        rec_at = datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()) if _rt else datetime.now()
+    except ValueError:
+        rec_at = datetime.now()
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
-                  record_date=rdate, period=period, values=_json.dumps(vals),
+                  record_date=rdate, period=period, recorded_at=rec_at, values=_json.dumps(vals),
                   notes=(f.get('notes') or '').strip())
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')

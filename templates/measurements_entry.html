@@ -75,6 +75,7 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
       <input type="hidden" name="area_id" value="{{ sel.id }}">
       <div class="grid">
         <div class="f"><label>Ημερομηνία</label><input type="date" name="record_date" value="{{ today }}" max="{{ today }}"></div>
+        <div class="f"><label>Ώρα</label><input type="time" name="record_time" value="{{ now_time }}"></div>
         <div class="f"><label>Περίοδος / Βάρδια</label>
           <select name="period">
             {% for pr in periods %}<option value="{{ pr.key }}">{{ pr.label }}{% if pr.time %} ({{ pr.time }}){% endif %}</option>{% endfor %}
