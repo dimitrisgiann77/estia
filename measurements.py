@@ -988,7 +988,7 @@ def measurements_entry():
     return render_template('measurements_entry.html', points_by_hotel=points_by_hotel,
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
                            hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
-                           recent=recent, actions=actions)
+                           recent=recent, actions=actions, today=date.today().isoformat())
 
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])
@@ -1018,8 +1018,15 @@ def measurements_entry_save():
                 except (ValueError, TypeError):
                     pass
     period = (f.get('period') or 'day').strip()
+    _rd = (f.get('record_date') or '').strip()
+    try:
+        rdate = date.fromisoformat(_rd) if _rd else date.today()
+    except ValueError:
+        rdate = date.today()
+    if rdate > date.today():
+        rdate = date.today()
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
-                  record_date=date.today(), period=period, values=_json.dumps(vals),
+                  record_date=rdate, period=period, values=_json.dumps(vals),
                   notes=(f.get('notes') or '').strip())
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')
