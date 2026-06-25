@@ -67,6 +67,18 @@ select.in-kind{width:120px;}
 .gnode{}
 .gchip.sub{background:#fbfdff;}
 .gchip.sub .gdot{background:#9fc4d2;}
+.tree{display:flex;flex-direction:column;}
+.treerow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;}
+.treerow:hover{background:#f6fafd;}
+.treerow.on{background:#f0f7ff;}
+.treerow.lvl0{margin-top:6px;}
+.ttog{width:24px;height:24px;border-radius:50%;border:1px solid #d6eef3;background:#fff;color:#cfd8de;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;}
+.ttog.on{background:var(--brand,#193847);border-color:var(--brand,#193847);color:#fff;}
+.tname{font-size:13px;color:#33454d;display:inline-flex;align-items:center;}
+.tname.top{font-weight:700;color:#193847;font-size:14px;}
+.tname .gdot{width:7px;height:7px;background:#9fc4d2;}
+.tname .gdot.g0{width:9px;height:9px;background:#3a6b82;}
+.tinfo{margin-left:auto;font-size:11px;color:#9aa7ad;background:#eef6fb;border-radius:5px;padding:1px 7px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -108,48 +120,25 @@ select.in-kind{width:120px;}
   {% endif %}
   {% if nh %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-sitemap"></i> Ομάδες (δίκτυα) αυτού του ξενοδοχείου</div>
-    <p class="muted" style="margin-bottom:8px;">Πάτα ✓ στις ομάδες που έχει το ξενοδοχείο. Για κάθε επιλεγμένη ομάδα ανοίγει πιο κάτω η καρτέλα της με τις υποομάδες της.</p>
-    <div class="gpick">
-      {% for g in top_groups %}<span class="gchip {{ 'on' if nh in g.row.hotels }}" title="{{ g.row.n.name }}"><span class="gdot"></span>{{ g.row.n.name }}<button type="button" class="gtog" onclick="nhtoggle(this,{{ g.row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in g.row.hotels else '+' }}</span></button></span>{% endfor %}
-      <button type="button" class="gchip gadd" onclick="gaddgroup()"><i class="ti ti-plus"></i> Νέα ομάδα</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Διαθέσιμα σημεία &amp; παλέτα μετρήσεων</div>
-    <p class="muted" style="margin-bottom:8px;">Σύρε ένα διαθέσιμο σημείο σε μια υποομάδα (αφού την ανοίξεις)· μετά σύρε μετρήσεις από την παλέτα στο σημείο.</p>
-    <div class="ptbox" style="background:#fffdf6;border-color:#f0e2c0;">
-      <div class="ptbox-h"><i class="ti ti-inbox"></i> Διαθέσιμα σημεία (χωρίς δίκτυο)</div>
-      <div class="netzone netdrop" data-node="">{% for a in pool_points %}<span class="pchip" data-pid="{{ a.id }}"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="u">{{ a.location }}</span>{% endif %}</span>{% else %}<span class="ph">— κανένα αταξινόμητο σημείο</span>{% endfor %}</div>
-    </div>
-    <div class="libcard"><div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — σύρε σε ένα σημείο</div><div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% endfor %}</div></div>
-  </div>
-  {% for g in top_groups %}{% if nh in g.row.hotels %}
-  <div class="card">
-    <div class="card-title"><span class="gdot"></span> {{ g.row.n.name }}</div>
-    <p class="muted" style="margin-bottom:8px;">Υποομάδες — πάτα ✓ σε όσες έχει το ξενοδοχείο· κλικ στο όνομα για να ανοίξει και να βάλεις σημεία/μετρήσεις.</p>
-    <div class="gpick">
-      {% for sub in g.subs %}<span class="gchip sub {{ 'on' if nh in sub.hotels }}" style="margin-left:{{ (sub.depth-1)*14 }}px;"><button type="button" class="gname" onclick="gexp('g{{ sub.n.id }}')"><span class="gdot"></span>{{ sub.n.name }}</button><button type="button" class="gtog" onclick="nhtoggle(this,{{ sub.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in sub.hotels else '+' }}</span></button></span>{% else %}<span class="muted">— καμία υποομάδα. Πρόσθεσε με «Νέα ομάδα» (γονέας: {{ g.row.n.name }}).</span>{% endfor %}
-    </div>
-    {% for sub in g.subs %}{% if nh in sub.hotels %}
-    <div class="gpanel" id="g{{ sub.n.id }}">
-      <div class="muted" style="margin-bottom:6px;"><b>{{ sub.n.name }}</b> — σύρε διαθέσιμα σημεία εδώ· μετά μετρήσεις στο κάθε σημείο:</div>
-      <div class="netzone netdrop" data-node="{{ sub.n.id }}"><span class="ph">σύρε σημείο εδώ</span></div>
-      {% for a in group_points.get(sub.n.id, []) %}
-      <div class="ptbox">
-        <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
-        <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
+    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
+    <p class="muted" style="margin-bottom:12px;">Τσέκαρε ποια δίκτυα και υποδίκτυα έχει αυτό το ξενοδοχείο. Τα σημεία και οι μετρήσεις ορίζονται στις καρτέλες «Σημεία» και «Μετρήσεις».</p>
+    <div class="tree">
+      {% for row in node_tree %}
+      <div class="treerow {{ 'on' if nh in row.hotels }} {{ 'lvl0' if not row.depth }}" style="padding-left:{{ row.depth*26 }}px;">
+        <button type="button" class="ttog {{ 'on' if nh in row.hotels }}" title="Έχει / δεν έχει" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><i class="ti ti-check"></i></button>
+        <span class="tname {{ 'top' if not row.depth }}"><span class="gdot {{ 'g0' if not row.depth }}"></span>{{ row.n.name }}</span>
+        {% if row.np %}<span class="tinfo">{{ row.np }} σημεία</span>{% endif %}
       </div>
+      {% else %}
+      <div class="muted" style="padding:8px 0;">Κανένας κόμβος ακόμη — πρόσθεσε πιο κάτω.</div>
       {% endfor %}
     </div>
-    {% endif %}{% endfor %}
   </div>
-  {% endif %}{% endfor %}
   <div class="card">
     <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
     <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
       <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
-      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span><select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Ανήκει σε (κενό = νέα ομάδα κορυφής)</span><select name="parent_id"><option value="">— (ομάδα κορυφής)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
       <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
       <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
@@ -339,7 +328,7 @@ select.in-kind{width:120px;}
 function nhtoggle(btn,nid,hid){
   fetch("/dashboard/measurements/node/"+nid+"/hotel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hotel_id:hid})})
     .then(function(r){return r.json();})
-    .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); var gc=btn.closest(".gchip"); if(gc) gc.classList.toggle("on", j.on); var c=btn.querySelector(".chk"); if(c) c.textContent=j.on?"✓":"+"; } else alert((j&&j.msg)||"Σφάλμα"); })
+    .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); var gc=btn.closest(".gchip"); if(gc) gc.classList.toggle("on", j.on); var tr=btn.closest(".treerow"); if(tr) tr.classList.toggle("on", j.on); var c=btn.querySelector(".chk"); if(c) c.textContent=j.on?"✓":"+"; } else alert((j&&j.msg)||"Σφάλμα"); })
     .catch(function(){ alert("Σφάλμα."); });
 }
 (function(){ if(!window.Sortable) return;
