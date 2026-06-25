@@ -104,30 +104,38 @@ select.in-kind{width:120px;}
     {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
   </div>
   {% if not nh %}
-  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο πάνω για να ορίσεις τη δομή του δικτύου του και να σύρεις σημεία/μετρήσεις.</div></div>
+  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο πάνω για να ορίσεις τη δομή του δικτύου του.</div></div>
   {% endif %}
   {% if nh %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-sitemap"></i> Δίκτυα αυτού του ξενοδοχείου</div>
-    <p class="muted" style="margin-bottom:8px;">Πάτα ✓ στα δίκτυα/υποδίκτυα που έχει αυτό το ξενοδοχείο. «+ Νέα ομάδα» για προσθήκη. (Αυτόματη αντιστοίχιση υπαρχόντων σημείων: <a href="#" onclick="document.getElementById('automapf').submit();return false;">εδώ</a>.)</p>
-    <form id="automapf" method="POST" action="/dashboard/measurements/nodes/automap" style="display:none;"></form>
+    <div class="card-title"><i class="ti ti-sitemap"></i> Ομάδες (δίκτυα) αυτού του ξενοδοχείου</div>
+    <p class="muted" style="margin-bottom:8px;">Πάτα ✓ στις ομάδες που έχει το ξενοδοχείο. Για κάθε επιλεγμένη ομάδα ανοίγει πιο κάτω η καρτέλα της με τις υποομάδες της.</p>
     <div class="gpick">
-      {% for row in node_tree %}<span class="gchip {{ 'on' if nh in row.hotels }} {{ 'sub' if row.depth }}" title="{{ row.n.name }}"><span class="gdot"></span>{{ row.n.name }}<button type="button" class="gtog" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span></button></span>{% endfor %}
+      {% for g in top_groups %}<span class="gchip {{ 'on' if nh in g.row.hotels }}" title="{{ g.row.n.name }}"><span class="gdot"></span>{{ g.row.n.name }}<button type="button" class="gtog" onclick="nhtoggle(this,{{ g.row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in g.row.hotels else '+' }}</span></button></span>{% endfor %}
       <button type="button" class="gchip gadd" onclick="gaddgroup()"><i class="ti ti-plus"></i> Νέα ομάδα</button>
     </div>
   </div>
   <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Σημεία &amp; μετρήσεις — σύρε σημεία στα δίκτυα, μετρήσεις στα σημεία</div>
-    <div class="libcard"><div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — σύρε σε ένα σημείο</div><div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% endfor %}</div></div>
+    <div class="card-title"><i class="ti ti-flask"></i> Διαθέσιμα σημεία &amp; παλέτα μετρήσεων</div>
+    <p class="muted" style="margin-bottom:8px;">Σύρε ένα διαθέσιμο σημείο σε μια υποομάδα (αφού την ανοίξεις)· μετά σύρε μετρήσεις από την παλέτα στο σημείο.</p>
     <div class="ptbox" style="background:#fffdf6;border-color:#f0e2c0;">
-      <div class="ptbox-h"><i class="ti ti-inbox"></i> Διαθέσιμα σημεία (χωρίς δίκτυο) — σύρε σε ένα δίκτυο πιο κάτω</div>
+      <div class="ptbox-h"><i class="ti ti-inbox"></i> Διαθέσιμα σημεία (χωρίς δίκτυο)</div>
       <div class="netzone netdrop" data-node="">{% for a in pool_points %}<span class="pchip" data-pid="{{ a.id }}"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="u">{{ a.location }}</span>{% endif %}</span>{% else %}<span class="ph">— κανένα αταξινόμητο σημείο</span>{% endfor %}</div>
     </div>
-    {% for row in node_tree %}{% if nh in row.hotels %}
-    <div class="netsec" style="margin-left:{{ row.depth*18 }}px;">
-      <div class="htitle"><span class="gdot"></span> {{ row.n.name }}</div>
-      <div class="netzone netdrop" data-node="{{ row.n.id }}"><span class="ph">σύρε σημείο εδώ</span></div>
-      {% for a in group_points.get(row.n.id, []) %}
+    <div class="libcard"><div class="libtitle"><i class="ti ti-flask"></i> Παλέτα μετρήσεων — σύρε σε ένα σημείο</div><div class="libwrap" id="measlib">{% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% endfor %}</div></div>
+  </div>
+  {% for g in top_groups %}{% if nh in g.row.hotels %}
+  <div class="card">
+    <div class="card-title"><span class="gdot"></span> {{ g.row.n.name }}</div>
+    <p class="muted" style="margin-bottom:8px;">Υποομάδες — πάτα ✓ σε όσες έχει το ξενοδοχείο· κλικ στο όνομα για να ανοίξει και να βάλεις σημεία/μετρήσεις.</p>
+    <div class="gpick">
+      {% for sub in g.subs %}<span class="gchip sub {{ 'on' if nh in sub.hotels }}" style="margin-left:{{ (sub.depth-1)*14 }}px;"><button type="button" class="gname" onclick="gexp('g{{ sub.n.id }}')"><span class="gdot"></span>{{ sub.n.name }}</button><button type="button" class="gtog" onclick="nhtoggle(this,{{ sub.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in sub.hotels else '+' }}</span></button></span>{% else %}<span class="muted">— καμία υποομάδα. Πρόσθεσε με «Νέα ομάδα» (γονέας: {{ g.row.n.name }}).</span>{% endfor %}
+    </div>
+    {% for sub in g.subs %}{% if nh in sub.hotels %}
+    <div class="gpanel" id="g{{ sub.n.id }}">
+      <div class="muted" style="margin-bottom:6px;"><b>{{ sub.n.name }}</b> — σύρε διαθέσιμα σημεία εδώ· μετά μετρήσεις στο κάθε σημείο:</div>
+      <div class="netzone netdrop" data-node="{{ sub.n.id }}"><span class="ph">σύρε σημείο εδώ</span></div>
+      {% for a in group_points.get(sub.n.id, []) %}
       <div class="ptbox">
         <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
         <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
@@ -136,11 +144,12 @@ select.in-kind{width:120px;}
     </div>
     {% endif %}{% endfor %}
   </div>
+  {% endif %}{% endfor %}
   <div class="card">
     <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
     <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
       <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
-      <div><span class="lbl">Γονέας (κενό = κορυφή)</span><select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span><select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
       <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
       <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>

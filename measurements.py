@@ -784,6 +784,15 @@ def measurements_console():
                 group_points.setdefault(a.node_id, []).append(a)
             else:
                 pool_points.append(a)
+    top_groups = []
+    if tab == 'structure':
+        cur = None
+        for row in node_tree:
+            if row['depth'] == 0:
+                cur = {'row': row, 'subs': []}
+                top_groups.append(cur)
+            elif cur is not None:
+                cur['subs'].append(row)
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
     area_chips = {}
@@ -810,7 +819,7 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
-                           group_points=group_points, pool_points=pool_points)
+                           group_points=group_points, pool_points=pool_points, top_groups=top_groups)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
