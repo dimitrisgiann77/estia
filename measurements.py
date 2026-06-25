@@ -913,7 +913,7 @@ def measurements_entry():
         nid = getattr(a, 'node_id', None)
         if nid and nid in _pmap:
             return (_pmap[nid]['order'], _pmap[nid]['path'])
-        return (999, None)
+        return (999, 'Χωρίς δίκτυο — προς αντιστοίχιση')
     points_by_hotel = []
     for hid, items in grouped.items():
         subs = {}
@@ -1009,24 +1009,13 @@ def measurements_today():
                 MonitorPeriod.sort, MonitorPeriod.id).all()
         return _pcache[tk]
 
-    _ZNX = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
-    tname = {t.key: t.name for t in MonitorTemplate.query.all()}
-
-    def _cat(tk):
-        if tk == 'pool':
-            return (tname.get('pool') or 'Πισίνες', 'ti-pool', 1)
-        if tk in _ZNX:
-            return (tname.get('znx') or 'Νερά Χρήσης', 'ti-droplet', 2)
-        return (tname.get(tk) or 'Λοιπά', 'ti-checklist', 5)
-
     _pmap = _node_pathmap()
     def _grp(a):
         nid = getattr(a, 'node_id', None)
         if nid and nid in _pmap:
             pm = _pmap[nid]
             return (pm['path'], pm['icon'], pm['order'])
-        t, i, o = _cat(a.template_key)
-        return (t, i, 100 + o)
+        return ('Χωρίς δίκτυο — προς αντιστοίχιση', 'ti-help-circle', 900)
 
     by_hotel = {}
     alerts = []
