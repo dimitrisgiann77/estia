@@ -408,6 +408,142 @@ def _entry_points():
             .order_by(Area.hotel_id, Area.template_key, Area.name).all())
 
 
+# ── Φ-Β: Δομή δικτύων (δεντρική διαχείριση κόμβων + ανάθεση σημείων) ──────────
+def _node_children_map():
+    m = {}
+    for n in MonitorNode.query.order_by(MonitorNode.sort, MonitorNode.name).all():
+        m.setdefault(n.parent_id, []).append(n)
+    return m
+
+
+def _point_counts():
+    rows = db.session.query(Area.node_id, db.func.count(Area.id)).group_by(Area.node_id).all()
+    return {nid: c for nid, c in rows if nid is not None}
+
+
+def _node_tree():
+    """Επίπεδη λίστα κόμβων με depth (DFS) για indentation στο UI + πλήθος σημείων."""
+    cmap = _node_children_map()
+    pc = _point_counts()
+    out = []
+    def walk(parent_id, depth):
+        for n in cmap.get(parent_id, []):
+            out.append({'n': n, 'depth': depth, 'np': pc.get(n.id, 0)})
+            walk(n.id, depth + 1)
+    walk(None, 0)
+    return out
+
+
+def _node_options():
+    return [{'id': r['n'].id, 'label': ('— ' * r['depth']) + r['n'].name,
+             'parent_id': r['n'].parent_id} for r in _node_tree()]
+
+
+def _would_cycle(node_id, new_parent):
+    """True αν βάζοντας new_parent ως γονέα του node_id δημιουργείται κύκλος."""
+    cur, seen = new_parent, 0
+    while cur is not None and seen < 200:
+        if cur == node_id:
+            return True
+        nd = MonitorNode.query.get(cur)
+        cur = nd.parent_id if nd else None
+        seen += 1
+    return False
+
+
+def _unique_node_key(name):
+    base = _slug_key(name) or 'node'
+    k, i = base[:40], 1
+    while MonitorNode.query.filter_by(key=k).first():
+        i += 1
+        k = ('%s_%d' % (base, i))[:40]
+    return k
+
+
+@app.route('/dashboard/measurements/node/save', methods=['POST'])
+def measurements_node_save():
+    """Προσθήκη/επεξεργασία κόμβου (ομάδα/υποομάδα) + reparent με έλεγχο κύκλου."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    nid = f.get('id')
+    name = (f.get('name') or '').strip()[:80]
+    pid = f.get('parent_id') or None
+    pid = int(pid) if pid else None
+    node_kind = (f.get('node_kind') or ('group' if not pid else 'subgroup')).strip()[:20]
+    icon = (f.get('icon') or '').strip()[:40]
+    try:
+        sort = int(f.get('sort') or 0)
+    except (TypeError, ValueError):
+        sort = 0
+
+    def go(m=''):
+        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+
+    if not name:
+        return go('Λείπει το όνομα.')
+    if nid:
+        n = MonitorNode.query.get(int(nid))
+        if not n:
+            return go('Δεν βρέθηκε ο κόμβος.')
+        if pid and (pid == n.id or _would_cycle(n.id, pid)):
+            return go('Μη έγκυρος γονέας (κύκλος).')
+        n.name, n.parent_id, n.node_kind, n.icon, n.sort = name, pid, node_kind, icon, sort
+        db.session.commit()
+        log_activity('meas_node_save', 'edit %s' % name)
+        return go('Αποθηκεύτηκε: ' + name)
+    db.session.add(MonitorNode(key=_unique_node_key(name), parent_id=pid, name=name,
+                               node_kind=node_kind, icon=icon, sort=sort, is_active=True))
+    db.session.commit()
+    log_activity('meas_node_save', 'add %s' % name)
+    return go('Προστέθηκε: ' + name)
+
+
+@app.route('/dashboard/measurements/node/<int:nid>/toggle', methods=['POST'])
+def measurements_node_toggle(nid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    n = MonitorNode.query.get(nid)
+    if n:
+        n.is_active = not bool(n.is_active)
+        db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=structure')
+
+
+@app.route('/dashboard/measurements/node/<int:nid>/delete', methods=['POST'])
+def measurements_node_delete(nid):
+    """Διαγραφή μόνο αν ΔΕΝ έχει παιδιά ούτε σημεία (ασφάλεια — μηδέν απώλεια)."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    def go(m=''):
+        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+    n = MonitorNode.query.get(nid)
+    if not n:
+        return go()
+    if MonitorNode.query.filter_by(parent_id=nid).first():
+        return go('Έχει υπο-κόμβους — μετακίνησέ τους πρώτα.')
+    if Area.query.filter_by(node_id=nid).first():
+        return go('Έχει σημεία — ανάθεσέ τα αλλού πρώτα.')
+    db.session.delete(n)
+    db.session.commit()
+    log_activity('meas_node_delete', n.name)
+    return go('Διαγράφηκε: ' + n.name)
+
+
+@app.route('/dashboard/measurements/point/<int:pid>/node', methods=['POST'])
+def measurements_point_node(pid):
+    """Ανάθεση σημείου σε κόμβο (node_id). Κενό = καμία (σημερινή συμπεριφορά)."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    a = Area.query.get(pid)
+    if a:
+        v = request.form.get('node_id') or None
+        a.node_id = int(v) if v else None
+        db.session.commit()
+        log_activity('meas_point_node', '%s -> %s' % (a.name, a.node_id))
+    return redirect(url_for('measurements_console') + '?tab=structure')
+
+
 # ── ΕΝΙΑΙΑ ΚΟΝΣΟΛΑ ΡΥΘΜΙΣΕΩΝ ─────────────────────────────────────────────────
 @app.route('/dashboard/measurements')
 def measurements_console():
@@ -424,6 +560,13 @@ def measurements_console():
     # Φ3 — ενιαία βιβλιοθήκη μετρήσεων (A1): παλέτα = ενεργές· διαχείριση = όλες (ομάδες)
     library = _library(include_inactive=False)
     lib_groups = _lib_groups()
+    # Φ-Β — δομή δικτύων (υπολογισμός μόνο στο tab)
+    node_tree, node_opts, assign_points = [], [], []
+    if tab == 'structure':
+        node_tree = _node_tree()
+        node_opts = _node_options()
+        for a in Area.query.filter(Area.engine_only.is_(True)).order_by(Area.hotel_id, Area.name).all():
+            assign_points.append({'a': a, 'hotel': hmap.get(a.hotel_id, '—'), 'node_id': getattr(a, 'node_id', None)})
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -440,7 +583,8 @@ def measurements_console():
                            all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
-                           lib_groups=lib_groups)
+                           lib_groups=lib_groups,
+                           node_tree=node_tree, node_opts=node_opts, assign_points=assign_points)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])

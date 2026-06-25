@@ -63,6 +63,7 @@ select.in-kind{width:120px;}
     <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-map-pin"></i> Σημεία</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Περίοδοι</a>
     <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Βιβλιοθήκη</a>
+    <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή</a>
     <a class="tab {{ 'active' if tab=='migrate' }}" href="/dashboard/measurements?tab=migrate"><i class="ti ti-database-import"></i> Μεταφορά</a>
   </div>
 
@@ -198,6 +199,59 @@ select.in-kind{width:120px;}
       <div><span class="lbl">Συχνότητα</span><select name="frequency"><option value="twice">2×/ημέρα</option><option value="daily" selected>Καθημερινά</option><option value="weekly">Εβδομαδιαία</option><option value="monthly">Μηνιαία</option></select></div>
       <button class="btn ghost" type="submit"><i class="ti ti-plus"></i> Νέος τύπος</button>
     </form>
+  </div>
+  {% endif %}
+
+  {% if tab=='structure' %}
+  <div class="card">
+    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
+    <p class="muted" style="margin-bottom:8px;">Το δέντρο των δικτύων. Κάθε γραμμή = ομάδα ή υποομάδα. Άλλαξε όνομα/γονέα/σειρά, ενεργοποίησε/απενεργοποίησε, ή πρόσθεσε νέα πιο κάτω. «σημ.» = πόσα σημεία είναι αναρτημένα εκεί.</p>
+    {% for row in node_tree %}
+    <form method="POST" action="/dashboard/measurements/node/save" class="row {{ 'off' if not row.n.is_active }}" style="padding-left:{{ row.depth*22 }}px;">
+      <input type="hidden" name="id" value="{{ row.n.id }}">
+      <span class="muted">{{ '└─' if row.depth else '●' }}</span>
+      <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
+      <span class="lbl">Γονέας</span>
+      <select name="parent_id">
+        <option value="">— (κορυφή)</option>
+        {% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==row.n.parent_id }} {{ 'disabled' if o.id==row.n.id }}>{{ o.label }}</option>{% endfor %}
+      </select>
+      <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
+      <span class="tag">{{ row.np }} σημ.</span>
+      <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+      <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
+      <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
+    </form>
+    {% else %}
+    <div class="muted" style="padding-top:8px;">Κανένας κόμβος — πρόσθεσε πιο κάτω.</div>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
+    <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
+      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
+      <div><span class="lbl">Γονέας (κενό = ομάδα κορυφής)</span>
+        <select name="parent_id"><option value="">— (κορυφή)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
+      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
+      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
+    </form>
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-map-pin"></i> Ανάθεση σημείων σε κόμβο</div>
+    <p class="muted" style="margin-bottom:8px;">Διάλεξε σε ποια ομάδα/υποομάδα ανήκει κάθε σημείο. Όσα μένουν «— (καμία)» δουλεύουν ακριβώς όπως σήμερα.</p>
+    {% for p in assign_points %}
+    <form method="POST" action="/dashboard/measurements/point/{{ p.a.id }}/node" class="row">
+      <span class="tag">{{ p.hotel }}</span>
+      <b>{{ p.a.name }}</b> <span class="muted">{{ p.a.template_key }}</span>
+      <select name="node_id">
+        <option value="">— (καμία)</option>
+        {% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==p.node_id }}>{{ o.label }}</option>{% endfor %}
+      </select>
+      <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+    </form>
+    {% else %}
+    <div class="muted">Κανένα σημείο ακόμη.</div>
+    {% endfor %}
   </div>
   {% endif %}
 
