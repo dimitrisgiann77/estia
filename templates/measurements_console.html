@@ -12,15 +12,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .topbar{background:#193847;color:#fff;padding:14px 24px;}
 .topbar-title{font-size:16px;font-weight:600;}
 .topbar-sub{font-size:12px;opacity:.7;margin-top:2px;}
-.container{max-width:900px;margin:0 auto;padding:24px;}
+.container{max-width:1280px;margin:0 auto;padding:22px 28px;}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
 .tab{padding:9px 16px;border-radius:8px;font-size:13px;text-decoration:none;color:#33454d;background:#fff;border:1px solid #d6eef3;}
 .tab.active{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
-.card{background:#fff;border-radius:12px;padding:18px 20px;border:1px solid #e0f0ff;margin-bottom:16px;}
-.card-title{font-size:14px;font-weight:600;margin-bottom:12px;}
+.card{background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #e0f0ff;margin-bottom:18px;}
+.card-title{font-size:15px;font-weight:700;margin-bottom:14px;}
 .ok{background:#dcfce7;border:1px solid #bbf7d0;color:#166534;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:14px;}
 .muted{color:#888;font-size:12px;}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #f4f4f4;}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:9px 0;border-top:1px solid #eef2f5;}
 input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;}
 .in-name{width:230px;} .in-loc{width:150px;} .in-sm{width:80px;}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:7px;font-size:12px;font-weight:600;border:none;cursor:pointer;color:#fff;background:var(--brand,#193847);}
@@ -33,7 +33,7 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 .fw{flex-basis:100%;} .fw input{width:100%;}
 .libedit{align-items:flex-end;}
 select.in-kind{width:120px;}
-.noderow{display:flex;align-items:center;gap:6px;border-top:1px solid #f4f4f4;padding:4px 0;}
+.noderow{display:flex;align-items:center;gap:8px;border-top:1px solid #eef2f5;padding:7px 0;}
 .noderow.over{background:#eef6fb;outline:2px dashed #9fc4d2;outline-offset:-2px;}
 .nform{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;}
 .grip{cursor:grab;color:#9fb3bf;font-size:15px;}
@@ -41,7 +41,7 @@ select.in-kind{width:120px;}
 .droproot.over{background:#eef6fb;border-color:#9fc4d2;color:#193847;}
 .ptunder{font-size:12px;color:#33454d;border-top:1px dashed #eef2f5;padding:3px 0;display:flex;align-items:center;gap:6px;}
 .nhotels{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:2px 0 6px;}
-.hchip{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid #d6eef3;background:#fff;color:#5a6b73;cursor:pointer;}
+.hchip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid #d6eef3;background:#fff;color:#5a6b73;cursor:pointer;}
 .hchip.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
@@ -103,7 +103,7 @@ select.in-kind{width:120px;}
     </div>
     <div class="nhotels" style="padding-left:{{ row.depth*22 + 34 }}px;">
       <span class="muted">Ξενοδοχεία:</span>
-      {% for h in all_hotels %}<button type="button" class="hchip {{ 'on' if h.id in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ h.id }})">{{ h.name }}</button>{% endfor %}
+      {% for h in all_hotels %}<button type="button" class="hchip {{ 'on' if h.id in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ h.id }})" title="{{ h.name }}">{{ hcodes.get(h.id) or h.name }}</button>{% endfor %}
       {% if not all_hotels %}<span class="muted">—</span>{% endif %}
     </div>
     {% for a in row.points %}

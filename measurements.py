@@ -765,10 +765,16 @@ def measurements_console():
         tpl_periods.append({'tpl': t, 'periods': MonitorPeriod.query.filter_by(template_key=t.key)
                             .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
                             'nparams': len(t.params or [])})
+    _active_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    try:
+        from schedule import _hotel_short
+        _hcodes = {h.id: (_hotel_short(h.name) or h.name) for h in _active_hotels}
+    except Exception:
+        _hcodes = {h.id: h.name for h in _active_hotels}
     return render_template('measurements_console.html', tab=tab,
                            points_by_hotel=points_by_hotel, tpl_periods=tpl_periods,
                            st=migration_status(), msg=request.args.get('msg'),
-                           all_hotels=Hotel.query.order_by(Hotel.name).all(),
+                           all_hotels=_active_hotels, hcodes=_hcodes,
                            all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
