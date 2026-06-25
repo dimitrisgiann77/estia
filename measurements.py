@@ -799,6 +799,13 @@ def measurements_console():
                     pool_points.append(a)
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
+    hotel_points = []
+    area_pkeys = {}
+    if tab in ('points', 'library', 'templates') and nh:
+        hotel_points = (Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh)
+                        .order_by(Area.name).all())
+        for a in hotel_points:
+            area_pkeys[a.id] = [p.pkey for p in point_params(a)]
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -823,7 +830,8 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
-                           group_points=group_points, pool_points=pool_points)
+                           group_points=group_points, pool_points=pool_points,
+                           hotel_points=hotel_points, area_pkeys=area_pkeys)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
