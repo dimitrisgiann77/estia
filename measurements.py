@@ -404,10 +404,13 @@ def point_params(area):
 
 
 def _entry_points():
-    """Σημεία για καταχώρηση: ενεργά engine σημεία ΕΚΤΟΣ coarse 'znx'."""
-    return (Area.query.filter(Area.is_active == True, Area.engine_only.is_(True),
-                              Area.template_key != 'znx')
-            .order_by(Area.hotel_id, Area.template_key, Area.name).all())
+    """Σημεία για καταχώρηση: ενεργά engine σημεία ΕΚΤΟΣ coarse 'znx'.
+    Φιλτράρει ΟΣΑ έχουν τουλάχιστον μία μέτρηση πάνω τους — σημείο χωρίς καμία
+    ανατεθειμένη μέτρηση ΔΕΝ εμφανίζεται στον συντηρητή (Giannis 25/06)."""
+    pts = (Area.query.filter(Area.is_active == True, Area.engine_only.is_(True),
+                             Area.template_key != 'znx')
+           .order_by(Area.hotel_id, Area.template_key, Area.name).all())
+    return [a for a in pts if point_params(a)]
 
 
 # ── Φ-Β: Δομή δικτύων (δεντρική διαχείριση κόμβων + ανάθεση σημείων) ──────────
