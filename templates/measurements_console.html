@@ -33,6 +33,12 @@ input[type=text],select{padding:7px 9px;border:1px solid #d6eef3;border-radius:7
 .fw{flex-basis:100%;} .fw input{width:100%;}
 .libedit{align-items:flex-end;}
 select.in-kind{width:120px;}
+.noderow{display:flex;align-items:center;gap:6px;border-top:1px solid #f4f4f4;padding:4px 0;}
+.noderow.over{background:#eef6fb;outline:2px dashed #9fc4d2;outline-offset:-2px;}
+.nform{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1;}
+.grip{cursor:grab;color:#9fb3bf;font-size:15px;}
+.droproot{border:1px dashed #cbd9e2;border-radius:8px;padding:6px 10px;color:#7c93a0;font-size:12px;margin-bottom:8px;}
+.droproot.over{background:#eef6fb;border-color:#9fc4d2;color:#193847;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -55,16 +61,14 @@ select.in-kind{width:120px;}
 <body>
 <div class="topbar">
   <div class="topbar-title"><i class="ti ti-adjustments-cog"></i> Μετρήσεις — Ρυθμίσεις</div>
-  <div class="topbar-sub">Σημεία ανά περιοχή · Περίοδοι · Βιβλιοθήκη μετρήσεων · Μεταφορά — όλα από εδώ.</div>
 </div>
 <div class="container">
   {% if msg %}<div class="ok"><i class="ti ti-check"></i> {{ msg }}</div>{% endif %}
   <div class="tabs">
     <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-map-pin"></i> Σημεία</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Περίοδοι</a>
-    <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Βιβλιοθήκη</a>
+    <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Μετρήσεις</a>
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή</a>
-    <a class="tab {{ 'active' if tab=='migrate' }}" href="/dashboard/measurements?tab=migrate"><i class="ti ti-database-import"></i> Μεταφορά</a>
   </div>
 
   {% if tab=='points' %}
@@ -76,9 +80,9 @@ select.in-kind{width:120px;}
     </form>
 
     <div class="libcard">
-      <div class="libtitle"><i class="ti ti-flask"></i> Βιβλιοθήκη μετρήσεων — σύρε σε ένα σημείο</div>
+      <div class="libtitle"><i class="ti ti-flask"></i> Μετρήσεις — σύρε σε ένα σημείο</div>
       <div class="libwrap" id="measlib">
-        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Βιβλιοθήκη».</span>{% endfor %}
+        {% for m in library %}<span class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</span>{% else %}<span class="muted">Καμία μέτρηση — πρόσθεσε από το tab «Μετρήσεις».</span>{% endfor %}
       </div>
     </div>
 
@@ -143,7 +147,7 @@ select.in-kind{width:120px;}
   {% if tab in ['library','templates'] %}
   {% macro kind_opts(k) %}<option value="num"{{ ' selected' if k=='num' }}>Αριθμός</option><option value="bool"{{ ' selected' if k=='bool' }}>Ναι/Όχι</option><option value="text"{{ ' selected' if k=='text' }}>Κείμενο</option>{% endmacro %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Βιβλιοθήκη μετρήσεων</div>
+    <div class="card-title"><i class="ti ti-flask"></i> Μετρήσεις</div>
     <p class="muted" style="margin-bottom:6px;">Μία κοινή βιβλιοθήκη — όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Τις σέρνεις σε σημεία από το tab «Σημεία». Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση.</p>
     {% for g in lib_groups %}
       <div class="htitle">{{ g.name }}</div>
@@ -212,23 +216,22 @@ select.in-kind{width:120px;}
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
-    <p class="muted" style="margin-bottom:8px;">Το δέντρο των δικτύων. Κάθε γραμμή = ομάδα ή υποομάδα. Άλλαξε όνομα/γονέα/σειρά, ενεργοποίησε/απενεργοποίησε, ή πρόσθεσε νέα πιο κάτω. «σημ.» = πόσα σημεία είναι αναρτημένα εκεί.</p>
+    <p class="muted" style="margin-bottom:8px;">Σύρε μια γραμμή από τη λαβή και άφησέ την πάνω σε άλλη για να γίνει υποομάδα της — ή στη μπάρα «κορυφαίο επίπεδο» για να γίνει ομάδα. Άλλαξε όνομα/σειρά, ενεργοποίησε/απενεργοποίησε, ή πρόσθεσε νέα πιο κάτω. «σημ.» = πόσα σημεία είναι αναρτημένα.</p>
+    <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
     {% for row in node_tree %}
-    <form method="POST" action="/dashboard/measurements/node/save" class="row {{ 'off' if not row.n.is_active }}" style="padding-left:{{ row.depth*22 }}px;">
-      <input type="hidden" name="id" value="{{ row.n.id }}">
-      <span class="muted">{{ '└─' if row.depth else '●' }}</span>
-      <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
-      <span class="lbl">Γονέας</span>
-      <select name="parent_id">
-        <option value="">— (κορυφή)</option>
-        {% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==row.n.parent_id }} {{ 'disabled' if o.id==row.n.id }}>{{ o.label }}</option>{% endfor %}
-      </select>
-      <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
-      <span class="tag">{{ row.np }} σημ.</span>
-      <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-      <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
-      <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
-    </form>
+    <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
+      <span class="grip" draggable="true" ondragstart="ndrag(event)" title="Σύρε για μετακίνηση"><i class="ti ti-grip-vertical"></i></span>
+      <form method="POST" action="/dashboard/measurements/node/save" class="nform">
+        <input type="hidden" name="id" value="{{ row.n.id }}">
+        <input type="hidden" name="parent_id" value="{{ row.n.parent_id or '' }}">
+        <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
+        <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
+        <span class="tag">{{ row.np }} σημ.</span>
+        <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+        <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
+        <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
+      </form>
+    </div>
     {% else %}
     <div class="muted" style="padding-top:8px;">Κανένας κόμβος — πρόσθεσε πιο κάτω.</div>
     {% endfor %}
@@ -259,21 +262,6 @@ select.in-kind{width:120px;}
     {% else %}
     <div class="muted">Κανένα σημείο ακόμη.</div>
     {% endfor %}
-  </div>
-  {% endif %}
-
-  {% if tab=='migrate' %}
-  <div class="card">
-    <div class="card-title">Μεταφορά παλιών καταγραφών (Φ2)</div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <tr><td class="muted" style="padding:6px;">Πισίνες legacy</td><td style="text-align:right;font-weight:600;">{{ st.pool_records }}</td><td class="muted">→ μεταφ.</td><td style="text-align:right;font-weight:600;">{{ st.pool_migrated }}</td></tr>
-      <tr><td class="muted" style="padding:6px;">Νερά legacy</td><td style="text-align:right;font-weight:600;">{{ st.water_records }}</td><td class="muted">→ μεταφ.</td><td style="text-align:right;font-weight:600;">{{ st.water_migrated }}</td></tr>
-    </table>
-    <div class="row" style="border:none;margin-top:10px;">
-      <form method="POST" action="/dashboard/measurements/migrate"><input type="hidden" name="action" value="points"><button class="btn ghost" type="submit"><i class="ti ti-map-pin-plus"></i> Δημιουργία σημείων (coarse)</button></form>
-      <form method="POST" action="/dashboard/measurements/migrate" onsubmit="return confirm('Backup; Αντιγραφή legacy → νέα δομή (idempotent).');"><input type="hidden" name="action" value="migrate"><button class="btn" type="submit"><i class="ti ti-database-import"></i> Μεταφορά καταγραφών</button></form>
-    </div>
-    <p class="muted" style="margin-top:8px;">Πάρε backup πρώτα. Αντιγραφή — τα παλιά δεν θίγονται.</p>
   </div>
   {% endif %}
 
@@ -313,6 +301,19 @@ select.in-kind{width:120px;}
     },500);
   };
 })();
+</script>
+<script>
+function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }
+function nallow(e){ e.preventDefault(); e.currentTarget.classList.add("over"); }
+function nleave(e){ e.currentTarget.classList.remove("over"); }
+function ndrop(e, target){
+  e.preventDefault(); e.currentTarget.classList.remove("over");
+  var nid=e.dataTransfer.getData("nid"); if(!nid || nid===String(target)) return;
+  fetch("/dashboard/measurements/node/"+nid+"/move",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({parent_id:(target||"")})})
+    .then(function(r){return r.json();})
+    .then(function(j){ if(j&&j.ok) location.reload(); else alert((j&&j.msg)||"Δεν μετακινήθηκε"); })
+    .catch(function(){ alert("Σφάλμα."); });
+}
 </script>
 </body>
 </html>

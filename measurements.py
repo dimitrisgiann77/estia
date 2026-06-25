@@ -556,6 +556,28 @@ def measurements_node_save():
     return go('Προστέθηκε: ' + name)
 
 
+@app.route('/dashboard/measurements/node/<int:nid>/move', methods=['POST'])
+def measurements_node_move(nid):
+    """Φ-Β drag&drop: άλλαξε γονέα κόμβου (drop πάνω σε άλλον ή σε «κορυφή»).
+    Έλεγχος κύκλου· σειρά = στο τέλος των νέων αδελφών."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    n = MonitorNode.query.get(nid)
+    if not n:
+        return jsonify(ok=False, msg='Δεν βρέθηκε ο κόμβος'), 404
+    data = request.get_json(silent=True) or {}
+    pv = data.get('parent_id')
+    pid = int(pv) if pv else None
+    if pid == nid or (pid and _would_cycle(nid, pid)):
+        return jsonify(ok=False, msg='Μη έγκυρος γονέας (κύκλος)')
+    n.parent_id = pid
+    mx = db.session.query(db.func.max(MonitorNode.sort)).filter(MonitorNode.parent_id == pid).scalar() or 0
+    n.sort = mx + 1
+    db.session.commit()
+    log_activity('meas_node_move', '%s -> %s' % (nid, pid))
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/measurements/node/<int:nid>/toggle', methods=['POST'])
 def measurements_node_toggle(nid):
     if not is_admin():
