@@ -99,7 +99,7 @@ select.in-kind{width:120px;}
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
-    <p class="muted" style="margin-bottom:8px;">Σύρε μια γραμμή από τη λαβή και άφησέ την πάνω σε άλλη για να γίνει υποομάδα της — ή στη μπάρα «κορυφαίο επίπεδο» για ομάδα. Κάτω από κάθε κόμβο φαίνονται τα σημεία του. Η ανάθεση σημείου σε κόμβο γίνεται στην καρτέλα «Σημεία».</p>
+    <p class="muted" style="margin-bottom:8px;">Διάλεξε ξενοδοχείο, σύνδεσε με ✓ τις ομάδες (δίκτυα) που έχει, και πάτα μια ομάδα για να ανοίξει — μέσα σύρε τις μετρήσεις στο κάθε σημείο. Οι υπάρχουσες μετρήσεις φαίνονται ήδη.</p>
     <div class="hpick">
       {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
     </div>
@@ -121,43 +121,18 @@ select.in-kind{width:120px;}
     {% for row in node_tree %}{% if row.depth==0 %}
     <div class="gpanel" id="g{{ row.n.id }}">
       <div class="muted" style="margin-bottom:8px;"><b>{{ row.n.name }}</b> — σύρε μετρήσεις από την παλέτα στο κάθε σημείο (× αφαιρεί· αποθηκεύεται αυτόματα):</div>
-      {% for a in group_points.get(row.n.id, []) %}
+      {% for sub in group_points.get(row.n.id, []) %}
+      <div class="htitle">{{ sub.sub }}</div>
+      {% for a in sub.areas %}
       <div class="ptbox">
         <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
         <div class="ptzone" data-area="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="mchip" data-pkey="{{ c.pkey }}">{{ c.label }}{% if c.unit %} <span class="u">{{ c.unit }}</span>{% endif %} <span class="x" onclick="this.parentNode.remove();ptSave(this.closest('.ptzone'));">×</span></span>{% endfor %}</div>
       </div>
+      {% endfor %}
       {% else %}<div class="muted">Κανένα σημείο σε αυτό το δίκτυο για το ξενοδοχείο. Πρόσθεσε από την καρτέλα «Σημεία».</div>{% endfor %}
     </div>
     {% endif %}{% endfor %}
     {% endif %}
-    <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
-    {% for row in node_tree %}
-    <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
-      <span class="grip" draggable="true" ondragstart="ndrag(event)" title="Σύρε για μετακίνηση"><i class="ti ti-grip-vertical"></i></span>
-      <form method="POST" action="/dashboard/measurements/node/save" class="nform">
-        <input type="hidden" name="id" value="{{ row.n.id }}">
-        <input type="hidden" name="parent_id" value="{{ row.n.parent_id or '' }}">
-        <input class="in-name" type="text" name="name" value="{{ row.n.name }}">
-        <input class="in-sm" type="text" name="sort" value="{{ row.n.sort or 0 }}" title="σειρά">
-        <span class="tag">{{ row.np }} σημ.</span>
-        <button class="btn ghost" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-        <button class="btn" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/toggle">{{ 'Απενεργ.' if row.n.is_active else 'Ενεργ.' }}</button>
-        <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
-      </form>
-    </div>
-    {% if nh %}
-    <div class="nhotels" style="padding-left:{{ row.depth*22 + 34 }}px;">
-      <button type="button" class="hchip {{ 'on' if nh in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span> {{ hcodes.get(nh) }}</button>
-      <span class="muted">· συνολικά {{ row.hotels|length }} ξεν.</span>
-    </div>
-    {% endif %}
-    {% for a in row.points %}
-    <div class="ptunder" style="padding-left:{{ row.depth*22 + 34 }}px;"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.hotel %} <span class="muted">· {{ a.hotel.name }}</span>{% endif %}{% if a.location %} <span class="tag">{{ a.location }}</span>{% endif %}</div>
-    {% endfor %}
-    {% else %}
-    <div class="muted" style="padding-top:8px;">Κανένας κόμβος — πρόσθεσε πιο κάτω.</div>
-    {% endfor %}
-  </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
     <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
