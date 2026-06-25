@@ -74,7 +74,7 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
 
   {% if sel %}
   <div class="card">
-    <div class="card-title" style="display:flex;align-items:center;gap:8px;"><i class="ti {{ tpl.icon or 'ti-checklist' }}"></i> {{ sel.name }}{% if sel.hotel %} <span class="muted" style="font-weight:400;">· {{ sel.hotel.name }}</span>{% endif %}<a class="chip" style="margin-left:auto;font-size:12px;" href="/dashboard/measurements/entry"><i class="ti ti-arrow-left"></i> Άλλο σημείο</a></div>
+    <div class="card-title" style="display:flex;align-items:center;gap:8px;"><i class="ti {{ tpl.icon or 'ti-checklist' }}"></i> {{ sel.name }}{% if sel.hotel %} <span class="muted" style="font-weight:400;">· {{ sel.hotel.name }}</span>{% endif %}<a class="chip" style="margin-left:auto;font-size:12px;" href="/dashboard/measurements/today"><i class="ti ti-calendar-check"></i> Σήμερα</a></div>
     <form method="POST" action="/dashboard/measurements/entry/save">
       <input type="hidden" name="area_id" value="{{ sel.id }}">
       <div class="grid">
