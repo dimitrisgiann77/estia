@@ -758,6 +758,8 @@ def measurements_console():
     # Φ-Β — δομή δικτύων (υπολογισμός μόνο στο tab)
     node_opts = _node_options()
     node_tree, space_opts = [], []
+    _nh = request.args.get('nh')
+    nh = int(_nh) if (_nh and _nh.isdigit()) else None
     if tab == 'structure':
         node_tree = _node_tree()
         _npts = {}
@@ -792,7 +794,7 @@ def measurements_console():
                            param_templates=MonitorTemplate.query.order_by(MonitorTemplate.sort).all(),
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
-                           node_tree=node_tree, node_opts=node_opts, space_opts=space_opts)
+                           node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])

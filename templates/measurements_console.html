@@ -43,6 +43,10 @@ select.in-kind{width:120px;}
 .nhotels{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:2px 0 6px;}
 .hchip{font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid #d6eef3;background:#fff;color:#5a6b73;cursor:pointer;}
 .hchip.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
+.hpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.hbtn{padding:6px 12px;border-radius:8px;font-size:12px;text-decoration:none;color:#33454d;background:#fff;border:1px solid #d6eef3;}
+.hbtn.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
+.hchip .chk{font-weight:700;margin-right:2px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -86,6 +90,10 @@ select.in-kind{width:120px;}
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύων — Ομάδες / Υποομάδες</div>
     <p class="muted" style="margin-bottom:8px;">Σύρε μια γραμμή από τη λαβή και άφησέ την πάνω σε άλλη για να γίνει υποομάδα της — ή στη μπάρα «κορυφαίο επίπεδο» για ομάδα. Κάτω από κάθε κόμβο φαίνονται τα σημεία του. Η ανάθεση σημείου σε κόμβο γίνεται στην καρτέλα «Σημεία».</p>
+    <div class="hpick">
+      {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
+    </div>
+    <p class="muted" style="margin-bottom:8px;">{% if nh %}Πάτα «+/✓» σε κάθε κόμβο για σύνδεση/αποσύνδεση με το επιλεγμένο ξενοδοχείο.{% else %}Διάλεξε ξενοδοχείο πάνω για να ορίσεις ποια δίκτυα έχει.{% endif %}</p>
     <div class="droproot" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,'')"><i class="ti ti-arrow-bar-to-up"></i> Άφησε εδώ για κορυφαίο επίπεδο (ομάδα)</div>
     {% for row in node_tree %}
     <div class="noderow {{ 'off' if not row.n.is_active }}" data-nid="{{ row.n.id }}" style="padding-left:{{ row.depth*22 }}px;" ondragover="nallow(event)" ondragleave="nleave(event)" ondrop="ndrop(event,{{ row.n.id }})">
@@ -101,11 +109,12 @@ select.in-kind{width:120px;}
         <button class="btn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή κόμβου «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
       </form>
     </div>
+    {% if nh %}
     <div class="nhotels" style="padding-left:{{ row.depth*22 + 34 }}px;">
-      <span class="muted">Ξενοδοχεία:</span>
-      {% for h in all_hotels %}<button type="button" class="hchip {{ 'on' if h.id in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ h.id }})" title="{{ h.name }}">{{ hcodes.get(h.id) or h.name }}</button>{% endfor %}
-      {% if not all_hotels %}<span class="muted">—</span>{% endif %}
+      <button type="button" class="hchip {{ 'on' if nh in row.hotels }}" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><span class="chk">{{ '✓' if nh in row.hotels else '+' }}</span> {{ hcodes.get(nh) }}</button>
+      <span class="muted">· συνολικά {{ row.hotels|length }} ξεν.</span>
     </div>
+    {% endif %}
     {% for a in row.points %}
     <div class="ptunder" style="padding-left:{{ row.depth*22 + 34 }}px;"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.hotel %} <span class="muted">· {{ a.hotel.name }}</span>{% endif %}{% if a.location %} <span class="tag">{{ a.location }}</span>{% endif %}</div>
     {% endfor %}
@@ -307,7 +316,7 @@ select.in-kind{width:120px;}
 function nhtoggle(btn,nid,hid){
   fetch("/dashboard/measurements/node/"+nid+"/hotel",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hotel_id:hid})})
     .then(function(r){return r.json();})
-    .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); } else alert((j&&j.msg)||"Σφάλμα"); })
+    .then(function(j){ if(j&&j.ok){ btn.classList.toggle("on", j.on); var c=btn.querySelector(".chk"); if(c) c.textContent=j.on?"✓":"+"; } else alert((j&&j.msg)||"Σφάλμα"); })
     .catch(function(){ alert("Σφάλμα."); });
 }
 function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }
