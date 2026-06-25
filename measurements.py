@@ -591,7 +591,13 @@ def measurements_node_save():
         sort = 0
 
     def go(m=''):
-        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+        _nh = (request.form.get('nh') or '').strip()
+        url = url_for('measurements_console') + '?tab=structure'
+        if _nh:
+            url += '&nh=' + _nh
+        if m:
+            url += '&msg=' + m
+        return redirect(url)
 
     if not name:
         return go('Λείπει το όνομα.')
@@ -651,7 +657,13 @@ def measurements_node_delete(nid):
     if not is_admin():
         return redirect(url_for('login'))
     def go(m=''):
-        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+        _nh = (request.form.get('nh') or '').strip()
+        url = url_for('measurements_console') + '?tab=structure'
+        if _nh:
+            url += '&nh=' + _nh
+        if m:
+            url += '&msg=' + m
+        return redirect(url)
     n = MonitorNode.query.get(nid)
     if not n:
         return go()
@@ -726,7 +738,13 @@ def measurements_node_point_add():
     hid = f.get('hotel_id')
     name = (f.get('name') or '').strip()[:120]
     def go(m=''):
-        return redirect(url_for('measurements_console') + '?tab=structure' + (('&msg=' + m) if m else ''))
+        _nh = (request.form.get('nh') or '').strip()
+        url = url_for('measurements_console') + '?tab=structure'
+        if _nh:
+            url += '&nh=' + _nh
+        if m:
+            url += '&msg=' + m
+        return redirect(url)
     if not (nid and hid and name):
         return go('Συμπλήρωσε κόμβο, ξενοδοχείο και όνομα.')
     db.session.add(Area(hotel_id=int(hid), template_key='generic', name=name, location='',

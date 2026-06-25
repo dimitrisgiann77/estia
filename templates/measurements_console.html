@@ -79,6 +79,12 @@ select.in-kind{width:120px;}
 .tname .gdot{width:7px;height:7px;background:#9fc4d2;}
 .tname .gdot.g0{width:9px;height:9px;background:#3a6b82;}
 .tinfo{margin-left:auto;font-size:11px;color:#9aa7ad;background:#eef6fb;border-radius:5px;padding:1px 7px;}
+.tname-in{flex:1;max-width:380px;font-size:13px;}
+.tname-in.top{font-weight:700;color:#193847;}
+.iconbtn{border:none;background:#eef6fb;color:#33454d;border-radius:7px;width:30px;height:30px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;}
+.iconbtn.del{background:#fee2e2;color:#b91c1c;}
+.iconbtn:hover{filter:brightness(.96);}
+.treerow{gap:8px;}
 /* Φ2 — βιβλιοθήκη + chips ανά σημείο */
 .libcard{background:#fff8ee;border:1px dashed #f0d9b8;border-radius:12px;padding:10px 12px;margin-bottom:14px;position:sticky;top:0;z-index:5;}
 .libtitle{font-size:11px;font-weight:700;color:#b07d2e;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
@@ -121,27 +127,26 @@ select.in-kind{width:120px;}
   {% if nh %}
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Τσέκαρε ποια δίκτυα και υποδίκτυα έχει αυτό το ξενοδοχείο. Τα σημεία και οι μετρήσεις ορίζονται στις καρτέλες «Σημεία» και «Μετρήσεις».</p>
+    <p class="muted" style="margin-bottom:12px;">Τσέκαρε <i class="ti ti-check"></i> τι έχει το ξενοδοχείο. Άλλαξε όνομα και πάτα <i class="ti ti-device-floppy"></i>. Το <i class="ti ti-plus"></i> δίπλα προσθέτει υποομάδα. Τα σημεία/μετρήσεις ορίζονται στις καρτέλες «Σημεία»/«Μετρήσεις».</p>
+    <button class="btn alt" type="button" onclick="gaddgroup({{ nh }})" style="margin-bottom:12px;"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
     <div class="tree">
       {% for row in node_tree %}
-      <div class="treerow {{ 'on' if nh in row.hotels }} {{ 'lvl0' if not row.depth }}" style="padding-left:{{ row.depth*26 }}px;">
-        <button type="button" class="ttog {{ 'on' if nh in row.hotels }}" title="Έχει / δεν έχει" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><i class="ti ti-check"></i></button>
-        <span class="tname {{ 'top' if not row.depth }}"><span class="gdot {{ 'g0' if not row.depth }}"></span>{{ row.n.name }}</span>
-        {% if row.np %}<span class="tinfo">{{ row.np }} σημεία</span>{% endif %}
-      </div>
+      <form method="POST" action="/dashboard/measurements/node/save" class="treerow {{ 'on' if nh in row.hotels }} {{ 'lvl0' if not row.depth }}" style="padding-left:{{ row.depth*26 }}px;">
+        <input type="hidden" name="id" value="{{ row.n.id }}">
+        <input type="hidden" name="parent_id" value="{{ row.n.parent_id or '' }}">
+        <input type="hidden" name="sort" value="{{ row.n.sort or 0 }}">
+        <input type="hidden" name="nh" value="{{ nh }}">
+        <button type="button" class="ttog {{ 'on' if nh in row.hotels }}" title="Έχει / δεν έχει αυτό το ξενοδοχείο" onclick="nhtoggle(this,{{ row.n.id }},{{ nh }})"><i class="ti ti-check"></i></button>
+        <input class="tname-in {{ 'top' if not row.depth }}" type="text" name="name" value="{{ row.n.name }}">
+        <button class="iconbtn" type="submit" title="Αποθήκευση ονόματος"><i class="ti ti-device-floppy"></i></button>
+        <button class="iconbtn" type="button" title="Νέα υποομάδα εδώ" onclick="addsub({{ row.n.id }},{{ nh }})"><i class="ti ti-plus"></i></button>
+        <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
+        {% if row.np %}<span class="tinfo">{{ row.np }} σημ.</span>{% endif %}
+      </form>
       {% else %}
-      <div class="muted" style="padding:8px 0;">Κανένας κόμβος ακόμη — πρόσθεσε πιο κάτω.</div>
+      <div class="muted" style="padding:8px 0;">Κανένας κόμβος — πάτα «Νέα ομάδα».</div>
       {% endfor %}
     </div>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-plus"></i> Νέα ομάδα / υποομάδα</div>
-    <form method="POST" action="/dashboard/measurements/node/save" class="row" style="border:none;">
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="name" placeholder="π.χ. Πύργοι ψύξης" required></div>
-      <div><span class="lbl">Ανήκει σε (κενό = νέα ομάδα κορυφής)</span><select name="parent_id"><option value="">— (ομάδα κορυφής)</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="0"></div>
-      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
   </div>
   {% endif %}
   {% endif %}
@@ -341,7 +346,9 @@ function nhtoggle(btn,nid,hid){
   });
 })();
 function gexp(id){ var p=document.getElementById(id); if(!p) return; p.style.display=(p.style.display==="block"?"none":"block"); }
-function gaddgroup(){ var n=prompt("Όνομα νέας ομάδας (δικτύου);"); if(!n) return; var f=document.createElement("form"); f.method="POST"; f.action="/dashboard/measurements/node/save"; var i1=document.createElement("input"); i1.name="name"; i1.value=n; var i2=document.createElement("input"); i2.name="parent_id"; i2.value=""; f.appendChild(i1); f.appendChild(i2); document.body.appendChild(f); f.submit(); }
+function _mknode(name,parent,nh){ var f=document.createElement("form"); f.method="POST"; f.action="/dashboard/measurements/node/save"; [["name",name],["parent_id",parent||""],["nh",nh||""]].forEach(function(kv){var i=document.createElement("input");i.name=kv[0];i.value=kv[1];f.appendChild(i);}); document.body.appendChild(f); f.submit(); }
+function gaddgroup(nh){ var n=prompt("Όνομα νέας ομάδας (δικτύου);"); if(n) _mknode(n,"",nh); }
+function addsub(pid,nh){ var n=prompt("Όνομα νέας υποομάδας;"); if(n) _mknode(n,pid,nh); }
 function ndrag(e){ var r=e.target.closest("[data-nid]"); if(r) e.dataTransfer.setData("nid", r.dataset.nid); }
 function nallow(e){ e.preventDefault(); e.currentTarget.classList.add("over"); }
 function nleave(e){ e.currentTarget.classList.remove("over"); }
