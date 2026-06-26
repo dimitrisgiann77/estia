@@ -914,6 +914,68 @@ def measurements_point_save():
     return redirect(url_for('measurements_console') + '?tab=points' + (('&nh=' + _nh) if _nh else ''))
 
 
+# ── Προτεινόμενα σημεία (standard σετ) ανά ξενοδοχείο ─────────────────────────
+# (όνομα, χώρος, node_key, [pkeys μετρήσεων])
+SCAFFOLD_POINTS = [
+    ('Δεξαμενή', 'Μηχανοστάσιο', 'water_storage', ['temp_tank', 'clo2_tank', 'ph_tank']),
+    ('Αναχώρηση ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_out', 'clo2_dhw_out']),
+    ('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_return', 'clo2_dhw_return']),
+    ('Αντ. Όσμωση', 'Μηχανοστάσιο', 'water_ro', ['temp_ro', 'clo2_ro']),
+    ('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_ro', ['temp_ro', 'clo2_ro']),
+    ('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_cold', ['temp_cold', 'clo2_cold']),
+    ('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_hot', ['temp_hot', 'clo2_hot']),
+    ('Κύρια Πισίνα', 'Πισίνα', 'pools',
+     ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
+      'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done']),
+]
+
+
+def scaffold_hotel_points(hotel_id):
+    """Δημιουργεί το standard σετ σημείων για ένα ξενοδοχείο. Idempotent
+    (παραλείπει όσα υπάρχουν ήδη με ίδιο όνομα). Επιστρέφει πλήθος που δημιουργήθηκαν."""
+    created = 0
+    ncache = {}
+    def node(key):
+        if key not in ncache:
+            ncache[key] = MonitorNode.query.filter_by(key=key).first()
+        return ncache[key]
+    for name, loc, nkey, pkeys in SCAFFOLD_POINTS:
+        if Area.query.filter_by(hotel_id=hotel_id, name=name, engine_only=True).first():
+            continue
+        nd = node(nkey)
+        a = Area(hotel_id=hotel_id, template_key='generic', name=name, location=loc,
+                 is_active=True, engine_only=True, node_id=(nd.id if nd else None))
+        db.session.add(a); db.session.flush()
+        for i, pk in enumerate(pkeys, 1):
+            db.session.add(AreaParam(area_id=a.id, pkey=pk, sort=i))
+        # σύνδεσε το ξενοδοχείο στον κόμβο (για να φαίνεται στη «Σήμερα»)
+        if nd:
+            cur = _hotels_set(nd)
+            if hotel_id not in cur:
+                cur.add(hotel_id)
+                nd.hotels = ','.join(str(x) for x in sorted(cur))
+        created += 1
+    db.session.commit()
+    return created
+
+
+@app.route('/dashboard/measurements/points/scaffold', methods=['POST'])
+def measurements_points_scaffold():
+    if not is_admin():
+        return redirect(url_for('login'))
+    _nh = (request.form.get('nh') or '').strip()
+    if _nh.isdigit():
+        try:
+            n = scaffold_hotel_points(int(_nh))
+            log_activity('meas_points_scaffold', 'hotel=%s created=%d' % (_nh, n))
+            msg = 'Δημιουργήθηκαν %d προτεινόμενα σημεία.' % n if n else 'Υπάρχουν ήδη σημεία — τίποτα νέο.'
+        except Exception as e:
+            db.session.rollback(); msg = 'Σφάλμα: %s' % e
+    else:
+        msg = 'Διάλεξε ξενοδοχείο πρώτα.'
+    return redirect(url_for('measurements_console') + '?tab=points&nh=' + _nh + '&msg=' + msg)
+
+
 @app.route('/dashboard/measurements/point/<int:pid>/delete', methods=['POST'])
 def measurements_point_delete(pid):
     if not is_admin():

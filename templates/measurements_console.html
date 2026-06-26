@@ -99,6 +99,7 @@ select.in-kind{width:120px;}
 .ptrow .grip{cursor:grab;color:#9fb3bf;font-size:15px;}
 .ptrows .ph{color:#b6c4cd;font-size:12px;font-style:italic;padding:2px;}
 .addpt{margin-top:8px;}
+.scaffold-empty{padding:14px;border:1px dashed #cfe0e8;border-radius:10px;text-align:center;background:#fbfdff;}
 .checkwrap{display:flex;flex-wrap:wrap;gap:4px;}
 .mcheck{display:inline-flex;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #e3edf4;border-radius:7px;padding:4px 9px;cursor:pointer;}
 .mcheck input{margin:0;}
@@ -214,7 +215,14 @@ select.in-kind{width:120px;}
       <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
     </form>
     {% else %}
-    <div class="muted" style="padding:8px 0;">Κανένα σημείο ακόμη — πάτα «Νέο σημείο».</div>
+    <div class="scaffold-empty">
+      <div class="muted" style="margin-bottom:10px;">Κανένα σημείο ακόμη σε αυτό το ξενοδοχείο.</div>
+      <form method="POST" action="/dashboard/measurements/points/scaffold" style="display:inline;">
+        <input type="hidden" name="nh" value="{{ nh }}">
+        <button class="btn" type="submit"><i class="ti ti-wand"></i> Δημιουργία προτεινόμενων σημείων</button>
+      </form>
+      <div class="muted" style="margin-top:8px;font-size:12px;">Φτιάχνει το standard σετ (Δεξαμενή, Αναχώρηση/Επιστροφή ΖΝΧ, Αντ. Όσμωση ×2, Κρύο/Ζεστό Νερό, Κύρια Πισίνα). Μετά διόρθωσε/σβήσε ό,τι δεν ισχύει εδώ.</div>
+    </div>
     {% endfor %}
     <button class="btn alt" type="button" onclick="addpoint('',{{ nh }})" style="margin-top:10px;"><i class="ti ti-plus"></i> Νέο σημείο</button>
   </div>
