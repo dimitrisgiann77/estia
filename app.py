@@ -362,11 +362,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.312'
-APP_BUILD   = '593'
+APP_VERSION = '12.313'
+APP_BUILD   = '594'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.313', 'b': '594', 'date': '26/06/2026', 'time': '19:45', 'title': 'Log: σωστός τύπος (Νερά) στα νέα σημεία',
+     'items': ['Στο Log Μετρήσεων ο «Τύπος» υπολογίζεται πλέον από το ΔΙΚΤΥΟ (κόμβο) του σημείου, όχι το template. Τα νέα σημεία νερού (Κρύο/Ζεστό Νερό, Επιστροφή ΖΝΧ, Αντ. Όσμωση Δωμάτιο) εμφανίζονται σωστά ως «Νερά» αντί «Τομέας».']},
     {'v': '12.312', 'b': '593', 'date': '26/06/2026', 'time': '19:20', 'title': 'tz-migrate: ανθεκτικό σε schema-drift',
      'items': ['Το migration ώρας διαβάζει πλέον ΜΟΝΟ τις στήλες που υπάρχουν όντως στη βάση (inspector), ώστε να μη σκοντάφτει σε στήλες μοντέλου που λείπουν από την παραγωγή (π.χ. payroll_run.approved_at). Το dry-run είχε σταματήσει χωρίς καμία αλλαγή.']},
     {'v': '12.311', 'b': '592', 'date': '26/06/2026', 'time': '19:00', 'title': 'Πλήρης μετάβαση σε ΩΡΑ ΕΛΛΑΔΟΣ (storage + display)',
@@ -3002,6 +3004,30 @@ def _records_items(user, ftype='all'):
     #   εμφανίζονται μαζί με τα legacy, ΧΩΡΙΣ διπλά (source_kind IS NULL). Κατηγοριοποίηση ανά template.
     _ZNX_TPL = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
     _ft_of = {'pool': 'pools', 'water': 'water', 'area': 'area'}
+    # Τύπος βάσει ΔΙΚΤΥΟΥ (κόμβου), όχι template — ώστε τα generic σημεία νερού να μη βγαίνουν «Τομέας».
+    try:
+        from measurements import MonitorNode as _MN
+        _nodes = {n.id: n for n in _MN.query.all()}
+    except Exception:
+        _nodes = {}
+    _rootkind_cache = {}
+    def _root_kind(nid):
+        if nid in _rootkind_cache:
+            return _rootkind_cache[nid]
+        seen = []
+        cur = nid
+        while cur is not None and cur in _nodes and cur not in seen:
+            seen.append(cur)
+            nn = _nodes[cur]
+            if nn.parent_id is None or nn.parent_id not in _nodes:
+                rk = ('pool' if nn.key == 'pools' else
+                      ('water' if nn.key in ('water', 'aerosol', 'irrigation', 'sewage') else 'area'))
+                for s in seen:
+                    _rootkind_cache[s] = rk
+                return rk
+            cur = nn.parent_id
+        _rootkind_cache[nid] = 'area'
+        return 'area'
     # Log: γνήσιες (source_kind None) + μεταφερμένες reshape ('rsplit'), ΟΧΙ legacy pool/water αντίγραφα.
     # Μόνο ΕΝΕΡΓΑ σημεία → τα αρχειοθετημένα (παλιά Κουζίνα/Απομακρυσμένο/coarse) δεν εμφανίζονται.
     _rq = apply_period(Reading.query.filter(db.or_(Reading.source_kind.is_(None), Reading.source_kind == 'rsplit')), Reading.record_date)
@@ -3010,7 +3036,13 @@ def _records_items(user, ftype='all'):
         if not a or not a.is_active or a.hotel_id not in hids:
             continue
         tk = r.template_key or (a.template_key if a else '') or ''
-        kind = 'pool' if tk == 'pool' else ('water' if tk in _ZNX_TPL else 'area')
+        if tk == 'pool':
+            kind = 'pool'
+        elif tk in _ZNX_TPL:
+            kind = 'water'
+        else:
+            nid = getattr(a, 'node_id', None) if a else None
+            kind = _root_kind(nid) if nid else 'area'
         if ftype not in ('all', _ft_of[kind]):
             continue
         items.append({
