@@ -638,15 +638,15 @@ RESHAPE_LIB = [
 
 
 def _reshape_sergios(apply=False):
-    """Επιστρέφει (log_lines). apply=False → μόνο αναφορά (καμία αλλαγή).
-    Βρίσκει σημεία με template_key (όχι hardcoded id) — ανθεκτικό."""
+    """Επιστρέφει log_lines. ΚΑΙ στο dry-run κάνει όλες τις ενέργειες, αλλά στο τέλος
+    ROLLBACK (πραγματική προσομοίωση — σωστά counts). apply=True → commit."""
     import json as __j
     L = []
     def say(x): L.append(x)
     h = Hotel.query.filter(Hotel.name.ilike('%sergios%')).first()
     if not h:
         say('ΣΦΑΛΜΑ: SERGIOS hotel δεν βρέθηκε.'); return L
-    say('=== RESHAPE SERGIOS (%s) ===' % ('APPLY' if apply else 'DRY-RUN — καμία αλλαγή'))
+    say('=== RESHAPE SERGIOS (%s) ===' % ('APPLY — commit' if apply else 'DRY-RUN — προσομοίωση, rollback στο τέλος'))
     say('Hotel id=%s %s' % (h.id, h.name))
 
     def node(key):
@@ -661,23 +661,20 @@ def _reshape_sergios(apply=False):
 
     # 0) νέες μετρήσεις βιβλιοθήκης
     for pkey, label, unit, mn, mx, low, high in RESHAPE_LIB:
-        ex = MonitorParam.query.filter_by(pkey=pkey).first()
-        if ex:
+        if MonitorParam.query.filter_by(pkey=pkey).first():
             say('  lib OK: %s' % pkey)
         else:
             say('  + lib NEW: %s (%s)' % (pkey, label))
-            if apply:
-                db.session.add(MonitorParam(template_key='generic', pkey=pkey, label=label,
-                                            unit=unit or '', min_v=mn, max_v=mx, action_low=low,
-                                            action_high=high, sort=50, kind='num',
-                                            category='Δίκτυο Νερού', is_active=True))
-    if apply:
-        db.session.flush()
-        try: _seed_periods('generic')
-        except Exception: pass
+            db.session.add(MonitorParam(template_key='generic', pkey=pkey, label=label,
+                                        unit=unit or '', min_v=mn, max_v=mx, action_low=low,
+                                        action_high=high, sort=50, kind='num',
+                                        category='Δίκτυο Νερού', is_active=True))
+    db.session.flush()
+    try: _seed_periods('generic')
+    except Exception: pass
 
     def set_params(area, pkeys):
-        if not apply or not area: return
+        if not area: return
         AreaParam.query.filter_by(area_id=area.id).delete()
         for i, pk in enumerate(pkeys, 1):
             db.session.add(AreaParam(area_id=area.id, pkey=pk, sort=i))
@@ -687,33 +684,27 @@ def _reshape_sergios(apply=False):
         if a:
             say('  area OK: %r (id=%s)' % (name, a.id))
         else:
-            say('  + area NEW: %r  (%s)' % (name, location))
-            if apply:
-                a = Area(hotel_id=h.id, template_key='generic', name=name, location=location,
-                         is_active=True, engine_only=True, node_id=(nd.id if nd else None))
-                db.session.add(a); db.session.flush()
-        if apply and a:
-            a.location = location; a.node_id = (nd.id if nd else None); a.is_active = True
-            set_params(a, pkeys)
+            a = Area(hotel_id=h.id, template_key='generic', name=name, location=location,
+                     is_active=True, engine_only=True, node_id=(nd.id if nd else None))
+            db.session.add(a); db.session.flush()
+            say('  + area NEW: %r (id=%s)' % (name, a.id))
+        a.location = location; a.node_id = (nd.id if nd else None); a.is_active = True
+        set_params(a, pkeys)
         return a
 
     def retag(area, name, location, nd, pkeys):
         if not area:
             say('  ! δεν βρέθηκε για retag → %r' % name); return None
         say('  ~ retag id=%s: %r → %r  loc=%r node=%s' % (area.id, area.name, name, location, nd.name if nd else '—'))
-        if apply:
-            area.name = name; area.location = location; area.node_id = (nd.id if nd else None)
-            set_params(area, pkeys)
+        area.name = name; area.location = location; area.node_id = (nd.id if nd else None)
+        set_params(area, pkeys)
         return area
 
     def copy_reading(src, tgt_area, key_map, position, gapfill=False):
         if tgt_area is None: return 0
         try: sv = __j.loads(src.values or '{}')
         except Exception: sv = {}
-        nv = {}
-        for tk, sk in key_map.items():
-            if sk in sv and sv[sk] not in (None, ''):
-                nv[tk] = sv[sk]
+        nv = {tk: sv[sk] for tk, sk in key_map.items() if sk in sv and sv[sk] not in (None, '')}
         if not nv:
             return 0
         if gapfill:
@@ -724,24 +715,18 @@ def _reshape_sergios(apply=False):
             if Reading.query.filter_by(source_kind='rsplit', source_id=src.id,
                                        area_id=tgt_area.id, position=position).first():
                 return 0
-        if apply:
-            db.session.add(Reading(area_id=tgt_area.id, template_key=tgt_area.template_key,
-                                   user_id=src.user_id, record_date=src.record_date,
-                                   period=src.period, recorded_at=src.recorded_at,
-                                   values=__j.dumps(nv), notes=src.notes,
-                                   position=position, source_kind='rsplit', source_id=src.id))
+        db.session.add(Reading(area_id=tgt_area.id, template_key=tgt_area.template_key,
+                               user_id=src.user_id, record_date=src.record_date,
+                               period=src.period, recorded_at=src.recorded_at,
+                               values=__j.dumps(nv), notes=src.notes,
+                               position=position, source_kind='rsplit', source_id=src.id))
+        db.session.flush()
         return 1
 
-    # σημεία προέλευσης (by template_key)
-    A_TANK = find('znx_tank')
-    A_ANX  = find('znx_dhw')
-    A_KIT  = find('znx_kitchen')
-    A_REM  = find('znx_remote')
-    A_ROM  = find('znx_ro')
-    A_COARSE = find('znx')
+    A_TANK, A_ANX, A_KIT = find('znx_tank'), find('znx_dhw'), find('znx_kitchen')
+    A_REM, A_ROM, A_COARSE = find('znx_remote'), find('znx_ro'), find('znx')
     A_POOL = find('pool', 'Κύρια Πισίνα') or find('pool')
 
-    # ── 1) in-place ──
     say('\n-- In-place --')
     retag(A_TANK, 'Δεξαμενή', 'Μηχανοστάσιο', N_STORAGE, ['temp_tank', 'clo2_tank', 'ph_tank'])
     retag(A_ROM, 'Αντ. Όσμωση', 'Μηχανοστάσιο', N_RO, ['temp_ro', 'clo2_ro'])
@@ -750,14 +735,12 @@ def _reshape_sergios(apply=False):
            'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done'])
     retag(A_ANX, 'Αναχώρηση ΖΝΧ', 'Μηχανοστάσιο', N_HOT, ['temp_dhw_out', 'clo2_dhw_out'])
 
-    # ── 2) νέα σημεία ──
     say('\n-- Νέα σημεία --')
-    A_RET  = ensure_area('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', N_HOT, ['temp_dhw_return', 'clo2_dhw_return'])
-    A_RO2  = ensure_area('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Βοηθητικός Χώρος', N_RO, ['temp_ro', 'clo2_ro'])
+    A_RET = ensure_area('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', N_HOT, ['temp_dhw_return', 'clo2_dhw_return'])
+    A_RO2 = ensure_area('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Βοηθητικός Χώρος', N_RO, ['temp_ro', 'clo2_ro'])
     A_COLD = ensure_area('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', N_COLD, ['temp_cold', 'clo2_cold'])
-    A_HOT  = ensure_area('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', N_HOT, ['temp_hot', 'clo2_hot'])
+    A_HOT = ensure_area('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', N_HOT, ['temp_hot', 'clo2_hot'])
 
-    # ── 3) split Αναχώρηση return-half → Επιστροφή ──
     say('\n-- Split readings --')
     c = 0
     if A_ANX and A_RET:
@@ -765,7 +748,6 @@ def _reshape_sergios(apply=False):
             c += copy_reading(r, A_RET, {'temp_dhw_return': 'temp_dhw_return', 'clo2_dhw_return': 'clo2_dhw_return'}, None)
     say('  Αναχώρηση→Επιστροφή: %d καταγραφές' % c)
 
-    # ── 4) merge Κουζίνα + Απομακρυσμένο → Κρύο/Ζεστό ──
     def merge_src(a, origin, ck_clo2, ck_tcold, ck_thot):
         if not a: say('  ! merge: δεν βρέθηκε %s' % origin); return
         cc = ch = 0
@@ -773,12 +755,10 @@ def _reshape_sergios(apply=False):
             cc += copy_reading(r, A_COLD, {'temp_cold': ck_tcold, 'clo2_cold': ck_clo2}, origin)
             ch += copy_reading(r, A_HOT, {'temp_hot': ck_thot}, origin)
         say('  %s: →Κρύο %d, →Ζεστό %d (θέση=%r)' % (a.name, cc, ch, origin))
-        if apply:
-            a.is_active = False; say('    (απενεργοποιήθηκε %r)' % a.name)
+        a.is_active = False
     merge_src(A_KIT, 'Κουζίνα', 'clo2_kitchen', 'temp_kitchen_cold', 'temp_kitchen_hot')
     merge_src(A_REM, 'Απομακρυσμένο', 'clo2_remote', 'temp_remote_cold', 'temp_remote_hot')
 
-    # ── 5) distribute coarse → όλα (gap-fill) ──
     say('\n-- AREA coarse «Κεντρικό Δίκτυο» διαμοιρασμός (gap-fill) --')
     if A_COARSE:
         d = {'tank': 0, 'out': 0, 'ret': 0, 'ro': 0, 'cold': 0, 'hot': 0}
@@ -793,13 +773,12 @@ def _reshape_sergios(apply=False):
             d['hot'] += copy_reading(r, A_HOT, {'temp_hot': 'temp_remote_hot'}, 'Απομακρυσμένο', gapfill=True)
         say('  Δεξαμενή+%d, Αναχ+%d, Επιστρ+%d, Όσμωση+%d, Κρύο+%d, Ζεστό+%d' %
             (d['tank'], d['out'], d['ret'], d['ro'], d['cold'], d['hot']))
-        if apply:
-            A_COARSE.is_active = False; say('    (απενεργοποιήθηκε «Κεντρικό Δίκτυο»)')
+        A_COARSE.is_active = False
 
     if apply:
         db.session.commit(); say('\n✅ ΕΦΑΡΜΟΣΤΗΚΕ & commit.')
     else:
-        db.session.rollback(); say('\n(DRY-RUN: τίποτα δεν αποθηκεύτηκε.)')
+        db.session.rollback(); say('\n(DRY-RUN: rollback — τίποτα δεν αποθηκεύτηκε. Τα νούμερα δείχνουν τι ΘΑ γίνει.)')
     return L
 
 @app.route('/dashboard/measurements/admin/sergios-reshape')

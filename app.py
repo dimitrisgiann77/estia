@@ -339,11 +339,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.304'
-APP_BUILD   = '585'
+APP_VERSION = '12.305'
+APP_BUILD   = '586'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.305', 'b': '586', 'date': '26/06/2026', 'time': '15:30', 'title': 'Φ2 fix: το dry-run δείχνει σωστά νούμερα (προσομοίωση+rollback)',
+     'items': ['Το dry-run του reshape SERGIOS εκτελεί πλέον όλες τις ενέργειες και κάνει rollback στο τέλος, ώστε να δείχνει ακριβώς τι θα γίνει (σωστά counts σπασίματος/μαζέματος). Καμία αλλαγή στη βάση στο dry-run.']},
     {'v': '12.304', 'b': '585', 'date': '26/06/2026', 'time': '15:00', 'title': 'Φ2: reshape SERGIOS (dry-run + apply, idempotent)',
      'items': ['Εργαλείο admin: /dashboard/measurements/admin/sergios-reshape (dry-run δείχνει τι θα γίνει, χωρίς αλλαγές· apply=NAI-SERGIOS εφαρμόζει). Μετονομασίες in-place, σπάσιμο Αναχώρηση/Επιστροφή, μάζεμα Κουζίνα+Απομακρυσμένο→Κρύο/Ζεστό με θέση, διαμοιρασμός coarse «Κεντρικό Δίκτυο» (gap-fill χωρίς διπλά). Idempotent. Δοκιμασμένο σε synthetic βάση.']},
     {'v': '12.303', 'b': '584', 'date': '26/06/2026', 'time': '14:15', 'title': 'Φ2 βήμα 1: διαγνωστικό SERGIOS (read-only)',
