@@ -339,11 +339,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.305'
-APP_BUILD   = '586'
+APP_VERSION = '12.306'
+APP_BUILD   = '587'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.306', 'b': '587', 'date': '26/06/2026', 'time': '16:00', 'title': 'Φ2 ολοκληρώθηκε — αφαίρεση προσωρινών admin routes',
+     'items': ['Η αναδιάρθρωση SERGIOS εφαρμόστηκε επιτυχώς. Αφαιρέθηκαν τα προσωρινά εργαλεία (sergios-audit, sergios-reshape) μετά την επιβεβαίωση.']},
     {'v': '12.305', 'b': '586', 'date': '26/06/2026', 'time': '15:30', 'title': 'Φ2 fix: το dry-run δείχνει σωστά νούμερα (προσομοίωση+rollback)',
      'items': ['Το dry-run του reshape SERGIOS εκτελεί πλέον όλες τις ενέργειες και κάνει rollback στο τέλος, ώστε να δείχνει ακριβώς τι θα γίνει (σωστά counts σπασίματος/μαζέματος). Καμία αλλαγή στη βάση στο dry-run.']},
     {'v': '12.304', 'b': '585', 'date': '26/06/2026', 'time': '15:00', 'title': 'Φ2: reshape SERGIOS (dry-run + apply, idempotent)',
