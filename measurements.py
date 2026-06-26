@@ -135,6 +135,19 @@ def _seed_periods(key):
         db.session.add(MonitorPeriod(template_key=key, key=pk, label=label, time=t, sort=s))
 
 
+# Ενοποιημένες μετρήσεις Κρύο/Ζεστό (Δωμάτιο/Βοηθ.) — (pkey, label, unit, min, max, low, high)
+UNIFIED_WATER_PARAMS = [
+    ('temp_cold', 'Θερμοκρασία (κρύο)', '°C', None, 20.0, None,
+     'Κρύο νερό >20°C: κίνδυνος legionella· έλεγξε ψύξη/ανανέωση/μόνωση.'),
+    ('clo2_cold', 'ClO₂ (κρύο)', 'ppm', 1.0, 2.0,
+     'ClO₂ κρύου <1 ppm: αύξησε δοσομέτρηση.', 'ClO₂ κρύου >2 ppm: μείωσε δοσομέτρηση.'),
+    ('temp_hot', 'Θερμοκρασία (ζεστό)', '°C', 50.0, None,
+     'Ζεστό <50°C: legionella· έλεγξε ανακυκλοφορία/θερμοκρασία/μόνωση.', None),
+    ('clo2_hot', 'ClO₂ (ζεστό)', 'ppm', 1.0, 2.0,
+     'ClO₂ ζεστού <1 ppm: αύξησε δοσομέτρηση.', 'ClO₂ ζεστού >2 ppm: μείωσε δοσομέτρηση.'),
+]
+
+
 def seed_measurement_engine():
     """boot (module-level) → χρειάζεται app context (όπως schedule/payroll)."""
     with app.app_context():
@@ -143,6 +156,14 @@ def seed_measurement_engine():
             created = _seed_template('pool', 'Πισίνα', 'ti-pool', POOL_PARAMS) or created
             created = _seed_template('znx', 'ΖΝΧ / Δίκτυο νερού', 'ti-droplet', ZNX_PARAMS) or created
             created = _seed_template('generic', 'Σημείο μέτρησης', 'ti-map-pin', []) or created
+            db.session.commit()
+            # ενοποιημένες μετρήσεις Κρύο/Ζεστό (idempotent ανά pkey)
+            for pkey, label, unit, mn, mx, low, high in UNIFIED_WATER_PARAMS:
+                if not MonitorParam.query.filter_by(pkey=pkey).first():
+                    db.session.add(MonitorParam(template_key='generic', pkey=pkey, label=label,
+                                                unit=unit or '', min_v=mn, max_v=mx, action_low=low,
+                                                action_high=high, sort=50, kind='num',
+                                                category='Δίκτυο Νερού', is_active=True))
             db.session.commit()
             for key in ('pool', 'znx', 'generic'):
                 _seed_periods(key)
