@@ -1639,7 +1639,7 @@ def _build_console_pdf(ctx):
         _lg = (get_theme() or {}).get('logo') or ''
         if _lg.startswith('data:image') and ',' in _lg and 'svg' not in _lg[:30].lower():
             _raw = base64.b64decode(_lg.split(',', 1)[1])
-            _info = pdf.image(_io.BytesIO(_raw), x=12, y=7, h=18); _logo_drawn = True
+            _info = pdf.image(_io.BytesIO(_raw), x=12, y=6, h=22); _logo_drawn = True
             _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 0
     except Exception:
         _logo_drawn = False
@@ -1647,18 +1647,18 @@ def _build_console_pdf(ctx):
     if not _logo_drawn:
         for _cand in ('logo-mark.png', 'logo.png'):
             try:
-                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=7, h=18)
+                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=6, h=22)
                 _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 14
                 break
             except Exception:
                 pass
     _tx = max(30.0, 12 + (_logo_w or 0) + 7)
-    pdf.set_xy(_tx, 9); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
+    pdf.set_xy(_tx, 10); pdf.set_font('dv', 'B', 12.5); pdf.set_text_color(*NAVY)
     pdf.cell(0, 8, 'Καταγραφή Μετρήσεων', ln=1)
     _hn = ((ctx.get('hotel_code') + '  ·  ') if ctx.get('hotel_code') else '') + (ctx.get('hotel_name') or '—')
     pdf.set_x(_tx); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
     pdf.cell(0, 6, _hn, ln=1)
-    pdf.set_y(max(pdf.get_y(), 27))
+    pdf.set_y(max(pdf.get_y(), 30))
     # γραμμή φίλτρων
     pdf.ln(3); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
     filt = ('Περίοδος: %s   ·   Χώρος: %s   ·   Προβολή: %s'
@@ -1844,9 +1844,10 @@ def measurements_console_pdf():
         return redirect(url_for('login'))
     ctx = _console_ctx()
     pdf = _build_console_pdf(ctx)
-    fn = 'metriseis-%s-%s.pdf' % ((ctx['hotel_name'] or 'hotel').split()[0], ctx['today'])
+    fn = '%s - %s - %s - Logs.pdf' % (ctx.get('hotel_code') or 'SRG',
+                                      ctx.get('hotel_name') or 'Hotel', ctx['today'])
     return Response(pdf, mimetype='application/pdf',
-                    headers={'Content-Disposition': 'attachment; filename=' + fn})
+                    headers={'Content-Disposition': 'attachment; filename="' + fn + '"'})
 
 
 print('measurements module loaded (Φ1→Φ4 ενοποίηση μετρήσεων)')
