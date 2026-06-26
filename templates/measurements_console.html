@@ -209,7 +209,6 @@ select.in-kind{width:120px;}
       <input class="in-name" type="text" name="name" value="{{ a.name }}">
       <input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="Χώρος / περιοχή">
       <select name="node_id"><option value="">— χωρίς δίκτυο —</option>{% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==a.node_id }}>{{ o.label }}</option>{% endfor %}</select>
-      <select name="position" title="Θέση δειγματοληψίας"><option value="">— θέση —</option><option value="near"{{ ' selected' if a.position=='near' }}>Κοντινό</option><option value="mid"{{ ' selected' if a.position=='mid' }}>Μεσαίο</option><option value="far"{{ ' selected' if a.position=='far' }}>Μακρινό</option></select>
       <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
       <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
       <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>

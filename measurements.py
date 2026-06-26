@@ -1162,9 +1162,10 @@ def measurements_entry_save():
         rec_at = datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()) if _rt else datetime.now()
     except ValueError:
         rec_at = datetime.now()
+    pos = (f.get('position') or '').strip()[:40] or None
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
                   record_date=rdate, period=period, recorded_at=rec_at, values=_json.dumps(vals),
-                  notes=(f.get('notes') or '').strip())
+                  notes=(f.get('notes') or '').strip(), position=pos)
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)

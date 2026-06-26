@@ -339,11 +339,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.301'
-APP_BUILD   = '582'
+APP_VERSION = '12.302'
+APP_BUILD   = '583'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.302', 'b': '583', 'date': '26/06/2026', 'time': '13:30', 'title': 'Θέση δειγματοληψίας στην καταχώρηση (per-reading)',
+     'items': ['Η «Θέση» (Κοντινό/Μεσαίο/Απομακρυσμένο + ελεύθερο) μπαίνει πλέον στη φόρμα καταχώρησης — ο συντηρητής τη γράφει κάθε φορά. Επιτρέπονται πολλές καταγραφές/μέρα στο ίδιο σημείο (μία ανά θέση). Φαίνεται στις πρόσφατες καταγραφές. Αφαιρέθηκε το παλιό πεδίο «Θέση» από το σημείο.']},
     {'v': '12.301', 'b': '582', 'date': '26/06/2026', 'time': '12:00', 'title': 'Θέση δειγματοληψίας + πλήρες δέντρο στη «Δομή»',
      'items': ['Στα «Σημεία» προστέθηκε «Θέση» (Κοντινό/Μεσαίο/Μακρινό) — χαρακτηρίζεις πού δειγματοληπτείς, χωρίς να αλλάζεις τις μετρήσεις. Φαίνεται σε Σήμερα/Καταχώρηση/Στατιστικά.',
                'Η «Δομή» δείχνει τώρα όλο το στήσιμο ανά ξενοδοχείο: Δίκτυο → Σημεία → Μετρήσεις (επισκόπηση, read-only). Η επεξεργασία μένει στις καρτέλες «Σημεία»/«Μετρήσεις».']},
@@ -1639,6 +1641,7 @@ class Reading(db.Model):
     updated_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
     values      = db.Column(db.Text)     # JSON {pkey: value}
     notes       = db.Column(db.Text)
+    position    = db.Column(db.String(40))   # θέση δειγματοληψίας ανά καταγραφή (Κοντινό/Μεσαίο/Απομακρυσμένο/ελεύθερο)
     source_kind = db.Column(db.String(10))   # Φ2: 'pool' | 'water' αν είναι αντίγραφο legacy record
     source_id   = db.Column(db.Integer)      # Φ2: PoolRecord.id / WaterRecord.id (idempotency)
     area        = db.relationship('Area')
@@ -4271,6 +4274,8 @@ def ensure_columns():
     _add_col('monitor_node', 'hotels', 'hotels VARCHAR(120)')
     # θέση δειγματοληψίας (κοντινό/μεσαίο/μακρινό)
     _add_col('area', 'position', 'position VARCHAR(10)')
+    # θέση δειγματοληψίας ανά καταγραφή (per-reading)
+    _add_col('reading', 'position', 'position VARCHAR(40)')
 
 def init_db():
     with app.app_context():
