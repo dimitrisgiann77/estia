@@ -572,6 +572,58 @@ def measurements_node_hotel(nid):
     log_activity('meas_node_hotel', '%s h%s=%s' % (nid, hid, on))
     return jsonify(ok=True, on=on)
 
+@app.route('/dashboard/measurements/admin/sergios-audit')
+def measurements_sergios_audit():
+    """Read-only διαγνωστικό SERGIOS: σημεία, μετρήσεις, καταγραφές (ΚΑΜΙΑ αλλαγή).
+    Βγάζει plain text για εύκολο screenshot/copy."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    import json as __j
+    h = Hotel.query.filter(Hotel.name.ilike('%sergios%')).first()
+    out = []
+    if not h:
+        return ('SERGIOS hotel ΔΕΝ βρέθηκε (Hotel.name ilike sergios).', 200,
+                {'Content-Type': 'text/plain; charset=utf-8'})
+    out.append('=== SERGIOS audit (read-only) ===')
+    out.append('Hotel: id=%s name=%s' % (h.id, h.name))
+    # nodes + hotels CSV
+    out.append('\n--- Κόμβοι (key · όνομα · hotels CSV) ---')
+    for n in MonitorNode.query.order_by(MonitorNode.sort, MonitorNode.id).all():
+        out.append('  [%s] %s · key=%s · hotels=%r' % (n.id, n.name, n.key, n.hotels or ''))
+    # areas of SERGIOS
+    areas = (Area.query.filter(Area.hotel_id == h.id, Area.engine_only.is_(True))
+             .order_by(Area.template_key, Area.name).all())
+    out.append('\n--- Σημεία (engine) SERGIOS: %d ---' % len(areas))
+    for a in areas:
+        nd = MonitorNode.query.get(a.node_id) if getattr(a, 'node_id', None) else None
+        aps = AreaParam.query.filter_by(area_id=a.id).order_by(AreaParam.sort, AreaParam.id).all()
+        ap_keys = [p.pkey for p in aps]
+        rds = Reading.query.filter_by(area_id=a.id).all()
+        # union of pkeys actually present in readings
+        seen = {}
+        dates = []
+        for r in rds:
+            try:
+                vv = __j.loads(r.values or '{}')
+            except Exception:
+                vv = {}
+            for k in vv.keys():
+                seen[k] = seen.get(k, 0) + 1
+            if r.record_date:
+                dates.append(r.record_date)
+        dr = ''
+        if dates:
+            dr = ' [%s … %s]' % (min(dates).isoformat(), max(dates).isoformat())
+        out.append('\n  • AREA id=%s  name=%r  active=%s' % (a.id, a.name, a.is_active))
+        out.append('    template_key=%s  location=%r  node=%s' % (
+            a.template_key, a.location or '', (nd.name if nd else '—')))
+        out.append('    AreaParam pkeys (%d): %s' % (len(ap_keys), ', '.join(ap_keys) or '(καμία → χρησιμοποιεί template default)'))
+        out.append('    Readings: %d%s' % (len(rds), dr))
+        if seen:
+            out.append('    pkeys στις καταγραφές: ' + ', '.join('%s×%d' % (k, c) for k, c in sorted(seen.items())))
+    return ('\n'.join(out), 200, {'Content-Type': 'text/plain; charset=utf-8'})
+
+
 
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
 def measurements_node_save():
