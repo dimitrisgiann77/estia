@@ -623,6 +623,202 @@ def measurements_sergios_audit():
             out.append('    pkeys στις καταγραφές: ' + ', '.join('%s×%d' % (k, c) for k, c in sorted(seen.items())))
     return ('\n'.join(out), 200, {'Content-Type': 'text/plain; charset=utf-8'})
 
+# ── Φ2: SERGIOS reshape + split/merge readings (dry-run default) ──────────────
+# Νέες μετρήσεις βιβλιοθήκης για ενοποιημένα Κρύο/Ζεστό (Δωμάτιο/Βοηθ.)
+RESHAPE_LIB = [
+    ('temp_cold', 'Θερμοκρασία (κρύο)', '°C', None, 20.0, None,
+     'Κρύο νερό >20°C: κίνδυνος legionella· έλεγξε ψύξη/ανανέωση/μόνωση.'),
+    ('clo2_cold', 'ClO₂ (κρύο)', 'ppm', 1.0, 2.0,
+     'ClO₂ κρύου <1 ppm: αύξησε δοσομέτρηση.', 'ClO₂ κρύου >2 ppm: μείωσε δοσομέτρηση.'),
+    ('temp_hot', 'Θερμοκρασία (ζεστό)', '°C', 50.0, None,
+     'Ζεστό <50°C: legionella· έλεγξε ανακυκλοφορία/θερμοκρασία/μόνωση.', None),
+    ('clo2_hot', 'ClO₂ (ζεστό)', 'ppm', 1.0, 2.0,
+     'ClO₂ ζεστού <1 ppm: αύξησε δοσομέτρηση.', 'ClO₂ ζεστού >2 ppm: μείωσε δοσομέτρηση.'),
+]
+
+
+def _reshape_sergios(apply=False):
+    """Επιστρέφει (log_lines). apply=False → μόνο αναφορά (καμία αλλαγή).
+    Βρίσκει σημεία με template_key (όχι hardcoded id) — ανθεκτικό."""
+    import json as __j
+    L = []
+    def say(x): L.append(x)
+    h = Hotel.query.filter(Hotel.name.ilike('%sergios%')).first()
+    if not h:
+        say('ΣΦΑΛΜΑ: SERGIOS hotel δεν βρέθηκε.'); return L
+    say('=== RESHAPE SERGIOS (%s) ===' % ('APPLY' if apply else 'DRY-RUN — καμία αλλαγή'))
+    say('Hotel id=%s %s' % (h.id, h.name))
+
+    def node(key):
+        return MonitorNode.query.filter_by(key=key).first()
+    N_STORAGE, N_HOT, N_RO, N_COLD, N_POOLS = (node('water_storage'), node('water_hot'),
+                                               node('water_ro'), node('water_cold'), node('pools'))
+    def find(tk, name=None):
+        q = Area.query.filter_by(hotel_id=h.id, template_key=tk, engine_only=True)
+        if name:
+            q = q.filter_by(name=name)
+        return q.order_by(Area.is_active.desc(), Area.id).first()
+
+    # 0) νέες μετρήσεις βιβλιοθήκης
+    for pkey, label, unit, mn, mx, low, high in RESHAPE_LIB:
+        ex = MonitorParam.query.filter_by(pkey=pkey).first()
+        if ex:
+            say('  lib OK: %s' % pkey)
+        else:
+            say('  + lib NEW: %s (%s)' % (pkey, label))
+            if apply:
+                db.session.add(MonitorParam(template_key='generic', pkey=pkey, label=label,
+                                            unit=unit or '', min_v=mn, max_v=mx, action_low=low,
+                                            action_high=high, sort=50, kind='num',
+                                            category='Δίκτυο Νερού', is_active=True))
+    if apply:
+        db.session.flush()
+        try: _seed_periods('generic')
+        except Exception: pass
+
+    def set_params(area, pkeys):
+        if not apply or not area: return
+        AreaParam.query.filter_by(area_id=area.id).delete()
+        for i, pk in enumerate(pkeys, 1):
+            db.session.add(AreaParam(area_id=area.id, pkey=pk, sort=i))
+
+    def ensure_area(name, location, nd, pkeys):
+        a = Area.query.filter_by(hotel_id=h.id, name=name, engine_only=True).first()
+        if a:
+            say('  area OK: %r (id=%s)' % (name, a.id))
+        else:
+            say('  + area NEW: %r  (%s)' % (name, location))
+            if apply:
+                a = Area(hotel_id=h.id, template_key='generic', name=name, location=location,
+                         is_active=True, engine_only=True, node_id=(nd.id if nd else None))
+                db.session.add(a); db.session.flush()
+        if apply and a:
+            a.location = location; a.node_id = (nd.id if nd else None); a.is_active = True
+            set_params(a, pkeys)
+        return a
+
+    def retag(area, name, location, nd, pkeys):
+        if not area:
+            say('  ! δεν βρέθηκε για retag → %r' % name); return None
+        say('  ~ retag id=%s: %r → %r  loc=%r node=%s' % (area.id, area.name, name, location, nd.name if nd else '—'))
+        if apply:
+            area.name = name; area.location = location; area.node_id = (nd.id if nd else None)
+            set_params(area, pkeys)
+        return area
+
+    def copy_reading(src, tgt_area, key_map, position, gapfill=False):
+        if tgt_area is None: return 0
+        try: sv = __j.loads(src.values or '{}')
+        except Exception: sv = {}
+        nv = {}
+        for tk, sk in key_map.items():
+            if sk in sv and sv[sk] not in (None, ''):
+                nv[tk] = sv[sk]
+        if not nv:
+            return 0
+        if gapfill:
+            if Reading.query.filter_by(area_id=tgt_area.id, record_date=src.record_date,
+                                       period=src.period, position=position).first():
+                return 0
+        else:
+            if Reading.query.filter_by(source_kind='rsplit', source_id=src.id,
+                                       area_id=tgt_area.id, position=position).first():
+                return 0
+        if apply:
+            db.session.add(Reading(area_id=tgt_area.id, template_key=tgt_area.template_key,
+                                   user_id=src.user_id, record_date=src.record_date,
+                                   period=src.period, recorded_at=src.recorded_at,
+                                   values=__j.dumps(nv), notes=src.notes,
+                                   position=position, source_kind='rsplit', source_id=src.id))
+        return 1
+
+    # σημεία προέλευσης (by template_key)
+    A_TANK = find('znx_tank')
+    A_ANX  = find('znx_dhw')
+    A_KIT  = find('znx_kitchen')
+    A_REM  = find('znx_remote')
+    A_ROM  = find('znx_ro')
+    A_COARSE = find('znx')
+    A_POOL = find('pool', 'Κύρια Πισίνα') or find('pool')
+
+    # ── 1) in-place ──
+    say('\n-- In-place --')
+    retag(A_TANK, 'Δεξαμενή', 'Μηχανοστάσιο', N_STORAGE, ['temp_tank', 'clo2_tank', 'ph_tank'])
+    retag(A_ROM, 'Αντ. Όσμωση', 'Μηχανοστάσιο', N_RO, ['temp_ro', 'clo2_ro'])
+    retag(A_POOL, 'Κύρια Πισίνα', 'Πισίνα', N_POOLS,
+          ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
+           'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done'])
+    retag(A_ANX, 'Αναχώρηση ΖΝΧ', 'Μηχανοστάσιο', N_HOT, ['temp_dhw_out', 'clo2_dhw_out'])
+
+    # ── 2) νέα σημεία ──
+    say('\n-- Νέα σημεία --')
+    A_RET  = ensure_area('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', N_HOT, ['temp_dhw_return', 'clo2_dhw_return'])
+    A_RO2  = ensure_area('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Βοηθητικός Χώρος', N_RO, ['temp_ro', 'clo2_ro'])
+    A_COLD = ensure_area('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', N_COLD, ['temp_cold', 'clo2_cold'])
+    A_HOT  = ensure_area('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', N_HOT, ['temp_hot', 'clo2_hot'])
+
+    # ── 3) split Αναχώρηση return-half → Επιστροφή ──
+    say('\n-- Split readings --')
+    c = 0
+    if A_ANX and A_RET:
+        for r in Reading.query.filter_by(area_id=A_ANX.id).all():
+            c += copy_reading(r, A_RET, {'temp_dhw_return': 'temp_dhw_return', 'clo2_dhw_return': 'clo2_dhw_return'}, None)
+    say('  Αναχώρηση→Επιστροφή: %d καταγραφές' % c)
+
+    # ── 4) merge Κουζίνα + Απομακρυσμένο → Κρύο/Ζεστό ──
+    def merge_src(a, origin, ck_clo2, ck_tcold, ck_thot):
+        if not a: say('  ! merge: δεν βρέθηκε %s' % origin); return
+        cc = ch = 0
+        for r in Reading.query.filter_by(area_id=a.id).all():
+            cc += copy_reading(r, A_COLD, {'temp_cold': ck_tcold, 'clo2_cold': ck_clo2}, origin)
+            ch += copy_reading(r, A_HOT, {'temp_hot': ck_thot}, origin)
+        say('  %s: →Κρύο %d, →Ζεστό %d (θέση=%r)' % (a.name, cc, ch, origin))
+        if apply:
+            a.is_active = False; say('    (απενεργοποιήθηκε %r)' % a.name)
+    merge_src(A_KIT, 'Κουζίνα', 'clo2_kitchen', 'temp_kitchen_cold', 'temp_kitchen_hot')
+    merge_src(A_REM, 'Απομακρυσμένο', 'clo2_remote', 'temp_remote_cold', 'temp_remote_hot')
+
+    # ── 5) distribute coarse → όλα (gap-fill) ──
+    say('\n-- AREA coarse «Κεντρικό Δίκτυο» διαμοιρασμός (gap-fill) --')
+    if A_COARSE:
+        d = {'tank': 0, 'out': 0, 'ret': 0, 'ro': 0, 'cold': 0, 'hot': 0}
+        for r in Reading.query.filter_by(area_id=A_COARSE.id).all():
+            d['tank'] += copy_reading(r, A_TANK, {'temp_tank': 'temp_tank', 'clo2_tank': 'clo2_tank', 'ph_tank': 'ph_tank'}, None, gapfill=True)
+            d['out'] += copy_reading(r, A_ANX, {'temp_dhw_out': 'temp_dhw_out', 'clo2_dhw_out': 'clo2_dhw_out'}, None, gapfill=True)
+            d['ret'] += copy_reading(r, A_RET, {'temp_dhw_return': 'temp_dhw_return', 'clo2_dhw_return': 'clo2_dhw_return'}, None, gapfill=True)
+            d['ro'] += copy_reading(r, A_ROM, {'temp_ro': 'temp_ro', 'clo2_ro': 'clo2_ro'}, None, gapfill=True)
+            d['cold'] += copy_reading(r, A_COLD, {'temp_cold': 'temp_kitchen_cold', 'clo2_cold': 'clo2_kitchen'}, 'Κουζίνα', gapfill=True)
+            d['cold'] += copy_reading(r, A_COLD, {'temp_cold': 'temp_remote_cold', 'clo2_cold': 'clo2_remote'}, 'Απομακρυσμένο', gapfill=True)
+            d['hot'] += copy_reading(r, A_HOT, {'temp_hot': 'temp_kitchen_hot'}, 'Κουζίνα', gapfill=True)
+            d['hot'] += copy_reading(r, A_HOT, {'temp_hot': 'temp_remote_hot'}, 'Απομακρυσμένο', gapfill=True)
+        say('  Δεξαμενή+%d, Αναχ+%d, Επιστρ+%d, Όσμωση+%d, Κρύο+%d, Ζεστό+%d' %
+            (d['tank'], d['out'], d['ret'], d['ro'], d['cold'], d['hot']))
+        if apply:
+            A_COARSE.is_active = False; say('    (απενεργοποιήθηκε «Κεντρικό Δίκτυο»)')
+
+    if apply:
+        db.session.commit(); say('\n✅ ΕΦΑΡΜΟΣΤΗΚΕ & commit.')
+    else:
+        db.session.rollback(); say('\n(DRY-RUN: τίποτα δεν αποθηκεύτηκε.)')
+    return L
+
+@app.route('/dashboard/measurements/admin/sergios-reshape')
+def measurements_sergios_reshape():
+    if not is_admin():
+        return redirect(url_for('login'))
+    apply = (request.args.get('apply') == 'NAI-SERGIOS')
+    try:
+        lines = _reshape_sergios(apply=apply)
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        lines = ['ΣΦΑΛΜΑ: %s' % e, traceback.format_exc()]
+    if apply:
+        log_activity('meas_reshape_sergios', 'APPLIED')
+    tail = '' if apply else '\n\n— Για εφαρμογή: πρόσθεσε ?apply=NAI-SERGIOS στο URL (αφού δεις το dry-run).'
+    return ('\n'.join(lines) + tail, 200, {'Content-Type': 'text/plain; charset=utf-8'})
+
+
 
 
 @app.route('/dashboard/measurements/node/save', methods=['POST'])

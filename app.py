@@ -339,11 +339,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.303'
-APP_BUILD   = '584'
+APP_VERSION = '12.304'
+APP_BUILD   = '585'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.304', 'b': '585', 'date': '26/06/2026', 'time': '15:00', 'title': 'Φ2: reshape SERGIOS (dry-run + apply, idempotent)',
+     'items': ['Εργαλείο admin: /dashboard/measurements/admin/sergios-reshape (dry-run δείχνει τι θα γίνει, χωρίς αλλαγές· apply=NAI-SERGIOS εφαρμόζει). Μετονομασίες in-place, σπάσιμο Αναχώρηση/Επιστροφή, μάζεμα Κουζίνα+Απομακρυσμένο→Κρύο/Ζεστό με θέση, διαμοιρασμός coarse «Κεντρικό Δίκτυο» (gap-fill χωρίς διπλά). Idempotent. Δοκιμασμένο σε synthetic βάση.']},
     {'v': '12.303', 'b': '584', 'date': '26/06/2026', 'time': '14:15', 'title': 'Φ2 βήμα 1: διαγνωστικό SERGIOS (read-only)',
      'items': ['Προσωρινή read-only σελίδα /dashboard/measurements/admin/sergios-audit που δείχνει σημεία/μετρήσεις/καταγραφές για ασφαλή σχεδιασμό του reshape. Καμία αλλαγή δεδομένων.']},
     {'v': '12.302', 'b': '583', 'date': '26/06/2026', 'time': '13:30', 'title': 'Θέση δειγματοληψίας στην καταχώρηση (per-reading)',
