@@ -1600,6 +1600,14 @@ def _meas_cat(p):
     return None
 
 
+def _hcode(name):
+    try:
+        from schedule import _hotel_short
+        return _hotel_short(name) or ''
+    except Exception:
+        return ''
+
+
 def _build_console_pdf(ctx):
     """Polished, print-ready PDF της φιλτραρισμένης κονσόλας μετρήσεων (fpdf2 landscape)."""
     import os, io as _io, base64
@@ -1631,7 +1639,7 @@ def _build_console_pdf(ctx):
         _lg = (get_theme() or {}).get('logo') or ''
         if _lg.startswith('data:image') and ',' in _lg and 'svg' not in _lg[:30].lower():
             _raw = base64.b64decode(_lg.split(',', 1)[1])
-            _info = pdf.image(_io.BytesIO(_raw), x=12, y=8, h=14); _logo_drawn = True
+            _info = pdf.image(_io.BytesIO(_raw), x=12, y=7, h=18); _logo_drawn = True
             _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 0
     except Exception:
         _logo_drawn = False
@@ -1639,21 +1647,23 @@ def _build_console_pdf(ctx):
     if not _logo_drawn:
         for _cand in ('logo-mark.png', 'logo.png'):
             try:
-                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=9, h=13)
+                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=7, h=18)
                 _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 14
                 break
             except Exception:
                 pass
     _tx = max(30.0, 12 + (_logo_w or 0) + 7)
     pdf.set_xy(_tx, 9); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
-    pdf.cell(0, 8, 'Κονσόλα Μετρήσεων', ln=1)
+    pdf.cell(0, 8, 'Καταγραφή Μετρήσεων', ln=1)
+    _hn = ((ctx.get('hotel_code') + '  ·  ') if ctx.get('hotel_code') else '') + (ctx.get('hotel_name') or '—')
     pdf.set_x(_tx); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
-    pdf.cell(0, 6, ctx.get('hotel_name') or '—', ln=1)
+    pdf.cell(0, 6, _hn, ln=1)
+    pdf.set_y(max(pdf.get_y(), 27))
     # γραμμή φίλτρων
     pdf.ln(3); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
-    filt = ('Περίοδος: %s   ·   Χώρος: %s   ·   Προβολή: %s   ·   Εκτύπωση: %s'
+    filt = ('Περίοδος: %s   ·   Χώρος: %s   ·   Προβολή: %s'
             % (ctx.get('period_label', '—'), (ctx.get('xoros') or 'Όλοι οι χώροι'),
-               ('Ανά χώρο' if byspace else 'Πίνακας'), ctx.get('today_disp', '')))
+               ('Ανά χώρο' if byspace else 'Πίνακας')))
     pdf.cell(0, 5, filt, ln=1)
     pdf.set_x(10); pdf.set_font('dv', 'B', 9.5); pdf.set_text_color(*NAVY)
     pdf.cell(0, 5, ('Καταγραφές: %d    ·    Εντός ορίων: %d%%    ·    Εκτός ορίων: %d%%'
@@ -1817,6 +1827,7 @@ def _console_ctx():
                 all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
                 lim_clo2=lim_clo2, lim_ph=lim_ph,
                 hotel_name=hmap.get(nh, '—'), period_label=period_label,
+                hotel_code=_hcode(hmap.get(nh, '') or ''),
                 today_disp=today.strftime('%d/%m/%Y'))
 
 
