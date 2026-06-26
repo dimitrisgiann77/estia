@@ -97,7 +97,7 @@ tbody tr:last-child td{ border-bottom:none; }
         <thead>
           <tr>
             <th>Ημ/νία</th><th>Ώρα</th><th>Τύπος</th><th>Βάρδια</th>
-            <th>Ξενοδοχείο</th><th>Σημείο</th><th>Μετρήσεις</th><th>Υπεύθυνος</th><th></th><th></th>
+            <th>Ξενοδοχείο</th><th>Σημείο</th><th>Υπεύθυνος</th><th></th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -109,14 +109,14 @@ tbody tr:last-child td{ border-bottom:none; }
             <td>{% if it.period == 'morning' %}<span class="badge badge-am">Πρωί</span>{% elif it.period == 'afternoon' %}<span class="badge badge-pm">Απόγ.</span>{% else %}<span class="badge badge-day">Ημέρα</span>{% endif %}</td>
             <td>{{ it.hotel }}</td>
             <td>{{ it.place }}</td>
-            <td>{% if it.mvals %}<div class="vals">{% for v in it.mvals %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
             <td style="white-space:nowrap;">{{ it.user }}{% if it.updated %} <span class="badge badge-upd" title="Ενημερώθηκε μετά την αρχική υποβολή">διορθ.</span>{% endif %}</td>
-            <td>{% if it.edit_url %}<a href="{{ it.edit_url }}" class="iact edit" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}</td>
+            <td style="white-space:nowrap;">{% if it.mvals %}<button type="button" class="iact" title="Προβολή μετρήσεων" onclick="toggleDet('det{{ loop.index }}')"><i class="ti ti-eye"></i></button>{% endif %}{% if it.edit_url %}<a href="{{ it.edit_url }}" class="iact edit" title="Επεξεργασία"><i class="ti ti-edit"></i></a>{% endif %}</td>
             <td>{% if is_admin %}<form method="POST" action="{% if it.src=='reading' %}/areas/reading/{{ it.id }}/delete{% elif it.kind=='pool' %}/pools/record/{{ it.id }}/delete{% else %}/water/record/{{ it.id }}/delete{% endif %}" style="display:inline;" onsubmit="return confirm('Διαγραφή αυτής της καταγραφής; Δεν αναιρείται.');"><button type="submit" class="iact del" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>{% endif %}</td>
           </tr>
+          {% if it.mvals %}<tr class="detrow" id="det{{ loop.index }}" style="display:none;"><td colspan="9"><div class="vals" style="padding:6px 2px;">{% for v in it.mvals %}<span class="vchip">{{ v.label }} <b>{{ v.value }}</b>{% if v.unit %}<span class="u">{{ v.unit }}</span>{% endif %}</span>{% endfor %}</div></td></tr>{% endif %}
           {% endfor %}
           {% if not items %}
-          <tr><td colspan="10" class="empty">Δεν υπάρχουν υποβολές ακόμα</td></tr>
+          <tr><td colspan="9" class="empty">Δεν υπάρχουν υποβολές ακόμα</td></tr>
           {% endif %}
         </tbody>
       </table>
@@ -125,8 +125,17 @@ tbody tr:last-child td{ border-bottom:none; }
   </div>
 </div>
 <script>
+function toggleDet(id){ var r=document.getElementById(id); if(r){ r.style.display=(r.style.display==="none"?"table-row":"none"); } }
 function toggleNewMenu(e){ if(e){e.stopPropagation();} var m=document.getElementById('newmenu'); if(m){ m.classList.toggle('open'); } }
 document.addEventListener('click', function(ev){ var m=document.getElementById('newmenu'); if(m && m.classList.contains('open') && !ev.target.closest('.newwrap')){ m.classList.remove('open'); } });
+</script>
+<script>
+/* auto-capitalize: πρώτο γράμμα κεφαλαίο σε πεδία κειμένου, καθώς γράφει ο χρήστης */
+(function(){
+  function cap(el){ var v=el.value; if(v && v.charAt(0)!==v.charAt(0).toUpperCase()){ var p=el.selectionStart; el.value=v.charAt(0).toUpperCase()+v.slice(1); try{el.setSelectionRange(p,p);}catch(e){} } }
+  function attach(root){ (root||document).querySelectorAll("input[type=text],input:not([type]),textarea").forEach(function(el){ if(el.dataset.cap) return; if(el.dataset.nocap!==undefined) return; el.dataset.cap="1"; el.addEventListener("input", function(){ cap(el); }); }); }
+  if(document.readyState!=="loading") attach(); else document.addEventListener("DOMContentLoaded", function(){attach();});
+})();
 </script>
 </body>
 </html>

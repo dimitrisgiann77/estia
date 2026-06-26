@@ -339,11 +339,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.308'
-APP_BUILD   = '589'
+APP_VERSION = '12.309'
+APP_BUILD   = '590'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.309', 'b': '590', 'date': '26/06/2026', 'time': '18:00', 'title': 'Ώρα Ελλάδος + τακτοποίηση Log + capitalize',
+     'items': ['Καταχωρήσεις & εμφάνιση ώρας σε ΩΡΑ ΕΛΛΑΔΟΣ (η φόρμα προτείνει ώρα Αθήνας, αποθηκεύεται σωστά σε UTC, εμφανίζεται Αθήνα).',
+               'Log Μετρήσεων: δείχνει μόνο ΕΝΕΡΓΑ σημεία (έφυγαν τα παλιά αρχειοθετημένα Κουζίνα/Απομακρυσμένο/Κεντρικό· οι μετρήσεις τους είναι πλέον στα Κρύο/Ζεστό).',
+               'Log: οι μετρήσεις μετακινήθηκαν σε κουμπί «προβολή» (μάτι) δίπλα στη διαγραφή — πιο καθαρός πίνακας.',
+               'Αυτόματο κεφαλαίο πρώτο γράμμα στα πεδία κειμένου (Καταχώρηση/Σημεία/Log).']},
     {'v': '12.308', 'b': '589', 'date': '26/06/2026', 'time': '17:00', 'title': 'Κουμπί «Δημιουργία προτεινόμενων σημείων» (scaffold)',
      'items': ['Στα «Σημεία», ξενοδοχείο χωρίς σημεία → κουμπί που φτιάχνει το standard σετ (Δεξαμενή, Αναχώρηση/Επιστροφή ΖΝΧ, Αντ. Όσμωση ×2, Κρύο/Ζεστό Νερό, Κύρια Πισίνα) έτοιμο για επεξεργασία. Συνδέει αυτόματα τα δίκτυα με το ξενοδοχείο. Idempotent.']},
     {'v': '12.307', 'b': '588', 'date': '26/06/2026', 'time': '16:30', 'title': 'Seed: ενοποιημένες μετρήσεις Κρύο/Ζεστό',
@@ -2961,10 +2966,12 @@ def _records_items(user, ftype='all'):
     #   εμφανίζονται μαζί με τα legacy, ΧΩΡΙΣ διπλά (source_kind IS NULL). Κατηγοριοποίηση ανά template.
     _ZNX_TPL = ('znx', 'znx_tank', 'znx_kitchen', 'znx_remote', 'znx_dhw', 'znx_ro')
     _ft_of = {'pool': 'pools', 'water': 'water', 'area': 'area'}
-    _rq = apply_period(Reading.query.filter(Reading.source_kind.is_(None)), Reading.record_date)
+    # Log: γνήσιες (source_kind None) + μεταφερμένες reshape ('rsplit'), ΟΧΙ legacy pool/water αντίγραφα.
+    # Μόνο ΕΝΕΡΓΑ σημεία → τα αρχειοθετημένα (παλιά Κουζίνα/Απομακρυσμένο/coarse) δεν εμφανίζονται.
+    _rq = apply_period(Reading.query.filter(db.or_(Reading.source_kind.is_(None), Reading.source_kind == 'rsplit')), Reading.record_date)
     for r in (_rq.order_by(Reading.recorded_at.desc()).limit(2000).all()):
         a = r.area
-        if not a or a.hotel_id not in hids:
+        if not a or not a.is_active or a.hotel_id not in hids:
             continue
         tk = r.template_key or (a.template_key if a else '') or ''
         kind = 'pool' if tk == 'pool' else ('water' if tk in _ZNX_TPL else 'area')

@@ -134,5 +134,13 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
   </div>
   {% endif %}
 </div>
+<script>
+/* auto-capitalize: πρώτο γράμμα κεφαλαίο σε πεδία κειμένου, καθώς γράφει ο χρήστης */
+(function(){
+  function cap(el){ var v=el.value; if(v && v.charAt(0)!==v.charAt(0).toUpperCase()){ var p=el.selectionStart; el.value=v.charAt(0).toUpperCase()+v.slice(1); try{el.setSelectionRange(p,p);}catch(e){} } }
+  function attach(root){ (root||document).querySelectorAll("input[type=text],input:not([type]),textarea").forEach(function(el){ if(el.dataset.cap) return; if(el.dataset.nocap!==undefined) return; el.dataset.cap="1"; el.addEventListener("input", function(){ cap(el); }); }); }
+  if(document.readyState!=="loading") attach(); else document.addEventListener("DOMContentLoaded", function(){attach();});
+})();
+</script>
 </body>
 </html>

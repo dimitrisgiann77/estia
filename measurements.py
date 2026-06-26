@@ -52,6 +52,22 @@ class MonitorNode(db.Model):
     hotels    = db.Column(db.String(120))   # Φ: λίστα hotel ids που «έχουν» τον κόμβο (κενό=όλα)
 
 
+# ── Ώρα Ελλάδος (αποθήκευση UTC, χρήση Europe/Athens στη φόρμα/μετατροπή) ──
+def _athens_now():
+    from datetime import timezone as _tz
+    from zoneinfo import ZoneInfo
+    return datetime.now(_tz.utc).astimezone(ZoneInfo("Europe/Athens"))
+
+def _athens_to_utc(dt_local):
+    """naive datetime σε ώρα Αθήνας → naive UTC (για αποθήκευση)."""
+    from datetime import timezone as _tz
+    from zoneinfo import ZoneInfo
+    try:
+        return dt_local.replace(tzinfo=ZoneInfo("Europe/Athens")).astimezone(_tz.utc).replace(tzinfo=None)
+    except Exception:
+        return dt_local
+
+
 _CLO2_LOW  = 'ClO2 {n} <1 ppm: αύξησε τη δοσομέτρηση ClO2· έλεγξε δοσομετρική αντλία/απόθεμα.'
 _CLO2_HIGH = 'ClO2 {n} >2 ppm: μείωσε τη δοσομέτρηση ClO2.'
 
@@ -1202,8 +1218,8 @@ def measurements_entry():
     return render_template('measurements_entry.html', points_by_hotel=points_by_hotel,
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
                            hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
-                           recent=recent, actions=actions, today=date.today().isoformat(),
-                           now_time=datetime.now().strftime('%H:%M'), view=view)
+                           recent=recent, actions=actions, today=_athens_now().date().isoformat(),
+                           now_time=_athens_now().strftime('%H:%M'), view=view)
 
 
 @app.route('/dashboard/measurements/entry/save', methods=['POST'])
@@ -1233,18 +1249,23 @@ def measurements_entry_save():
                 except (ValueError, TypeError):
                     pass
     period = (f.get('period') or 'day').strip()
+    _today_gr = _athens_now().date()
     _rd = (f.get('record_date') or '').strip()
     try:
-        rdate = date.fromisoformat(_rd) if _rd else date.today()
+        rdate = date.fromisoformat(_rd) if _rd else _today_gr
     except ValueError:
-        rdate = date.today()
-    if rdate > date.today():
-        rdate = date.today()
+        rdate = _today_gr
+    if rdate > _today_gr:
+        rdate = _today_gr
     _rt = (f.get('record_time') or '').strip()
+    # η ώρα που πληκτρολογείται είναι ώρα Ελλάδος → αποθήκευση σε UTC
     try:
-        rec_at = datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()) if _rt else datetime.now()
+        if _rt:
+            rec_at = _athens_to_utc(datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()))
+        else:
+            rec_at = datetime.utcnow()
     except ValueError:
-        rec_at = datetime.now()
+        rec_at = datetime.utcnow()
     pos = (f.get('position') or '').strip()[:40] or None
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
                   record_date=rdate, period=period, recorded_at=rec_at, values=_json.dumps(vals),
