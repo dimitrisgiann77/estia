@@ -11,6 +11,7 @@ MENU_CATALOG = [
     ('dashboard',   'Dashboard',              'ti-layout-dashboard', '/overview',                    False),
     ('today',       'Σήμερα (Μετρήσεις)',     'ti-calendar-check',   '/dashboard/measurements/today',False),
     ('records',     'Καταγραφές - Μετρήσεις', 'ti-clipboard-data',   '/records',                     False),
+    ('meas_data',   'Κονσόλα Μετρήσεων',      'ti-table',            '/dashboard/measurements/console', False),
     ('meas_console','Μετρήσεις · Ρυθμίσεις',   'ti-adjustments-cog',  '/dashboard/measurements',      False),
     ('meas_entry',  'Μετρήσεις · Καταχώρηση',  'ti-pencil-plus',      '/dashboard/measurements/entry', False),
     ('meas_stats',  'Μετρήσεις · Στατιστικά',  'ti-chart-histogram',  '/dashboard/measurements/stats', False),
