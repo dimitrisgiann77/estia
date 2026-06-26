@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Εστία — Κονσόλα Μετρήσεων</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<style>
+:root{--brand:#193847;--ink:#16323f;--muted:#5f7682;--line:#e1edf4;--line2:#cfe0e8;--secondary:#f4f9fc;--tertiary:#e9f1f6;--ok:#0F6E56;--bad:#A32D2D;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#eef4f8;color:var(--ink);}
+.topbar{background:var(--brand);color:#fff;padding:14px 24px;}
+.topbar-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.container{padding:16px 22px 60px;display:flex;flex-direction:column;gap:12px;}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:14px;}
+.lbl{font-size:11px;color:var(--muted);margin-right:6px;}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;}
+.seg a{text-decoration:none;background:#fff;padding:6px 11px;font-size:12px;color:var(--muted);border-right:1px solid var(--line);}
+.seg a:last-child{border-right:none;} .seg a.on{background:var(--brand);color:#fff;}
+.daysf{display:inline-flex;align-items:center;gap:4px;}
+.daysf input{width:52px;padding:6px;font-size:12px;border:1px solid var(--line2);border-radius:8px;}
+.daysf button{padding:6px 9px;font-size:12px;border:1px solid var(--line2);border-radius:8px;background:#fff;cursor:pointer;color:var(--ink);}
+.chips{display:flex;gap:10px;flex-wrap:wrap;}
+.chip{background:var(--secondary);border-radius:8px;padding:9px 14px;min-width:130px;border:1px solid var(--line);}
+.chip .l{font-size:11px;color:var(--muted);} .chip .v{font-size:22px;font-weight:700;margin-top:1px;}
+.oob{background:#FCEBEB;border:1px solid #F09595;border-radius:8px;padding:10px 13px;}
+.oob .h{font-size:12px;font-weight:700;color:#A32D2D;margin-bottom:5px;display:flex;gap:6px;align-items:center;}
+.oob .r{font-size:11.5px;color:#791F1F;line-height:1.95;}
+.win{width:100%;background:#fff;border-radius:8px;overflow:auto;border:1px solid var(--line);}
+table.m{width:100%;border-collapse:collapse;font-size:11px;}
+table.m th,table.m td{padding:5px 9px;text-align:center;white-space:nowrap;}
+table.m thead th{position:sticky;top:0;background:var(--tertiary);color:var(--muted);font-weight:700;font-size:10px;border-bottom:1px solid var(--line);}
+table.m thead th .lim{display:block;font-size:9px;color:#9fb2bd;font-weight:400;margin-top:1px;}
+table.m tbody td{border-bottom:1px solid var(--line);}
+table.m td.d,table.m td.l{text-align:left;}
+.xoros{background:#E1F5EE;color:#0F6E56;font-weight:700;}
+.xhead td{background:#E1F5EE;color:#0F6E56;font-weight:700;text-align:left;}
+.ok{color:var(--ok);} .bad{color:var(--bad);font-weight:700;}
+.nz{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#FAEEDA;color:#854F0B;}
+.np{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#E6F1FB;color:#0C447C;}
+.empty{text-align:center;color:#9fb2bd;padding:26px;font-style:italic;}
+.embed .topbar{display:none!important;}
+</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
+</head>
+<body>
+{% set emb = '&embed=1' if request.args.get('embed') else '' %}
+{% set base = '/dashboard/measurements/console?nh=' ~ nh %}
+<div class="topbar"><div class="topbar-title"><i class="ti ti-clipboard-data"></i> Κονσόλα Μετρήσεων</div></div>
+<div class="container">
+
+  {% if all_hotels|length > 1 %}
+  <div class="seg">{% for h in all_hotels %}<a class="{{ 'on' if h.id==nh }}" href="/dashboard/measurements/console?nh={{ h.id }}&range={{ rng }}{{ emb }}">{{ h.name }}</a>{% endfor %}</div>
+  {% endif %}
+
+  <div class="bar">
+    <div><span class="lbl">Περίοδος</span><span class="seg">
+      <a class="{{ 'on' if rng=='today' }}" href="{{ base }}&range=today&xoros={{ xoros }}&view={{ view }}{{ emb }}">Σήμερα</a>
+      <a class="{{ 'on' if rng=='7' }}" href="{{ base }}&range=7&xoros={{ xoros }}&view={{ view }}{{ emb }}">7 ημ.</a>
+      <a class="{{ 'on' if rng=='30' }}" href="{{ base }}&range=30&xoros={{ xoros }}&view={{ view }}{{ emb }}">30 ημ.</a>
+      <a class="{{ 'on' if rng=='60' }}" href="{{ base }}&range=60&xoros={{ xoros }}&view={{ view }}{{ emb }}">60 ημ.</a>
+    </span></div>
+    <form class="daysf" method="get" action="/dashboard/measurements/console">
+      <input type="hidden" name="nh" value="{{ nh }}"><input type="hidden" name="xoros" value="{{ xoros }}">
+      <input type="hidden" name="view" value="{{ view }}">{% if request.args.get('embed') %}<input type="hidden" name="embed" value="1">{% endif %}
+      <span class="lbl">ή ημέρες</span><input type="number" name="days" min="1" value="{{ days }}"><button type="submit">OK</button>
+    </form>
+    <div><span class="lbl">Χώρος</span><span class="seg">
+      <a class="{{ 'on' if not xoros }}" href="{{ base }}&range={{ rng }}&view={{ view }}{{ emb }}">Όλοι</a>
+      {% for s in spaces %}<a class="{{ 'on' if xoros==s }}" href="{{ base }}&range={{ rng }}&xoros={{ s }}&view={{ view }}{{ emb }}">{{ s }}</a>{% endfor %}
+    </span></div>
+    <div style="margin-left:auto;"><span class="lbl">Προβολή</span><span class="seg">
+      <a class="{{ 'on' if view!='byspace' }}" href="{{ base }}&range={{ rng }}&xoros={{ xoros }}&view=table{{ emb }}">Πίνακας</a>
+      <a class="{{ 'on' if view=='byspace' }}" href="{{ base }}&range={{ rng }}&xoros={{ xoros }}&view=byspace{{ emb }}">Ανά χώρο</a>
+    </span></div>
+  </div>
+
+  <div class="chips">
+    <div class="chip"><div class="l">Καταγραφές ({{ days }} ημ.)</div><div class="v">{{ total }}</div></div>
+    <div class="chip"><div class="l">Εντός ορίων</div><div class="v" style="color:var(--ok);">{{ pct_in }}%</div></div>
+    <div class="chip"><div class="l">Εκτός ορίων</div><div class="v" style="color:var(--bad);">{{ pct_out }}%</div></div>
+  </div>
+
+  {% if oob %}
+  <div class="oob"><div class="h"><i class="ti ti-alert-triangle"></i> Εκτός ορίων — να ελεγχθούν ({{ oob|length }})</div>
+    <div class="r">{% for o in oob[:12] %}● {{ o.date.strftime('%d/%m') }} · {{ o.xoros }} · {{ o.point }} · {{ o.label }} {{ o.value }}{{ o.unit }} (όριο {{ o.limit }})<br>{% endfor %}
+    {% if oob|length > 12 %}<span style="opacity:.7;">…και {{ oob|length - 12 }} ακόμη</span>{% endif %}</div></div>
+  {% endif %}
+
+  <div class="win"><table class="m">
+    <thead><tr>
+      <th class="d">Ημέρα</th>{% if view!='byspace' %}<th class="l">Χώρος</th>{% endif %}<th class="l">Σημείο</th><th>Θέση</th>
+      <th>Θερμοκρασία<span class="lim">ΖΝΧ ≥60 · ΨΝΧ ≤20 °C</span></th>
+      <th>ClO₂<span class="lim">{{ lim_clo2 }}</span></th>
+      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th>
+    </tr></thead>
+    <tbody>
+      {% set ns = namespace(prev='__') %}
+      {% for r in rows %}
+        {% if view=='byspace' and r.xoros != ns.prev %}
+        <tr class="xhead"><td colspan="7"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
+        {% set ns.prev = r.xoros %}
+        {% endif %}
+        <tr>
+          <td class="d">{{ r.date.strftime('%d/%m') }}</td>
+          {% if view!='byspace' %}<td class="l xoros">{{ r.xoros }}</td>{% endif %}
+          <td class="l">{{ r.point }}</td>
+          <td>{{ r.pos or '—' }}</td>
+          <td class="{{ 'bad' if r.temp_bad else 'ok' }}">{% if r.temp is not none %}{{ r.temp }}{% if r.net %}<span class="{{ 'nz' if r.net=='ΖΝΧ' else 'np' }}">{{ r.net }}</span>{% endif %}{% else %}—{% endif %}</td>
+          <td class="{{ 'bad' if r.clo2_bad else 'ok' }}">{{ r.clo2 if r.clo2 is not none else '—' }}</td>
+          <td class="{{ 'bad' if r.ph_bad else 'ok' }}">{{ r.ph if r.ph is not none else '—' }}</td>
+          <td class="{{ 'ok' if r.ok else 'bad' }}">{{ '✓' if r.ok else '✗ εκτός' }}</td>
+        </tr>
+      {% endfor %}
+      {% if not rows %}<tr><td colspan="7" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
+    </tbody>
+  </table></div>
+</div>
+</body></html>

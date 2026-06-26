@@ -610,46 +610,6 @@ def measurements_node_hotel(nid):
     return jsonify(ok=True, on=on)
 
 
-@app.route('/dashboard/measurements/admin/tz-check')
-def measurements_tz_check():
-    """Read-only διαγνωστικό ώρας — ΚΑΜΙΑ αλλαγή. Plain text."""
-    if not is_admin():
-        return redirect(url_for('login'))
-    import os, time as _t
-    from datetime import datetime as _dt, date as _d
-    out = []
-    out.append('=== TZ CHECK (read-only) ===')
-    try:
-        from app import SysFlag as _SF
-        out.append('Flag tz_greek (μετάβαση έγινε;) = %s' % bool(_SF.query.filter_by(key='tz_greek').first()))
-    except Exception as _e:
-        out.append('Flag tz_greek = ? (%s)' % _e)
-    out.append('os.environ TZ      = %r' % os.environ.get('TZ'))
-    out.append('time.tzname        = %r' % (_t.tzname,))
-    out.append('datetime.now()     = %s' % _dt.now().strftime('%Y-%m-%d %H:%M:%S'))
-    out.append('datetime.utcnow()  = %s' % _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
-    out.append('date.today()       = %s' % _d.today().isoformat())
-    out.append('_athens_now()      = %s  (zoneinfo, αξιόπιστο Ελλάδος)' % _athens_now().strftime('%Y-%m-%d %H:%M:%S'))
-    _delta = (_dt.now() - _dt.utcnow()).total_seconds() / 3600.0
-    out.append('now − utcnow (ώρες) = %.1f   → %s' % (
-        _delta, 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε Ελλάδος' if abs(_delta) > 0.5 else 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε UTC'))
-    out.append('')
-    out.append('--- Τελευταίες 8 (RAW αποθηκευμένο vs τι θα γίνει σε Ελλάδος αν είναι UTC) ---')
-    for r in Reading.query.order_by(Reading.id.desc()).limit(8).all():
-        a = r.area
-        raw = r.recorded_at.strftime('%Y-%m-%d %H:%M:%S') if r.recorded_at else '—'
-        try:
-            from zoneinfo import ZoneInfo as _ZI
-            from datetime import timezone as _TZ
-            shown = (r.recorded_at.replace(tzinfo=_TZ.utc).astimezone(_ZI('Europe/Athens')).strftime('%Y-%m-%d %H:%M:%S')
-                     if r.recorded_at else '—')
-        except Exception:
-            shown = '?'
-        out.append('  id=%-5s %-18s RAW=%s  |gr=%s' % (r.id, (a.name[:18] if a else '—'), raw, shown))
-    return ('\n'.join(out), 200, {'Content-Type': 'text/plain; charset=utf-8'})
-
-
-
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
 def measurements_node_save():
     """Προσθήκη/επεξεργασία κόμβου (ομάδα/υποομάδα) + reparent με έλεγχο κύκλου."""
@@ -1586,6 +1546,147 @@ def measurements_stats():
                            dfrom=dfrom.isoformat(), dto=dto.isoformat(),
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotel_ids],
                            hsel=hsel, hotel_name=hotel_name, cur_range=request.args.get('range', ''))
+
+
+# ── Κονσόλα Μετρήσεων (αναλυτικός πίνακας τιμών + chips + εκτός ορίων) ────────
+def _limit_text(p):
+    mn, mx = p.min_v, p.max_v
+    if mn is not None and mx is not None:
+        return '%s–%s' % (_numfmt(mn), _numfmt(mx))
+    if mn is not None:
+        return '≥%s' % _numfmt(mn)
+    if mx is not None:
+        return '≤%s' % _numfmt(mx)
+    return ''
+
+def _numfmt(v):
+    try:
+        f = float(v)
+        return str(int(f)) if f == int(f) else ('%.2f' % f).rstrip('0').rstrip('.')
+    except Exception:
+        return str(v)
+
+def _val_status(p, v):
+    """Επιστρέφει True αν εντός ορίων (ή χωρίς όρια), False αν εκτός."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return True
+    if p.min_v is not None and x < float(p.min_v):
+        return False
+    if p.max_v is not None and x > float(p.max_v):
+        return False
+    return True
+
+def _net_tag(p):
+    """ΖΝΧ (ζεστό: κάτω όριο) / ΨΝΧ (κρύο: άνω όριο) — μόνο για θερμοκρασία."""
+    if (p.unit or '') != '°C':
+        return ''
+    if p.min_v is not None and p.max_v is None:
+        return 'ΖΝΧ'
+    if p.max_v is not None and p.min_v is None:
+        return 'ΨΝΧ'
+    return ''
+
+def _meas_cat(p):
+    u = (p.unit or '')
+    k = (p.pkey or '')
+    if u == '°C' or k.startswith('temp'):
+        return 'temp'
+    if u == 'ppm' or k.startswith('clo2') or 'ClO' in (p.label or ''):
+        return 'clo2'
+    if k == 'ph' or k.startswith('ph'):
+        return 'ph'
+    return None
+
+
+@app.route('/dashboard/measurements/console')
+def measurements_data_console():
+    if 'user_id' not in session or not can_log():
+        return redirect(url_for('login'))
+    u = current_user()
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    scoped = scoped_hotel_ids(u)
+    _ah = [h for h in Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all() if h.id in scoped]
+    _nh = request.args.get('nh')
+    nh = int(_nh) if (_nh and _nh.isdigit() and int(_nh) in scoped) else (_ah[0].id if _ah else None)
+    # περίοδος
+    rng = (request.args.get('range') or '7').strip()
+    try:
+        days = max(1, int(request.args.get('days') or rng))
+    except ValueError:
+        days = 7
+    if rng == 'today':
+        days = 1
+    today = _athens_now().date()
+    cutoff = today - timedelta(days=days - 1)
+    xoros = (request.args.get('xoros') or '').strip()
+    view = (request.args.get('view') or 'table').strip()
+
+    pmap = {p.pkey: p for p in MonitorParam.query.all()}
+    areas = {a.id: a for a in Area.query.filter(Area.engine_only.is_(True), Area.is_active.is_(True),
+                                                Area.hotel_id == nh).all()} if nh else {}
+    aids = list(areas.keys())
+    spaces = sorted({(a.location or '').strip() for a in areas.values() if (a.location or '').strip()})
+    rows, oob = [], []
+    n_in = n_out = 0
+    if aids:
+        rq = (Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date >= cutoff)
+              .order_by(Reading.record_date.desc(), Reading.recorded_at.desc()).all())
+        for r in rq:
+            a = areas.get(r.area_id)
+            if not a:
+                continue
+            loc = (a.location or '').strip()
+            if xoros and loc != xoros:
+                continue
+            try:
+                vals = _json.loads(r.values or '{}')
+            except Exception:
+                vals = {}
+            cells = {'temp': None, 'clo2': None, 'ph': None}
+            cell_bad = {'temp': False, 'clo2': False, 'ph': False}
+            net = ''
+            row_ok = True
+            for pk, v in vals.items():
+                p = pmap.get(pk)
+                if not p or v in (None, ''):
+                    continue
+                ok = _val_status(p, v)
+                if not ok:
+                    row_ok = False
+                    oob.append({'date': r.record_date, 'xoros': loc or '—', 'point': a.name,
+                                'label': p.label, 'value': _numfmt(v), 'unit': p.unit or '',
+                                'limit': _limit_text(p)})
+                cat = _meas_cat(p)
+                if cat:
+                    cells[cat] = _numfmt(v)
+                    cell_bad[cat] = (not ok)
+                    if cat == 'temp':
+                        net = net or _net_tag(p)
+            if row_ok:
+                n_in += 1
+            else:
+                n_out += 1
+            rows.append({'date': r.record_date, 'xoros': loc or '—', 'point': a.name,
+                         'pos': r.position or '', 'net': net,
+                         'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
+                         'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],
+                         'ph': cells['ph'], 'ph_bad': cell_bad['ph'], 'ok': row_ok})
+    total = n_in + n_out
+    pct_in = round(100 * n_in / total) if total else 0
+    pct_out = round(100 * n_out / total) if total else 0
+    oob.sort(key=lambda x: x['date'], reverse=True)
+    if view == 'byspace':
+        rows.sort(key=lambda r: r['xoros'])  # stable: κρατά τη σειρά ημ/νίας μέσα σε κάθε χώρο
+    # όρια κεφαλίδων (αντιπροσωπευτικά)
+    lim_clo2 = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'clo2' and _limit_text(p)), '1–2 ppm')
+    lim_ph = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'ph' and _limit_text(p)), '')
+    return render_template('measurements_console_data.html',
+                           rows=rows, oob=oob, total=total, pct_in=pct_in, pct_out=pct_out,
+                           n_out=n_out, spaces=spaces, xoros=xoros, view=view, days=days, rng=rng,
+                           all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
+                           lim_clo2=lim_clo2, lim_ph=lim_ph)
 
 
 print('measurements module loaded (Φ1→Φ4 ενοποίηση μετρήσεων)')

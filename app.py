@@ -362,11 +362,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.313'
-APP_BUILD   = '594'
+APP_VERSION = '12.315'
+APP_BUILD   = '596'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.315', 'b': '596', 'date': '26/06/2026', 'time': '20:45', 'title': 'Νέα σελίδα «Κονσόλα Μετρήσεων»',
+     'items': ['Νέα οθόνη (Συντήρηση → Κονσόλα Μετρήσεων): αναλυτικός πίνακας τιμών με φίλτρα περιόδου (Σήμερα/7/30/60 ημ. ή custom) & χώρου, chips (καταγραφές/%εντός/%εκτός), λίστα «εκτός ορίων», όρια στις κεφαλίδες, ετικέτα ΖΝΧ/ΨΝΧ στη θερμοκρασία, και προβολή «Ανά χώρο».']},
+    {'v': '12.314', 'b': '595', 'date': '26/06/2026', 'time': '20:00', 'title': 'Καθαρισμός temp routes + compact Log',
+     'items': ['Αφαιρέθηκαν τα προσωρινά εργαλεία ώρας (tz-check, tz-migrate) μετά την επιτυχή μετάβαση. Το Log Μετρήσεων έγινε πιο compact (μικρότερα paddings/γραμματοσειρά).']},
     {'v': '12.313', 'b': '594', 'date': '26/06/2026', 'time': '19:45', 'title': 'Log: σωστός τύπος (Νερά) στα νέα σημεία',
      'items': ['Στο Log Μετρήσεων ο «Τύπος» υπολογίζεται πλέον από το ΔΙΚΤΥΟ (κόμβο) του σημείου, όχι το template. Τα νέα σημεία νερού (Κρύο/Ζεστό Νερό, Επιστροφή ΖΝΧ, Αντ. Όσμωση Δωμάτιο) εμφανίζονται σωστά ως «Νερά» αντί «Τομέας».']},
     {'v': '12.312', 'b': '593', 'date': '26/06/2026', 'time': '19:20', 'title': 'tz-migrate: ανθεκτικό σε schema-drift',
@@ -3069,96 +3073,6 @@ def records_feed():
     items = _records_items(user, ftype)
     return render_template('records.html', items=items, ftype=ftype, user=user, is_admin=is_admin())
 
-
-def _tz_migrate_greek(apply=False):
-    """ΕΦΑΠΑΞ: μετατρέπει ΟΛΑ τα αποθηκευμένα UTC timestamps → ώρα Ελλάδος (Europe/Athens, με DST).
-    Auto-discovery όλων των DateTime στηλών. Flag-guarded (SysFlag 'tz_greek'). apply=False → dry-run."""
-    import sqlalchemy as _sa
-    from zoneinfo import ZoneInfo
-    from datetime import timezone as _utc
-    ATH = ZoneInfo('Europe/Athens')
-    L = []
-    done = SysFlag.query.filter_by(key='tz_greek').first() is not None
-    L.append('=== TZ MIGRATE → ΕΛΛΑΔΟΣ (%s) ===' % ('APPLY' if apply else 'DRY-RUN'))
-    L.append('Flag tz_greek: %s' % ('ΥΠΑΡΧΕΙ — έχει ήδη γίνει' if done else 'ΔΕΝ υπάρχει'))
-    if done:
-        L.append('→ Παράλειψη (idempotent). Καμία αλλαγή.')
-        return L
-    conn = db.session.connection()
-    insp = _sa.inspect(db.engine)
-    existing_tables = set(insp.get_table_names())
-    total = 0
-    sample = []
-    skipped = []
-    for t in db.metadata.sorted_tables:
-        if t.name not in existing_tables:
-            skipped.append('%s(δεν υπάρχει στη βάση)' % t.name)
-            continue
-        # ΜΟΝΟ στήλες που όντως υπάρχουν στη βάση (αποφυγή schema-drift π.χ. payroll_run.approved_at)
-        real_cols = {c['name'] for c in insp.get_columns(t.name)}
-        dtcols = [c for c in t.columns if isinstance(c.type, _sa.DateTime) and c.name in real_cols]
-        if not dtcols:
-            continue
-        pkcols = [c for c in t.primary_key.columns if c.name in real_cols]
-        if len(pkcols) != 1:
-            skipped.append('%s(PK)' % t.name)
-            continue
-        pk = pkcols[0]
-        try:
-            rows = conn.execute(_sa.select(pk, *dtcols)).fetchall()
-        except Exception as _e:
-            skipped.append('%s(%s)' % (t.name, type(_e).__name__))
-            continue
-        cnt = 0
-        for row in rows:
-            rid = row[0]
-            upd = {}
-            for i, c in enumerate(dtcols, start=1):
-                v = row[i]
-                if v is not None:
-                    upd[c.name] = v.replace(tzinfo=_utc.utc).astimezone(ATH).replace(tzinfo=None)
-            if upd:
-                cnt += 1
-                if len(sample) < 6:
-                    k0 = list(upd.keys())[0]
-                    v0 = row[1]
-                    sample.append('    %s.%s: %s → %s' % (t.name, k0,
-                                  v0.strftime('%Y-%m-%d %H:%M'), upd[k0].strftime('%Y-%m-%d %H:%M')))
-                if apply:
-                    conn.execute(_sa.update(t).where(pk == rid).values(**upd))
-        if cnt:
-            total += cnt
-            L.append('  %-26s %d γραμμές (%d στήλες ώρας)' % (t.name, cnt, len(dtcols)))
-    L.append('— Δείγμα μετατροπής (UTC → Ελλάδος, +2/+3 με DST):')
-    L.extend(sample)
-    if skipped:
-        L.append('Παραλείφθηκαν (χωρίς στήλες ώρας ή drift): ' + ', '.join(skipped))
-    L.append('ΣΥΝΟΛΟ γραμμές προς μετατροπή: %d' % total)
-    if apply:
-        db.session.add(SysFlag(key='tz_greek'))
-        db.session.commit()
-        L.append('\n✅ ΕΦΑΡΜΟΣΤΗΚΕ + flag set. Από τώρα: αποθήκευση & εμφάνιση ΜΟΝΟ ώρα Ελλάδος.')
-    else:
-        db.session.rollback()
-        L.append('\n(DRY-RUN: rollback — τίποτα δεν αποθηκεύτηκε.)')
-    return L
-
-
-@app.route('/dashboard/measurements/admin/tz-migrate')
-def tz_migrate_route():
-    if not is_admin():
-        return redirect(url_for('login'))
-    apply = (request.args.get('apply') == 'NAI-GREEK')
-    try:
-        lines = _tz_migrate_greek(apply=apply)
-    except Exception as e:
-        db.session.rollback()
-        import traceback
-        lines = ['ΣΦΑΛΜΑ: %s' % e, traceback.format_exc()]
-    if apply:
-        log_activity('tz_migrate_greek', 'APPLIED')
-    tail = '' if apply else '\n\n— Για εφαρμογή: ?apply=NAI-GREEK (αφού δεις το dry-run).'
-    return ('\n'.join(lines) + tail, 200, {'Content-Type': 'text/plain; charset=utf-8'})
 
 @app.route('/pools/record/<int:record_id>/delete', methods=['POST'])
 def delete_pool_record(record_id):

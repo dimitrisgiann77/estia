@@ -24,6 +24,7 @@ MENU_REG = [
     {'k': 'faults_board', 'label': 'Πίνακας Βλαβών',      'icon': 'ti-alert-triangle',   'url': '/dashboard/faults', 'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'areas_dash',   'label': 'Πίνακας τομέων',      'icon': 'ti-clipboard-list',   'url': '/areas/dashboard',  'ws': 'operations',          'group': 'Συντήρηση'},
     {'k': 'records',      'label': 'Καταγραφές - Μετρήσεις', 'short': 'Καταγραφές', 'icon': 'ti-clipboard-data',   'url': '/records',          'ws': 'operations',          'group': 'Συντήρηση'},
+    {'k': 'meas_data',    'label': 'Κονσόλα Μετρήσεων',    'short': 'Κονσόλα',    'icon': 'ti-table',           'url': '/dashboard/measurements/console', 'ws': 'operations', 'group': 'Συντήρηση'},
     {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
     {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'evals',        'label': 'Αξιολόγηση προσωπικού','icon': 'ti-star',            'url': '/dashboard/evaluations','ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
@@ -37,7 +38,7 @@ _REG_BY_KEY = {it['k']: it for it in MENU_REG}
 ROLES_CFG = ['manager', 'staff']   # admin/masteradmin = πάντα όλα· viewer = ελάχιστα
 # Προεπιλογές ορατότητας ανά ρόλο (manager = υποδοχή: πρόγραμμα/βλάβες/records/τι νέο)
 DEFAULT_VIS = {
-    'manager': {'today', 'measure', 'records', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'info', 'evals'},
+    'manager': {'today', 'measure', 'records', 'meas_data', 'faults_board', 'fault_submit', 'schedule', 'whatsnew', 'info', 'evals'},
     # v12.83 — ο συντηρητής (staff) βλέπει ΜΟΝΟ την καταγραφή: Σήμερα + φόρμες + δήλωση βλάβης/τομείς.
     # v12.231 — Φ3c-3: παλιές φόρμες pools/water αποσύρθηκαν· staff χρησιμοποιεί 'measure' (νέα ενιαία)
     'staff':   {'today', 'measure', 'fault_submit', 'areas', 'whatsnew'},
