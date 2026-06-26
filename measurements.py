@@ -1668,7 +1668,7 @@ def measurements_data_console():
                 n_in += 1
             else:
                 n_out += 1
-            rows.append({'date': r.record_date, 'xoros': loc or '—', 'point': a.name,
+            rows.append({'rid': r.id, 'date': r.record_date, 'xoros': loc or '—', 'point': a.name,
                          'pos': r.position or '', 'net': net,
                          'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
                          'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],

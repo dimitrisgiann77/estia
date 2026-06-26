@@ -39,6 +39,11 @@ table.m td.d,table.m td.l{text-align:left;}
 .np{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#E6F1FB;color:#0C447C;}
 .empty{text-align:center;color:#9fb2bd;padding:26px;font-style:italic;}
 .embed .topbar{display:none!important;}
+@keyframes flashok{0%{background:#fff7d6;}100%{background:transparent;}} tr.rnew{animation:flashok 2.6s ease-out;}
+@keyframes flashbad{0%{background:#fcdada;}100%{background:transparent;}} tr.rnewbad{animation:flashbad 2.8s ease-out;}
+#mc-toasts{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;flex-direction:column;gap:8px;max-width:300px;}
+.mtoast{background:#16323f;color:#fff;border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;gap:8px;align-items:flex-start;cursor:pointer;}
+.mtoast.out{background:#A32D2D;} .mtoast .x{margin-left:auto;opacity:.7;}
 </style>
 <script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
 </head>
@@ -74,17 +79,17 @@ table.m td.d,table.m td.l{text-align:left;}
     </span></div>
   </div>
 
-  <div class="chips">
+  <div class="chips" id="mc-chips">
     <div class="chip"><div class="l">Καταγραφές ({{ days }} ημ.)</div><div class="v">{{ total }}</div></div>
     <div class="chip"><div class="l">Εντός ορίων</div><div class="v" style="color:var(--ok);">{{ pct_in }}%</div></div>
     <div class="chip"><div class="l">Εκτός ορίων</div><div class="v" style="color:var(--bad);">{{ pct_out }}%</div></div>
   </div>
 
-  {% if oob %}
+  <div id="mc-oob">{% if oob %}
   <div class="oob"><div class="h"><i class="ti ti-alert-triangle"></i> Εκτός ορίων — να ελεγχθούν ({{ oob|length }})</div>
     <div class="r">{% for o in oob[:12] %}● {{ o.date.strftime('%d/%m') }} · {{ o.xoros }} · {{ o.point }} · {{ o.label }} {{ o.value }}{{ o.unit }} (όριο {{ o.limit }})<br>{% endfor %}
     {% if oob|length > 12 %}<span style="opacity:.7;">…και {{ oob|length - 12 }} ακόμη</span>{% endif %}</div></div>
-  {% endif %}
+  {% endif %}</div>
 
   <div class="win"><table class="m">
     <thead><tr>
@@ -93,14 +98,14 @@ table.m td.d,table.m td.l{text-align:left;}
       <th>ClO₂<span class="lim">{{ lim_clo2 }}</span></th>
       <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th>
     </tr></thead>
-    <tbody>
+    <tbody id="mc-tbody">
       {% set ns = namespace(prev='__') %}
       {% for r in rows %}
         {% if view=='byspace' and r.xoros != ns.prev %}
         <tr class="xhead"><td colspan="7"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
         {% set ns.prev = r.xoros %}
         {% endif %}
-        <tr>
+        <tr data-rid="{{ r.rid }}" data-point="{{ r.point }}" data-ok="{{ 1 if r.ok else 0 }}">
           <td class="d">{{ r.date.strftime('%d/%m') }}</td>
           {% if view!='byspace' %}<td class="l xoros">{{ r.xoros }}</td>{% endif %}
           <td class="l">{{ r.point }}</td>
@@ -115,4 +120,41 @@ table.m td.d,table.m td.l{text-align:left;}
     </tbody>
   </table></div>
 </div>
+<div id="mc-toasts"></div>
+<script>
+(function(){
+  var seen=new Set();
+  document.querySelectorAll("#mc-tbody tr[data-rid]").forEach(function(tr){seen.add(tr.getAttribute("data-rid"));});
+  function toast(point, ok){
+    var w=document.getElementById("mc-toasts"); if(!w) return;
+    var el=document.createElement("div"); el.className="mtoast"+(ok?"":" out");
+    el.innerHTML="<i class=\"ti ti-"+(ok?"check":"alert-triangle")+"\"></i><div><b>Νέα καταγραφή</b><br>"+point+" "+(ok?"· εντός ορίων":"· ΕΚΤΟΣ ορίων")+"</div><i class=\"ti ti-x x\"></i>";
+    var t=setTimeout(function(){el.remove();},10000);
+    el.onclick=function(){clearTimeout(t);el.remove();};
+    w.appendChild(el);
+  }
+  function poll(){
+    fetch(location.href,{headers:{"X-Requested-With":"poll"}}).then(function(r){return r.text();}).then(function(html){
+      var doc=new DOMParser().parseFromString(html,"text/html");
+      var nb=doc.getElementById("mc-tbody"); if(!nb) return;
+      var newIds=[].map.call(nb.querySelectorAll("tr[data-rid]"),function(tr){return tr.getAttribute("data-rid");});
+      var fresh=newIds.filter(function(id){return !seen.has(id);});
+      if(fresh.length===0) return;
+      document.getElementById("mc-tbody").innerHTML=nb.innerHTML;
+      var nc=doc.getElementById("mc-chips"); if(nc) document.getElementById("mc-chips").innerHTML=nc.innerHTML;
+      var no=doc.getElementById("mc-oob"); if(no) document.getElementById("mc-oob").innerHTML=no.innerHTML;
+      var shown=0;
+      fresh.forEach(function(id){
+        var tr=document.querySelector("#mc-tbody tr[data-rid=\""+id+"\"]");
+        if(tr){ var ok=tr.getAttribute("data-ok")==="1"; tr.classList.add(ok?"rnew":"rnewbad");
+          if(shown<5){ toast(tr.getAttribute("data-point"), ok); shown++; } }
+        seen.add(id);
+      });
+      if(fresh.length>5) toast("…και "+(fresh.length-5)+" ακόμη", true);
+    }).catch(function(){});
+  }
+  var iv=setInterval(function(){ if(!document.hidden) poll(); }, 15000);
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) poll(); });
+})();
+</script>
 </body></html>
