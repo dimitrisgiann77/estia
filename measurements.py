@@ -1600,10 +1600,110 @@ def _meas_cat(p):
     return None
 
 
-@app.route('/dashboard/measurements/console')
-def measurements_data_console():
-    if 'user_id' not in session or not can_log():
-        return redirect(url_for('login'))
+def _build_console_pdf(ctx):
+    """Polished, print-ready PDF της φιλτραρισμένης κονσόλας μετρήσεων (fpdf2 landscape)."""
+    import os
+    from fpdf import FPDF
+    BASE = os.path.dirname(os.path.abspath(__file__))
+    NAVY = (25, 56, 71); GREY = (120, 120, 120); RED = (163, 45, 45); OKG = (15, 110, 86)
+    byspace = (ctx.get('view') == 'byspace')
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.set_auto_page_break(True, margin=14)
+    pdf.add_font('dv', '', os.path.join(BASE, 'assets', 'fonts', 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', os.path.join(BASE, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.add_page()
+    try:
+        pdf.image(os.path.join(BASE, 'static', 'img', 'logo.png'), x=12, y=9, h=13)
+    except Exception:
+        pass
+    pdf.set_xy(30, 9); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'Εστία — CONDIAN HOTELS · Κονσόλα Μετρήσεων', ln=1)
+    pdf.set_x(30); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
+    pdf.cell(0, 6, ctx.get('hotel_name') or '—', ln=1)
+    # γραμμή φίλτρων
+    pdf.ln(3); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
+    filt = ('Περίοδος: %s   ·   Χώρος: %s   ·   Προβολή: %s   ·   Εκτύπωση: %s'
+            % (ctx.get('period_label', '—'), (ctx.get('xoros') or 'Όλοι οι χώροι'),
+               ('Ανά χώρο' if byspace else 'Πίνακας'), ctx.get('today_disp', '')))
+    pdf.cell(0, 5, filt, ln=1)
+    pdf.set_x(10); pdf.set_font('dv', 'B', 9.5); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 5, ('Καταγραφές: %d    ·    Εντός ορίων: %d%%    ·    Εκτός ορίων: %d%%'
+                    % (ctx.get('total', 0), ctx.get('pct_in', 0), ctx.get('pct_out', 0))), ln=1)
+    pdf.set_x(10); pdf.set_font('dv', '', 8.5); pdf.set_text_color(*GREY)
+    pdf.cell(0, 5, ('Όρια — Θερμοκρασία: ΖΝΧ ≥60°C / ΨΝΧ ≤20°C   ·   ClO₂: %s   ·   pH: %s'
+                    % (ctx.get('lim_clo2') or '1–2 ppm', ctx.get('lim_ph') or '7.2–7.8')), ln=1)
+    pdf.ln(2)
+
+    heads = ['Ημέρα', 'Χώρος', 'Σημείο', 'Θέση', 'Θερμοκρασία °C', 'ClO₂ ppm', 'pH', 'Κατάσταση']
+    widths = [20, 46, 50, 30, 50, 26, 24, 30]
+    if byspace:
+        heads = heads[:1] + heads[2:]; widths = [20, 56, 30, 52, 28, 26, 30]
+
+    def thead():
+        pdf.set_font('dv', 'B', 8.5); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*NAVY)
+        for h, w in zip(heads, widths):
+            hh = h
+            while hh and pdf.get_string_width(hh) > w - 2 and len(hh) > 2:
+                hh = hh[:-2]
+            pdf.cell(w, 8, hh, border=0, fill=True, align='L')
+        pdf.ln(8)
+    thead()
+
+    def clip(s, w):
+        s = str(s)
+        while s and pdf.get_string_width(s) > w - 2 and len(s) > 2:
+            s = s[:-2]
+        return s
+
+    rows = ctx.get('rows', [])
+    if not rows:
+        pdf.set_font('dv', '', 11); pdf.set_text_color(*GREY)
+        pdf.cell(0, 10, 'Καμία καταγραφή στο επιλεγμένο διάστημα.', ln=1)
+        return bytes(pdf.output())
+
+    fill = False; prev = None
+    for r in rows:
+        if byspace and r['xoros'] != prev:
+            prev = r['xoros']
+            pdf.set_font('dv', 'B', 8.5); pdf.set_text_color(*NAVY); pdf.set_fill_color(225, 245, 238)
+            pdf.cell(sum(widths), 7, '  ' + str(r['xoros']), border=0, fill=True, ln=1, align='L')
+        if pdf.get_y() > 188:
+            pdf.add_page(); thead(); fill = False
+        pdf.set_fill_color(243, 247, 250) if fill else pdf.set_fill_color(255, 255, 255)
+        temp = '—'
+        if r.get('temp') is not None:
+            temp = str(r['temp']) + ((' ' + r['net']) if r.get('net') else '')
+        cells = ([r['date'].strftime('%d/%m'), r['xoros'], r['point'], r.get('pos') or '—',
+                  temp, (r.get('clo2') if r.get('clo2') is not None else '—'),
+                  (r.get('ph') if r.get('ph') is not None else '—'),
+                  ('Εντός' if r['ok'] else 'ΕΚΤΟΣ')])
+        if byspace:
+            cells = cells[:1] + cells[2:]
+        # χρώμα ανά κελί
+        bad_map = {}
+        base = 1 if not byspace else 0
+        # δείκτες θερμ/clo2/ph/κατάσταση ανάλογα view
+        idx_temp = 4 if not byspace else 3
+        idx_clo2 = 5 if not byspace else 4
+        idx_ph = 6 if not byspace else 5
+        idx_st = 7 if not byspace else 6
+        if r.get('temp_bad'): bad_map[idx_temp] = True
+        if r.get('clo2_bad'): bad_map[idx_clo2] = True
+        if r.get('ph_bad'): bad_map[idx_ph] = True
+        pdf.set_font('dv', '', 8.2)
+        for i, (val, w) in enumerate(zip(cells, widths)):
+            if i == idx_st:
+                pdf.set_text_color(*(RED if not r['ok'] else OKG)); pdf.set_font('dv', 'B', 8.2)
+            elif bad_map.get(i):
+                pdf.set_text_color(*RED); pdf.set_font('dv', 'B', 8.2)
+            else:
+                pdf.set_text_color(40, 40, 40); pdf.set_font('dv', '', 8.2)
+            pdf.cell(w, 7, clip(val, w), border=0, fill=True, align='L')
+        pdf.ln(7); fill = not fill
+    return bytes(pdf.output())
+
+
+def _console_ctx():
     u = current_user()
     hmap = {h.id: h.name for h in Hotel.query.all()}
     scoped = scoped_hotel_ids(u)
@@ -1682,11 +1782,31 @@ def measurements_data_console():
     # όρια κεφαλίδων (αντιπροσωπευτικά)
     lim_clo2 = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'clo2' and _limit_text(p)), '1–2 ppm')
     lim_ph = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'ph' and _limit_text(p)), '')
-    return render_template('measurements_console_data.html',
-                           rows=rows, oob=oob, total=total, pct_in=pct_in, pct_out=pct_out,
-                           n_out=n_out, spaces=spaces, xoros=xoros, view=view, days=days, rng=rng,
-                           all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
-                           lim_clo2=lim_clo2, lim_ph=lim_ph)
+    period_label = 'Σήμερα' if rng == 'today' else ('Τελευταίες %d ημέρες' % days)
+    return dict(rows=rows, oob=oob, total=total, pct_in=pct_in, pct_out=pct_out,
+                n_out=n_out, spaces=spaces, xoros=xoros, view=view, days=days, rng=rng,
+                all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
+                lim_clo2=lim_clo2, lim_ph=lim_ph,
+                hotel_name=hmap.get(nh, '—'), period_label=period_label,
+                today_disp=today.strftime('%d/%m/%Y'))
+
+
+@app.route('/dashboard/measurements/console')
+def measurements_data_console():
+    if 'user_id' not in session or not can_log():
+        return redirect(url_for('login'))
+    return render_template('measurements_console_data.html', **_console_ctx())
+
+
+@app.route('/dashboard/measurements/console/pdf')
+def measurements_console_pdf():
+    if 'user_id' not in session or not can_log():
+        return redirect(url_for('login'))
+    ctx = _console_ctx()
+    pdf = _build_console_pdf(ctx)
+    fn = 'metriseis-%s-%s.pdf' % ((ctx['hotel_name'] or 'hotel').split()[0], ctx['today'])
+    return Response(pdf, mimetype='application/pdf',
+                    headers={'Content-Disposition': 'attachment; filename=' + fn})
 
 
 print('measurements module loaded (Φ1→Φ4 ενοποίηση μετρήσεων)')
