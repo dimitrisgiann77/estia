@@ -68,7 +68,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="sechead"><i class="ti {{ g.icon }}"></i> {{ g.title }} <span class="secn">{{ g.areas|length }}</span></div>
       {% for c in g.areas %}
       <div class="card">
-        <div class="pname">{{ c.area.name }}{% if c.area.location %} <span class="loc">· {{ c.area.location }}</span>{% endif %}{% if c.count %}<span class="cntbadge" title="Μετρήσεις σήμερα">{{ c.count }} σήμερα</span>{% endif %}</div>
+        <div class="pname">{{ c.area.name }}{% if c.area.pos_label %} <span class="loc" style="font-weight:700;color:#2c6079;">· {{ c.area.pos_label }}</span>{% endif %}{% if c.area.location %} <span class="loc">· {{ c.area.location }}</span>{% endif %}{% if c.count %}<span class="cntbadge" title="Μετρήσεις σήμερα">{{ c.count }} σήμερα</span>{% endif %}</div>
         <div class="slots">
           {% for s in c.slots %}
           <a class="slot {{ 'done' if s.done }}" href="/dashboard/measurements/entry?point={{ c.area.id }}">

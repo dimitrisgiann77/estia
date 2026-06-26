@@ -109,7 +109,7 @@ td.num{text-align:right;}
 
   {% for r in rows %}
   <div class="card">
-    <div class="pname"><i class="ti ti-map-pin"></i> {{ r.point.name }} <span class="muted">· {{ r.point.template_key }}</span></div>
+    <div class="pname"><i class="ti ti-map-pin"></i> {{ r.point.name }}{% if r.point.pos_label %} <span style="font-size:11px;color:#2c6079;font-weight:700;">· {{ r.point.pos_label }}</span>{% endif %} <span class="muted">· {{ r.point.template_key }}</span></div>
     <table>
       <tr><th>Παράμετρος</th><th>Πλήθος</th><th>Μέσος</th><th>Ελάχ</th><th>Μέγ</th><th>Εκτός ορίων</th><th>Συμμόρφωση</th></tr>
       {% for it in r.params %}

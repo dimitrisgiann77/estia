@@ -72,6 +72,15 @@ select.in-kind{width:120px;}
 .treerow:hover{background:#f6fafd;}
 .treerow.on{background:#f0f7ff;}
 .treerow.lvl0{margin-top:6px;}
+.nodepts{padding:2px 0 6px;}
+.nodept{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;}
+.nodept:hover{background:#f6fafd;}
+.nodept.off{opacity:.5;}
+.npn{font-size:13px;color:#193847;font-weight:600;display:inline-flex;align-items:center;gap:4px;}
+.postag{font-size:10px;font-weight:700;background:#e7f2f8;color:#2c6079;border-radius:6px;padding:1px 6px;}
+.npm{display:inline-flex;flex-wrap:wrap;gap:4px;}
+.mtag{font-size:11px;background:#fff;border:1px solid #dbecf3;border-radius:6px;padding:2px 7px;color:#3a6b82;}
+.mtag i{font-style:normal;color:#9aa7ad;}
 .ttog{width:24px;height:24px;border-radius:50%;border:1px solid #d6eef3;background:#fff;color:#cfd8de;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;}
 .ttog.on{background:var(--brand,#193847);border-color:var(--brand,#193847);color:#fff;}
 .tname{font-size:13px;color:#33454d;display:inline-flex;align-items:center;}
@@ -136,7 +145,7 @@ select.in-kind{width:120px;}
   {% if nh %}
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Τσέκαρε <i class="ti ti-check"></i> τι έχει το ξενοδοχείο. Άλλαξε όνομα και πάτα <i class="ti ti-device-floppy"></i>. Το <i class="ti ti-plus"></i> δίπλα προσθέτει υποομάδα. Τα σημεία/μετρήσεις ορίζονται στις καρτέλες «Σημεία»/«Μετρήσεις».</p>
+    <p class="muted" style="margin-bottom:12px;">Τσέκαρε <i class="ti ti-check"></i> τι έχει το ξενοδοχείο. Άλλαξε όνομα και πάτα <i class="ti ti-device-floppy"></i>. Το <i class="ti ti-plus"></i> δίπλα προσθέτει υποομάδα. Κάτω από κάθε δίκτυο βλέπεις τα σημεία του και τις μετρήσεις τους (επισκόπηση). Τα ορίζεις στις καρτέλες «Σημεία»/«Μετρήσεις».</p>
     <button class="btn alt" type="button" onclick="gaddgroup({{ nh }})" style="margin-bottom:12px;"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
     <div class="tree">
       {% for row in node_tree %}
@@ -152,9 +161,31 @@ select.in-kind{width:120px;}
         <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/node/{{ row.n.id }}/delete" onclick="return confirm('Διαγραφή «{{ row.n.name }}»; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button>
         {% if row.np %}<span class="tinfo">{{ row.np }} σημ.</span>{% endif %}
       </form>
+      {% set npts = group_points.get(row.n.id, []) %}
+      {% if npts %}
+      <div class="nodepts" style="margin-left:{{ (row.depth+1)*26 }}px;">
+        {% for a in npts %}
+        <div class="nodept {{ 'off' if not a.is_active }}">
+          <span class="npn"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.pos_label %} <span class="postag">{{ a.pos_label }}</span>{% endif %}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %}</span>
+          <span class="npm">{% for c in area_chips.get(a.id, []) %}<span class="mtag">{{ c.label }}{% if c.unit %} <i>{{ c.unit }}</i>{% endif %}</span>{% else %}<span class="muted" style="font-size:11px;">— χωρίς μετρήσεις —</span>{% endfor %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% else %}
       <div class="muted" style="padding:8px 0;">Κανένας κόμβος — πάτα «Νέα ομάδα».</div>
       {% endfor %}
+      {% if pool_points %}
+      <div class="nodepts" style="margin-top:10px;border-top:1px dashed #d6e6ee;padding-top:8px;">
+        <div class="muted" style="font-size:12px;font-weight:600;margin-bottom:4px;">Χωρίς δίκτυο — προς αντιστοίχιση (όρισέ τα στα «Σημεία»):</div>
+        {% for a in pool_points %}
+        <div class="nodept {{ 'off' if not a.is_active }}">
+          <span class="npn"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.pos_label %} <span class="postag">{{ a.pos_label }}</span>{% endif %}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %}</span>
+          <span class="npm">{% for c in area_chips.get(a.id, []) %}<span class="mtag">{{ c.label }}{% if c.unit %} <i>{{ c.unit }}</i>{% endif %}</span>{% endfor %}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -178,6 +209,7 @@ select.in-kind{width:120px;}
       <input class="in-name" type="text" name="name" value="{{ a.name }}">
       <input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="Χώρος / περιοχή">
       <select name="node_id"><option value="">— χωρίς δίκτυο —</option>{% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==a.node_id }}>{{ o.label }}</option>{% endfor %}</select>
+      <select name="position" title="Θέση δειγματοληψίας"><option value="">— θέση —</option><option value="near"{{ ' selected' if a.position=='near' }}>Κοντινό</option><option value="mid"{{ ' selected' if a.position=='mid' }}>Μεσαίο</option><option value="far"{{ ' selected' if a.position=='far' }}>Μακρινό</option></select>
       <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
       <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
       <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>

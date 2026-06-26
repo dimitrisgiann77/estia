@@ -339,11 +339,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.300'
-APP_BUILD   = '581'
+APP_VERSION = '12.301'
+APP_BUILD   = '582'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.301', 'b': '582', 'date': '26/06/2026', 'time': '12:00', 'title': 'Θέση δειγματοληψίας + πλήρες δέντρο στη «Δομή»',
+     'items': ['Στα «Σημεία» προστέθηκε «Θέση» (Κοντινό/Μεσαίο/Μακρινό) — χαρακτηρίζεις πού δειγματοληπτείς, χωρίς να αλλάζεις τις μετρήσεις. Φαίνεται σε Σήμερα/Καταχώρηση/Στατιστικά.',
+               'Η «Δομή» δείχνει τώρα όλο το στήσιμο ανά ξενοδοχείο: Δίκτυο → Σημεία → Μετρήσεις (επισκόπηση, read-only). Η επεξεργασία μένει στις καρτέλες «Σημεία»/«Μετρήσεις».']},
     {'v': '12.300', 'b': '581', 'date': '25/06/2026', 'time': '16:30', 'title': 'Σημεία & Μετρήσεις: τέλος drag — dropdown + checkboxes',
      'items': ['Τέλος το σύρσιμο. Στα «Σημεία»: διαλέγεις δίκτυο από λίστα (dropdown) ανά σημείο. Στις «Μετρήσεις»: τσεκάρεις κουτάκια ποιες μετρήσεις παίρνει κάθε σημείο (αυτόματη αποθήκευση). Και οι δύο καρτέλες ανά ξενοδοχείο.']},
     {'v': '12.299', 'b': '580', 'date': '25/06/2026', 'time': '15:40', 'title': 'Σημεία: έτοιμες περιοχές στο πεδίο «Χώρος»',
@@ -1617,7 +1620,11 @@ class Area(db.Model):
     legacy_kind  = db.Column(db.String(10))               # Φ2: 'pool' | 'water' (προέλευση)
     legacy_id    = db.Column(db.Integer)                  # Φ2: Pool.id / WaterSystem.id
     node_id      = db.Column(db.Integer)                  # Φ-Α: κόμβος δέντρου δικτύων (MonitorNode.id· null=σημερινή συμπεριφορά)
+    position     = db.Column(db.String(10))               # χαρακτηρισμός θέσης δειγματοληψίας: near|mid|far|None
     hotel        = db.relationship('Hotel')
+    @property
+    def pos_label(self):
+        return {'near': 'Κοντινό', 'mid': 'Μεσαίο', 'far': 'Μακρινό'}.get(self.position or '')
     template     = db.relationship('MonitorTemplate')
 
 class Reading(db.Model):
@@ -4262,6 +4269,8 @@ def ensure_columns():
     # v12.271 — Φ-Α δομή δικτύων (δέντρο)
     _add_col('area', 'node_id', 'node_id INTEGER')
     _add_col('monitor_node', 'hotels', 'hotels VARCHAR(120)')
+    # θέση δειγματοληψίας (κοντινό/μεσαίο/μακρινό)
+    _add_col('area', 'position', 'position VARCHAR(10)')
 
 def init_db():
     with app.app_context():

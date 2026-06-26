@@ -876,15 +876,18 @@ def measurements_point_save():
     loc = (f.get('location') or '').strip()
     _nv = f.get('node_id')
     node_id = int(_nv) if _nv else None
+    position = (f.get('position') or '').strip() or None
+    if position not in ('near', 'mid', 'far'):
+        position = None
     if pid:
         a = Area.query.get(int(pid))
         if a and name:
-            a.name = name[:120]; a.location = loc[:120]; a.node_id = node_id
+            a.name = name[:120]; a.location = loc[:120]; a.node_id = node_id; a.position = position
     else:
         hid = f.get('hotel_id'); tk = (f.get('template_key') or 'generic')
         if hid and name:
             db.session.add(Area(hotel_id=int(hid), template_key=tk, name=name[:120], location=loc[:120],
-                                is_active=True, engine_only=True, node_id=node_id))
+                                is_active=True, engine_only=True, node_id=node_id, position=position))
     db.session.commit()
     _nh = (request.form.get('nh') or '').strip()
     return redirect(url_for('measurements_console') + '?tab=points' + (('&nh=' + _nh) if _nh else ''))

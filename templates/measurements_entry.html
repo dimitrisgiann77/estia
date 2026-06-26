@@ -64,7 +64,7 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
       {% for sub in g.groups %}
         {% if sub.title %}<div class="sub"><i class="ti {{ 'ti-map-pin' if view=='space' else 'ti-sitemap' }}"></i> {{ sub.title }}</div>{% endif %}
         {% for a in sub.areas %}
-        <a class="pt" href="/dashboard/measurements/entry?point={{ a.id }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> {{ a.name }}</a>
+        <a class="pt" href="/dashboard/measurements/entry?point={{ a.id }}{% if hsel %}&hotel={{ hsel }}{% endif %}"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.pos_label %} <span style="font-size:11px;color:#2c6079;font-weight:700;">· {{ a.pos_label }}</span>{% endif %}</a>
         {% endfor %}
       {% endfor %}
     {% endfor %}
