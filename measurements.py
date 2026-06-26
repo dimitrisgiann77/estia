@@ -610,6 +610,38 @@ def measurements_node_hotel(nid):
     return jsonify(ok=True, on=on)
 
 
+@app.route('/dashboard/measurements/admin/tz-check')
+def measurements_tz_check():
+    """Read-only διαγνωστικό ώρας — ΚΑΜΙΑ αλλαγή. Plain text."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    import os, time as _t
+    from datetime import datetime as _dt, date as _d
+    out = []
+    out.append('=== TZ CHECK (read-only) ===')
+    out.append('os.environ TZ      = %r' % os.environ.get('TZ'))
+    out.append('time.tzname        = %r' % (_t.tzname,))
+    out.append('datetime.now()     = %s' % _dt.now().strftime('%Y-%m-%d %H:%M:%S'))
+    out.append('datetime.utcnow()  = %s' % _dt.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+    out.append('date.today()       = %s' % _d.today().isoformat())
+    out.append('_athens_now()      = %s  (zoneinfo, αξιόπιστο Ελλάδος)' % _athens_now().strftime('%Y-%m-%d %H:%M:%S'))
+    _delta = (_dt.now() - _dt.utcnow()).total_seconds() / 3600.0
+    out.append('now − utcnow (ώρες) = %.1f   → %s' % (
+        _delta, 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε Ελλάδος' if abs(_delta) > 0.5 else 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε UTC'))
+    out.append('')
+    out.append('--- Τελευταίες 8 καταγραφές (raw recorded_at vs |gr εμφάνιση) ---')
+    for r in Reading.query.order_by(Reading.id.desc()).limit(8).all():
+        a = r.area
+        raw = r.recorded_at.strftime('%Y-%m-%d %H:%M:%S') if r.recorded_at else '—'
+        try:
+            shown = _gr_time(r.recorded_at, '%Y-%m-%d %H:%M:%S')
+        except Exception:
+            shown = '?'
+        out.append('  id=%-5s %-18s RAW=%s  |gr=%s' % (r.id, (a.name[:18] if a else '—'), raw, shown))
+    return ('\n'.join(out), 200, {'Content-Type': 'text/plain; charset=utf-8'})
+
+
+
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
 def measurements_node_save():
     """Προσθήκη/επεξεργασία κόμβου (ομάδα/υποομάδα) + reparent με έλεγχο κύκλου."""
