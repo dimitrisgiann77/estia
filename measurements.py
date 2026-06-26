@@ -1602,23 +1602,52 @@ def _meas_cat(p):
 
 def _build_console_pdf(ctx):
     """Polished, print-ready PDF της φιλτραρισμένης κονσόλας μετρήσεων (fpdf2 landscape)."""
-    import os
+    import os, io as _io, base64
     from fpdf import FPDF
     BASE = os.path.dirname(os.path.abspath(__file__))
     NAVY = (25, 56, 71); GREY = (120, 120, 120); RED = (163, 45, 45); OKG = (15, 110, 86)
     byspace = (ctx.get('view') == 'byspace')
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.set_auto_page_break(True, margin=14)
+    _foot_right = _athens_now().strftime('%d/%m/%Y %H:%M')
+
+    class _ConsolePDF(FPDF):
+        def footer(self):
+            self.set_y(-12)
+            self.set_font('dv', '', 8); self.set_text_color(150, 150, 150)
+            w = self.w - 20
+            self.set_x(10); self.cell(w, 6, 'Εστία — CONDIAN HOTELS', align='L')
+            self.set_x(10); self.cell(w, 6, 'Σελίδα %d / {nb}' % self.page_no(), align='C')
+            self.set_x(10); self.cell(w, 6, 'Εκτύπωση: ' + _foot_right, align='R')
+
+    pdf = _ConsolePDF(orientation='L', unit='mm', format='A4')
+    pdf.set_auto_page_break(True, margin=16)
     pdf.add_font('dv', '', os.path.join(BASE, 'assets', 'fonts', 'DejaVuSans.ttf'))
     pdf.add_font('dv', 'B', os.path.join(BASE, 'assets', 'fonts', 'DejaVuSans-Bold.ttf'))
+    pdf.alias_nb_pages()
     pdf.add_page()
+    # Λογότυπο: ανεβασμένο στο theme (data URI) αλλιώς προεπιλεγμένο
+    _logo_drawn = False
     try:
-        pdf.image(os.path.join(BASE, 'static', 'img', 'logo.png'), x=12, y=9, h=13)
+        from app import get_theme
+        _lg = (get_theme() or {}).get('logo') or ''
+        if _lg.startswith('data:image') and ',' in _lg and 'svg' not in _lg[:30].lower():
+            _raw = base64.b64decode(_lg.split(',', 1)[1])
+            _info = pdf.image(_io.BytesIO(_raw), x=12, y=8, h=14); _logo_drawn = True
+            _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 0
     except Exception:
-        pass
-    pdf.set_xy(30, 9); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
-    pdf.cell(0, 8, 'Εστία — CONDIAN HOTELS · Κονσόλα Μετρήσεων', ln=1)
-    pdf.set_x(30); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
+        _logo_drawn = False
+    _logo_w = locals().get('_logo_w', 0) or 0
+    if not _logo_drawn:
+        for _cand in ('logo-mark.png', 'logo.png'):
+            try:
+                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=9, h=13)
+                _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 14
+                break
+            except Exception:
+                pass
+    _tx = max(30.0, 12 + (_logo_w or 0) + 7)
+    pdf.set_xy(_tx, 9); pdf.set_font('dv', 'B', 15); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 8, 'Κονσόλα Μετρήσεων', ln=1)
+    pdf.set_x(_tx); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
     pdf.cell(0, 6, ctx.get('hotel_name') or '—', ln=1)
     # γραμμή φίλτρων
     pdf.ln(3); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
@@ -1667,7 +1696,7 @@ def _build_console_pdf(ctx):
             prev = r['xoros']
             pdf.set_font('dv', 'B', 8.5); pdf.set_text_color(*NAVY); pdf.set_fill_color(225, 245, 238)
             pdf.cell(sum(widths), 7, '  ' + str(r['xoros']), border=0, fill=True, ln=1, align='L')
-        if pdf.get_y() > 188:
+        if pdf.get_y() > 184:
             pdf.add_page(); thead(); fill = False
         pdf.set_fill_color(243, 247, 250) if fill else pdf.set_fill_color(255, 255, 255)
         temp = '—'
