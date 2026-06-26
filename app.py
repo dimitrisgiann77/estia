@@ -42,8 +42,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import text
 from datetime import datetime, date, timedelta
 import os, smtplib, threading, json, time, secrets, urllib.request, urllib.error, urllib.parse
-# v12.91 — Ολόκληρη η πλατφόρμα σε ώρα Ελλάδος (Europe/Athens)
-os.environ.setdefault('TZ', 'Europe/Athens')
+# v12.311 — Όλη η πλατφόρμα σε ώρα Ελλάδος. POSIX TZ string (δεν χρειάζεται tzdata αρχεία,
+# δουλεύει στον Railway container που ΔΕΝ έχει /usr/share/zoneinfo): EET=UTC+2, EEST=UTC+3,
+# DST τελ.Κυρ Μαρτίου 03:00 → τελ.Κυρ Οκτωβρίου 04:00.
+os.environ['TZ'] = 'EET-2EEST,M3.5.0/3,M10.5.0/4'
 try:
     time.tzset()
 except Exception:
@@ -321,13 +323,34 @@ def inject_nav():
 def inject_theme():
     return {'theme': get_theme()}
 
+def _tz_greek_done():
+    """True αν έγινε η εφάπαξ μετάβαση σε αποθήκευση ώρας Ελλάδος (flag SysFlag). Cache ανά request."""
+    try:
+        from flask import g
+        if hasattr(g, "_tzg"):
+            return g._tzg
+    except Exception:
+        g = None
+    try:
+        v = SysFlag.query.filter_by(key="tz_greek").first() is not None
+    except Exception:
+        v = False
+    try:
+        if g is not None:
+            g._tzg = v
+    except Exception:
+        pass
+    return v
+
 @app.template_filter('gr')
 def _gr_time(dt, fmt='%d/%m %H:%M'):
-    """v12.226 — οι ώρες αποθηκεύονται UTC (server). Εμφάνιση σε ώρα Ελλάδος (Europe/Athens, με θερινή ώρα).
-    Μετατροπή στο σημείο εμφάνισης ώστε να είναι σωστή ανεξάρτητα από το TZ του server."""
+    """v12.311 — ΕΛΛΑΔΟΣ. Αν έγινε η μετάβαση (flag) → εμφάνιση ως-έχει (αποθηκευμένο Ελλάδος).
+    Αλλιώς (παλιά UTC δεδομένα) → μετατροπή UTC→Αθήνα. Έτσι μηδέν λάθος στη μεταβατική φάση."""
     if not dt:
         return ''
     try:
+        if _tz_greek_done():
+            return dt.strftime(fmt)
         from datetime import timezone as _tz
         from zoneinfo import ZoneInfo
         d = dt if dt.tzinfo else dt.replace(tzinfo=_tz.utc)
@@ -339,11 +362,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.310'
-APP_BUILD   = '591'
+APP_VERSION = '12.311'
+APP_BUILD   = '592'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.311', 'b': '592', 'date': '26/06/2026', 'time': '19:00', 'title': 'Πλήρης μετάβαση σε ΩΡΑ ΕΛΛΑΔΟΣ (storage + display)',
+     'items': ['Η διεργασία τρέχει πλέον σε ώρα Ελλάδος μέσω POSIX TZ (δουλεύει στον Railway χωρίς tzdata). Κάθε νέα ώρα γράφεται σε ώρα Ελλάδος.',
+               'Εργαλείο migration /dashboard/measurements/admin/tz-migrate (dry-run/apply=NAI-GREEK): μετατρέπει εφάπαξ ΟΛΑ τα παλιά UTC timestamps → Ελλάδος (DST-aware, 43 πίνακες, idempotent flag).',
+               'Το |gr εμφανίζει ως-έχει μετά τη μετάβαση (μηδέν διπλή μετατροπή). Καθόλου UTC σε χρήστη.']},
     {'v': '12.310', 'b': '591', 'date': '26/06/2026', 'time': '18:30', 'title': 'Διαγνωστικό ώρας (read-only) πριν τη μετάβαση',
      'items': ['Προσωρινή σελίδα /dashboard/measurements/admin/tz-check που δείχνει σε τι ώρα τρέχει ο server & πώς αποθηκεύονται οι ώρες, για ασφαλή πλήρη μετάβαση σε ώρα Ελλάδος. Καμία αλλαγή.']},
     {'v': '12.309', 'b': '590', 'date': '26/06/2026', 'time': '18:00', 'title': 'Ώρα Ελλάδος + τακτοποίηση Log + capitalize',
@@ -1487,6 +1514,11 @@ class WaterRecord(db.Model):
     user         = db.relationship('User', foreign_keys=[user_id], backref='water_records')
     updated_user = db.relationship('User', foreign_keys=[updated_by])
     water_system = db.relationship('WaterSystem')
+
+class SysFlag(db.Model):
+    """Σημαίες εφάπαξ ενεργειών (π.χ. tz_greek = έγινε μετάβαση σε ώρα Ελλάδος)."""
+    key        = db.Column(db.String(60), primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
 
 class Hotel(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
@@ -3002,6 +3034,83 @@ def records_feed():
     ftype = request.args.get('type', 'all')          # all | pools | water
     items = _records_items(user, ftype)
     return render_template('records.html', items=items, ftype=ftype, user=user, is_admin=is_admin())
+
+
+def _tz_migrate_greek(apply=False):
+    """ΕΦΑΠΑΞ: μετατρέπει ΟΛΑ τα αποθηκευμένα UTC timestamps → ώρα Ελλάδος (Europe/Athens, με DST).
+    Auto-discovery όλων των DateTime στηλών. Flag-guarded (SysFlag 'tz_greek'). apply=False → dry-run."""
+    import sqlalchemy as _sa
+    from zoneinfo import ZoneInfo
+    from datetime import timezone as _utc
+    ATH = ZoneInfo('Europe/Athens')
+    L = []
+    done = SysFlag.query.filter_by(key='tz_greek').first() is not None
+    L.append('=== TZ MIGRATE → ΕΛΛΑΔΟΣ (%s) ===' % ('APPLY' if apply else 'DRY-RUN'))
+    L.append('Flag tz_greek: %s' % ('ΥΠΑΡΧΕΙ — έχει ήδη γίνει' if done else 'ΔΕΝ υπάρχει'))
+    if done:
+        L.append('→ Παράλειψη (idempotent). Καμία αλλαγή.')
+        return L
+    conn = db.session.connection()
+    total = 0
+    sample = []
+    for t in db.metadata.sorted_tables:
+        dtcols = [c for c in t.columns if isinstance(c.type, _sa.DateTime)]
+        if not dtcols:
+            continue
+        pkcols = list(t.primary_key.columns)
+        if len(pkcols) != 1:
+            L.append('  ! %s: όχι single PK — ΠΑΡΑΛΕΙΨΗ (χειροκίνητα αν χρειαστεί)' % t.name)
+            continue
+        pk = pkcols[0]
+        rows = conn.execute(_sa.select(pk, *dtcols)).fetchall()
+        cnt = 0
+        for row in rows:
+            rid = row[0]
+            upd = {}
+            for i, c in enumerate(dtcols, start=1):
+                v = row[i]
+                if v is not None:
+                    upd[c.name] = v.replace(tzinfo=_utc.utc).astimezone(ATH).replace(tzinfo=None)
+            if upd:
+                cnt += 1
+                if len(sample) < 6:
+                    k0 = list(upd.keys())[0]
+                    v0 = row[1]
+                    sample.append('    %s.%s: %s → %s' % (t.name, k0,
+                                  v0.strftime('%Y-%m-%d %H:%M'), upd[k0].strftime('%Y-%m-%d %H:%M')))
+                if apply:
+                    conn.execute(_sa.update(t).where(pk == rid).values(**upd))
+        if cnt:
+            total += cnt
+            L.append('  %-26s %d γραμμές (%d στήλες ώρας)' % (t.name, cnt, len(dtcols)))
+    L.append('— Δείγμα μετατροπής (UTC → Ελλάδος, +2/+3 με DST):')
+    L.extend(sample)
+    L.append('ΣΥΝΟΛΟ γραμμές προς μετατροπή: %d' % total)
+    if apply:
+        db.session.add(SysFlag(key='tz_greek'))
+        db.session.commit()
+        L.append('\n✅ ΕΦΑΡΜΟΣΤΗΚΕ + flag set. Από τώρα: αποθήκευση & εμφάνιση ΜΟΝΟ ώρα Ελλάδος.')
+    else:
+        db.session.rollback()
+        L.append('\n(DRY-RUN: rollback — τίποτα δεν αποθηκεύτηκε.)')
+    return L
+
+
+@app.route('/dashboard/measurements/admin/tz-migrate')
+def tz_migrate_route():
+    if not is_admin():
+        return redirect(url_for('login'))
+    apply = (request.args.get('apply') == 'NAI-GREEK')
+    try:
+        lines = _tz_migrate_greek(apply=apply)
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        lines = ['ΣΦΑΛΜΑ: %s' % e, traceback.format_exc()]
+    if apply:
+        log_activity('tz_migrate_greek', 'APPLIED')
+    tail = '' if apply else '\n\n— Για εφαρμογή: ?apply=NAI-GREEK (αφού δεις το dry-run).'
+    return ('\n'.join(lines) + tail, 200, {'Content-Type': 'text/plain; charset=utf-8'})
 
 @app.route('/pools/record/<int:record_id>/delete', methods=['POST'])
 def delete_pool_record(record_id):

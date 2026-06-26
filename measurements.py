@@ -619,6 +619,11 @@ def measurements_tz_check():
     from datetime import datetime as _dt, date as _d
     out = []
     out.append('=== TZ CHECK (read-only) ===')
+    try:
+        from app import SysFlag as _SF
+        out.append('Flag tz_greek (μετάβαση έγινε;) = %s' % bool(_SF.query.filter_by(key='tz_greek').first()))
+    except Exception as _e:
+        out.append('Flag tz_greek = ? (%s)' % _e)
     out.append('os.environ TZ      = %r' % os.environ.get('TZ'))
     out.append('time.tzname        = %r' % (_t.tzname,))
     out.append('datetime.now()     = %s' % _dt.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -629,12 +634,15 @@ def measurements_tz_check():
     out.append('now − utcnow (ώρες) = %.1f   → %s' % (
         _delta, 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε Ελλάδος' if abs(_delta) > 0.5 else 'η ΔΙΕΡΓΑΣΙΑ τρέχει σε UTC'))
     out.append('')
-    out.append('--- Τελευταίες 8 καταγραφές (raw recorded_at vs |gr εμφάνιση) ---')
+    out.append('--- Τελευταίες 8 (RAW αποθηκευμένο vs τι θα γίνει σε Ελλάδος αν είναι UTC) ---')
     for r in Reading.query.order_by(Reading.id.desc()).limit(8).all():
         a = r.area
         raw = r.recorded_at.strftime('%Y-%m-%d %H:%M:%S') if r.recorded_at else '—'
         try:
-            shown = _gr_time(r.recorded_at, '%Y-%m-%d %H:%M:%S')
+            from zoneinfo import ZoneInfo as _ZI
+            from datetime import timezone as _TZ
+            shown = (r.recorded_at.replace(tzinfo=_TZ.utc).astimezone(_ZI('Europe/Athens')).strftime('%Y-%m-%d %H:%M:%S')
+                     if r.recorded_at else '—')
         except Exception:
             shown = '?'
         out.append('  id=%-5s %-18s RAW=%s  |gr=%s' % (r.id, (a.name[:18] if a else '—'), raw, shown))
@@ -1290,14 +1298,11 @@ def measurements_entry_save():
     if rdate > _today_gr:
         rdate = _today_gr
     _rt = (f.get('record_time') or '').strip()
-    # η ώρα που πληκτρολογείται είναι ώρα Ελλάδος → αποθήκευση σε UTC
+    # ώρα Ελλάδος — αποθηκεύεται ως-έχει (όλη η πλατφόρμα τρέχει σε ώρα Ελλάδος)
     try:
-        if _rt:
-            rec_at = _athens_to_utc(datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()))
-        else:
-            rec_at = datetime.utcnow()
+        rec_at = datetime.combine(rdate, datetime.strptime(_rt, '%H:%M').time()) if _rt else datetime.now()
     except ValueError:
-        rec_at = datetime.utcnow()
+        rec_at = datetime.now()
     pos = (f.get('position') or '').strip()[:40] or None
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
                   record_date=rdate, period=period, recorded_at=rec_at, values=_json.dumps(vals),
