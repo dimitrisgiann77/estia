@@ -362,11 +362,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.311'
-APP_BUILD   = '592'
+APP_VERSION = '12.312'
+APP_BUILD   = '593'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.312', 'b': '593', 'date': '26/06/2026', 'time': '19:20', 'title': 'tz-migrate: ανθεκτικό σε schema-drift',
+     'items': ['Το migration ώρας διαβάζει πλέον ΜΟΝΟ τις στήλες που υπάρχουν όντως στη βάση (inspector), ώστε να μη σκοντάφτει σε στήλες μοντέλου που λείπουν από την παραγωγή (π.χ. payroll_run.approved_at). Το dry-run είχε σταματήσει χωρίς καμία αλλαγή.']},
     {'v': '12.311', 'b': '592', 'date': '26/06/2026', 'time': '19:00', 'title': 'Πλήρης μετάβαση σε ΩΡΑ ΕΛΛΑΔΟΣ (storage + display)',
      'items': ['Η διεργασία τρέχει πλέον σε ώρα Ελλάδος μέσω POSIX TZ (δουλεύει στον Railway χωρίς tzdata). Κάθε νέα ώρα γράφεται σε ώρα Ελλάδος.',
                'Εργαλείο migration /dashboard/measurements/admin/tz-migrate (dry-run/apply=NAI-GREEK): μετατρέπει εφάπαξ ΟΛΑ τα παλιά UTC timestamps → Ελλάδος (DST-aware, 43 πίνακες, idempotent flag).',
@@ -3051,18 +3053,30 @@ def _tz_migrate_greek(apply=False):
         L.append('→ Παράλειψη (idempotent). Καμία αλλαγή.')
         return L
     conn = db.session.connection()
+    insp = _sa.inspect(db.engine)
+    existing_tables = set(insp.get_table_names())
     total = 0
     sample = []
+    skipped = []
     for t in db.metadata.sorted_tables:
-        dtcols = [c for c in t.columns if isinstance(c.type, _sa.DateTime)]
+        if t.name not in existing_tables:
+            skipped.append('%s(δεν υπάρχει στη βάση)' % t.name)
+            continue
+        # ΜΟΝΟ στήλες που όντως υπάρχουν στη βάση (αποφυγή schema-drift π.χ. payroll_run.approved_at)
+        real_cols = {c['name'] for c in insp.get_columns(t.name)}
+        dtcols = [c for c in t.columns if isinstance(c.type, _sa.DateTime) and c.name in real_cols]
         if not dtcols:
             continue
-        pkcols = list(t.primary_key.columns)
+        pkcols = [c for c in t.primary_key.columns if c.name in real_cols]
         if len(pkcols) != 1:
-            L.append('  ! %s: όχι single PK — ΠΑΡΑΛΕΙΨΗ (χειροκίνητα αν χρειαστεί)' % t.name)
+            skipped.append('%s(PK)' % t.name)
             continue
         pk = pkcols[0]
-        rows = conn.execute(_sa.select(pk, *dtcols)).fetchall()
+        try:
+            rows = conn.execute(_sa.select(pk, *dtcols)).fetchall()
+        except Exception as _e:
+            skipped.append('%s(%s)' % (t.name, type(_e).__name__))
+            continue
         cnt = 0
         for row in rows:
             rid = row[0]
@@ -3085,6 +3099,8 @@ def _tz_migrate_greek(apply=False):
             L.append('  %-26s %d γραμμές (%d στήλες ώρας)' % (t.name, cnt, len(dtcols)))
     L.append('— Δείγμα μετατροπής (UTC → Ελλάδος, +2/+3 με DST):')
     L.extend(sample)
+    if skipped:
+        L.append('Παραλείφθηκαν (χωρίς στήλες ώρας ή drift): ' + ', '.join(skipped))
     L.append('ΣΥΝΟΛΟ γραμμές προς μετατροπή: %d' % total)
     if apply:
         db.session.add(SysFlag(key='tz_greek'))
