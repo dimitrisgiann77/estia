@@ -1,0 +1,30 @@
+name: ESTIA checks
+
+# Αυτόματος ελεγκτής: σε κάθε push/PR τρέχει το tools/check.py (py_compile +
+# Jinja parse + arch_map). Με τα deps εγκατεστημένα, τρέχει ΚΑΙ ο Jinja έλεγχος
+# (που τοπικά παρακάμπτεται). Δεν κάνει deploy — μόνο ✅/❌ σήμα.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:   # να μπορείς να το τρέξεις και χειροκίνητα από το GitHub
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run ESTIA checks (py_compile + Jinja + arch_map)
+        run: python tools/check.py
