@@ -17,7 +17,7 @@ body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:#eef4f8;color:
 .seg a{text-decoration:none;background:#fff;padding:6px 11px;font-size:12px;color:var(--muted);border-right:1px solid var(--line);}
 .seg a:last-child{border-right:none;} .seg a.on{background:var(--brand);color:#fff;}
 .daysf{display:inline-flex;align-items:center;gap:4px;}
-.daysf input{width:52px;padding:6px;font-size:12px;border:1px solid var(--line2);border-radius:8px;}
+.daysf input[type=date]{width:auto;padding:6px;font-size:12px;border:1px solid var(--line2);border-radius:8px;}
 .daysf button{padding:6px 9px;font-size:12px;border:1px solid var(--line2);border-radius:8px;background:#fff;cursor:pointer;color:var(--ink);}
 .pdfbtn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;background:#A32D2D;color:#fff;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600;}
 .chips{display:flex;gap:10px;flex-wrap:wrap;}
@@ -68,13 +68,13 @@ table.m td.d,table.m td.l{text-align:left;}
     <form class="daysf" method="get" action="/dashboard/measurements/console">
       <input type="hidden" name="nh" value="{{ nh }}"><input type="hidden" name="xoros" value="{{ xoros }}">
       <input type="hidden" name="view" value="{{ view }}">{% if request.args.get('embed') %}<input type="hidden" name="embed" value="1">{% endif %}
-      <span class="lbl">ή ημέρες</span><input type="number" name="days" min="1" value="{{ days }}"><button type="submit">OK</button>
+      <span class="lbl">ή διάστημα</span><input type="date" name="df" value="{{ df }}"><span class="lbl">–</span><input type="date" name="dt" value="{{ dt }}"><button type="submit">OK</button>
     </form>
     <div><span class="lbl">Χώρος</span><span class="seg">
       <a class="{{ 'on' if not xoros }}" href="{{ base }}&range={{ rng }}&view={{ view }}{{ emb }}">Όλοι</a>
       {% for s in spaces %}<a class="{{ 'on' if xoros==s }}" href="{{ base }}&range={{ rng }}&xoros={{ s }}&view={{ view }}{{ emb }}">{{ s }}</a>{% endfor %}
     </span></div>
-    <a class="pdfbtn" href="/dashboard/measurements/console/pdf?nh={{ nh }}&range={{ rng }}&days={{ days }}&xoros={{ xoros }}&view={{ view }}" target="_blank" rel="noopener"><i class="ti ti-file-type-pdf"></i> PDF</a>
+    <a class="pdfbtn" href="/dashboard/measurements/console/pdf?nh={{ nh }}&range={{ rng }}&df={{ df }}&dt={{ dt }}&xoros={{ xoros }}&view={{ view }}" target="_blank" rel="noopener"><i class="ti ti-file-type-pdf"></i> PDF</a>
     <div style="margin-left:auto;"><span class="lbl">Προβολή</span><span class="seg">
       <a class="{{ 'on' if view!='byspace' }}" href="{{ base }}&range={{ rng }}&xoros={{ xoros }}&view=table{{ emb }}">Πίνακας</a>
       <a class="{{ 'on' if view=='byspace' }}" href="{{ base }}&range={{ rng }}&xoros={{ xoros }}&view=byspace{{ emb }}">Ανά χώρο</a>
@@ -95,20 +95,20 @@ table.m td.d,table.m td.l{text-align:left;}
 
   <div class="win"><table class="m">
     <thead><tr>
-      <th class="d">Ημέρα</th>{% if view!='byspace' %}<th class="l">Χώρος</th>{% endif %}<th class="l">Σημείο</th><th>Θέση</th>
+      <th class="d">Ημερομηνία</th>{% if view!='byspace' %}<th class="l">Χώρος</th>{% endif %}<th class="l">Σημείο</th><th>Θέση</th>
       <th>Θερμοκρασία<span class="lim">ΖΝΧ ≥60 · ΨΝΧ ≤20 °C</span></th>
       <th>ClO₂<span class="lim">{{ lim_clo2 }}</span></th>
-      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th>
+      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th><th class="l">Υπεύθυνος</th>
     </tr></thead>
     <tbody id="mc-tbody">
       {% set ns = namespace(prev='__') %}
       {% for r in rows %}
         {% if view=='byspace' and r.xoros != ns.prev %}
-        <tr class="xhead"><td colspan="7"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
+        <tr class="xhead"><td colspan="8"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
         {% set ns.prev = r.xoros %}
         {% endif %}
         <tr data-rid="{{ r.rid }}" data-point="{{ r.point }}" data-ok="{{ 1 if r.ok else 0 }}">
-          <td class="d">{{ r.date.strftime('%d/%m') }}</td>
+          <td class="d" style="white-space:nowrap;">{{ r.dt_disp }}</td>
           {% if view!='byspace' %}<td class="l xoros">{{ r.xoros }}</td>{% endif %}
           <td class="l">{{ r.point }}</td>
           <td>{{ r.pos or '—' }}</td>
@@ -116,9 +116,10 @@ table.m td.d,table.m td.l{text-align:left;}
           <td class="{{ 'bad' if r.clo2_bad else 'ok' }}">{{ r.clo2 if r.clo2 is not none else '—' }}</td>
           <td class="{{ 'bad' if r.ph_bad else 'ok' }}">{{ r.ph if r.ph is not none else '—' }}</td>
           <td class="{{ 'ok' if r.ok else 'bad' }}">{{ '✓' if r.ok else '✗ εκτός' }}</td>
+          <td class="l">{{ r.user }}</td>
         </tr>
       {% endfor %}
-      {% if not rows %}<tr><td colspan="7" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
+      {% if not rows %}<tr><td colspan="9" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
     </tbody>
   </table></div>
 </div>

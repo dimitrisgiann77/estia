@@ -1639,7 +1639,7 @@ def _build_console_pdf(ctx):
         _lg = (get_theme() or {}).get('logo') or ''
         if _lg.startswith('data:image') and ',' in _lg and 'svg' not in _lg[:30].lower():
             _raw = base64.b64decode(_lg.split(',', 1)[1])
-            _info = pdf.image(_io.BytesIO(_raw), x=12, y=6, h=22); _logo_drawn = True
+            _info = pdf.image(_io.BytesIO(_raw), x=12, y=5, h=26); _logo_drawn = True
             _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 0
     except Exception:
         _logo_drawn = False
@@ -1647,7 +1647,7 @@ def _build_console_pdf(ctx):
     if not _logo_drawn:
         for _cand in ('logo-mark.png', 'logo.png'):
             try:
-                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=6, h=22)
+                _info = pdf.image(os.path.join(BASE, 'static', 'img', _cand), x=12, y=5, h=26)
                 _logo_w = getattr(_info, 'rendered_width', 0) or (_info.get('rendered_width', 0) if isinstance(_info, dict) else 0) or 14
                 break
             except Exception:
@@ -1658,7 +1658,7 @@ def _build_console_pdf(ctx):
     _hn = ((ctx.get('hotel_code') + '  ·  ') if ctx.get('hotel_code') else '') + (ctx.get('hotel_name') or '—')
     pdf.set_x(_tx); pdf.set_font('dv', 'B', 11); pdf.set_text_color(40, 40, 40)
     pdf.cell(0, 6, _hn, ln=1)
-    pdf.set_y(max(pdf.get_y(), 30))
+    pdf.set_y(max(pdf.get_y(), 33))
     # γραμμή φίλτρων
     pdf.ln(3); pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY)
     filt = ('Περίοδος: %s   ·   Χώρος: %s   ·   Προβολή: %s'
@@ -1673,10 +1673,10 @@ def _build_console_pdf(ctx):
                     % (ctx.get('lim_clo2') or '1–2 ppm', ctx.get('lim_ph') or '7.2–7.8')), ln=1)
     pdf.ln(2)
 
-    heads = ['Ημέρα', 'Χώρος', 'Σημείο', 'Θέση', 'Θερμοκρασία °C', 'ClO₂ ppm', 'pH', 'Κατάσταση']
-    widths = [20, 46, 50, 30, 50, 26, 24, 30]
+    heads = ['Ημερομηνία', 'Χώρος', 'Σημείο', 'Θέση', 'Θερμοκρασία °C', 'ClO₂ ppm', 'pH', 'Κατάσταση', 'Υπεύθυνος']
+    widths = [28, 38, 42, 24, 38, 22, 16, 24, 45]
     if byspace:
-        heads = heads[:1] + heads[2:]; widths = [20, 56, 30, 52, 28, 26, 30]
+        heads = heads[:1] + heads[2:]; widths = [28, 54, 28, 40, 24, 18, 26, 59]
 
     def thead():
         pdf.set_font('dv', 'B', 8.5); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*NAVY)
@@ -1712,10 +1712,10 @@ def _build_console_pdf(ctx):
         temp = '—'
         if r.get('temp') is not None:
             temp = str(r['temp']) + ((' ' + r['net']) if r.get('net') else '')
-        cells = ([r['date'].strftime('%d/%m'), r['xoros'], r['point'], r.get('pos') or '—',
+        cells = ([r.get('dt_disp') or r['date'].strftime('%d/%m'), r['xoros'], r['point'], r.get('pos') or '—',
                   temp, (r.get('clo2') if r.get('clo2') is not None else '—'),
                   (r.get('ph') if r.get('ph') is not None else '—'),
-                  ('Εντός' if r['ok'] else 'ΕΚΤΟΣ')])
+                  ('Εντός' if r['ok'] else 'ΕΚΤΟΣ'), (r.get('user') or '—')])
         if byspace:
             cells = cells[:1] + cells[2:]
         # χρώμα ανά κελί
@@ -1739,6 +1739,91 @@ def _build_console_pdf(ctx):
                 pdf.set_text_color(40, 40, 40); pdf.set_font('dv', '', 8.2)
             pdf.cell(w, 7, clip(val, w), border=0, fill=True, align='L')
         pdf.ln(7); fill = not fill
+    # ── Τελική σελίδα: 2 διαγράμματα πορείας (χειροκίνητα) ──
+    def _f(v):
+        try:
+            return float(str(v).replace(',', '.'))
+        except Exception:
+            return None
+    t_pts = [(r['date'], _f(r['temp']), r.get('temp_bad')) for r in rows if r.get('temp') is not None]
+    t_pts = [p for p in t_pts if p[1] is not None]
+    c_pts = [(r['date'], _f(r['clo2']), r.get('clo2_bad')) for r in rows if r.get('clo2') is not None]
+    c_pts = [p for p in c_pts if p[1] is not None]
+    if t_pts or c_pts:
+        from datetime import timedelta as _td
+        d0 = ctx.get('date_from'); d1 = ctx.get('date_to')
+        try:
+            span = max(1, (d1 - d0).days)
+        except Exception:
+            span = 1
+        pdf.add_page()
+        pdf.set_xy(15, 12); pdf.set_font('dv', 'B', 13); pdf.set_text_color(*NAVY)
+        pdf.cell(0, 8, 'Διαγράμματα πορείας', ln=1)
+
+        def chart(x, y, w, h, title, pts, refs):
+            pdf.set_xy(x, y - 7); pdf.set_font('dv', 'B', 10); pdf.set_text_color(*NAVY)
+            pdf.cell(0, 6, title, ln=0)
+            vals = [p[1] for p in pts] + list(refs)
+            lo = min(vals); hi = max(vals)
+            if hi == lo:
+                hi = lo + 1
+            pad = (hi - lo) * 0.12; lo -= pad; hi += pad
+
+            def X(dd):
+                return x + ((dd - d0).days / span) * w
+
+            def Y(v):
+                return y + h - ((v - lo) / (hi - lo)) * h
+            pdf.set_draw_color(225, 237, 244); pdf.set_line_width(0.2)
+            pdf.set_font('dv', '', 7); pdf.set_text_color(150, 150, 150)
+            for i in range(5):
+                gy = y + h - (h * i / 4.0); gv = lo + (hi - lo) * i / 4.0
+                pdf.line(x, gy, x + w, gy)
+                pdf.set_xy(x - 13, gy - 2); pdf.cell(12, 4, ('%.1f' % gv).rstrip('0').rstrip('.'), align='R')
+            pdf.set_draw_color(186, 117, 23); pdf.set_line_width(0.3)
+            try:
+                pdf.set_dash_pattern(dash=1.2, gap=1.2)
+            except Exception:
+                pass
+            for rf in refs:
+                if lo <= rf <= hi:
+                    ry = Y(rf); pdf.line(x, ry, x + w, ry)
+                    pdf.set_xy(x + w - 20, ry - 3.4); pdf.set_text_color(133, 79, 11); pdf.set_font('dv', '', 6.5)
+                    pdf.cell(20, 3, 'όριο ' + ('%.1f' % rf).rstrip('0').rstrip('.'), align='R')
+            try:
+                pdf.set_dash_pattern()
+            except Exception:
+                pass
+            pdf.set_draw_color(150, 160, 165); pdf.set_line_width(0.3)
+            pdf.line(x, y, x, y + h); pdf.line(x, y + h, x + w, y + h)
+            pdf.set_font('dv', '', 6.5); pdf.set_text_color(120, 120, 120)
+            step = max(3, (span // 8)) if span > 24 else 3
+            dd = d0
+            while dd <= d1:
+                xx = X(dd)
+                pdf.set_draw_color(232, 240, 245); pdf.line(xx, y, xx, y + h)
+                pdf.set_xy(xx - 8, y + h + 1.5); pdf.set_text_color(120, 120, 120); pdf.cell(16, 3, dd.strftime('%d/%m'), align='C')
+                dd = dd + _td(days=step)
+            sp = sorted(pts, key=lambda p: p[0])
+            pdf.set_draw_color(25, 56, 71); pdf.set_line_width(0.4)
+            for i in range(1, len(sp)):
+                pdf.line(X(sp[i - 1][0]), Y(sp[i - 1][1]), X(sp[i][0]), Y(sp[i][1]))
+            for (dd2, v, bad) in sp:
+                px, py = X(dd2), Y(v)
+                pdf.set_fill_color(226, 75, 74) if bad else pdf.set_fill_color(29, 158, 117)
+                pdf.ellipse(px - 1.1, py - 1.1, 2.2, 2.2, style='F')
+            pdf.set_line_width(0.2)
+
+        CW = 248
+        if t_pts:
+            chart(30, 32, CW, 60, 'Θερμοκρασία (°C) — πορεία', t_pts, [20.0, 60.0])
+        else:
+            pdf.set_xy(30, 40); pdf.set_font('dv', '', 10); pdf.set_text_color(150, 150, 150); pdf.cell(0, 6, 'Θερμοκρασία: καμία μέτρηση στο διάστημα.', ln=1)
+        if c_pts:
+            chart(30, 120, CW, 60, 'ClO₂ (ppm) — πορεία', c_pts, [1.0, 2.0])
+        else:
+            pdf.set_xy(30, 128); pdf.set_font('dv', '', 10); pdf.set_text_color(150, 150, 150); pdf.cell(0, 6, 'ClO₂: καμία μέτρηση στο διάστημα.', ln=1)
+
     return bytes(pdf.output())
 
 
@@ -1750,15 +1835,28 @@ def _console_ctx():
     _nh = request.args.get('nh')
     nh = int(_nh) if (_nh and _nh.isdigit() and int(_nh) in scoped) else (_ah[0].id if _ah else None)
     # περίοδος
-    rng = (request.args.get('range') or '7').strip()
-    try:
-        days = max(1, int(request.args.get('days') or rng))
-    except ValueError:
-        days = 7
-    if rng == 'today':
-        days = 1
+    from datetime import date as _date
     today = _athens_now().date()
-    cutoff = today - timedelta(days=days - 1)
+    df = (request.args.get('df') or '').strip()
+    dt = (request.args.get('dt') or '').strip()
+    custom = False; end = today; rng = ''
+    if df and dt:
+        try:
+            cutoff = _date.fromisoformat(df); end = _date.fromisoformat(dt)
+            if end < cutoff:
+                cutoff, end = end, cutoff
+            days = (end - cutoff).days + 1; custom = True
+        except ValueError:
+            df = dt = ''
+    if not custom:
+        rng = (request.args.get('range') or '7').strip()
+        try:
+            days = max(1, int(request.args.get('days') or rng))
+        except ValueError:
+            days = 7
+        if rng == 'today':
+            days = 1
+        cutoff = today - timedelta(days=days - 1); end = today
     xoros = (request.args.get('xoros') or '').strip()
     view = (request.args.get('view') or 'table').strip()
 
@@ -1770,7 +1868,7 @@ def _console_ctx():
     rows, oob = [], []
     n_in = n_out = 0
     if aids:
-        rq = (Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date >= cutoff)
+        rq = (Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date >= cutoff, Reading.record_date <= end)
               .order_by(Reading.record_date.desc(), Reading.recorded_at.desc()).all())
         for r in rq:
             a = areas.get(r.area_id)
@@ -1807,7 +1905,11 @@ def _console_ctx():
                 n_in += 1
             else:
                 n_out += 1
-            rows.append({'rid': r.id, 'date': r.record_date, 'xoros': loc or '—', 'point': a.name,
+            _rdt = r.recorded_at or None
+            _dtd = (_rdt.strftime('%d/%m/%y %H:%M') if _rdt else r.record_date.strftime('%d/%m/%y'))
+            rows.append({'rid': r.id, 'date': r.record_date, 'dt_disp': _dtd,
+                         'user': (r.user.full_name if r.user else '—'),
+                         'xoros': loc or '—', 'point': a.name,
                          'pos': r.position or '', 'net': net,
                          'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
                          'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],
@@ -1821,14 +1923,18 @@ def _console_ctx():
     # όρια κεφαλίδων (αντιπροσωπευτικά)
     lim_clo2 = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'clo2' and _limit_text(p)), '1–2 ppm')
     lim_ph = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'ph' and _limit_text(p)), '')
-    period_label = 'Σήμερα' if rng == 'today' else ('Τελευταίες %d ημέρες' % days)
+    if custom:
+        period_label = '%s – %s' % (cutoff.strftime('%d/%m/%y'), end.strftime('%d/%m/%y'))
+    else:
+        period_label = 'Σήμερα' if rng == 'today' else ('Τελευταίες %d ημέρες' % days)
     return dict(rows=rows, oob=oob, total=total, pct_in=pct_in, pct_out=pct_out,
                 n_out=n_out, spaces=spaces, xoros=xoros, view=view, days=days, rng=rng,
                 all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
                 lim_clo2=lim_clo2, lim_ph=lim_ph,
                 hotel_name=hmap.get(nh, '—'), period_label=period_label,
                 hotel_code=_hcode(hmap.get(nh, '') or ''),
-                today_disp=today.strftime('%d/%m/%Y'))
+                today_disp=today.strftime('%d/%m/%Y'),
+                date_from=cutoff, date_to=end, df=df, dt=dt, custom=custom)
 
 
 @app.route('/dashboard/measurements/console')
