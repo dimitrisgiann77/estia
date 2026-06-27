@@ -1,0 +1,36 @@
+# ───────────────────────────────────────────────────────────
+# ESTIA — .gitignore
+# Η production τρέχει σε PostgreSQL (Railway). Τα τοπικά SQLite/bytecode
+# δεν ανήκουν στο version control.
+# ───────────────────────────────────────────────────────────
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Τοπική βάση (dev SQLite μόνο — prod = PostgreSQL)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+instance/
+
+# Secrets / environment (ΠΟΤΕ secret στο git — βλ. CLAUDE.md §4)
+.env
+.env.*
+!.env.example
+
+# Λειτουργικό / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Προσωρινά
+*.log
+*.tmp
+*.bak
