@@ -39,6 +39,7 @@ table.m td.d,table.m td.l{text-align:left;}
 .nz{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#FAEEDA;color:#854F0B;}
 .np{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#E6F1FB;color:#0C447C;}
 .empty{text-align:center;color:#9fb2bd;padding:26px;font-style:italic;}
+table.m td.note{text-align:left;white-space:normal;max-width:220px;color:#5f7682;font-style:italic;line-height:1.35;}
 .embed .topbar{display:none!important;}
 @keyframes flashok{0%{background:#fff7d6;}100%{background:transparent;}} tr.rnew{animation:flashok 2.6s ease-out;}
 @keyframes flashbad{0%{background:#fcdada;}100%{background:transparent;}} tr.rnewbad{animation:flashbad 2.8s ease-out;}
@@ -98,13 +99,13 @@ table.m td.d,table.m td.l{text-align:left;}
       <th class="d">Ημερομηνία</th>{% if view!='byspace' %}<th class="l">Χώρος</th>{% endif %}<th class="l">Σημείο</th><th>Θέση</th>
       <th>Θερμοκρασία<span class="lim">ΖΝΧ ≥60 · ΨΝΧ ≤20 °C</span></th>
       <th>ClO₂<span class="lim">{{ lim_clo2 }}</span></th>
-      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th><th class="l">Υπεύθυνος</th>
+      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th><th class="l">Υπεύθυνος</th><th class="l">Σχόλια</th>
     </tr></thead>
     <tbody id="mc-tbody">
       {% set ns = namespace(prev='__') %}
       {% for r in rows %}
         {% if view=='byspace' and r.xoros != ns.prev %}
-        <tr class="xhead"><td colspan="8"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
+        <tr class="xhead"><td colspan="9"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
         {% set ns.prev = r.xoros %}
         {% endif %}
         <tr data-rid="{{ r.rid }}" data-point="{{ r.point }}" data-ok="{{ 1 if r.ok else 0 }}">
@@ -117,9 +118,10 @@ table.m td.d,table.m td.l{text-align:left;}
           <td class="{{ 'bad' if r.ph_bad else 'ok' }}">{{ r.ph if r.ph is not none else '—' }}</td>
           <td class="{{ 'ok' if r.ok else 'bad' }}">{{ '✓' if r.ok else '✗ εκτός' }}</td>
           <td class="l">{{ r.user }}</td>
+          <td class="note" title="{{ r.notes }}">{{ r.notes or '—' }}</td>
         </tr>
       {% endfor %}
-      {% if not rows %}<tr><td colspan="9" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
+      {% if not rows %}<tr><td colspan="10" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
     </tbody>
   </table></div>
 </div>

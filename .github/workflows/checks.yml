@@ -25,6 +25,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest
 
       - name: Run ESTIA checks (py_compile + Jinja + arch_map)
         run: python tools/check.py
+
+      - name: Run smoke-tests (κρίσιμα routes)
+        run: python -m pytest tests/ -q

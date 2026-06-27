@@ -1913,7 +1913,8 @@ def _console_ctx():
                          'pos': r.position or '', 'net': net,
                          'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
                          'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],
-                         'ph': cells['ph'], 'ph_bad': cell_bad['ph'], 'ok': row_ok})
+                         'ph': cells['ph'], 'ph_bad': cell_bad['ph'], 'ok': row_ok,
+                         'notes': (r.notes or '').strip()})
     total = n_in + n_out
     pct_in = round(100 * n_in / total) if total else 0
     pct_out = round(100 * n_out / total) if total else 0
