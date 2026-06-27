@@ -88,6 +88,8 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
         <div class="f"><label>Θέση δειγματοληψίας</label>
           <input type="text" name="position" list="poslist" placeholder="π.χ. Κοντινό / Μεσαίο / Απομακρυσμένο (προαιρετικό)">
           <datalist id="poslist"><option value="Κοντινό"><option value="Μεσαίο"><option value="Απομακρυσμένο"></datalist></div>
+        <div class="f"><label>Χώρος δείγματος</label>
+          <input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar / Ζαχαροπλαστείο (προαιρετικό)"></div>
         {% for p in params %}
         <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}</label>
           {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>

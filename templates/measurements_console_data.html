@@ -40,6 +40,9 @@ table.m td.d,table.m td.l{text-align:left;}
 .np{font-size:8.5px;padding:0 4px;border-radius:4px;margin-left:3px;background:#E6F1FB;color:#0C447C;}
 .empty{text-align:center;color:#9fb2bd;padding:26px;font-style:italic;}
 table.m td.note{text-align:left;white-space:normal;max-width:220px;color:#5f7682;font-style:italic;line-height:1.35;}
+.cell-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:var(--tertiary);color:var(--ink);font-size:10.5px;font-weight:600;max-width:170px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
+.cell-chip.tok{background:#E1F5EE;color:#0F6E56;} .cell-chip.tbad{background:#FCEBEB;color:#A32D2D;}
+table.m thead th{cursor:grab;} table.m thead th.dragging{opacity:.45;} table.m thead th.dragover{background:#d6e6f0;}
 .embed .topbar{display:none!important;}
 @keyframes flashok{0%{background:#fff7d6;}100%{background:transparent;}} tr.rnew{animation:flashok 2.6s ease-out;}
 @keyframes flashbad{0%{background:#fcdada;}100%{background:transparent;}} tr.rnewbad{animation:flashbad 2.8s ease-out;}
@@ -96,32 +99,33 @@ table.m td.note{text-align:left;white-space:normal;max-width:220px;color:#5f7682
 
   <div class="win"><table class="m">
     <thead><tr>
-      <th class="d">Ημερομηνία</th>{% if view!='byspace' %}<th class="l">Χώρος</th>{% endif %}<th class="l">Σημείο</th><th>Θέση</th>
-      <th>Θερμοκρασία<span class="lim">ΖΝΧ ≥60 · ΨΝΧ ≤20 °C</span></th>
-      <th>ClO₂<span class="lim">ΖΝΧ 0–2 · ΨΝΧ 1–2</span></th>
-      <th>pH<span class="lim">{{ lim_ph }}</span></th><th>Κατάσταση</th><th class="l">Υπεύθυνος</th><th class="l">Σχόλια</th>
+      <th class="d" data-key="date">Ημερομηνία</th>{% if view!='byspace' %}<th class="l" data-key="xoros">Χώρος</th>{% endif %}<th class="l" data-key="point">Σημείο</th><th data-key="pos">Θέση</th><th data-key="place">Χώρος δείγμ.</th>
+      <th data-key="temp">Θερμοκρασία<span class="lim" title="{{ head_temp_tip }}">{{ head_temp or 'ΖΝΧ ≥50 · ΨΝΧ ≤20 °C' }}</span></th>
+      <th data-key="clo2">ClO₂<span class="lim" title="{{ head_clo2_tip }}">{{ head_clo2 or 'ΖΝΧ 0–2 · ΨΝΧ 1–2' }}</span></th>
+      <th data-key="ph">pH<span class="lim">{{ lim_ph }}</span></th><th data-key="status">Κατάσταση</th><th class="l" data-key="user">Υπεύθυνος</th><th class="l" data-key="notes">Σχόλια</th>
     </tr></thead>
     <tbody id="mc-tbody">
       {% set ns = namespace(prev='__') %}
       {% for r in rows %}
         {% if view=='byspace' and r.xoros != ns.prev %}
-        <tr class="xhead"><td colspan="9"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
+        <tr class="xhead"><td colspan="11"><i class="ti ti-map-pin"></i> {{ r.xoros }}</td></tr>
         {% set ns.prev = r.xoros %}
         {% endif %}
         <tr data-rid="{{ r.rid }}" data-point="{{ r.point }}" data-ok="{{ 1 if r.ok else 0 }}">
-          <td class="d" style="white-space:nowrap;">{{ r.dt_disp }}</td>
-          {% if view!='byspace' %}<td class="l xoros">{{ r.xoros }}</td>{% endif %}
-          <td class="l">{{ r.point }}</td>
-          <td>{{ r.pos or '—' }}</td>
-          <td class="{{ 'bad' if r.temp_bad else 'ok' }}">{% if r.temp is not none %}{{ r.temp }}{% if r.net %}<span class="{{ 'nz' if r.net=='ΖΝΧ' else 'np' }}">{{ r.net }}</span>{% endif %}{% else %}—{% endif %}</td>
-          <td class="{{ 'bad' if r.clo2_bad else 'ok' }}">{{ r.clo2 if r.clo2 is not none else '—' }}</td>
-          <td class="{{ 'bad' if r.ph_bad else 'ok' }}">{{ r.ph if r.ph is not none else '—' }}</td>
-          <td class="{{ 'ok' if r.ok else 'bad' }}">{{ '✓' if r.ok else '✗ εκτός' }}</td>
-          <td class="l">{{ r.user }}</td>
-          <td class="note" title="{{ r.notes }}">{{ r.notes or '—' }}</td>
+          <td class="d" data-key="date" style="white-space:nowrap;">{{ r.dt_disp }}</td>
+          {% if view!='byspace' %}<td class="l" data-key="xoros">{% if r.xoros and r.xoros!='—' %}<span class="cell-chip">{{ r.xoros }}</span>{% else %}—{% endif %}</td>{% endif %}
+          <td class="l" data-key="point"><span class="cell-chip">{{ r.point }}</span></td>
+          <td data-key="pos">{% if r.pos %}<span class="cell-chip">{{ r.pos }}</span>{% else %}—{% endif %}</td>
+          <td data-key="place">{% if r.place %}<span class="cell-chip">{{ r.place }}</span>{% else %}—{% endif %}</td>
+          <td class="{{ 'bad' if r.temp_bad else 'ok' }}" data-key="temp">{% if r.temp is not none %}{{ r.temp }}{% if r.net %}<span class="{{ 'nz' if r.net=='ΖΝΧ' else 'np' }}">{{ r.net }}</span>{% endif %}{% else %}—{% endif %}</td>
+          <td class="{{ 'bad' if r.clo2_bad else 'ok' }}" data-key="clo2">{{ r.clo2 if r.clo2 is not none else '—' }}</td>
+          <td class="{{ 'bad' if r.ph_bad else 'ok' }}" data-key="ph">{{ r.ph if r.ph is not none else '—' }}</td>
+          <td data-key="status"><span class="cell-chip {{ 'tok' if r.ok else 'tbad' }}">{{ '✓ εντός' if r.ok else '✗ εκτός' }}</span></td>
+          <td class="l" data-key="user"><span class="cell-chip">{{ r.user }}</span></td>
+          <td class="note" data-key="notes" title="{{ r.notes }}">{{ r.notes or '—' }}</td>
         </tr>
       {% endfor %}
-      {% if not rows %}<tr><td colspan="10" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
+      {% if not rows %}<tr><td colspan="11" class="empty">Καμία καταγραφή στο επιλεγμένο διάστημα.</td></tr>{% endif %}
     </tbody>
   </table></div>
 </div>
@@ -146,6 +150,7 @@ table.m td.note{text-align:left;white-space:normal;max-width:220px;color:#5f7682
       var fresh=newIds.filter(function(id){return !seen.has(id);});
       if(fresh.length===0) return;
       document.getElementById("mc-tbody").innerHTML=nb.innerHTML;
+      if(window.mcSyncCols) window.mcSyncCols();
       var nc=doc.getElementById("mc-chips"); if(nc) document.getElementById("mc-chips").innerHTML=nc.innerHTML;
       var no=doc.getElementById("mc-oob"); if(no) document.getElementById("mc-oob").innerHTML=no.innerHTML;
       var shown=0;
@@ -160,6 +165,45 @@ table.m td.note{text-align:left;white-space:normal;max-width:220px;color:#5f7682
   }
   var iv=setInterval(function(){ if(!document.hidden) poll(); }, 15000);
   document.addEventListener("visibilitychange",function(){ if(!document.hidden) poll(); });
+})();
+</script>
+<script>
+/* Drag-to-rearrange στηλών (persist localStorage· defensive) */
+(function(){
+  try{
+    var LSK="mc_colorder_v1";
+    var tbl=document.querySelector("table.m"); if(!tbl||!tbl.tHead||!tbl.tBodies[0]) return;
+    var hr=tbl.tHead.rows[0];
+    function bodyRows(){ return [].filter.call(tbl.tBodies[0].rows, function(tr){
+      return !tr.classList.contains("xhead") && !tr.querySelector("td.empty"); }); }
+    function reorderRow(row, order){
+      var byKey={}; [].forEach.call(row.cells, function(c){ var k=c.getAttribute("data-key"); if(k) byKey[k]=c; });
+      order.forEach(function(k){ if(byKey[k]) row.appendChild(byKey[k]); });
+    }
+    function headOrder(){ return [].map.call(hr.cells, function(c){ return c.getAttribute("data-key"); }).filter(Boolean); }
+    function applyOrder(order){ if(!order||!order.length) return; reorderRow(hr, order); bodyRows().forEach(function(r){ reorderRow(r, order); }); }
+    // expose: το auto-refresh ξαναφτιάχνει το tbody → ξανα-εφαρμόζει τη σειρά του header
+    window.mcSyncCols=function(){ bodyRows().forEach(function(r){ reorderRow(r, headOrder()); }); };
+    function save(){ try{ localStorage.setItem(LSK, JSON.stringify(headOrder())); }catch(e){} }
+    try{ var saved=JSON.parse(localStorage.getItem(LSK)||"null"); if(saved&&saved.length) applyOrder(saved); }catch(e){}
+    var dragKey=null;
+    [].forEach.call(hr.cells, function(th){
+      th.setAttribute("draggable","true");
+      th.addEventListener("dragstart", function(){ dragKey=th.getAttribute("data-key"); th.classList.add("dragging"); });
+      th.addEventListener("dragend", function(){ th.classList.remove("dragging"); [].forEach.call(hr.cells,function(c){c.classList.remove("dragover");}); });
+      th.addEventListener("dragover", function(e){ e.preventDefault(); th.classList.add("dragover"); });
+      th.addEventListener("dragleave", function(){ th.classList.remove("dragover"); });
+      th.addEventListener("drop", function(e){
+        e.preventDefault(); th.classList.remove("dragover");
+        var tgt=th.getAttribute("data-key");
+        if(!dragKey||dragKey===tgt) return;
+        var order=headOrder(), from=order.indexOf(dragKey), to=order.indexOf(tgt);
+        if(from<0||to<0) return;
+        order.splice(to,0,order.splice(from,1)[0]);
+        applyOrder(order); save();
+      });
+    });
+  }catch(e){}
 })();
 </script>
 </body></html>

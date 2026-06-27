@@ -362,11 +362,17 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.323'
-APP_BUILD   = '604'
+APP_VERSION = '12.324'
+APP_BUILD   = '605'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.324', 'b': '605', 'date': '27/06/2026', 'time': '19:30', 'title': 'Μετρήσεις: Χώρος δείγματος + Κονσόλα (chips/drag/δυναμικά όρια)',
+     'items': ['Καταχωρήσεις: νέο πεδίο «Χώρος δείγματος» (π.χ. Μεσαίο → Lobby Bar / Ζαχαροπλαστείο) + δική του στήλη στην Κονσόλα.',
+               'Κονσόλα: οι στήλες Χώρος/Σημείο/Θέση/Κατάσταση/Υπεύθυνος ως badges (chips) για ευκρίνεια.',
+               'Κονσόλα: σύρε τις κεφαλίδες για να αλλάξεις σειρά στηλών (αποθηκεύεται στον browser σου).',
+               'Κονσόλα: οι κεφαλίδες Θερμοκρασία/ClO₂ δείχνουν τα πραγματικά διακριτά όρια όταν διαφέρουν (π.χ. Αναχώρηση ≥60 · Επιστροφή ≥50) + tooltip με ανάλυση ανά μέτρηση.',
+               'Διόρθωση: η θερμοκρασία πισίνας δεν εμφανίζει πλέον ετικέτα ΖΝΧ/ΨΝΧ (δεν είναι δίκτυο).']},
     {'v': '12.323', 'b': '604', 'date': '27/06/2026', 'time': '18:40', 'title': 'Κονσόλα Μετρήσεων: στήλη «Σχόλια» + tweaks',
      'items': ['Νέα στήλη «Σχόλια» στον πίνακα της Κονσόλας Μετρήσεων — εμφανίζει τη σημείωση που γράφει ο συντηρητής σε κάθε καταχώρηση (μεγάλα κείμενα με αναδίπλωση + tooltip).',
                'Η στήλη «Χώρος» δεν είναι πια πράσινη (ουδέτερη εμφάνιση).',
@@ -1721,6 +1727,7 @@ class Reading(db.Model):
     values      = db.Column(db.Text)     # JSON {pkey: value}
     notes       = db.Column(db.Text)
     position    = db.Column(db.String(40))   # θέση δειγματοληψίας ανά καταγραφή (Κοντινό/Μεσαίο/Απομακρυσμένο/ελεύθερο)
+    place       = db.Column(db.String(60))   # χώρος δείγματος ανά καταγραφή (π.χ. Lobby Bar / Ζαχαροπλαστείο)
     source_kind = db.Column(db.String(10))   # Φ2: 'pool' | 'water' αν είναι αντίγραφο legacy record
     source_id   = db.Column(db.Integer)      # Φ2: PoolRecord.id / WaterRecord.id (idempotency)
     area        = db.relationship('Area')
@@ -4388,6 +4395,8 @@ def ensure_columns():
     _add_col('area', 'position', 'position VARCHAR(10)')
     # θέση δειγματοληψίας ανά καταγραφή (per-reading)
     _add_col('reading', 'position', 'position VARCHAR(40)')
+    # χώρος δείγματος ανά καταγραφή (π.χ. Lobby Bar)
+    _add_col('reading', 'place', 'place VARCHAR(60)')
 
 def init_db():
     with app.app_context():

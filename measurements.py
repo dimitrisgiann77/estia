@@ -1264,9 +1264,10 @@ def measurements_entry_save():
     except ValueError:
         rec_at = datetime.now()
     pos = (f.get('position') or '').strip()[:40] or None
+    plc = (f.get('place') or '').strip()[:60] or None
     rec = Reading(area_id=area.id, template_key=area.template_key, user_id=current_user().id,
                   record_date=rdate, period=period, recorded_at=rec_at, values=_json.dumps(vals),
-                  notes=(f.get('notes') or '').strip(), position=pos)
+                  notes=(f.get('notes') or '').strip(), position=pos, place=plc)
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
@@ -1579,8 +1580,10 @@ def _val_status(p, v):
     return True
 
 def _net_tag(p):
-    """ΖΝΧ (ζεστό: κάτω όριο) / ΨΝΧ (κρύο: άνω όριο) — μόνο για θερμοκρασία."""
+    """ΖΝΧ (ζεστό: κάτω όριο) / ΨΝΧ (κρύο: άνω όριο) — μόνο για θερμοκρασία ΔΙΚΤΥΟΥ."""
     if (p.unit or '') != '°C':
+        return ''
+    if (p.pkey or '') == 'temp':   # θερμοκρασία πισίνας — όχι δικτύου, χωρίς ΖΝΧ/ΨΝΧ tag
         return ''
     if p.min_v is not None and p.max_v is None:
         return 'ΖΝΧ'
@@ -1669,8 +1672,9 @@ def _build_console_pdf(ctx):
     pdf.cell(0, 5, ('Καταγραφές: %d    ·    Εντός ορίων: %d%%    ·    Εκτός ορίων: %d%%'
                     % (ctx.get('total', 0), ctx.get('pct_in', 0), ctx.get('pct_out', 0))), ln=1)
     pdf.set_x(10); pdf.set_font('dv', '', 8.5); pdf.set_text_color(*GREY)
-    pdf.cell(0, 5, ('Όρια — Θερμοκρασία: ΖΝΧ ≥60°C / ΨΝΧ ≤20°C   ·   ClO₂: %s   ·   pH: %s'
-                    % (ctx.get('lim_clo2') or '1–2 ppm', ctx.get('lim_ph') or '7.2–7.8')), ln=1)
+    pdf.cell(0, 5, ('Όρια — Θερμοκρασία: %s   ·   ClO₂: %s   ·   pH: %s'
+                    % (ctx.get('head_temp') or 'ΖΝΧ ≥50°C / ΨΝΧ ≤20°C',
+                       ctx.get('head_clo2') or 'ΖΝΧ 0–2 / ΨΝΧ 1–2', ctx.get('lim_ph') or '7.2–7.8')), ln=1)
     pdf.ln(2)
 
     heads = ['Ημερομηνία', 'Χώρος', 'Σημείο', 'Θέση', 'Θερμοκρασία °C', 'ClO₂ ppm', 'pH', 'Κατάσταση', 'Υπεύθυνος']
@@ -1867,6 +1871,9 @@ def _console_ctx():
     spaces = sorted({(a.location or '').strip() for a in areas.values() if (a.location or '').strip()})
     rows, oob = [], []
     n_in = n_out = 0
+    hdr_lims = {'temp': [], 'clo2': [], 'ph': []}   # διακριτά όρια ανά στήλη (visible)
+    hdr_det  = {'temp': [], 'clo2': [], 'ph': []}   # «label: όριο» (tooltip)
+    _seen_l  = {'temp': set(), 'clo2': set(), 'ph': set()}
     if aids:
         rq = (Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date >= cutoff, Reading.record_date <= end)
               .order_by(Reading.record_date.desc(), Reading.recorded_at.desc()).all())
@@ -1899,8 +1906,14 @@ def _console_ctx():
                 if cat:
                     cells[cat] = _numfmt(v)
                     cell_bad[cat] = (not ok)
+                    tag = _net_tag(p)
                     if cat == 'temp':
-                        net = net or _net_tag(p)
+                        net = net or tag
+                    lt = _limit_text(p)
+                    if lt and lt not in _seen_l[cat]:
+                        _seen_l[cat].add(lt)
+                        hdr_lims[cat].append((tag + ' ' if tag else '') + lt)
+                        hdr_det[cat].append((p.label + ': ' if p.label else '') + lt)
             if row_ok:
                 n_in += 1
             else:
@@ -1910,7 +1923,7 @@ def _console_ctx():
             rows.append({'rid': r.id, 'date': r.record_date, 'dt_disp': _dtd,
                          'user': (r.user.full_name if r.user else '—'),
                          'xoros': loc or '—', 'point': a.name,
-                         'pos': r.position or '', 'net': net,
+                         'pos': r.position or '', 'place': (r.place or ''), 'net': net,
                          'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
                          'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],
                          'ph': cells['ph'], 'ph_bad': cell_bad['ph'], 'ok': row_ok,
@@ -1921,8 +1934,11 @@ def _console_ctx():
     oob.sort(key=lambda x: x['date'], reverse=True)
     if view == 'byspace':
         rows.sort(key=lambda r: r['xoros'])  # stable: κρατά τη σειρά ημ/νίας μέσα σε κάθε χώρο
-    # όρια κεφαλίδων (αντιπροσωπευτικά)
-    lim_clo2 = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'clo2' and _limit_text(p)), '1–2 ppm')
+    # όρια κεφαλίδων — δυναμικά: τα διακριτά όρια που εμφανίζονται (αν διαφέρουν, όλα)
+    head_temp = ' · '.join(hdr_lims['temp'])
+    head_clo2 = ' · '.join(hdr_lims['clo2'])
+    head_temp_tip = ' · '.join(hdr_det['temp'])
+    head_clo2_tip = ' · '.join(hdr_det['clo2'])
     lim_ph = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'ph' and _limit_text(p)), '')
     if custom:
         period_label = '%s – %s' % (cutoff.strftime('%d/%m/%y'), end.strftime('%d/%m/%y'))
@@ -1931,7 +1947,8 @@ def _console_ctx():
     return dict(rows=rows, oob=oob, total=total, pct_in=pct_in, pct_out=pct_out,
                 n_out=n_out, spaces=spaces, xoros=xoros, view=view, days=days, rng=rng,
                 all_hotels=_ah, nh=nh, hmap=hmap, today=today.isoformat(),
-                lim_clo2=lim_clo2, lim_ph=lim_ph,
+                head_temp=head_temp, head_clo2=head_clo2,
+                head_temp_tip=head_temp_tip, head_clo2_tip=head_clo2_tip, lim_ph=lim_ph,
                 hotel_name=hmap.get(nh, '—'), period_label=period_label,
                 hotel_code=_hcode(hmap.get(nh, '') or ''),
                 today_disp=today.strftime('%d/%m/%Y'),
