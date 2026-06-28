@@ -52,6 +52,17 @@ class MonitorNode(db.Model):
     hotels    = db.Column(db.String(120))   # Φ: λίστα hotel ids που «έχουν» τον κόμβο (κενό=όλα)
 
 
+# ── Φ2 ρυθμίσεων: Χώροι δειγματοληψίας ως διαχειριζόμενη λίστα (αντί free-text) ──
+class SamplingSpace(db.Model):
+    id        = db.Column(db.Integer, primary_key=True)
+    name      = db.Column(db.String(80), nullable=False)
+    sort      = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+
+DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 'Spa / Jacuzzi', 'Δώμα',
+                  'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'Απομακρυσμένο']
+
+
 # ── Ώρα Ελλάδος (αποθήκευση UTC, χρήση Europe/Athens στη φόρμα/μετατροπή) ──
 def _athens_now():
     from datetime import timezone as _tz
@@ -184,6 +195,10 @@ def seed_measurement_engine():
             for key in ('pool', 'znx', 'generic'):
                 _seed_periods(key)
             db.session.commit()
+            if not SamplingSpace.query.first():
+                for i, nm in enumerate(DEFAULT_SPACES):
+                    db.session.add(SamplingSpace(name=nm, sort=i))
+                db.session.commit()
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
         except Exception as e:
@@ -730,6 +745,35 @@ def measurements_point_node(pid):
     return redirect(url_for('measurements_console') + '?tab=structure')
 
 
+# ── Φ2 ρυθμίσεων: CRUD Χώρων δειγματοληψίας ──────────────────────────────────
+@app.route('/dashboard/measurements/space/save', methods=['POST'])
+def measurements_space_save():
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    sid = f.get('id'); name = (f.get('name') or '').strip()[:80]
+    if name:
+        if sid:
+            s = SamplingSpace.query.get(int(sid))
+            if s:
+                s.name = name
+        else:
+            mx = (db.session.query(db.func.max(SamplingSpace.sort)).scalar() or 0) + 1
+            db.session.add(SamplingSpace(name=name, sort=mx))
+        db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=spaces')
+
+
+@app.route('/dashboard/measurements/space/<int:sid>/delete', methods=['POST'])
+def measurements_space_delete(sid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    s = SamplingSpace.query.get(sid)
+    if s:
+        db.session.delete(s); db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=spaces')
+
+
 # ── Φ-Γ: αυτόματη αντιστοίχιση υπαρχόντων σημείων σε κόμβους (conservative) ───
 # Συντηρητικό: όλα τα ΖΝΧ μαζί (Ζεστό νερό), Όσμωση χωριστά (Επεξεργασία),
 # Πισίνες στις Πισίνες. ΔΕΝ τρέχει στο boot (αλλάζει δεδομένα) — μόνο με κουμπί.
@@ -873,6 +917,7 @@ def measurements_console():
         tpl_periods.append({'tpl': t, 'periods': MonitorPeriod.query.filter_by(template_key=t.key)
                             .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
                             'nparams': len(t.params or [])})
+    spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
     _active_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     try:
         from schedule import _hotel_short
@@ -890,7 +935,8 @@ def measurements_console():
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
-                           assign_rows=assign_rows, point_meas=point_meas)
+                           assign_rows=assign_rows, point_meas=point_meas,
+                           spaces_list=spaces_list)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
