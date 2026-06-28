@@ -86,8 +86,12 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
             {% if not periods %}<option value="day">Ημέρα</option>{% endif %}
           </select></div>
         <div class="f"><label>Θέση δειγματοληψίας</label>
-          <input type="text" name="position" list="poslist" placeholder="π.χ. Κοντινό / Μεσαίο / Απομακρυσμένο (προαιρετικό)">
-          <datalist id="poslist"><option value="Κοντινό"><option value="Μεσαίο"><option value="Απομακρυσμένο"></datalist></div>
+          <select name="position">
+            <option value="">—</option>
+            <option value="Απομακρυσμένο">Απομακρυσμένο</option>
+            <option value="Μεσαίο">Μεσαίο</option>
+            <option value="Κοντινό">Κοντινό</option>
+          </select></div>
         <div class="f"><label>Χώρος δείγματος</label>
           <input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar / Ζαχαροπλαστείο (προαιρετικό)"></div>
         {% for p in params %}

@@ -1937,8 +1937,8 @@ def _console_ctx():
     # όρια κεφαλίδων — δυναμικά: τα διακριτά όρια που εμφανίζονται (αν διαφέρουν, όλα)
     head_temp = ' · '.join(hdr_lims['temp'])
     head_clo2 = ' · '.join(hdr_lims['clo2'])
-    head_temp_tip = ' · '.join(hdr_det['temp'])
-    head_clo2_tip = ' · '.join(hdr_det['clo2'])
+    head_temp_tip = '\n'.join(hdr_det['temp'])   # κάθε όριο σε δική του γραμμή στο tooltip
+    head_clo2_tip = '\n'.join(hdr_det['clo2'])
     lim_ph = next((_limit_text(p) for p in pmap.values() if _meas_cat(p) == 'ph' and _limit_text(p)), '')
     if custom:
         period_label = '%s – %s' % (cutoff.strftime('%d/%m/%y'), end.strftime('%d/%m/%y'))
