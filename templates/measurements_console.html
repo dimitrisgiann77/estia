@@ -46,6 +46,16 @@ select.in-kind{width:120px;}
 .hpick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
 .hbtn{padding:6px 12px;border-radius:8px;font-size:12px;text-decoration:none;color:#33454d;background:#fff;border:1px solid #d6eef3;}
 .hbtn.on{background:var(--brand,#193847);color:#fff;border-color:var(--brand,#193847);font-weight:600;}
+.amx{width:100%;border-collapse:collapse;font-size:13px;}
+.amx th,.amx td{padding:6px 8px;text-align:center;border-bottom:1px solid #eef3f7;white-space:nowrap;}
+.amx th.rn,.amx td.rn{text-align:left;}
+.amx thead th{font-size:11px;color:#5f7682;}
+.amx .hcol{text-decoration:none;color:#5a6b73;font-weight:700;font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid transparent;}
+.amx .hcol.on{background:var(--brand,#193847);color:#fff;}
+.amxcell{border:none;background:none;cursor:pointer;color:#c8d6df;font-size:20px;padding:2px;line-height:1;}
+.amxcell.on{color:#185FA5;}
+.amxcell:disabled{opacity:.5;cursor:wait;}
+.cust{font-size:9px;background:#FAEEDA;color:#854F0B;border-radius:4px;padding:0 4px;margin-left:4px;}
 .hchip .chk{font-weight:700;margin-right:2px;}
 .gpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px;padding:9px 11px;background:#f6fafd;border:1px solid #e3edf4;border-radius:9px;}
 .gchip{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid #d6eef3;border-radius:999px;padding:2px 4px 2px 10px;}
@@ -194,11 +204,44 @@ select.in-kind{width:120px;}
 
   {% if tab=='points' %}
   <datalist id="spaces"><option value="Μηχανοστάσιο"><option value="Κουζίνα"><option value="Απομακρυσμένο"><option value="Δώμα"><option value="Πύργοι ψύξης"><option value="Πισίνα"><option value="Spa / Jacuzzi"><option value="Δωμάτια">{% for s in space_opts %}<option value="{{ s }}">{% endfor %}</datalist>
-  <div class="hpick">
-    {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
+  <div class="card">
+    <div class="card-title"><i class="ti ti-table"></i> Ανάθεση σημείων ανά ξενοδοχείο</div>
+    <p class="muted" style="margin-bottom:10px;">Τικ = το ξενοδοχείο έχει αυτό το σημείο (untick = απενεργοποίηση, κρατά ιστορικό). Κλικ στο <b>όνομα ξενοδοχείου</b> (κεφαλίδα) για λεπτομερή επεξεργασία ορίων/μετρήσεων παρακάτω.</p>
+    <div style="overflow-x:auto;">
+    <table class="amx">
+      <thead><tr><th class="rn">Σημείο</th>
+        {% for h in all_hotels %}<th><a class="hcol {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}" title="{{ h.name }}">{{ hcodes.get(h.id) or h.name }}</a></th>{% endfor %}
+      </tr></thead>
+      <tbody>
+        {% for r in assign_rows %}
+        <tr><td class="rn">{{ r.name }}{% if not r.scaffold %}<span class="cust">custom</span>{% endif %}</td>
+          {% for h in all_hotels %}
+          <td><button type="button" class="amxcell {{ 'on' if r.cells[h.id] }}" data-hotel="{{ h.id }}" data-name="{{ r.name }}" onclick="toggleAssign(this)"><i class="ti {{ 'ti-square-check' if r.cells[h.id] else 'ti-square' }}"></i></button></td>
+          {% endfor %}
+        </tr>
+        {% else %}
+        <tr><td class="rn muted" colspan="{{ all_hotels|length + 1 }}">Δεν υπάρχουν τύποι σημείων.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
   </div>
+  <script>
+  function toggleAssign(btn){
+    var on=btn.classList.contains('on');
+    var fd=new FormData(); fd.append('hotel_id',btn.dataset.hotel); fd.append('name',btn.dataset.name); fd.append('on', on?'0':'1');
+    btn.disabled=true;
+    fetch('/dashboard/measurements/point/assign',{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})
+      .then(function(r){return r.json();}).then(function(d){
+        btn.disabled=false;
+        if(!d||!d.ok){ alert('Σφάλμα ανάθεσης.'); return; }
+        btn.classList.toggle('on', d.on);
+        btn.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
+      }).catch(function(){ btn.disabled=false; alert('Σφάλμα δικτύου.'); });
+  }
+  </script>
   {% if not nh %}
-  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο πάνω για να δεις/ρυθμίσεις τα σημεία του.</div></div>
+  <div class="card"><div class="muted">Κλικ σε ξενοδοχείο (κεφαλίδα πίνακα) για λεπτομερή επεξεργασία των σημείων του.</div></div>
   {% endif %}
   {% if nh %}
   <div class="card">

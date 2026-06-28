@@ -834,8 +834,20 @@ def measurements_console():
                     group_points.setdefault(a.node_id, []).append(a)
                 else:
                     pool_points.append(a)
+    assign_rows = []
     if tab == 'points':
         space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
+        # Πίνακας ανάθεσης: γραμμές=τύποι σημείων (scaffold + custom), στήλες=ξενοδοχεία
+        _ahp = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+        amap = {}
+        for a in pts:
+            if a.is_active:
+                amap.setdefault(a.name, {})[a.hotel_id] = a.id
+        _scaffn = [s[0] for s in SCAFFOLD_POINTS]
+        _rownames = _scaffn + [n for n in sorted(amap) if n not in _scaffn]
+        for n in _rownames:
+            assign_rows.append({'name': n, 'scaffold': n in _scaffn,
+                                'cells': {h.id: amap.get(n, {}).get(h.id) for h in _ahp}})
     hotel_points = []
     area_pkeys = {}
     if tab in ('points', 'library', 'templates') and nh:
@@ -868,7 +880,8 @@ def measurements_console():
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
                            group_points=group_points, pool_points=pool_points,
-                           hotel_points=hotel_points, area_pkeys=area_pkeys)
+                           hotel_points=hotel_points, area_pkeys=area_pkeys,
+                           assign_rows=assign_rows)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
@@ -990,6 +1003,56 @@ def measurements_points_scaffold():
     else:
         msg = 'Διάλεξε ξενοδοχείο πρώτα.'
     return redirect(url_for('measurements_console') + '?tab=points&nh=' + _nh + '&msg=' + msg)
+
+
+@app.route('/dashboard/measurements/point/assign', methods=['POST'])
+def measurements_point_assign():
+    """Πίνακας ανάθεσης: tick = δημιουργία/ενεργοποίηση σημείου σε ξενοδοχείο (από scaffold),
+    untick = απενεργοποίηση (is_active=False, κρατά ιστορικό). AJAX."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    f = request.form
+    try:
+        hid = int(f.get('hotel_id'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False), 400
+    name = (f.get('name') or '').strip()
+    on = f.get('on') == '1'
+    if not name:
+        return jsonify(ok=False), 400
+    existing = Area.query.filter_by(hotel_id=hid, name=name, engine_only=True).first()
+    if on:
+        if existing:
+            if not existing.is_active:
+                existing.is_active = True
+            aid = existing.id
+        else:
+            entry = next((s for s in SCAFFOLD_POINTS if s[0] == name), None)
+            nd = None
+            if entry:
+                _, loc, nkey, pkeys = entry
+                nd = MonitorNode.query.filter_by(key=nkey).first()
+            else:
+                loc, pkeys = '', []
+            a = Area(hotel_id=hid, template_key='generic', name=name[:120], location=loc[:120],
+                     is_active=True, engine_only=True, node_id=(nd.id if nd else None))
+            db.session.add(a); db.session.flush()
+            for i, pk in enumerate(pkeys, 1):
+                db.session.add(AreaParam(area_id=a.id, pkey=pk, sort=i))
+            if nd:
+                cur = _hotels_set(nd)
+                if hid not in cur:
+                    cur.add(hid); nd.hotels = ','.join(str(x) for x in sorted(cur))
+            aid = a.id
+        db.session.commit()
+        log_activity('meas_point_assign', 'on %s @%d' % (name, hid))
+        return jsonify(ok=True, on=True, area_id=aid)
+    else:
+        if existing and existing.is_active:
+            existing.is_active = False
+            db.session.commit()
+            log_activity('meas_point_assign', 'off %s @%d' % (name, hid))
+        return jsonify(ok=True, on=False)
 
 
 @app.route('/dashboard/measurements/point/<int:pid>/delete', methods=['POST'])
