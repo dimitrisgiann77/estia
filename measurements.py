@@ -774,6 +774,22 @@ def measurements_space_delete(sid):
     return redirect(url_for('measurements_console') + '?tab=spaces')
 
 
+@app.route('/dashboard/measurements/space/reorder', methods=['POST'])
+def measurements_space_reorder():
+    if not is_admin():
+        return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    for i, sid in enumerate(data.get('ids') or []):
+        try:
+            s = SamplingSpace.query.get(int(sid))
+        except (TypeError, ValueError):
+            s = None
+        if s:
+            s.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/measurements/lib/reorder', methods=['POST'])
 def measurements_lib_reorder():
     """Αναδιάταξη ειδών μετρήσεων (drag): θέτει MonitorParam.sort ανά pkey (όλες οι εμφανίσεις)."""

@@ -169,9 +169,6 @@ select.in-kind{width:120px;}
 <style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head>
 <body>
-<div class="topbar">
-  <div class="topbar-title"><i class="ti ti-adjustments-cog"></i> Μετρήσεις — Ρυθμίσεις</div>
-</div>
 <div class="container">
   {% if msg %}<div class="ok"><i class="ti ti-check"></i> {{ msg }}</div>{% endif %}
   <div class="tabs">
@@ -410,24 +407,42 @@ select.in-kind{width:120px;}
   {% endif %}
 
   {% if tab=='spaces' %}
+  <style>
+  .spgrid{display:flex;flex-wrap:wrap;gap:8px;}
+  .spchip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e1edf4;border-left:3px solid #1D9E75;border-radius:0 10px 10px 0;padding:7px 10px;font-size:13px;}
+  .spchip .grip{cursor:grab;color:#9fb2bd;} .spchip .spn{font-weight:600;}
+  .spchip .ic{border:none;background:none;cursor:pointer;color:#9fb2bd;padding:2px;} .spchip .ic.del:hover{color:#A32D2D;}
+  .spchip .sped input{padding:4px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;width:130px;}
+  </style>
   <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin"></i> Χώροι δειγματοληψίας</div>
-    <p class="muted" style="margin-bottom:12px;">Κοινή λίστα χώρων (π.χ. Μηχανοστάσιο, Κουζίνα, Πισίνα). Χρησιμοποιούνται στο πεδίο «Χώρος» των σημείων — ορίζονται μία φορά εδώ.</p>
-    {% for s in spaces_list %}
-    <form class="ptrow" method="POST" action="/dashboard/measurements/space/save">
-      <input type="hidden" name="id" value="{{ s.id }}">
-      <input class="in-name" type="text" name="name" value="{{ s.name }}">
-      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-      <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/space/{{ s.id }}/delete" onclick="return confirm('Διαγραφή χώρου «{{ s.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
-    </form>
-    {% else %}
-    <div class="muted">Κανένας χώρος ακόμη.</div>
-    {% endfor %}
-    <form class="ptrow" method="POST" action="/dashboard/measurements/space/save" style="margin-top:10px;">
-      <input class="in-name" type="text" name="name" placeholder="Νέος χώρος…">
+    <div class="card-title"><i class="ti ti-map-pin"></i> Χώροι δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινά για όλα)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Χρησιμοποιούνται στο πεδίο «Χώρος» των σημείων.</p>
+    <div class="spgrid" id="spgrid">
+      {% for s in spaces_list %}
+      <div class="spchip" data-id="{{ s.id }}">
+        <span class="grip"><i class="ti ti-grip-vertical"></i></span>
+        <span class="spn">{{ s.name }}</span>
+        <form method="POST" action="/dashboard/measurements/space/save" class="sped" style="display:none;align-items:center;gap:4px;">
+          <input type="hidden" name="id" value="{{ s.id }}"><input type="text" name="name" value="{{ s.name }}">
+          <button class="ic" type="submit" title="Αποθήκευση"><i class="ti ti-check"></i></button>
+        </form>
+        <button class="ic" type="button" onclick="spRename(this)" title="Μετονομασία"><i class="ti ti-pencil"></i></button>
+        <form method="POST" action="/dashboard/measurements/space/{{ s.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή «{{ s.name }}»;');"><button class="ic del" type="submit" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>
+      </div>
+      {% else %}<div class="muted">Κανένας χώρος ακόμη.</div>{% endfor %}
+    </div>
+    <form method="POST" action="/dashboard/measurements/space/save" style="margin-top:14px;display:flex;gap:6px;">
+      <input type="text" name="name" placeholder="Νέος χώρος…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
       <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
   </div>
+  <script>
+  function spRename(b){var c=b.closest('.spchip');c.querySelector('.spn').style.display='none';b.style.display='none';c.querySelector('.sped').style.display='inline-flex';c.querySelector('.sped input[name=name]').focus();}
+  (function(){if(window.Sortable){var g=document.getElementById('spgrid');if(g)new Sortable(g,{handle:'.grip',animation:150,onSort:function(){
+    var ids=[].map.call(g.querySelectorAll('.spchip'),function(c){return c.getAttribute('data-id');});
+    fetch('/dashboard/measurements/space/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
+  }});}})();
+  </script>
   {% endif %}
 
   {% if tab in ['library','templates'] %}
