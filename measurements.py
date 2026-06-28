@@ -774,6 +774,41 @@ def measurements_space_delete(sid):
     return redirect(url_for('measurements_console') + '?tab=spaces')
 
 
+# ── Φ3 ρυθμίσεων: αντιγραφή setup σημείων από ένα ξενοδοχείο σε άλλο ──────────
+@app.route('/dashboard/measurements/copy-setup', methods=['POST'])
+def measurements_copy_setup():
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    try:
+        src = int(f.get('from_hotel')); dst = int(f.get('to_hotel'))
+    except (TypeError, ValueError):
+        return redirect(url_for('measurements_console') + '?tab=points')
+    n = 0
+    if src and dst and src != dst:
+        existing = {a.name for a in Area.query.filter_by(hotel_id=dst, engine_only=True).all()}
+        for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == src,
+                                   Area.is_active.is_(True)).all():
+            if a.name in existing:
+                continue
+            na = Area(hotel_id=dst, template_key=a.template_key, name=a.name, location=a.location,
+                      is_active=True, engine_only=True, node_id=a.node_id, position=a.position)
+            db.session.add(na); db.session.flush()
+            for i, p in enumerate(point_params(a), 1):
+                db.session.add(AreaParam(area_id=na.id, pkey=p.pkey, sort=i))
+            if a.node_id:
+                nd = MonitorNode.query.get(a.node_id)
+                if nd:
+                    cur = _hotels_set(nd)
+                    if dst not in cur:
+                        cur.add(dst); nd.hotels = ','.join(str(x) for x in sorted(cur))
+            n += 1
+        db.session.commit()
+        log_activity('meas_copy_setup', '%d->%d (%d)' % (src, dst, n))
+    msg = 'Αντιγράφηκαν %d σημεία.' % n if n else 'Τίποτα νέο (υπάρχουν ήδη).'
+    return redirect(url_for('measurements_console') + '?tab=points&view=board&nh=%d&msg=%s' % (dst, msg))
+
+
 # ── Φ-Γ: αυτόματη αντιστοίχιση υπαρχόντων σημείων σε κόμβους (conservative) ───
 # Συντηρητικό: όλα τα ΖΝΧ μαζί (Ζεστό νερό), Όσμωση χωριστά (Επεξεργασία),
 # Πισίνες στις Πισίνες. ΔΕΝ τρέχει στο boot (αλλάζει δεδομένα) — μόνο με κουμπί.
@@ -918,6 +953,7 @@ def measurements_console():
                             .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
                             'nparams': len(t.params or [])})
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
+    lib_map_json = _json.dumps({m['pkey']: m for m in library}, ensure_ascii=False)
     _active_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     try:
         from schedule import _hotel_short
@@ -936,7 +972,7 @@ def measurements_console():
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,
-                           spaces_list=spaces_list)
+                           spaces_list=spaces_list, lib_map_json=lib_map_json)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
