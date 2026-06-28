@@ -1270,6 +1270,13 @@ def measurements_entry_save():
                   notes=(f.get('notes') or '').strip(), position=pos, place=plc)
     db.session.add(rec); db.session.commit()
     log_activity('meas_entry_save', f'{area.name}/{period}')
+    if f.get('ajax'):
+        try:
+            acts = area_actions(rec)
+        except Exception:
+            acts = []
+        return app.response_class(_json.dumps({'ok': True, 'area_id': area.id, 'period': period,
+                                               'actions': acts}), mimetype='application/json')
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
 
 
@@ -1328,13 +1335,18 @@ def measurements_today():
         cat, icon, order = _grp(a)
         groups = by_hotel.setdefault(a.hotel_id, {})
         g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
-        g['areas'].append({'area': a, 'slots': slots, 'count': cnt.get(a.id, 0)})
+        prm = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
+                'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
+                'kind': _param_input_kind(p)} for p in point_params(a)]
+        g['areas'].append({'area': a, 'slots': slots, 'count': cnt.get(a.id, 0), 'params': prm})
     today_by_hotel = []
     for hid, groups in by_hotel.items():
         glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
         today_by_hotel.append({'hotel': hmap.get(hid, '—'), 'groups': glist})
     return render_template('measurements_today.html', today_by_hotel=today_by_hotel,
-                           alerts=alerts, total=total, donen=donen)
+                           alerts=alerts, total=total, donen=donen,
+                           today=_athens_now().date().isoformat(),
+                           now_time=_athens_now().strftime('%H:%M'))
 
 
 # ── Φ4b: ΣΤΑΤΙΣΤΙΚΑ (σημείο × παράμετρος, μέσος/μέγ/ελάχ/εκτός ορίων) ──────────

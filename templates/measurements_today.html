@@ -7,52 +7,61 @@
 <link rel="stylesheet" href="/static/estia-theme.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f7ff;color:#1a1a1a;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f7ff;color:#16323f;}
 .topbar{background:#193847;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
 .topbar-title{font-size:16px;font-weight:600;}
 .topbar-sub{font-size:12px;opacity:.75;margin-top:2px;}
 .prog{font-size:13px;background:rgba(255,255,255,.15);padding:6px 12px;border-radius:999px;}
-.container{max-width:900px;margin:0 auto;padding:24px;}
-.card{background:#fff;border-radius:12px;padding:16px 18px;border:1px solid #e0f0ff;margin-bottom:14px;}
-.htitle{font-size:13px;font-weight:700;color:#193847;margin:12px 0 6px;}
-.hotel{font-size:18px;font-weight:800;color:#16323f;margin:18px 0 6px;}
+.container{max-width:900px;margin:0 auto;padding:20px 22px 60px;}
+.pbar{height:6px;background:#dbe9f3;border-radius:999px;overflow:hidden;margin-bottom:14px;}
+.pbar>i{display:block;height:100%;background:#185FA5;transition:width .3s;}
+.hotel{font-size:18px;font-weight:800;color:#16323f;margin:16px 0 6px;}
 .section{background:#eef5fb;border:1px solid #d9e7f1;border-radius:14px;padding:10px 12px;margin-bottom:14px;}
-.sechead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--brand,#193847);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
+.sechead{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--brand,#193847);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
 .sechead i{font-size:16px;}
 .secn{font-size:11px;font-weight:700;background:#fff;color:var(--brand,#193847);border:1px solid #d9e7f1;border-radius:20px;padding:1px 8px;}
-.section .card{margin-bottom:8px;}
-.section .card:last-child{margin-bottom:0;}
-.pname{font-size:14px;font-weight:600;margin-bottom:8px;}
-.pname .loc{font-size:12px;color:#889;font-weight:400;}
-.slots{display:flex;gap:8px;flex-wrap:wrap;}
-.slot{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;text-decoration:none;font-size:13px;border:1.5px dashed #cfe0ea;color:#33454d;background:#fbfdff;}
-.slot.done{border-style:solid;border-color:#16a34a;background:#dcfce7;color:#166534;font-weight:600;}
-.slot .dot{width:8px;height:8px;border-radius:50%;background:#c8d6df;}
-.slot.done .dot{background:#16a34a;}
-.slot.add{border-style:solid;border-color:var(--brand,#193847);color:var(--brand,#193847);background:#fff;font-weight:600;}
-.cntbadge{font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:20px;padding:1px 9px;margin-left:8px;}
+.pt{background:#fff;border:1px solid #e0f0ff;border-radius:10px;margin-bottom:8px;overflow:hidden;}
+.pt:last-child{margin-bottom:0;}
+.pthead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;}
+.pthead .nm{font-size:14px;font-weight:600;}
+.pthead .loc{font-size:11px;color:#889;font-weight:400;}
+.pthead .cnt{font-size:11px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:20px;padding:1px 9px;}
+.pthead .chev{margin-left:auto;color:#9fb2bd;}
+.st{font-size:18px;}
+.st.ok{color:#0F6E56;} .st.bad{color:#A32D2D;} .st.no{color:#c8d6df;}
+.det{display:none;border-top:1px solid #e6f0f8;padding:14px;background:#fbfdff;}
+.pt.open .det{display:block;}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.f label{display:block;font-size:11px;color:#5f7682;margin-bottom:3px;}
+.f .lim{color:#9fb2bd;font-weight:600;}
+.f input,.f select{width:100%;padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:14px;background:#fff;color:#16323f;}
+.f.wide{grid-column:1/-1;}
+.measin.ok{border-color:#5DCAA5;} .measin.bad{border-color:#F09595;}
+.warnbox{background:#FAEEDA;border-radius:8px;padding:9px 11px;font-size:12px;color:#854F0B;margin:10px 0 0;}
+.warnbox .wi{padding:2px 0;}
+.savebtn{margin-top:12px;display:inline-flex;align-items:center;gap:7px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;color:#fff;background:var(--brand,#193847);}
+.fulllink{font-size:11px;color:#2c6079;text-decoration:none;margin-left:12px;}
 .alerts{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px 16px;margin-bottom:14px;}
 .alerts .at{font-weight:700;color:#9a3412;margin-bottom:8px;font-size:14px;}
 .alert{font-size:13px;color:#9a3412;padding:4px 0;}
-.quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
-.qbtn{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;color:#fff;background:var(--brand,#193847);}
-.qbtn.ghost{background:#eef6fb;color:#193847;border:1px solid #d6eef3;}
 .muted{color:#888;font-size:12px;}
+.savedmsg{background:#dcfce7;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:8px 11px;font-size:12px;margin-top:10px;display:none;}
 :root{--brand:{{ theme.primary if theme else '#193847' }};}
-.topbar{background:var(--brand)!important;}.slot.done{background:#dcfce7!important;}
+.topbar{background:var(--brand)!important;}
+.embed .topbar{display:none!important;}.embed body{background:transparent!important;}
 </style>
-<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
-<style>.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
+<script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");}}catch(e){}</script>
 </head>
 <body>
 <div class="topbar">
   <div>
     <div class="topbar-title"><i class="ti ti-calendar-check"></i> Σήμερα — Μετρήσεις</div>
-    <div class="topbar-sub">Συμπλήρωσε τις μετρήσεις ανά περιοχή. Πράσινο = έγινε, διακεκομμένο = εκκρεμεί.</div>
+    <div class="topbar-sub">Πάτα ένα σημείο, συμπλήρωσε, αποθήκευσε. Πράσινο = έγινε.</div>
   </div>
-  <div class="prog">{{ donen }} / {{ total }} σήμερα</div>
+  <div class="prog"><span id="donen">{{ donen }}</span> / {{ total }} σήμερα</div>
 </div>
 <div class="container">
+  <div class="pbar"><i id="pbar" style="width:{{ ((donen/total*100)|round|int) if total else 0 }}%;"></i></div>
 
   {% if alerts %}
   <div class="alerts">
@@ -67,23 +76,95 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="section">
       <div class="sechead"><i class="ti {{ g.icon }}"></i> {{ g.title }} <span class="secn">{{ g.areas|length }}</span></div>
       {% for c in g.areas %}
-      <div class="card">
-        <div class="pname">{{ c.area.name }}{% if c.area.pos_label %} <span class="loc" style="font-weight:700;color:#2c6079;">· {{ c.area.pos_label }}</span>{% endif %}{% if c.area.location %} <span class="loc">· {{ c.area.location }}</span>{% endif %}{% if c.count %}<span class="cntbadge" title="Μετρήσεις σήμερα">{{ c.count }} σήμερα</span>{% endif %}</div>
-        <div class="slots">
-          {% for s in c.slots %}
-          <a class="slot {{ 'done' if s.done }}" href="/dashboard/measurements/entry?point={{ c.area.id }}">
-            <span class="dot"></span> {{ s.label }}{% if s.time %} · {{ s.time }}{% endif %}{% if s.done %} ✓{% endif %}
-          </a>
-          {% endfor %}
-          <a class="slot add" href="/dashboard/measurements/entry?point={{ c.area.id }}"><i class="ti ti-plus"></i> Νέα μέτρηση</a>
+      {% set anydone = c.count > 0 %}
+      <div class="pt" data-aid="{{ c.area.id }}">
+        <div class="pthead" onclick="togglePt(this)">
+          <i class="ti st {{ 'ok' if anydone else 'no' }} {{ 'ti-circle-check' if anydone else 'ti-circle' }}"></i>
+          <span class="nm">{{ c.area.name }}</span>
+          {% if c.area.pos_label %}<span class="loc">· {{ c.area.pos_label }}</span>{% endif %}
+          {% if c.area.location %}<span class="loc">· {{ c.area.location }}</span>{% endif %}
+          <span class="cnt" style="{{ '' if c.count else 'display:none;' }}">{{ c.count }} σήμερα</span>
+          <i class="ti ti-chevron-down chev"></i>
+        </div>
+        <div class="det">
+          <form class="entryform" onsubmit="return saveEntry(event,this)">
+            <input type="hidden" name="area_id" value="{{ c.area.id }}">
+            <input type="hidden" name="ajax" value="1">
+            <input type="hidden" name="record_date" value="{{ today }}">
+            <div class="fgrid">
+              <div class="f"><label>Περίοδος / Βάρδια</label>
+                <select name="period">
+                  {% for s in c.slots %}<option value="{{ s.period }}">{{ s.label }}{% if s.time %} ({{ s.time }}){% endif %}</option>{% endfor %}
+                  {% if not c.slots %}<option value="day">Ημέρα</option>{% endif %}
+                </select></div>
+              <div class="f"><label>Ώρα</label><input type="time" name="record_time" value="{{ now_time }}"></div>
+              <div class="f"><label>Θέση δειγματοληψίας</label>
+                <select name="position"><option value="">—</option><option>Απομακρυσμένο</option><option>Μεσαίο</option><option>Κοντινό</option></select></div>
+              <div class="f"><label>Χώρος δείγματος</label><input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar"></div>
+              {% for p in c.params %}
+              <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.min_v is not none or p.max_v is not none %} <span class="lim">{{ p.min_v if p.min_v is not none else '' }}{% if p.min_v is not none and p.max_v is not none %}–{% endif %}{{ p.max_v if p.max_v is not none else '' }}</span>{% endif %}</label>
+                {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
+                {% elif p.kind=='text' %}<input type="text" name="{{ p.pkey }}">
+                {% else %}<input type="number" step="any" name="{{ p.pkey }}" class="measin" data-min="{{ p.min_v if p.min_v is not none else '' }}" data-max="{{ p.max_v if p.max_v is not none else '' }}" data-low="{{ p.low or '' }}" data-high="{{ p.high or '' }}" data-label="{{ p.label }}" oninput="liveCheck(this)">{% endif %}
+              </div>
+              {% endfor %}
+              <div class="f wide"><label>Σημειώσεις</label><input type="text" name="notes"></div>
+            </div>
+            <div class="warnbox" style="display:none;"></div>
+            <button class="savebtn" type="submit"><i class="ti ti-device-floppy"></i> Καταχώρηση</button>
+            <a class="fulllink" href="/dashboard/measurements/entry?point={{ c.area.id }}">Πλήρης φόρμα / άλλη μέρα</a>
+            <div class="savedmsg"><i class="ti ti-check"></i> Αποθηκεύτηκε.</div>
+          </form>
         </div>
       </div>
       {% endfor %}
     </div>
     {% endfor %}
   {% endfor %}
-  {% if not today_by_hotel %}<div class="card muted">Δεν υπάρχουν σημεία μέτρησης για σένα.</div>{% endif %}
+  {% if not today_by_hotel %}<div class="muted">Δεν υπάρχουν σημεία μέτρησης για σένα.</div>{% endif %}
 
 </div>
+<script>
+function togglePt(head){
+  var pt=head.parentNode, open=pt.classList.contains('open');
+  document.querySelectorAll('.pt.open').forEach(function(x){ if(x!==pt) x.classList.remove('open'); });
+  pt.classList.toggle('open', !open);
+}
+function liveCheck(el){
+  var v=el.value; el.classList.remove('ok','bad');
+  if(v!==''&&v!=null){ var x=parseFloat((''+v).replace(',','.'));
+    if(!isNaN(x)){ var mn=el.dataset.min, mx=el.dataset.max;
+      var bad=(mn!==''&&x<parseFloat(mn))||(mx!==''&&x>parseFloat(mx));
+      el.classList.add(bad?'bad':'ok'); } }
+  var form=el.closest('form'), box=form.querySelector('.warnbox'), items=[];
+  form.querySelectorAll('.measin').forEach(function(e){
+    var raw=e.value; if(raw===''||raw==null) return; var n=parseFloat((''+raw).replace(',','.')); if(isNaN(n)) return;
+    var mn=e.dataset.min, mx=e.dataset.max, lab=e.dataset.label||'';
+    if(mn!==''&&n<parseFloat(mn)&&e.dataset.low){ items.push(lab+': '+e.dataset.low); }
+    else if(mx!==''&&n>parseFloat(mx)&&e.dataset.high){ items.push(lab+': '+e.dataset.high); }
+  });
+  if(!items.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.innerHTML='<b>⚠ Προτεινόμενες ενέργειες</b>'+items.map(function(t){return '<div class="wi">'+t+'</div>';}).join('');
+  box.style.display='block';
+}
+function saveEntry(ev, form){
+  ev.preventDefault();
+  var btn=form.querySelector('.savebtn'); btn.disabled=true;
+  fetch('/dashboard/measurements/entry/save',{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'fetch'}})
+   .then(function(r){return r.json();})
+   .then(function(d){
+     btn.disabled=false;
+     if(!d||!d.ok){ alert('Σφάλμα αποθήκευσης.'); return; }
+     var pt=form.closest('.pt');
+     var ic=pt.querySelector('.pthead .st'); ic.className='ti st ok ti-circle-check';
+     var cnt=pt.querySelector('.pthead .cnt'); var n=parseInt((cnt.textContent||'0'))||0; n++; cnt.textContent=n+' σήμερα'; cnt.style.display='';
+     var msg=form.querySelector('.savedmsg'); msg.style.display='block'; setTimeout(function(){msg.style.display='none';},2500);
+     var dn=document.getElementById('donen'); if(dn){ dn.textContent=(parseInt(dn.textContent)||0)+1; }
+     setTimeout(function(){ pt.classList.remove('open'); },700);
+   })
+   .catch(function(){ btn.disabled=false; alert('Σφάλμα δικτύου.'); });
+  return false;
+}
+</script>
 </body>
 </html>
