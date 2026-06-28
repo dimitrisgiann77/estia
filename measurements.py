@@ -774,6 +774,19 @@ def measurements_space_delete(sid):
     return redirect(url_for('measurements_console') + '?tab=spaces')
 
 
+@app.route('/dashboard/measurements/lib/reorder', methods=['POST'])
+def measurements_lib_reorder():
+    """Αναδιάταξη ειδών μετρήσεων (drag): θέτει MonitorParam.sort ανά pkey (όλες οι εμφανίσεις)."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    for i, pk in enumerate(data.get('pkeys') or []):
+        for p in MonitorParam.query.filter_by(pkey=str(pk)[:40]).all():
+            p.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 # ── Φ3 ρυθμίσεων: αντιγραφή setup σημείων από ένα ξενοδοχείο σε άλλο ──────────
 @app.route('/dashboard/measurements/copy-setup', methods=['POST'])
 def measurements_copy_setup():

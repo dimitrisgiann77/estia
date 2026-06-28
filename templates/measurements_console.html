@@ -432,46 +432,109 @@ select.in-kind{width:120px;}
 
   {% if tab in ['library','templates'] %}
   {% macro kind_opts(k) %}<option value="num"{{ ' selected' if k=='num' }}>Αριθμός</option><option value="bool"{{ ' selected' if k=='bool' }}>Ναι/Όχι</option><option value="text"{{ ' selected' if k=='text' }}>Κείμενο</option>{% endmacro %}
+  <style>
+  .libwrap{display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start;}
+  .libcat{font-size:11px;font-weight:700;color:#5f7682;text-transform:uppercase;letter-spacing:.03em;margin:12px 0 6px;}
+  .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:9px;}
+  .mcardL{background:#fff;border:1px solid #e1edf4;border-left:3px solid #185FA5;border-radius:0 10px 10px 0;padding:10px 11px;cursor:pointer;}
+  .mcardL:hover{box-shadow:0 2px 10px rgba(20,58,82,.10);}
+  .mcardL.sel{box-shadow:0 0 0 2px #E6F1FB;}
+  .mcardL.off{opacity:.5;}
+  .mcardL.cold{border-left-color:#1D9E75;} .mcardL.pool{border-left-color:#BA7517;}
+  .mcardL .nm{font-size:13.5px;font-weight:600;}
+  .mcardL .nm .u{color:#9fb2bd;font-weight:400;font-size:11px;}
+  .mcardL .lim{display:inline-block;margin-top:6px;background:#E6F1FB;color:#185FA5;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
+  .mcardL.cold .lim{background:#E1F5EE;color:#0F6E56;} .mcardL.pool .lim{background:#FAEEDA;color:#854F0B;}
+  .mcardL .msg{margin-top:5px;font-size:10px;color:#9fb2bd;}
+  .libed{background:#fff;border:1px solid #e1edf4;border-radius:12px;padding:14px;position:sticky;top:14px;}
+  .libed h3{font-size:14px;font-weight:700;margin-bottom:2px;}
+  .libed label{font-size:11px;color:#5f7682;display:block;margin:8px 0 3px;}
+  .libed input,.libed select{width:100%;padding:7px 9px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;}
+  .libed .rw{display:flex;gap:8px;} .libed .rw>div{flex:1;}
+  .libed .acts{display:flex;gap:8px;margin-top:14px;}
+  .libed .save{flex:1;background:#193847;color:#fff;border:none;border-radius:6px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;}
+  .libed .tgl{background:#fff;border:1px solid #d6eef3;color:#5f7682;border-radius:6px;padding:9px 11px;font-size:12px;cursor:pointer;}
+  </style>
   <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Είδη μετρήσεων — Βιβλιοθήκη <span class="muted" style="font-weight:400;">(κοινά για όλα τα ξενοδοχεία)</span></div>
-    <p class="muted" style="margin-bottom:6px;">Όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση. Πιο κάτω αναθέτεις ποιες μετρήσεις παίρνει κάθε σημείο.</p>
-    {% for g in lib_groups %}
-      <div class="htitle">{{ g.name }}</div>
-      {% for m in g.rows %}
-      <form method="POST" action="/dashboard/measurements/lib/save" class="row libedit {{ 'off' if not m.active }}">
-        <input type="hidden" name="pkey" value="{{ m.pkey }}">
-        <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" value="{{ m.label }}" required></div>
-        <div><span class="lbl">Μονάδα</span><input class="in-sm" type="text" name="unit" value="{{ m.unit }}"></div>
-        <div><span class="lbl">Κάτω</span><input class="in-sm" type="text" name="min_v" value="{{ m.min_v if m.min_v is not none else '' }}"></div>
-        <div><span class="lbl">Άνω</span><input class="in-sm" type="text" name="max_v" value="{{ m.max_v if m.max_v is not none else '' }}"></div>
-        <div><span class="lbl">Είδος</span><select class="in-kind" name="kind">{{ kind_opts(m.kind) }}</select></div>
-        <div><span class="lbl">Κατηγορία</span><input class="in-loc" type="text" name="category" value="{{ m.category }}" placeholder="Πισίνα/Νερό/Γενικό"></div>
-        <span class="tag">{{ m.pkey }}</span>
-        <div class="fw"><span class="lbl">Ενέργεια αν χαμηλό</span><input type="text" name="action_low" value="{{ m.action_low }}"></div>
-        <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high" value="{{ m.action_high }}"></div>
-        <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
-        <button class="btn {{ '' if m.active else 'ghost' }}" type="submit" formaction="/dashboard/measurements/lib/{{ m.pkey }}/toggle">{{ 'Απενεργοποίηση' if m.active else 'Ενεργοποίηση' }}</button>
-      </form>
-      {% endfor %}
-    {% else %}
-      <div class="muted" style="padding-top:8px;">Καμία μέτρηση ακόμη — πρόσθεσε από κάτω.</div>
-    {% endfor %}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div class="card-title" style="margin:0;"><i class="ti ti-flask"></i> Είδη μετρήσεων <span class="muted" style="font-weight:400;">(κοινά για όλα)</span></div>
+      <button class="btn" type="button" style="margin-left:auto;" onclick="libNew()"><i class="ti ti-plus"></i> Νέο είδος</button>
+    </div>
+    <p class="muted" style="margin-bottom:8px;">Κλικ σε κάρτα → επεξεργασία δεξιά. Σύρε για αναδιάταξη μέσα στην κατηγορία.</p>
+    <div class="libwrap">
+      <div>
+        {% for g in lib_groups %}
+        {% set cc = 'pool' if g.name=='Πισίνα' else ('cold' if g.name=='Νερό' else '') %}
+        <div class="libcat">{{ g.name }}</div>
+        <div class="libgrid" data-cat="{{ g.name }}">
+          {% for m in g.rows %}
+          <div class="mcardL {{ cc }} {{ 'off' if not m.active }}" data-pkey="{{ m.pkey }}" data-label="{{ m.label }}" data-unit="{{ m.unit }}" data-min="{{ m.min_v if m.min_v is not none else '' }}" data-max="{{ m.max_v if m.max_v is not none else '' }}" data-low="{{ m.action_low }}" data-high="{{ m.action_high }}" data-kind="{{ m.kind }}" data-cat="{{ m.category }}" data-active="{{ 1 if m.active else 0 }}" onclick="libEdit(this)">
+            <div class="nm">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</div>
+            <span class="lim">{% if m.min_v is not none and m.max_v is not none %}{{ m.min_v }}–{{ m.max_v }}{% elif m.min_v is not none %}≥{{ m.min_v }}{% elif m.max_v is not none %}≤{{ m.max_v }}{% else %}—{% endif %}{% if m.unit %} {{ m.unit }}{% endif %}</span>
+            {% if m.action_low or m.action_high %}<div class="msg"><i class="ti ti-message-2"></i> μηνύματα</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="muted">Καμία μέτρηση ακόμη — «+ Νέο είδος».</div>
+        {% endfor %}
+      </div>
+      <div class="libed">
+        <form method="POST" action="/dashboard/measurements/lib/save" id="libform">
+          <h3 id="lf-title">Διάλεξε ή «+ Νέο»</h3>
+          <input type="hidden" name="pkey" id="lf-pkey">
+          <div id="lf-keyrow" style="display:none;"><label>Key (λατινικά)</label><input type="text" name="key" id="lf-key" placeholder="π.χ. cl_free"></div>
+          <label>Όνομα</label><input type="text" name="label" id="lf-label" required>
+          <div class="rw"><div><label>Μονάδα</label><input type="text" name="unit" id="lf-unit"></div><div><label>Είδος</label><select name="kind" id="lf-kind">{{ kind_opts('num') }}</select></div></div>
+          <div class="rw"><div><label>Κάτω όριο</label><input type="number" step="any" name="min_v" id="lf-min"></div><div><label>Άνω όριο</label><input type="number" step="any" name="max_v" id="lf-max"></div></div>
+          <label>Μήνυμα αν χαμηλό</label><input type="text" name="action_low" id="lf-low">
+          <label>Μήνυμα αν υψηλό</label><input type="text" name="action_high" id="lf-high">
+          <label>Κατηγορία</label><input type="text" name="category" id="lf-cat" placeholder="Πισίνα/Νερό/ΖΝΧ/Γενικό">
+          <div class="acts">
+            <button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+            <button class="tgl" type="submit" id="lf-tgl" style="display:none;"></button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-plus"></i> Νέα μέτρηση</div>
-    <form method="POST" action="/dashboard/measurements/lib/save" class="row libedit" style="border:none;">
-      <div><span class="lbl">Key (λατινικά)</span><input class="in-sm" style="width:130px;" type="text" name="key" placeholder="π.χ. cl_free"></div>
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" placeholder="π.χ. Ελεύθερο χλώριο" required></div>
-      <div><span class="lbl">Μονάδα</span><input class="in-sm" type="text" name="unit" placeholder="mg/L"></div>
-      <div><span class="lbl">Κάτω</span><input class="in-sm" type="text" name="min_v"></div>
-      <div><span class="lbl">Άνω</span><input class="in-sm" type="text" name="max_v"></div>
-      <div><span class="lbl">Είδος</span><select class="in-kind" name="kind">{{ kind_opts('num') }}</select></div>
-      <div><span class="lbl">Κατηγορία</span><input class="in-loc" type="text" name="category" placeholder="Πισίνα/Νερό/Γενικό"></div>
-      <div class="fw"><span class="lbl">Ενέργεια αν χαμηλό</span><input type="text" name="action_low"></div>
-      <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high"></div>
-      <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
-  </div>
+  <script>
+  (function(){
+    function setKind(v){var s=document.getElementById('lf-kind');for(var i=0;i<s.options.length;i++){if(s.options[i].value===v){s.selectedIndex=i;return;}}}
+    window.libEdit=function(el){
+      document.querySelectorAll('.mcardL.sel').forEach(function(c){c.classList.remove('sel');}); el.classList.add('sel');
+      document.getElementById('lf-title').textContent='Επεξεργασία: '+el.getAttribute('data-label');
+      document.getElementById('lf-pkey').value=el.getAttribute('data-pkey');
+      document.getElementById('lf-keyrow').style.display='none';
+      document.getElementById('lf-label').value=el.getAttribute('data-label');
+      document.getElementById('lf-unit').value=el.getAttribute('data-unit');
+      document.getElementById('lf-min').value=el.getAttribute('data-min');
+      document.getElementById('lf-max').value=el.getAttribute('data-max');
+      document.getElementById('lf-low').value=el.getAttribute('data-low');
+      document.getElementById('lf-high').value=el.getAttribute('data-high');
+      document.getElementById('lf-cat').value=el.getAttribute('data-cat');
+      setKind(el.getAttribute('data-kind')||'num');
+      var t=document.getElementById('lf-tgl'),on=el.getAttribute('data-active')==='1';
+      t.style.display='inline-block'; t.textContent=on?'Απενεργοποίηση':'Ενεργοποίηση';
+      t.setAttribute('formaction','/dashboard/measurements/lib/'+el.getAttribute('data-pkey')+'/toggle');
+    };
+    window.libNew=function(){
+      document.querySelectorAll('.mcardL.sel').forEach(function(c){c.classList.remove('sel');});
+      document.getElementById('lf-title').textContent='Νέο είδος μέτρησης';
+      document.getElementById('lf-pkey').value=''; document.getElementById('lf-keyrow').style.display='block';
+      ['lf-label','lf-unit','lf-min','lf-max','lf-low','lf-high','lf-cat','lf-key'].forEach(function(id){document.getElementById(id).value='';});
+      setKind('num'); document.getElementById('lf-tgl').style.display='none';
+    };
+    if(window.Sortable){
+      function collect(){return [].map.call(document.querySelectorAll('.libgrid .mcardL'),function(c){return c.getAttribute('data-pkey');});}
+      document.querySelectorAll('.libgrid').forEach(function(grid){
+        new Sortable(grid,{animation:150,onSort:function(){
+          fetch('/dashboard/measurements/lib/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkeys:collect()})});
+        }});
+      });
+    }
+  })();
+  </script>
   <div class="card">
     <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης</div>
     <p class="muted" style="margin-bottom:6px;">Οι τύποι (Πισίνα/ΖΝΧ/…) είναι το «είδος» κάθε σημείου και ομαδοποιούν τις περιόδους.</p>
