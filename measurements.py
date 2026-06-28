@@ -850,11 +850,18 @@ def measurements_console():
                                 'cells': {h.id: amap.get(n, {}).get(h.id) for h in _ahp}})
     hotel_points = []
     area_pkeys = {}
+    point_meas = {}
     if tab in ('points', 'library', 'templates') and nh:
         hotel_points = (Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh)
                         .order_by(Area.name).all())
         for a in hotel_points:
-            area_pkeys[a.id] = [p.pkey for p in point_params(a)]
+            pps = point_params(a)
+            area_pkeys[a.id] = [p.pkey for p in pps]
+            point_meas[a.id] = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit or '',
+                                 'min_v': p.min_v, 'max_v': p.max_v,
+                                 'low': p.action_low or '', 'high': p.action_high or '',
+                                 'kind': _param_input_kind(p),
+                                 'category': (getattr(p, 'category', '') or '')} for p in pps]
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -881,7 +888,7 @@ def measurements_console():
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
-                           assign_rows=assign_rows)
+                           assign_rows=assign_rows, point_meas=point_meas)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
@@ -1112,6 +1119,9 @@ def measurements_lib_save():
     category = (f.get('category') or '').strip()[:40]
 
     def _go(m):
+        bp = (f.get('back_points') or '').strip()
+        if bp:
+            return redirect(url_for('measurements_console') + '?tab=points&nh=' + bp + '&msg=' + m)
         return redirect(url_for('measurements_console') + '?tab=library&msg=' + m)
 
     if not label:

@@ -56,6 +56,15 @@ select.in-kind{width:120px;}
 .amxcell.on{color:#185FA5;}
 .amxcell:disabled{opacity:.5;cursor:wait;}
 .cust{font-size:9px;background:#FAEEDA;color:#854F0B;border-radius:4px;padding:0 4px;margin-left:4px;}
+.ptmeas{margin:-4px 0 12px;border:1px solid #eef3f7;border-radius:8px;padding:6px 10px;background:#fbfdff;overflow-x:auto;}
+.ptmeas>summary{cursor:pointer;font-size:12px;font-weight:600;color:#3a6b82;padding:4px 0;}
+.limhead,.limrow{display:grid;grid-template-columns:1.4fr 68px 68px 1.6fr 1.6fr 34px;gap:6px;align-items:center;min-width:560px;}
+.limhead{font-size:10px;color:#9aa7ad;padding:6px 0 2px;}
+.limrow{margin-bottom:5px;}
+.limrow input{padding:6px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;width:100%;}
+.limrow .lm-l{font-size:12px;font-weight:600;color:#16323f;}
+.limrow .lm-l .u{color:#9aa7ad;font-weight:400;}
+.limnote{font-size:11px;margin-top:6px;}
 .hchip .chk{font-weight:700;margin-right:2px;}
 .gpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px;padding:9px 11px;background:#f6fafd;border:1px solid #e3edf4;border-radius:9px;}
 .gchip{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid #d6eef3;border-radius:999px;padding:2px 4px 2px 10px;}
@@ -246,7 +255,7 @@ select.in-kind{width:120px;}
   {% if nh %}
   <div class="card">
     <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Για κάθε σημείο: όνομα, χώρος (περιοχή), και <b>δίκτυο</b> (διάλεξε από τη λίστα). Πάτα <i class="ti ti-device-floppy"></i> για αποθήκευση. Τις μετρήσεις τις βάζεις στην καρτέλα «Μετρήσεις».</p>
+    <p class="muted" style="margin-bottom:12px;">Για κάθε σημείο: όνομα, χώρος, <b>δίκτυο</b> + <i class="ti ti-device-floppy"></i> αποθήκευση. Άνοιξε «Όρια & μηνύματα» για inline επεξεργασία ορίων/ενεργειών ανά μέτρηση.</p>
     {% for a in hotel_points %}
     <form class="ptrow {{ 'off' if not a.is_active }}" method="POST" action="/dashboard/measurements/point/save">
       <input type="hidden" name="point_id" value="{{ a.id }}"><input type="hidden" name="nh" value="{{ nh }}">
@@ -257,6 +266,28 @@ select.in-kind{width:120px;}
       <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
       <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
     </form>
+    <details class="ptmeas">
+      <summary><i class="ti ti-adjustments"></i> Όρια & μηνύματα — {{ point_meas[a.id]|length }} μετρήσεις</summary>
+      {% if point_meas[a.id] %}
+      <div class="limhead"><span>Μέτρηση</span><span>Κάτω</span><span>Άνω</span><span>Μήνυμα χαμηλού</span><span>Μήνυμα υψηλού</span><span></span></div>
+      {% for m in point_meas[a.id] %}
+      <form class="limrow" method="POST" action="/dashboard/measurements/lib/save">
+        <input type="hidden" name="pkey" value="{{ m.pkey }}"><input type="hidden" name="label" value="{{ m.label }}">
+        <input type="hidden" name="unit" value="{{ m.unit }}"><input type="hidden" name="kind" value="{{ m.kind }}">
+        <input type="hidden" name="category" value="{{ m.category }}"><input type="hidden" name="back_points" value="{{ nh }}">
+        <span class="lm-l">{{ m.label }}{% if m.unit %} <span class="u">({{ m.unit }})</span>{% endif %}</span>
+        <input type="number" step="any" name="min_v" value="{{ m.min_v if m.min_v is not none else '' }}" placeholder="—">
+        <input type="number" step="any" name="max_v" value="{{ m.max_v if m.max_v is not none else '' }}" placeholder="—">
+        <input type="text" name="action_low" value="{{ m.low }}" placeholder="ενέργεια αν χαμηλό">
+        <input type="text" name="action_high" value="{{ m.high }}" placeholder="ενέργεια αν υψηλό">
+        <button class="iconbtn" type="submit" title="Αποθήκευση ορίων"><i class="ti ti-device-floppy"></i></button>
+      </form>
+      {% endfor %}
+      <div class="muted limnote">Τα όρια/μηνύματα είναι <b>κοινά</b> για όλα τα σημεία με την ίδια μέτρηση. Διαφορετικά όρια → ξεχωριστή μέτρηση. Το <b>ποιες</b> μετρήσεις έχει το σημείο ορίζεται στην καρτέλα «Μετρήσεις».</div>
+      {% else %}
+      <div class="muted" style="padding:8px;">Καμία μέτρηση ανατεθειμένη. Πρόσθεσέ τες από την καρτέλα «Μετρήσεις».</div>
+      {% endif %}
+    </details>
     {% else %}
     <div class="scaffold-empty">
       <div class="muted" style="margin-bottom:10px;">Κανένα σημείο ακόμη σε αυτό το ξενοδοχείο.</div>
