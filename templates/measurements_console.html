@@ -65,6 +65,25 @@ select.in-kind{width:120px;}
 .limrow .lm-l{font-size:12px;font-weight:600;color:#16323f;}
 .limrow .lm-l .u{color:#9aa7ad;font-weight:400;}
 .limnote{font-size:11px;margin-top:6px;}
+.vtog2{display:inline-flex;border:1px solid #d6eef3;border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.vtog2 a{padding:7px 14px;font-size:12px;text-decoration:none;color:#5f7682;background:#fff;border-right:1px solid #eef3f7;}
+.vtog2 a:last-child{border-right:none;} .vtog2 a.on{background:#193847;color:#fff;}
+.bd{display:grid;grid-template-columns:180px 1fr;gap:12px;align-items:start;}
+.bd-pal{background:#f4f9fc;border-radius:8px;padding:10px;}
+.bd-pal .ph{font-size:11px;font-weight:700;color:#5f7682;text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
+#bd-palette{display:flex;flex-direction:column;gap:6px;}
+.bd .mchip{background:#fff;border:1px solid #85B7EB;border-radius:7px;padding:7px 9px;font-size:12px;cursor:grab;color:#185FA5;font-weight:600;}
+.bd .mchip .u{color:#9fb2bd;font-weight:400;font-size:10px;}
+.bd-net{border:1px solid #e1edf4;border-radius:8px;padding:8px;margin-bottom:8px;background:#fff;}
+.bd-neth{font-size:12px;font-weight:700;color:#185FA5;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.bd-pts{display:flex;flex-direction:column;gap:6px;min-height:30px;}
+.bd-pt{border:1px solid #e1edf4;border-radius:7px;padding:7px 9px;background:#fbfdff;}
+.bd-pt.off{opacity:.5;}
+.bd-pth{font-size:13px;font-weight:600;cursor:grab;margin-bottom:5px;display:flex;align-items:center;gap:6px;}
+.bd-zone{display:flex;flex-wrap:wrap;gap:4px;min-height:28px;border:1px dashed #cfe0ea;border-radius:6px;padding:5px;}
+.bd-zone:empty::before{content:"σύρε μετρήσεις";color:#9fb2bd;font-size:11px;font-style:italic;}
+.bd-m{background:#E6F1FB;border:1px solid #B5D4F4;border-radius:6px;padding:2px 7px;font-size:11px;color:#185FA5;font-weight:600;display:inline-flex;gap:4px;align-items:center;}
+.bd-m .x{cursor:pointer;color:#9fb2bd;font-weight:700;}
 .hchip .chk{font-weight:700;margin-right:2px;}
 .gpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px;padding:9px 11px;background:#f6fafd;border:1px solid #e3edf4;border-radius:9px;}
 .gchip{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid #d6eef3;border-radius:999px;padding:2px 4px 2px 10px;}
@@ -213,6 +232,66 @@ select.in-kind{width:120px;}
 
   {% if tab=='points' %}
   <datalist id="spaces"><option value="Μηχανοστάσιο"><option value="Κουζίνα"><option value="Απομακρυσμένο"><option value="Δώμα"><option value="Πύργοι ψύξης"><option value="Πισίνα"><option value="Spa / Jacuzzi"><option value="Δωμάτια">{% for s in space_opts %}<option value="{{ s }}">{% endfor %}</datalist>
+  {% macro point_card(a) %}
+  <div class="bd-pt {{ 'off' if not a.is_active }}" data-aid="{{ a.id }}">
+    <div class="bd-pth"><i class="ti ti-grip-vertical"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %}</div>
+    <div class="bd-zone" data-aid="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="bd-m" data-pkey="{{ c.pkey }}">{{ c.label }}<span class="x">×</span></span>{% endfor %}</div>
+  </div>
+  {% endmacro %}
+  <div class="vtog2">
+    <a class="{{ 'on' if request.args.get('view')!='board' }}" href="/dashboard/measurements?tab=points{{ ('&nh=' ~ nh) if nh else '' }}"><i class="ti ti-table"></i> Πίνακας ανάθεσης</a>
+    <a class="{{ 'on' if request.args.get('view')=='board' }}" href="/dashboard/measurements?tab=points&view=board{{ ('&nh=' ~ nh) if nh else '' }}"><i class="ti ti-layout-board"></i> Board (σύρε &amp; άσε)</a>
+  </div>
+  {% if request.args.get('view')=='board' %}
+  <div class="hpick">{% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&view=board&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }}</a>{% endfor %}</div>
+  {% if not nh %}
+  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο για το board.</div></div>
+  {% else %}
+  <div class="card">
+    <div class="card-title"><i class="ti ti-layout-board"></i> Board — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
+    <p class="muted" style="margin-bottom:10px;">Σύρε <b>μετρήσεις</b> (αριστερά) πάνω σε σημεία· σύρε <b>σημεία</b> (λαβή ⋮⋮) σε άλλο δίκτυο. Αποθηκεύεται αυτόματα.</p>
+    <div class="bd">
+      <div class="bd-pal">
+        <div class="ph">Είδη μετρήσεων</div>
+        <div id="bd-palette">{% for m in library %}<div class="mchip" data-pkey="{{ m.pkey }}">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</div>{% endfor %}</div>
+      </div>
+      <div class="bd-canvas">
+        {% for row in node_tree %}{% if (nh in row.hotels) or group_points.get(row.n.id) %}
+        <div class="bd-net">
+          <div class="bd-neth" style="padding-left:{{ row.depth*12 }}px;"><i class="ti ti-droplet"></i> {{ row.n.name }}</div>
+          <div class="bd-pts" data-node="{{ row.n.id }}">{% for a in group_points.get(row.n.id, []) %}{{ point_card(a) }}{% endfor %}</div>
+        </div>
+        {% endif %}{% endfor %}
+        <div class="bd-net">
+          <div class="bd-neth"><i class="ti ti-help-circle"></i> Χωρίς δίκτυο</div>
+          <div class="bd-pts" data-node="">{% for a in pool_points %}{{ point_card(a) }}{% endfor %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var pal=document.getElementById('bd-palette'); if(!pal||!window.Sortable) return;
+    new Sortable(pal,{group:{name:'meas',pull:'clone',put:false},sort:false,animation:150});
+    function pk(z){return [].map.call(z.querySelectorAll('.bd-m'),function(m){return m.getAttribute('data-pkey');});}
+    function save(z){var aid=z.getAttribute('data-aid');fetch('/dashboard/measurements/point/'+aid+'/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkeys:pk(z)})});}
+    function wireX(m){var x=m.querySelector('.x');if(x)x.onclick=function(){var z=m.closest('.bd-zone');m.remove();save(z);};}
+    document.querySelectorAll('.bd-m').forEach(wireX);
+    document.querySelectorAll('.bd-zone').forEach(function(z){new Sortable(z,{group:'meas',animation:150,onAdd:function(ev){
+      var p=ev.item.getAttribute('data-pkey');var lbl=ev.item.textContent.replace('×','').trim();
+      var dup=[].some.call(z.querySelectorAll('.bd-m'),function(m){return m!==ev.item&&m.getAttribute('data-pkey')===p;});
+      var chip=document.createElement('span');chip.className='bd-m';chip.setAttribute('data-pkey',p);chip.innerHTML=lbl+'<span class="x">×</span>';
+      ev.item.replaceWith(chip);if(dup){chip.remove();}else{wireX(chip);}save(z);
+    }});});
+    document.querySelectorAll('.bd-pts').forEach(function(c){new Sortable(c,{group:'pts',handle:'.bd-pth',animation:150,onAdd:function(ev){
+      var aid=ev.item.getAttribute('data-aid');var node=c.getAttribute('data-node');
+      var fd=new FormData();fd.append('node_id',node);fd.append('ajax','1');
+      fetch('/dashboard/measurements/point/'+aid+'/node',{method:'POST',body:fd});
+    }});});
+  })();
+  </script>
+  {% endif %}
+  {% else %}
   <div class="card">
     <div class="card-title"><i class="ti ti-table"></i> Ανάθεση σημείων ανά ξενοδοχείο</div>
     <p class="muted" style="margin-bottom:10px;">Τικ = το ξενοδοχείο έχει αυτό το σημείο (untick = απενεργοποίηση, κρατά ιστορικό). Κλικ στο <b>όνομα ξενοδοχείου</b> (κεφαλίδα) για λεπτομερή επεξεργασία ορίων/μετρήσεων παρακάτω.</p>
@@ -300,6 +379,7 @@ select.in-kind{width:120px;}
     {% endfor %}
     <button class="btn alt" type="button" onclick="addpoint('',{{ nh }})" style="margin-top:10px;"><i class="ti ti-plus"></i> Νέο σημείο</button>
   </div>
+  {% endif %}
   {% endif %}
   {% endif %}
 

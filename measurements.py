@@ -725,6 +725,8 @@ def measurements_point_node(pid):
         a.node_id = int(v) if v else None
         db.session.commit()
         log_activity('meas_point_node', '%s -> %s' % (a.name, a.node_id))
+    if request.form.get('ajax'):
+        return jsonify(ok=bool(a))
     return redirect(url_for('measurements_console') + '?tab=structure')
 
 
