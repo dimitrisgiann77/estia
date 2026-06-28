@@ -382,7 +382,7 @@ select.in-kind{width:120px;}
   {% if nh %}
   <div class="card">
     <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Για κάθε σημείο: όνομα, χώρος, <b>δίκτυο</b> + <i class="ti ti-device-floppy"></i> αποθήκευση. Άνοιξε «Όρια & μηνύματα» για inline επεξεργασία ορίων/ενεργειών ανά μέτρηση.</p>
+    <p class="muted" style="margin-bottom:12px;">Για κάθε σημείο: όνομα, χώρος, <b>δίκτυο</b> + <i class="ti ti-device-floppy"></i> αποθήκευση. Μετρήσεις & όρια → όψη <b>«Board»</b> (πάνω). Είδη/όρια μετρήσεων → καρτέλα «Είδη μετρήσεων».</p>
     {% for a in hotel_points %}
     <form class="ptrow {{ 'off' if not a.is_active }}" method="POST" action="/dashboard/measurements/point/save">
       <input type="hidden" name="point_id" value="{{ a.id }}"><input type="hidden" name="nh" value="{{ nh }}">
@@ -393,28 +393,6 @@ select.in-kind{width:120px;}
       <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
       <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
     </form>
-    <details class="ptmeas">
-      <summary><i class="ti ti-adjustments"></i> Όρια & μηνύματα — {{ point_meas[a.id]|length }} μετρήσεις</summary>
-      {% if point_meas[a.id] %}
-      <div class="limhead"><span>Μέτρηση</span><span>Κάτω</span><span>Άνω</span><span>Μήνυμα χαμηλού</span><span>Μήνυμα υψηλού</span><span></span></div>
-      {% for m in point_meas[a.id] %}
-      <form class="limrow" method="POST" action="/dashboard/measurements/lib/save">
-        <input type="hidden" name="pkey" value="{{ m.pkey }}"><input type="hidden" name="label" value="{{ m.label }}">
-        <input type="hidden" name="unit" value="{{ m.unit }}"><input type="hidden" name="kind" value="{{ m.kind }}">
-        <input type="hidden" name="category" value="{{ m.category }}"><input type="hidden" name="back_points" value="{{ nh }}">
-        <span class="lm-l">{{ m.label }}{% if m.unit %} <span class="u">({{ m.unit }})</span>{% endif %}</span>
-        <input type="number" step="any" name="min_v" value="{{ m.min_v if m.min_v is not none else '' }}" placeholder="—">
-        <input type="number" step="any" name="max_v" value="{{ m.max_v if m.max_v is not none else '' }}" placeholder="—">
-        <input type="text" name="action_low" value="{{ m.low }}" placeholder="ενέργεια αν χαμηλό">
-        <input type="text" name="action_high" value="{{ m.high }}" placeholder="ενέργεια αν υψηλό">
-        <button class="iconbtn" type="submit" title="Αποθήκευση ορίων"><i class="ti ti-device-floppy"></i></button>
-      </form>
-      {% endfor %}
-      <div class="muted limnote">Τα όρια/μηνύματα είναι <b>κοινά</b> για όλα τα σημεία με την ίδια μέτρηση. Διαφορετικά όρια → ξεχωριστή μέτρηση. Το <b>ποιες</b> μετρήσεις έχει το σημείο ορίζεται στην καρτέλα «Μετρήσεις».</div>
-      {% else %}
-      <div class="muted" style="padding:8px;">Καμία μέτρηση ανατεθειμένη. Πρόσθεσέ τες από την καρτέλα «Μετρήσεις».</div>
-      {% endif %}
-    </details>
     {% else %}
     <div class="scaffold-empty">
       <div class="muted" style="margin-bottom:10px;">Κανένα σημείο ακόμη σε αυτό το ξενοδοχείο.</div>
@@ -454,9 +432,8 @@ select.in-kind{width:120px;}
 
   {% if tab in ['library','templates'] %}
   {% macro kind_opts(k) %}<option value="num"{{ ' selected' if k=='num' }}>Αριθμός</option><option value="bool"{{ ' selected' if k=='bool' }}>Ναι/Όχι</option><option value="text"{{ ' selected' if k=='text' }}>Κείμενο</option>{% endmacro %}
-  <div class="hpick">{% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=library&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}</div>
   <div class="card">
-    <div class="card-title"><i class="ti ti-flask"></i> Μετρήσεις — Βιβλιοθήκη</div>
+    <div class="card-title"><i class="ti ti-flask"></i> Είδη μετρήσεων — Βιβλιοθήκη <span class="muted" style="font-weight:400;">(κοινά για όλα τα ξενοδοχεία)</span></div>
     <p class="muted" style="margin-bottom:6px;">Όρισε «τι μετράμε» (όνομα, μονάδα, όρια, ενέργειες, είδος εισόδου, κατηγορία). Οι αλλαγές ισχύουν παντού όπου χρησιμοποιείται η μέτρηση. Πιο κάτω αναθέτεις ποιες μετρήσεις παίρνει κάθε σημείο.</p>
     {% for g in lib_groups %}
       <div class="htitle">{{ g.name }}</div>
@@ -494,19 +471,6 @@ select.in-kind{width:120px;}
       <div class="fw"><span class="lbl">Ενέργεια αν υψηλό</span><input type="text" name="action_high"></div>
       <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-checkbox"></i> Ανάθεση μετρήσεων σε σημεία{% if nh %} — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}{% endif %}</div>
-    <p class="muted" style="margin-bottom:8px;">Τσέκαρε ποιες μετρήσεις παίρνει κάθε σημείο. Αποθηκεύεται αυτόματα.</p>
-    {% if not nh %}<div class="muted">Διάλεξε ξενοδοχείο πάνω.</div>{% endif %}
-    {% if nh %}{% for a in hotel_points %}
-    <div class="ptbox">
-      <div class="ptbox-h"><i class="ti ti-map-pin"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %} <span class="savedok" id="ok{{ a.id }}"></span></div>
-      <div class="checkwrap" data-area="{{ a.id }}">
-        {% for m in library %}<label class="mcheck"><input type="checkbox" value="{{ m.pkey }}"{{ ' checked' if m.pkey in area_pkeys.get(a.id, []) }} onchange="saveMeas({{ a.id }})"> {{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</label>{% endfor %}
-      </div>
-    </div>
-    {% else %}<div class="muted" style="padding-top:8px;">Κανένα σημείο — φτιάξε σημεία στην καρτέλα «Σημεία».</div>{% endfor %}{% endif %}
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης</div>
