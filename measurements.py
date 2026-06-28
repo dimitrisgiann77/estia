@@ -937,9 +937,9 @@ SCAFFOLD_POINTS = [
     ('Αναχώρηση ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_out', 'clo2_dhw_out']),
     ('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_return', 'clo2_dhw_return']),
     ('Αντ. Όσμωση', 'Μηχανοστάσιο', 'water_ro', ['temp_ro', 'clo2_ro']),
-    ('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_ro', ['temp_ro', 'clo2_ro']),
-    ('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_cold', ['temp_cold', 'clo2_cold']),
-    ('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Βοηθητικός Χώρος', 'water_hot', ['temp_hot', 'clo2_hot']),
+    ('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_ro', ['temp_ro', 'clo2_ro']),
+    ('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_cold', ['temp_cold', 'clo2_cold']),
+    ('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_hot', ['temp_hot', 'clo2_hot']),
     ('Κύρια Πισίνα', 'Πισίνα', 'pools',
      ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
       'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done']),
@@ -1307,13 +1307,11 @@ def measurements_today():
                 MonitorPeriod.sort, MonitorPeriod.id).all()
         return _pcache[tk]
 
-    _pmap = _node_pathmap()
     def _grp(a):
-        nid = getattr(a, 'node_id', None)
-        if nid and nid in _pmap:
-            pm = _pmap[nid]
-            return (pm['path'], pm['icon'], pm['order'])
-        return ('Χωρίς δίκτυο — προς αντιστοίχιση', 'ti-help-circle', 900)
+        loc = (a.location or '').strip()
+        if loc:
+            return (loc, 'ti-map-pin', loc.lower())
+        return ('Χωρίς χώρο', 'ti-map-pin', 'zzzz')
 
     by_hotel = {}
     alerts = []
