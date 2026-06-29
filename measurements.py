@@ -1707,10 +1707,13 @@ def measurements_entry():
         sel = Area.query.get(int(pid))
         if sel:
             tpl = MonitorTemplate.query.get(sel.template_key)
+            # C2: συχνότητα ανά μέτρηση (DayPeriod keys) → η φόρμα δείχνει τις due ανά περίοδο
+            _fr = {mf.pkey: [p for p in (mf.periods or '').split(',') if p]
+                   for mf in MeasFreq.query.filter_by(area_id=sel.id).all()}
             params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
                        'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
-                       'kind': _param_input_kind(p)} for p in point_params(sel)]
-            periods = MonitorPeriod.query.filter_by(template_key=sel.template_key).order_by(MonitorPeriod.sort, MonitorPeriod.id).all()
+                       'kind': _param_input_kind(p), 'due': _fr.get(p.pkey, [])} for p in point_params(sel)]
+            periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
             recent = Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc()).limit(10).all()
             if recent:
                 try:
@@ -1720,6 +1723,7 @@ def measurements_entry():
     return render_template('measurements_entry.html', points_by_hotel=points_by_hotel,
                            hotel_opts=[(hid, hmap.get(hid, '—')) for hid in hotels_with_points],
                            hsel=hsel, sel=sel, tpl=tpl, params=params, periods=periods,
+                           cur=_current_dayperiod(),
                            recent=recent, actions=actions, today=_athens_now().date().isoformat(),
                            now_time=_athens_now().strftime('%H:%M'), view=view)
 
