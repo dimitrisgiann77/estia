@@ -181,7 +181,6 @@ select.in-kind{width:120px;}
     <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Είδη μετρήσεων</a>
     <a class="tab {{ 'active' if tab=='spaces' }}" href="/dashboard/measurements?tab=spaces"><i class="ti ti-map-pin"></i> Ζώνες</a>
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή δικτύου</a>
-    <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Συχνότητα</a>
   </div>
 
   {% if tab=='structure' %}
@@ -437,40 +436,93 @@ select.in-kind{width:120px;}
   .zpts-tbl .ppos{padding:4px 6px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
   .zpts-tbl .pcol{width:38px;height:26px;padding:1px;border:1px solid #d6eef3;border-radius:5px;}
   .zpts-tbl .dlink{font-size:11px;color:#185FA5;text-decoration:none;white-space:nowrap;}
+  .ptblk{border:1px solid #e1edf4;border-left:3px solid #1D9E75;border-radius:0 10px 10px 0;padding:10px 12px;margin-bottom:10px;background:#fbfdff;}
+  .ptblk.off{opacity:.55;}
+  .pthead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .pthead b{font-size:13px;}
+  .pthead .hb{font-size:10px;font-weight:700;background:#e7f2f8;color:#2c6079;border-radius:6px;padding:1px 6px;}
+  .pthead .ptc{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:11px;color:#5f7682;flex-wrap:wrap;}
+  .pthead .ppos{padding:4px 6px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
+  .pthead .pcol{width:34px;height:24px;padding:1px;border:1px solid #d6eef3;border-radius:5px;}
+  .pthead .dlink{font-size:11px;color:#185FA5;text-decoration:none;white-space:nowrap;}
+  .freqgrid{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .freqgrid th{font-size:10px;color:#5f7682;padding:3px 6px;text-align:left;font-weight:700;}
+  .freqgrid td{padding:3px 6px;border-top:1px solid #eef3f7;}
+  .freqgrid th.fqp,.freqgrid td.fqp{text-align:center;}
+  .fqcell{border:none;background:none;cursor:pointer;color:#cfd8de;font-size:18px;padding:0;line-height:1;}
+  .fqcell.on{color:#185FA5;}
+  .fqcount{font-weight:600;color:#5f7682;text-align:center;}
+  .pdef{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .pdef input[type=time]{padding:5px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
+  .pdef .in-name{padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;width:140px;}
   </style>
   <div class="card" id="zpts-wrap" style="display:none;margin-top:14px;">
     <div class="card-title"><i class="ti ti-flask"></i> Σημεία Δειγματοληψίας — <span id="zpts-zone" style="color:#185FA5;"></span></div>
-    <p class="muted" style="margin-bottom:10px;font-size:12px;">Θέση & χρώμα ρυθμίζονται εδώ (auto-save). Οι μετρήσεις & η ανάθεση ορίζονται στη «Δομή δικτύου».</p>
+    <p class="muted" style="margin-bottom:10px;font-size:12px;">Θέση & χρώμα + <b>συχνότητα ανά μέτρηση</b> ρυθμίζονται εδώ (auto-save). Ποιες μετρήσεις & η ανάθεση ορίζονται στη «Δομή δικτύου». Διαστήματα ωρών πιο κάτω.</p>
     {% for s in spaces_list %}{% set pts = zone_points.get(s.name, []) %}
     <div class="zpts-panel" id="zpts-{{ s.id }}" style="display:none;">
       {% if pts %}
-      <table class="zpts-tbl">
-        <thead><tr><th>Ξεν.</th><th>Σημείο Δειγματοληψίας</th><th>Μετρήσεις</th><th>Θέση</th><th>Χρώμα</th><th></th></tr></thead>
-        <tbody>
-        {% for p in pts %}
-        <tr data-pid="{{ p.id }}" class="{{ '' if p.active else 'off' }}">
-          <td><span class="hb">{{ hcodes.get(p.hotel_id) or p.hotel }}</span></td>
-          <td>{{ p.name }}{% if not p.active %} <span class="muted">(ανενεργό)</span>{% endif %}</td>
-          <td>{% for m in p.meas %}<span class="pm">{{ m }}</span>{% endfor %}{% if not p.meas %}<span class="muted">—</span>{% endif %}</td>
-          <td><select class="ppos" onchange="psave(this)"><option value="">—</option><option value="near"{{ ' selected' if p.position=='near' }}>Κοντινό</option><option value="mid"{{ ' selected' if p.position=='mid' }}>Μεσαίο</option><option value="far"{{ ' selected' if p.position=='far' }}>Μακρινό</option></select></td>
-          <td><input type="color" class="pcol" value="{{ p.color or '#185FA5' }}" onchange="psave(this)"></td>
-          <td>{% if p.node_id %}<a class="dlink" href="/dashboard/measurements?tab=structure" title="Επεξεργασία μετρήσεων στη Δομή («{{ p.node }}»)"><i class="ti ti-external-link"></i> Δομή</a>{% endif %}</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+      {% for p in pts %}
+      <div class="ptblk {{ '' if p.active else 'off' }}" style="border-left-color:{{ p.color or '#1D9E75' }};">
+        <div class="pthead">
+          <span class="hb">{{ hcodes.get(p.hotel_id) or p.hotel }}</span>
+          <b>{{ p.name }}</b>{% if not p.active %} <span class="muted">(ανενεργό)</span>{% endif %}
+          <span class="ptc">
+            Θέση:<select class="ppos" data-pid="{{ p.id }}" onchange="psave(this)"><option value="">—</option><option value="near"{{ ' selected' if p.position=='near' }}>Κοντινό</option><option value="mid"{{ ' selected' if p.position=='mid' }}>Μεσαίο</option><option value="far"{{ ' selected' if p.position=='far' }}>Μακρινό</option></select>
+            Χρώμα:<input type="color" class="pcol" data-pid="{{ p.id }}" value="{{ p.color or '#185FA5' }}" onchange="psave(this)">
+            {% if p.node_id %}<a class="dlink" href="/dashboard/measurements?tab=structure" title="Μετρήσεις στη Δομή («{{ p.node }}»)"><i class="ti ti-external-link"></i> Δομή</a>{% endif %}
+          </span>
+        </div>
+        {% if p.meas %}
+        <table class="freqgrid">
+          <thead><tr><th>Μέτρηση</th>{% for d in day_periods %}<th class="fqp">{{ d.name }}</th>{% endfor %}<th class="fqp">Σύνολο</th></tr></thead>
+          <tbody>
+          {% for m in p.meas %}
+          <tr data-pid="{{ p.id }}" data-pkey="{{ m.pkey }}">
+            <td>{{ m.label }}</td>
+            {% for d in day_periods %}<td class="fqp"><button type="button" class="fqcell {{ 'on' if d.key in m.periods }}" data-period="{{ d.key }}" onclick="freqToggle(this)"><i class="ti {{ 'ti-square-check' if d.key in m.periods else 'ti-square' }}"></i></button></td>{% endfor %}
+            <td class="fqcount">{{ m.periods|length }}×</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση — όρισέ τες στη «Δομή δικτύου».</div>{% endif %}
+      </div>
+      {% endfor %}
       {% else %}<div class="muted" style="font-size:12px;">Κανένα Σημείο Δειγματοληψίας σε αυτή τη ζώνη — όρισέ τα στη «Δομή δικτύου» (τικ ξενοδοχείου + επίλεξε αυτή τη ζώνη).</div>{% endif %}
     </div>
+    {% endfor %}
+  </div>
+  <div class="card" style="margin-top:14px;">
+    <div class="card-title"><i class="ti ti-clock"></i> Ορισμός περιόδων ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών — βάση της συχνότητας)</span></div>
+    {% for d in day_periods %}
+    <form method="POST" action="/dashboard/measurements/freq/period/save" class="pdef">
+      <input type="hidden" name="id" value="{{ d.id }}">
+      <input class="in-name" type="text" name="name" value="{{ d.name }}">
+      <span class="muted">από</span><input type="time" name="t_from" value="{{ d.t_from }}">
+      <span class="muted">έως</span><input type="time" name="t_to" value="{{ d.t_to }}">
+      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+    </form>
     {% endfor %}
   </div>
   <script>
   function zicon(){var ic=document.getElementById('z-icon').value||'ti-map-pin';var c=document.getElementById('z-color').value;var p=document.getElementById('z-prev');p.className='ti '+ic;p.style.color=c;}
   function psave(el){
-    var tr=el.closest('tr');var pid=tr.getAttribute('data-pid');var fd=new FormData();
+    var pid=el.getAttribute('data-pid');var fd=new FormData();
     if(el.classList.contains('ppos')) fd.append('position', el.value); else fd.append('color', el.value);
     el.disabled=true;
     fetch('/dashboard/measurements/point/'+pid+'/attrs',{method:'POST',body:fd})
       .then(function(r){return r.json();}).then(function(d){el.disabled=false;}).catch(function(){el.disabled=false;});
+  }
+  function freqToggle(btn){
+    var tr=btn.closest('tr');var fd=new FormData();
+    fd.append('area_id',tr.getAttribute('data-pid'));fd.append('pkey',tr.getAttribute('data-pkey'));fd.append('period',btn.getAttribute('data-period'));
+    btn.disabled=true;
+    fetch('/dashboard/measurements/freq/set',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+      btn.disabled=false;if(!d||!d.ok){alert('Σφάλμα.');return;}
+      btn.classList.toggle('on',d.on);btn.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
+      tr.querySelector('.fqcount').textContent=d.count+'×';
+    }).catch(function(){btn.disabled=false;});
   }
   function zpick(el){
     document.querySelectorAll('.zcard.sel').forEach(function(c){c.classList.remove('sel');});
@@ -630,70 +682,6 @@ select.in-kind{width:120px;}
       <button class="btn ghost" type="submit"><i class="ti ti-plus"></i> Νέος τύπος</button>
     </form>
   </div>
-  {% endif %}
-
-  {% if tab=='periods' %}
-  <style>
-  .fqcard{border:1px solid #e1edf4;border-left:3px solid #1D9E75;border-radius:0 10px 10px 0;padding:10px 12px;margin-bottom:10px;background:#fbfdff;}
-  .fqh{font-weight:600;font-size:14px;margin-bottom:6px;}
-  .fqtbl{width:100%;border-collapse:collapse;font-size:12.5px;}
-  .fqtbl th{font-size:11px;color:#5f7682;padding:4px 6px;text-align:left;font-weight:700;}
-  .fqtbl td{padding:4px 6px;border-top:1px solid #eef3f7;}
-  .fqtbl th.fqp,.fqtbl td.fqp{text-align:center;}
-  .fqcell{border:none;background:none;cursor:pointer;color:#cfd8de;font-size:18px;padding:0;line-height:1;}
-  .fqcell.on{color:#185FA5;}
-  .fqcount{font-weight:600;color:#5f7682;text-align:center;}
-  .fqper{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-  .fqper input[type=time]{padding:5px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
-  .fqper .in-name{padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;width:140px;}
-  </style>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-clock-cog"></i> Συχνότητα μετρήσεων <span class="muted" style="font-weight:400;">(ανά Ζώνη × μέτρηση)</span></div>
-    <p class="muted" style="margin-bottom:12px;">Για κάθε Ζώνη, τίκαρε σε ποιες περιόδους μετριέται η κάθε μέτρηση. Τα διαστήματα ωρών ορίζονται πιο κάτω.</p>
-    {% for sp in freq_spaces %}
-    <div class="fqcard">
-      <div class="fqh"><i class="ti ti-map-pin"></i> {{ sp.name }}</div>
-      {% if sp.meas %}
-      <table class="fqtbl">
-        <thead><tr><th>Μέτρηση</th>{% for d in day_periods %}<th class="fqp">{{ d.name }}</th>{% endfor %}<th class="fqp">Σύνολο</th></tr></thead>
-        <tbody>
-        {% for m in sp.meas %}
-        <tr data-space="{{ sp.name }}" data-pkey="{{ m.pkey }}">
-          <td>{{ m.label }}</td>
-          {% for d in day_periods %}<td class="fqp"><button type="button" class="fqcell {{ 'on' if d.key in m.periods }}" data-period="{{ d.key }}" onclick="freqToggle(this)"><i class="ti {{ 'ti-square-check' if d.key in m.periods else 'ti-square' }}"></i></button></td>{% endfor %}
-          <td class="fqcount">{{ m.periods|length }}×</td>
-        </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτή τη Ζώνη — όρισε μετρήσεις & Ζώνη στους κόμβους («Δομή δικτύου»).</div>{% endif %}
-    </div>
-    {% else %}<div class="muted">Δεν υπάρχουν ζώνες — πρόσθεσε στις «Ζώνες».</div>{% endfor %}
-  </div>
-  <div class="card">
-    <div class="card-title"><i class="ti ti-clock"></i> Ορισμός περιόδων ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών)</span></div>
-    {% for d in day_periods %}
-    <form method="POST" action="/dashboard/measurements/freq/period/save" class="fqper">
-      <input type="hidden" name="id" value="{{ d.id }}">
-      <input class="in-name" type="text" name="name" value="{{ d.name }}">
-      <span class="muted">από</span><input type="time" name="t_from" value="{{ d.t_from }}">
-      <span class="muted">έως</span><input type="time" name="t_to" value="{{ d.t_to }}">
-      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-    </form>
-    {% endfor %}
-  </div>
-  <script>
-  function freqToggle(btn){
-    var tr=btn.closest('tr'); var fd=new FormData();
-    fd.append('space',tr.getAttribute('data-space')); fd.append('pkey',tr.getAttribute('data-pkey')); fd.append('period',btn.getAttribute('data-period'));
-    btn.disabled=true;
-    fetch('/dashboard/measurements/freq/set',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
-      btn.disabled=false; if(!d||!d.ok){alert('Σφάλμα.');return;}
-      btn.classList.toggle('on',d.on); btn.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
-      tr.querySelector('.fqcount').textContent=d.count+'×';
-    }).catch(function(){btn.disabled=false;});
-  }
-  </script>
   {% endif %}
 
 </div>

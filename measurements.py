@@ -78,7 +78,8 @@ class DayPeriod(db.Model):
 
 class MeasFreq(db.Model):
     id      = db.Column(db.Integer, primary_key=True)
-    space   = db.Column(db.String(80), index=True)   # = Area.location (όνομα χώρου)
+    area_id = db.Column(db.Integer, index=True)       # Φ3: ανά Σημείο Δειγματοληψίας (Area.id)
+    space   = db.Column(db.String(80), index=True)    # legacy/αναφορά (= Area.location)· πριν τη Φ3 ήταν το κλειδί
     pkey    = db.Column(db.String(40))
     periods = db.Column(db.String(160))              # CSV από DayPeriod.key
 
@@ -259,6 +260,17 @@ def seed_measurement_engine():
             except Exception as _e:
                 db.session.rollback()
                 print(f'[measurements] renames skipped: {_e}')
+            # Εφάπαξ (flagged) Φ3: MeasFreq ζώνη×μέτρηση → Σημείο×μέτρηση.
+            try:
+                from app import SysFlag
+                if not SysFlag.query.filter_by(key='meas_freq_perpoint_20260629').first():
+                    _fm = _migrate_freq_to_points()
+                    db.session.add(SysFlag(key='meas_freq_perpoint_20260629'))
+                    db.session.commit()
+                    print(f'[measurements] Συχνότητα→Σημείο (εφάπαξ): {_fm} εγγραφές')
+            except Exception as _e:
+                db.session.rollback()
+                print(f'[measurements] freq→point skipped: {_e}')
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
         except Exception as e:
@@ -937,21 +949,27 @@ def measurements_freq_period_save():
             p.t_from = (f.get('t_from') or '').strip()[:5]
             p.t_to = (f.get('t_to') or '').strip()[:5]
             db.session.commit()
-    return redirect(url_for('measurements_console') + '?tab=periods')
+    return redirect(url_for('measurements_console') + '?tab=spaces')
 
 
 @app.route('/dashboard/measurements/freq/set', methods=['POST'])
 def measurements_freq_set():
-    """AJAX toggle: συχνότητα μιας μέτρησης σε έναν χώρο για μια περίοδο."""
+    """Φ3 AJAX toggle: συχνότητα μιας μέτρησης σε ένα Σημείο Δειγματοληψίας για μια περίοδο."""
     if not is_admin():
         return jsonify(ok=False), 403
     f = request.form
-    space = (f.get('space') or '').strip()[:80]
+    try:
+        aid = int(f.get('area_id'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False), 400
     pkey = (f.get('pkey') or '').strip()[:40]
     per = (f.get('period') or '').strip()[:20]
-    if not (space and pkey and per):
+    if not (aid and pkey and per):
         return jsonify(ok=False), 400
-    row = MeasFreq.query.filter_by(space=space, pkey=pkey).first()
+    a = Area.query.get(aid)
+    if not a:
+        return jsonify(ok=False), 404
+    row = MeasFreq.query.filter_by(area_id=aid, pkey=pkey).first()
     cur = set([x for x in ((row.periods or '').split(',')) if x]) if row else set()
     on = per not in cur
     if on:
@@ -961,7 +979,7 @@ def measurements_freq_set():
     order = [d.key for d in DayPeriod.query.order_by(DayPeriod.sort).all()]
     val = ','.join([k for k in order if k in cur])
     if not row:
-        row = MeasFreq(space=space, pkey=pkey, periods=val); db.session.add(row)
+        row = MeasFreq(area_id=aid, space=(a.location or ''), pkey=pkey, periods=val); db.session.add(row)
     else:
         row.periods = val
     db.session.commit()
@@ -1114,45 +1132,33 @@ def measurements_console():
     # Φ1 Ζώνες: μετρητής χρήσης ανά ζώνη = πόσα ενεργά Σημεία τη χρησιμοποιούν (location)
     space_usage = {}
     zone_points = {}
+    day_periods = []
     if tab == 'spaces':
+        day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
         for loc, cnt in (db.session.query(Area.location, db.func.count(Area.id))
                          .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
                                  Area.location.isnot(None))
                          .group_by(Area.location).all()):
             if loc:
                 space_usage[loc] = cnt
-        # Φ2 Ζώνες: τα Σημεία Δειγματοληψίας ανά ζώνη (για το panel κάτω από τον editor)
+        # Φ2/Φ3 Ζώνες: τα Σημεία ανά ζώνη + οι μετρήσεις τους με συχνότητα ανά μέτρηση (Φ3)
         _hc = {h.id: h.name for h in Hotel.query.all()}
         _nn = {n.id: n.name for n in MonitorNode.query.all()}
+        _fr = {(mf.area_id, mf.pkey): [p for p in (mf.periods or '').split(',') if p]
+               for mf in MeasFreq.query.filter(MeasFreq.area_id.isnot(None)).all()}
         for a in (Area.query.filter(Area.engine_only.is_(True), Area.location.isnot(None))
                   .order_by(Area.location, Area.hotel_id, Area.name).all()):
             loc = (a.location or '').strip()
             if not loc:
                 continue
+            meas = [{'pkey': p.pkey, 'label': p.label, 'periods': _fr.get((a.id, p.pkey), [])}
+                    for p in point_params(a)]
             zone_points.setdefault(loc, []).append({
                 'id': a.id, 'name': a.name, 'hotel_id': a.hotel_id,
                 'hotel': _hc.get(a.hotel_id, ''), 'position': a.position or '',
                 'color': a.color or '', 'active': a.is_active, 'node_id': a.node_id,
-                'node': _nn.get(a.node_id, ''), 'meas': [p.label for p in point_params(a)]})
+                'node': _nn.get(a.node_id, ''), 'meas': meas})
     lib_map_json = _json.dumps({m['pkey']: m for m in library}, ensure_ascii=False)
-    day_periods = []
-    freq_spaces = []
-    if tab == 'periods':
-        day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
-        _lbl = {m['pkey']: m['label'] for m in library}
-        _sp = {}
-        for loc, pk in (db.session.query(Area.location, AreaParam.pkey)
-                        .join(AreaParam, AreaParam.area_id == Area.id)
-                        .filter(Area.engine_only.is_(True), Area.is_active.is_(True)).all()):
-            loc = (loc or '').strip()
-            if loc:
-                _sp.setdefault(loc, set()).add(pk)
-        _fr = {(mf.space, mf.pkey): [p for p in (mf.periods or '').split(',') if p]
-               for mf in MeasFreq.query.all()}
-        for s in SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all():
-            meas = [{'pkey': pk, 'label': _lbl.get(pk, pk), 'periods': _fr.get((s.name, pk), [])}
-                    for pk in sorted(_sp.get(s.name, set()), key=lambda k: _lbl.get(k, k))]
-            freq_spaces.append({'name': s.name, 'meas': meas})
     _active_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     try:
         from schedule import _hotel_short
@@ -1173,7 +1179,7 @@ def measurements_console():
                            group_points=group_points, pool_points=pool_points,
                            spaces_list=spaces_list, space_usage=space_usage,
                            zone_points=zone_points, lib_map_json=lib_map_json,
-                           day_periods=day_periods, freq_spaces=freq_spaces)
+                           day_periods=day_periods)
 
 
 @app.route('/dashboard/measurements/autocreate', methods=['POST'])
@@ -1367,6 +1373,30 @@ def _apply_renames():
         zw = RENAME_ZONES.get(s.name)
         if zw and s.name != zw:
             s.name = zw; n += 1
+    return n
+
+
+def _migrate_freq_to_points():
+    """Φ3 εφάπαξ: μετατροπή MeasFreq από (ζώνη × μέτρηση) → (Σημείο × μέτρηση).
+    Για κάθε παλιά εγγραφή (space-based) «ξεδιπλώνει» τη συχνότητα σε όλα τα Σημεία
+    της ζώνης· μετά σβήνει τις παλιές. Μη καταστροφικό (τα δεδομένα μένουν ως per-point)."""
+    old = MeasFreq.query.filter(MeasFreq.area_id.is_(None)).all()
+    if not old:
+        return 0
+    by_space = {}
+    for mf in old:
+        if mf.space:
+            by_space.setdefault(mf.space, {})[mf.pkey] = mf.periods
+    n = 0
+    for a in Area.query.filter(Area.engine_only.is_(True)).all():
+        sp = (a.location or '').strip()
+        if sp in by_space:
+            for pk, per in by_space[sp].items():
+                if not MeasFreq.query.filter_by(area_id=a.id, pkey=pk).first():
+                    db.session.add(MeasFreq(area_id=a.id, space=sp, pkey=pk, periods=per))
+                    n += 1
+    for mf in old:
+        db.session.delete(mf)
     return n
 
 
