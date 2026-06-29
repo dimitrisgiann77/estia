@@ -63,6 +63,14 @@ class SamplingSpace(db.Model):
     color     = db.Column(db.String(20))    # Φ1 Ζώνες: χρώμα κάρτας/chip
     description = db.Column(db.String(200)) # Φ1 Ζώνες: περιγραφή/σημειώσεις
 
+
+class MeasCategory(db.Model):
+    """Παραμετροποίηση: διαχειριζόμενη λίστα κατηγοριών ειδών μετρήσεων (owner).
+    Τα MonitorParam.category τη διαβάζουν (dropdown στα «Είδη»)."""
+    id   = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(40), nullable=False)
+    sort = db.Column(db.Integer, default=0)
+
 DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 'Spa / Jacuzzi', 'Δώμα',
                   'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Χώρος', 'Απομακρυσμένο']
 
@@ -237,6 +245,15 @@ def seed_measurement_engine():
                 for i, (k, nm, a, b) in enumerate(DEFAULT_DAYPERIODS):
                     db.session.add(DayPeriod(key=k, name=nm, t_from=a, t_to=b, sort=i))
                 db.session.commit()
+            # Παραμετροποίηση: seed κατηγοριών από τις υπάρχουσες distinct (idempotent)
+            _have = {c.name for c in MeasCategory.query.all()}
+            _mx = (db.session.query(db.func.max(MeasCategory.sort)).scalar() or 0)
+            for cat in (db.session.query(MonitorParam.category).distinct().all()):
+                nm = (cat[0] or '').strip()
+                if nm and nm not in _have:
+                    _mx += 1
+                    db.session.add(MeasCategory(name=nm[:40], sort=_mx)); _have.add(nm)
+            db.session.commit()
             # Εφάπαξ (flagged) backfill Δρόμος A: φόρτωσε υπάρχουσες μετρήσεις σημείων
             # (AreaParam) πάνω στους κόμβους (NodeParam) — μη καταστροφικό, μόνο κενοί κόμβοι.
             try:
@@ -935,6 +952,54 @@ def measurements_point_attrs(pid):
     return jsonify(ok=True, position=a.position or '', color=a.color or '')
 
 
+# ── Παραμετροποίηση: CRUD κατηγοριών ειδών μετρήσεων ─────────────────────────
+@app.route('/dashboard/measurements/category/save', methods=['POST'])
+def measurements_category_save():
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    cid = f.get('id'); name = (f.get('name') or '').strip()[:40]
+    c = MeasCategory.query.get(int(cid)) if cid else None
+    if not c and not name:
+        return redirect(url_for('measurements_console') + '?tab=params')
+    if not c:
+        mx = (db.session.query(db.func.max(MeasCategory.sort)).scalar() or 0) + 1
+        db.session.add(MeasCategory(name=name, sort=mx))
+    elif name and name != c.name:
+        old = c.name; c.name = name
+        # cascade → ενημέρωσε όλα τα Είδη που είχαν την παλιά κατηγορία (όχι ορφανά)
+        for p in MonitorParam.query.filter_by(category=old).all():
+            p.category = name
+    db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=params')
+
+
+@app.route('/dashboard/measurements/category/<int:cid>/delete', methods=['POST'])
+def measurements_category_delete(cid):
+    if not is_admin():
+        return redirect(url_for('login'))
+    c = MeasCategory.query.get(cid)
+    if c:
+        db.session.delete(c); db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=params')
+
+
+@app.route('/dashboard/measurements/category/reorder', methods=['POST'])
+def measurements_category_reorder():
+    if not is_admin():
+        return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    for i, cid in enumerate(data.get('ids') or []):
+        try:
+            c = MeasCategory.query.get(int(cid))
+        except (TypeError, ValueError):
+            c = None
+        if c:
+            c.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/measurements/freq/period/save', methods=['POST'])
 def measurements_freq_period_save():
     """Ορισμός περιόδου ημέρας (όνομα + από/έως)."""
@@ -1129,10 +1194,21 @@ def measurements_console():
                             .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
                             'nparams': len(t.params or [])})
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
+    # Παραμετροποίηση: κατηγορίες (λίστα + dropdown στα «Είδη») + μετρητής χρήσης
+    categories_list = MeasCategory.query.order_by(MeasCategory.sort, MeasCategory.name).all()
+    category_usage = {}
+    if tab == 'params':
+        for cat, cnt in (db.session.query(MonitorParam.category, db.func.count(MonitorParam.id))
+                         .group_by(MonitorParam.category).all()):
+            c = (cat or '').strip()
+            if c:
+                category_usage[c] = cnt
     # Φ1 Ζώνες: μετρητής χρήσης ανά ζώνη = πόσα ενεργά Σημεία τη χρησιμοποιούν (location)
     space_usage = {}
     zone_points = {}
     day_periods = []
+    if tab == 'params':
+        day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
     if tab == 'spaces':
         day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
         for loc, cnt in (db.session.query(Area.location, db.func.count(Area.id))
@@ -1179,6 +1255,7 @@ def measurements_console():
                            group_points=group_points, pool_points=pool_points,
                            spaces_list=spaces_list, space_usage=space_usage,
                            zone_points=zone_points, lib_map_json=lib_map_json,
+                           categories_list=categories_list, category_usage=category_usage,
                            day_periods=day_periods)
 
 

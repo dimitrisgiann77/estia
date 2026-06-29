@@ -181,6 +181,7 @@ select.in-kind{width:120px;}
     <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Είδη μετρήσεων</a>
     <a class="tab {{ 'active' if tab=='spaces' }}" href="/dashboard/measurements?tab=spaces"><i class="ti ti-map-pin"></i> Ζώνες</a>
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή δικτύου</a>
+    <a class="tab {{ 'active' if tab=='params' }}" href="/dashboard/measurements?tab=params"><i class="ti ti-adjustments"></i> Παραμετροποίηση</a>
   </div>
 
   {% if tab=='structure' %}
@@ -493,18 +494,7 @@ select.in-kind{width:120px;}
     </div>
     {% endfor %}
   </div>
-  <div class="card" style="margin-top:14px;">
-    <div class="card-title"><i class="ti ti-clock"></i> Ορισμός περιόδων ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών — βάση της συχνότητας)</span></div>
-    {% for d in day_periods %}
-    <form method="POST" action="/dashboard/measurements/freq/period/save" class="pdef">
-      <input type="hidden" name="id" value="{{ d.id }}">
-      <input class="in-name" type="text" name="name" value="{{ d.name }}">
-      <span class="muted">από</span><input type="time" name="t_from" value="{{ d.t_from }}">
-      <span class="muted">έως</span><input type="time" name="t_to" value="{{ d.t_to }}">
-      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-    </form>
-    {% endfor %}
-  </div>
+  <p class="muted" style="font-size:12px;margin-top:6px;">Τα διαστήματα ωρών των περιόδων ορίζονται στο tab «Παραμετροποίηση».</p>
   <script>
   function zicon(){var ic=document.getElementById('z-icon').value||'ti-map-pin';var c=document.getElementById('z-color').value;var p=document.getElementById('z-prev');p.className='ti '+ic;p.style.color=c;}
   function psave(el){
@@ -619,7 +609,7 @@ select.in-kind{width:120px;}
           <div class="rw"><div><label>Κάτω όριο</label><input type="number" step="any" name="min_v" id="lf-min"></div><div><label>Άνω όριο</label><input type="number" step="any" name="max_v" id="lf-max"></div></div>
           <label>Μήνυμα αν χαμηλό</label><input type="text" name="action_low" id="lf-low">
           <label>Μήνυμα αν υψηλό</label><input type="text" name="action_high" id="lf-high">
-          <label>Κατηγορία</label><input type="text" name="category" id="lf-cat" placeholder="Πισίνα/Νερό/ΖΝΧ/Γενικό">
+          <label>Κατηγορία</label><select name="category" id="lf-cat"><option value="">— καμία —</option>{% for c in categories_list %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select>
           <div class="acts">
             <button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
             <button class="tgl" type="submit" id="lf-tgl" style="display:none;"></button>
@@ -682,6 +672,62 @@ select.in-kind{width:120px;}
       <button class="btn ghost" type="submit"><i class="ti ti-plus"></i> Νέος τύπος</button>
     </form>
   </div>
+  {% endif %}
+
+  {% if tab=='params' %}
+  <style>
+  .pdef{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .pdef input[type=time]{padding:5px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
+  .pdef .in-name{padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;width:140px;}
+  .catgrid{display:flex;flex-wrap:wrap;gap:8px;}
+  .catchip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e1edf4;border-left:3px solid #185FA5;border-radius:0 10px 10px 0;padding:7px 10px;font-size:13px;}
+  .catchip .grip{cursor:grab;color:#9fb2bd;} .catchip .cn{font-weight:600;}
+  .catchip .cu{font-size:10px;color:#5f7682;background:#eef6fb;border-radius:6px;padding:1px 6px;} .catchip .cu.free{color:#b6c4cd;background:#f4f7f9;}
+  .catchip .ic{border:none;background:none;cursor:pointer;color:#9fb2bd;padding:2px;} .catchip .ic.del:hover{color:#A32D2D;}
+  .catchip .ced input{padding:4px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;width:120px;}
+  </style>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-clock"></i> Περίοδοι ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών — βάση της συχνότητας)</span></div>
+    {% for d in day_periods %}
+    <form method="POST" action="/dashboard/measurements/freq/period/save" class="pdef">
+      <input type="hidden" name="id" value="{{ d.id }}">
+      <input class="in-name" type="text" name="name" value="{{ d.name }}">
+      <span class="muted">από</span><input type="time" name="t_from" value="{{ d.t_from }}">
+      <span class="muted">έως</span><input type="time" name="t_to" value="{{ d.t_to }}">
+      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
+    </form>
+    {% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-category"></i> Κατηγορίες ειδών μετρήσεων <span class="muted" style="font-weight:400;">(ομαδοποιούν τα «Είδη»)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία (ενημερώνει & τα Είδη)· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Ο μετρητής = πόσα Είδη την έχουν.</p>
+    <div class="catgrid" id="catgrid">
+      {% for c in categories_list %}{% set u = category_usage.get(c.name, 0) %}
+      <div class="catchip" data-id="{{ c.id }}">
+        <span class="grip"><i class="ti ti-grip-vertical"></i></span>
+        <span class="cn">{{ c.name }}</span>
+        <span class="cu {{ 'free' if not u }}" title="Είδη">{{ u }}</span>
+        <form method="POST" action="/dashboard/measurements/category/save" class="ced" style="display:none;align-items:center;gap:4px;">
+          <input type="hidden" name="id" value="{{ c.id }}"><input type="text" name="name" value="{{ c.name }}">
+          <button class="ic" type="submit" title="Αποθήκευση"><i class="ti ti-check"></i></button>
+        </form>
+        <button class="ic" type="button" onclick="catRename(this)" title="Μετονομασία"><i class="ti ti-pencil"></i></button>
+        <form method="POST" action="/dashboard/measurements/category/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή κατηγορίας «{{ c.name }}»{{ (' — έχει ' + (u|string) + ' είδη') if u else '' }};');"><button class="ic del" type="submit" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>
+      </div>
+      {% else %}<div class="muted">Καμία κατηγορία ακόμη.</div>{% endfor %}
+    </div>
+    <form method="POST" action="/dashboard/measurements/category/save" style="margin-top:14px;display:flex;gap:6px;">
+      <input type="text" name="name" placeholder="Νέα κατηγορία…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
+      <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
+    </form>
+  </div>
+  <script>
+  function catRename(b){var c=b.closest('.catchip');c.querySelector('.cn').style.display='none';b.style.display='none';c.querySelector('.ced').style.display='inline-flex';c.querySelector('.ced input[name=name]').focus();}
+  (function(){if(window.Sortable){var g=document.getElementById('catgrid');if(g)new Sortable(g,{handle:'.grip',animation:150,onSort:function(){
+    var ids=[].map.call(g.querySelectorAll('.catchip'),function(c){return c.getAttribute('data-id');});
+    fetch('/dashboard/measurements/category/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
+  }});}})();
+  </script>
   {% endif %}
 
 </div>
