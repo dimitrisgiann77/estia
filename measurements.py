@@ -51,6 +51,7 @@ class MonitorNode(db.Model):
     sort      = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     hotels    = db.Column(db.String(120))   # Φ: λίστα hotel ids που «έχουν» τον κόμβο (κενό=όλα)
+    zones     = db.Column(db.String(200))   # #6: CSV από SamplingSpace.id — κοινές ζώνες δειγματοληψίας του κόμβου
 
 
 # ── Φ2 ρυθμίσεων: Χώροι δειγματοληψίας ως διαχειριζόμενη λίστα (αντί free-text) ──
@@ -704,6 +705,100 @@ def _hotels_set(n):
     return out
 
 
+# ── #6: κόμβος → πολλές ΖΩΝΕΣ δειγματοληψίας (SPEC 04) ─────────────────────────
+def _zones_set(n):
+    """Αποθηκευμένες ζώνες κόμβου = set από SamplingSpace.id (CSV node.zones)."""
+    raw = getattr(n, 'zones', '') or ''
+    out = set()
+    for x in raw.split(','):
+        x = x.strip()
+        if x.isdigit():
+            out.add(int(x))
+    return out
+
+
+def _node_zone_ids_display(n):
+    """SPEC §4.3: ticked space ids στο checklist = node.zones ∪ ids των SamplingSpace
+    που ταιριάζουν σε locations ΕΝΕΡΓΩΝ σημείων του κόμβου (ήδη στημένα = ticked χωρίς
+    migration)."""
+    ids = set(_zones_set(n))
+    locs = {(loc or '').strip() for (loc,) in
+            db.session.query(Area.location)
+            .filter(Area.node_id == n.id, Area.engine_only.is_(True),
+                    Area.is_active.is_(True), Area.location.isnot(None)).distinct().all()
+            if (loc or '').strip()}
+    if locs:
+        for s in SamplingSpace.query.all():
+            if (s.name or '').strip() in locs:
+                ids.add(s.id)
+    return ids
+
+
+def _sync_node_areas(node):
+    """SPEC §4.4 reconcile: σημεία (Area) = cross product ΖΩΝΩΝ × ΞΕΝΟΔΟΧΕΙΩΝ του κόμβου.
+    Επιστρέφει (created, deactivated, warnings). Μη καταστροφικό — guard σε καταγραφές."""
+    hotels = _hotels_set(node)
+    zids = _zones_set(node)
+    spaces = ({s.id: (s.name or '').strip()
+               for s in SamplingSpace.query.filter(SamplingSpace.id.in_(zids)).all()}
+              if zids else {})
+    zone_names = sorted({nm for nm in spaces.values() if nm})
+    npks = [np.pkey for np in NodeParam.query.filter_by(node_id=node.id)
+            .order_by(NodeParam.sort, NodeParam.id).all()]
+    created = deactivated = 0
+    warnings = []
+    # ADD/REACTIVATE: αν υπάρχουν ζώνες → cross product· αλλιώς zone-less ('') ανά ξεν.
+    target_locs = zone_names if zone_names else ['']
+    if hotels:
+        for hid in hotels:
+            for zn in target_locs:
+                q = Area.query.filter_by(node_id=node.id, hotel_id=hid, engine_only=True)
+                if zn:
+                    a = q.filter_by(location=zn).first()
+                else:
+                    a = q.filter((Area.location.is_(None)) | (Area.location == '')).first()
+                nm = (('%s — %s' % (node.name, zn)) if zn else node.name)[:120]
+                if a:
+                    if not a.is_active:
+                        a.is_active = True
+                    a.name = nm
+                else:
+                    a = Area(hotel_id=hid, template_key='generic', name=nm, location=(zn or ''),
+                             is_active=True, engine_only=True, node_id=node.id)
+                    db.session.add(a)
+                    db.session.flush()
+                    for i, pk in enumerate(npks):
+                        db.session.add(AreaParam(area_id=a.id, pkey=pk, sort=i))
+                    created += 1
+    # DEACTIVATE (συντηρητικό): μόνο εκτός cross product· legacy/unknown ζώνες μένουν
+    all_space_names = {(s.name or '').strip() for s in SamplingSpace.query.all()
+                       if (s.name or '').strip()}
+    zone_set = set(zone_names)
+    for a in Area.query.filter_by(node_id=node.id, engine_only=True, is_active=True).all():
+        loc = (a.location or '').strip()
+        hotel_gone = a.hotel_id not in hotels
+        zone_removed = (not hotel_gone) and bool(loc) and (loc in all_space_names) and (loc not in zone_set)
+        zoneless_superseded = (not hotel_gone) and (not loc) and bool(zone_names)
+        if not (hotel_gone or zone_removed or zoneless_superseded):
+            continue
+        if Reading.query.filter_by(area_id=a.id).first() is not None:
+            warnings.append('Το σημείο «%s» έχει καταγραφές — δεν απενεργοποιήθηκε.' % a.name)
+            continue
+        a.is_active = False
+        deactivated += 1
+    db.session.commit()
+    return created, deactivated, warnings
+
+
+def _node_point_estimate(node):
+    """Live μετρητής για το UI: πόσα σημεία παράγει το cross product (ζώνες×ξεν.)."""
+    h = len(_hotels_set(node))
+    z = len({(s.name or '').strip() for s in
+             SamplingSpace.query.filter(SamplingSpace.id.in_(_zones_set(node))).all()
+             if (s.name or '').strip()}) if _zones_set(node) else 0
+    return h * z if (h and z) else h  # 0 ζώνες → 1 zone-less ανά ξεν.
+
+
 @app.route('/dashboard/measurements/node/<int:nid>/hotel', methods=['POST'])
 def measurements_node_hotel(nid):
     """Σύνδεση/αποσύνδεση ξενοδοχείου σε κόμβο (ποια ξενοδοχεία «έχουν» το δίκτυο)."""
@@ -723,40 +818,35 @@ def measurements_node_hotel(nid):
     else:
         cur.add(hid); on = True
     n.hotels = ','.join(str(x) for x in sorted(cur))
-    # Δρόμος A: το τικ δημιουργεί/ενεργοποιεί σημείο (Area) για το ξεν., με τις μετρήσεις του κόμβου
-    a = Area.query.filter_by(hotel_id=hid, node_id=nid, engine_only=True).first()
-    if on:
-        if a:
-            a.is_active = True
-        else:
-            a = Area(hotel_id=hid, template_key='generic', name=n.name[:120], location='',
-                     is_active=True, engine_only=True, node_id=nid)
-            db.session.add(a); db.session.flush()
-            for i, np in enumerate(NodeParam.query.filter_by(node_id=nid)
-                                   .order_by(NodeParam.sort, NodeParam.id).all()):
-                db.session.add(AreaParam(area_id=a.id, pkey=np.pkey, sort=i))
-    elif a:
-        a.is_active = False
     db.session.commit()
-    log_activity('meas_node_hotel', '%s h%s=%s' % (nid, hid, on))
-    return jsonify(ok=True, on=on)
+    # #6: reconcile σημεία (cross product ζωνών × ξενοδοχείων)
+    created, deactivated, warnings = _sync_node_areas(n)
+    log_activity('meas_node_hotel', '%s h%s=%s (+%d/-%d)' % (nid, hid, on, created, deactivated))
+    return jsonify(ok=True, on=on, created=created, deactivated=deactivated,
+                   warnings=warnings, points=_node_point_estimate(n))
 
 
-@app.route('/dashboard/measurements/node/<int:nid>/hotel-loc', methods=['POST'])
-def measurements_node_hotel_loc(nid):
-    """Χώρος (location) του σημείου ενός ξενοδοχείου για αυτόν τον κόμβο."""
+@app.route('/dashboard/measurements/node/<int:nid>/zones', methods=['POST'])
+def measurements_node_zones(nid):
+    """#6: κοινές ζώνες δειγματοληψίας του κόμβου (CSV SamplingSpace.id) → reconcile σημείων."""
     if not is_admin():
         return jsonify(ok=False), 403
-    f = request.form
-    try:
-        hid = int(f.get('hotel_id'))
-    except (TypeError, ValueError):
-        return jsonify(ok=False), 400
-    loc = (f.get('location') or '').strip()[:120] or None
-    a = Area.query.filter_by(hotel_id=hid, node_id=nid, engine_only=True).first()
-    if a:
-        a.location = loc; db.session.commit()
-    return jsonify(ok=True)
+    n = MonitorNode.query.get(nid)
+    if not n:
+        return jsonify(ok=False), 404
+    data = request.get_json(silent=True) or {}
+    ids = []
+    for x in (data.get('space_ids') or []):
+        try:
+            ids.append(int(x))
+        except (TypeError, ValueError):
+            pass
+    n.zones = ','.join(str(x) for x in sorted(set(ids)))
+    db.session.commit()
+    created, deactivated, warnings = _sync_node_areas(n)
+    log_activity('meas_node_zones', '%s zones=%s (+%d/-%d)' % (nid, n.zones, created, deactivated))
+    return jsonify(ok=True, created=created, deactivated=deactivated,
+                   warnings=warnings, points=_node_point_estimate(n))
 
 
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
@@ -1179,7 +1269,7 @@ def measurements_console():
     node_kids = {}
     node_meas = {}
     node_np = {}
-    node_hotel_loc = {}
+    node_zone_ids = {}   # #6: {node_id: [ticked SamplingSpace.id]}
     if tab in ('structure', 'points'):
         node_tree = _node_tree()
         for row in node_tree:
@@ -1202,8 +1292,8 @@ def measurements_console():
                 else:
                     chips.append({'label': pk, 'color': ''})
             node_meas[k] = chips
-        for a in Area.query.filter(Area.engine_only.is_(True), Area.node_id.isnot(None)).all():
-            node_hotel_loc.setdefault(a.node_id, {})[a.hotel_id] = a.location or ''
+        for row in node_tree:
+            node_zone_ids[row['n'].id] = sorted(_node_zone_ids_display(row['n']))
         if nh:
             for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
                 if getattr(a, 'node_id', None):
@@ -1273,7 +1363,7 @@ def measurements_console():
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
                            node_kids=node_kids, node_meas=node_meas, node_np=node_np,
-                           node_hotel_loc=node_hotel_loc,
+                           node_zone_ids=node_zone_ids,
                            group_points=group_points, pool_points=pool_points,
                            spaces_list=spaces_list, space_usage=space_usage,
                            zone_points=zone_points, lib_map_json=lib_map_json,

@@ -202,8 +202,10 @@ select.in-kind{width:120px;}
   .hck.on{background:#193847;color:#fff;border-color:#193847;}
   #st-hotels .hrow{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
   #st-hotels .hck{min-width:66px;}
-  #st-hotels .loc{flex:1;padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
-  #st-hotels .loc:disabled{background:#f1f3f5;color:#b6c4cd;}
+  #st-zones{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+  #st-zones .zrow{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;}
+  #st-zones .zrow:has(.zck:checked){background:#E6F1FB;border-color:#9cc6ea;font-weight:600;}
+  #st-zinfo{background:#f0f7ff;border-radius:7px;padding:6px 9px;white-space:pre-line;color:#185FA5;font-weight:600;}
   .strtree .nrow.top{border-left-color:#193847;background:#fbfdff;}
   .strtree .nrow.sel{box-shadow:0 0 0 2px #E6F1FB;}
   .strtree .grip{cursor:grab;color:#9fb2bd;font-size:17px;}
@@ -233,7 +235,7 @@ select.in-kind{width:120px;}
   </style>
   {% macro nodecard(row) %}
   <div class="node" data-nid="{{ row.n.id }}">
-    <div class="nrow {{ 'top' if not row.depth }}" style="border-left-color:{{ row.n.color or ('#193847' if not row.depth else '#185FA5') }};" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" data-color="{{ row.n.color or '' }}" data-hotels="{{ row.hotels|join(',') }}" data-meas="{{ node_np.get(row.n.id, [])|join(',') }}" data-locs='{{ node_hotel_loc.get(row.n.id, {})|tojson }}' onclick="pickNode(this)">
+    <div class="nrow {{ 'top' if not row.depth }}" style="border-left-color:{{ row.n.color or ('#193847' if not row.depth else '#185FA5') }};" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" data-color="{{ row.n.color or '' }}" data-hotels="{{ row.hotels|join(',') }}" data-meas="{{ node_np.get(row.n.id, [])|join(',') }}" data-zones="{{ node_zone_ids.get(row.n.id, [])|join(',') }}" onclick="pickNode(this)">
       <i class="ti ti-grip-vertical grip"></i>
       {% if not row.depth %}<i class="ti {{ row.n.icon or 'ti-folder' }}" style="color:{{ row.n.color or '#185FA5' }};"></i>{% endif %}
       <span class="nm">{{ row.n.name }}</span>
@@ -268,8 +270,11 @@ select.in-kind{width:120px;}
           <label>Μετρήσεις δικτύου <span class="muted" style="font-weight:400;">(κοινές για όλα τα ξεν.· σύρε από κάτω)</span></label>
           <div id="st-meas" class="zone"></div>
           <div id="st-pal" class="pal">{% for m in library %}<div class="pchip" data-pkey="{{ m.pkey }}">{{ m.label }}</div>{% endfor %}</div>
-          <label>Ξενοδοχεία &amp; Ζώνη δειγματοληψίας</label>
-          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span><select class="loc" onchange="nodeHotelLoc(this)" disabled><option value="">— ζώνη —</option>{% for s in spaces_list %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}</select></div>{% endfor %}</div>
+          <label>Ζώνες δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινές· κάθε ζώνη × ξενοδοχείο = ένα σημείο που μετριέται χωριστά)</span></label>
+          <div id="st-zones">{% for s in spaces_list %}<label class="zrow"><input type="checkbox" class="zck" value="{{ s.id }}" onchange="nodeZoneCk()"> {{ s.name }}</label>{% endfor %}</div>
+          <div id="st-zinfo" class="muted"></div>
+          <label>Ξενοδοχεία <span class="muted" style="font-weight:400;">(ποια έχουν τον κόμβο)</span></label>
+          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span></div>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
           <button class="addsub" type="button" id="st-addsub"><i class="ti ti-plus"></i> Νέα υποομάδα εδώ</button>
         </form>
@@ -298,30 +303,43 @@ select.in-kind{width:120px;}
       document.getElementById('st-del').setAttribute('formaction','/dashboard/measurements/node/'+nid+'/delete');
       document.getElementById('st-addsub').onclick=function(){addNode(nid);};
       var hs=(el.getAttribute('data-hotels')||'').split(',');
-      var locs={}; try{locs=JSON.parse(el.getAttribute('data-locs')||'{}');}catch(e){}
       document.querySelectorAll('#st-hotels .hrow').forEach(function(r){
         var hid=r.getAttribute('data-h'); var on=hs.indexOf(hid)>=0;
         var hck=r.querySelector('.hck'); hck.classList.toggle('on',on); hck.querySelector('i').className='ti '+(on?'ti-square-check':'ti-square');
-        var loc=r.querySelector('.loc'); var lv=locs[hid]||'';
-        if(lv && !Array.prototype.some.call(loc.options,function(o){return o.value===lv;})){var op=document.createElement('option');op.value=lv;op.textContent=lv+' (παλιό)';loc.appendChild(op);}
-        loc.value=lv; loc.disabled=!on;
       });
+      var zs=(el.getAttribute('data-zones')||'').split(',');
+      document.querySelectorAll('#st-zones .zck').forEach(function(c){ c.checked = zs.indexOf(c.value)>=0; });
       renderMeas(el.getAttribute('data-meas')||'');
+      recalcZInfo();
     };
+    function recalcZInfo(warnings){
+      var zc=document.querySelectorAll('#st-zones .zck:checked').length;
+      var hc=document.querySelectorAll('#st-hotels .hck.on').length;
+      var pts=(zc&&hc)?(zc*hc):hc;
+      var msg='→ '+pts+' σημεία δειγματοληψίας ('+zc+' ζώνες × '+hc+' ξεν.)';
+      if(warnings&&warnings.length) msg+='\n⚠ '+warnings.join(' ');
+      document.getElementById('st-zinfo').textContent=msg;
+    }
     window.nodeHotelCk=function(hck){
       var nid=document.getElementById('st-id').value; if(!nid)return;
       var r=hck.closest('.hrow'); var hid=r.getAttribute('data-h');
       fetch('/dashboard/measurements/node/'+nid+'/hotel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hotel_id:hid})})
         .then(function(rr){return rr.json();}).then(function(d){if(d&&typeof d.on!=='undefined'){
           hck.classList.toggle('on',d.on); hck.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
-          var loc=r.querySelector('.loc'); loc.disabled=!d.on; if(d.on) loc.focus();
+          var sel=document.querySelector('.strtree .nrow.sel');
+          if(sel){var hs=[].map.call(document.querySelectorAll('#st-hotels .hck.on'),function(x){return x.closest('.hrow').getAttribute('data-h');}); sel.setAttribute('data-hotels',hs.join(','));}
+          recalcZInfo(d.warnings);
         }});
     };
-    window.nodeHotelLoc=function(inp){
+    window.nodeZoneCk=function(){
       var nid=document.getElementById('st-id').value; if(!nid)return;
-      var hid=inp.closest('.hrow').getAttribute('data-h');
-      var fd=new FormData(); fd.append('hotel_id',hid); fd.append('location',inp.value);
-      fetch('/dashboard/measurements/node/'+nid+'/hotel-loc',{method:'POST',body:fd});
+      var ids=[].map.call(document.querySelectorAll('#st-zones .zck:checked'),function(c){return parseInt(c.value);});
+      recalcZInfo();
+      fetch('/dashboard/measurements/node/'+nid+'/zones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({space_ids:ids})})
+        .then(function(rr){return rr.json();}).then(function(d){if(d&&d.ok){
+          var sel=document.querySelector('.strtree .nrow.sel'); if(sel) sel.setAttribute('data-zones',ids.join(','));
+          recalcZInfo(d.warnings);
+        }});
     };
     window.addNode=function(parent){
       var n=prompt('Όνομα νέου κόμβου;'); if(!n)return;
