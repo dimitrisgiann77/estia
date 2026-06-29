@@ -179,7 +179,7 @@ select.in-kind{width:120px;}
   {% if msg %}<div class="ok"><i class="ti ti-check"></i> {{ msg }}</div>{% endif %}
   <div class="tabs">
     <a class="tab {{ 'active' if tab in ['library','templates'] }}" href="/dashboard/measurements?tab=library"><i class="ti ti-flask"></i> Είδη μετρήσεων</a>
-    <a class="tab {{ 'active' if tab=='spaces' }}" href="/dashboard/measurements?tab=spaces"><i class="ti ti-map-pin"></i> Χώροι</a>
+    <a class="tab {{ 'active' if tab=='spaces' }}" href="/dashboard/measurements?tab=spaces"><i class="ti ti-map-pin"></i> Ζώνες</a>
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή δικτύου</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Συχνότητα</a>
   </div>
@@ -269,8 +269,8 @@ select.in-kind{width:120px;}
           <label>Μετρήσεις δικτύου <span class="muted" style="font-weight:400;">(κοινές για όλα τα ξεν.· σύρε από κάτω)</span></label>
           <div id="st-meas" class="zone"></div>
           <div id="st-pal" class="pal">{% for m in library %}<div class="pchip" data-pkey="{{ m.pkey }}">{{ m.label }}</div>{% endfor %}</div>
-          <label>Ξενοδοχεία &amp; χώρος δειγματοληψίας</label>
-          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span><select class="loc" onchange="nodeHotelLoc(this)" disabled><option value="">— χώρος —</option>{% for s in spaces_list %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}</select></div>{% endfor %}</div>
+          <label>Ξενοδοχεία &amp; Ζώνη δειγματοληψίας</label>
+          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span><select class="loc" onchange="nodeHotelLoc(this)" disabled><option value="">— ζώνη —</option>{% for s in spaces_list %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}</select></div>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
           <button class="addsub" type="button" id="st-addsub"><i class="ti ti-plus"></i> Νέα υποομάδα εδώ</button>
         </form>
@@ -372,8 +372,8 @@ select.in-kind{width:120px;}
   .spchip .sped input{padding:4px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;width:130px;}
   </style>
   <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin"></i> Χώροι δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινά για όλα)</span></div>
-    <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Χρησιμοποιούνται στο πεδίο «Χώρος» των σημείων.</p>
+    <div class="card-title"><i class="ti ti-map-pin"></i> Ζώνες δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινά για όλα)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Χρησιμοποιούνται στο πεδίο «Ζώνη» των Σημείων Δειγματοληψίας.</p>
     <div class="spgrid" id="spgrid">
       {% for s in spaces_list %}
       <div class="spchip" data-id="{{ s.id }}">
@@ -386,10 +386,10 @@ select.in-kind{width:120px;}
         <button class="ic" type="button" onclick="spRename(this)" title="Μετονομασία"><i class="ti ti-pencil"></i></button>
         <form method="POST" action="/dashboard/measurements/space/{{ s.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή «{{ s.name }}»;');"><button class="ic del" type="submit" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>
       </div>
-      {% else %}<div class="muted">Κανένας χώρος ακόμη.</div>{% endfor %}
+      {% else %}<div class="muted">Καμία ζώνη ακόμη.</div>{% endfor %}
     </div>
     <form method="POST" action="/dashboard/measurements/space/save" style="margin-top:14px;display:flex;gap:6px;">
-      <input type="text" name="name" placeholder="Νέος χώρος…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
+      <input type="text" name="name" placeholder="Νέα ζώνη…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
       <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
     </form>
   </div>
@@ -542,8 +542,8 @@ select.in-kind{width:120px;}
   .fqper .in-name{padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;width:140px;}
   </style>
   <div class="card">
-    <div class="card-title"><i class="ti ti-clock-cog"></i> Συχνότητα μετρήσεων <span class="muted" style="font-weight:400;">(ανά χώρο × μέτρηση)</span></div>
-    <p class="muted" style="margin-bottom:12px;">Για κάθε χώρο, τίκαρε σε ποιες περιόδους μετριέται η κάθε μέτρηση. Τα διαστήματα ωρών ορίζονται πιο κάτω.</p>
+    <div class="card-title"><i class="ti ti-clock-cog"></i> Συχνότητα μετρήσεων <span class="muted" style="font-weight:400;">(ανά Ζώνη × μέτρηση)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Για κάθε Ζώνη, τίκαρε σε ποιες περιόδους μετριέται η κάθε μέτρηση. Τα διαστήματα ωρών ορίζονται πιο κάτω.</p>
     {% for sp in freq_spaces %}
     <div class="fqcard">
       <div class="fqh"><i class="ti ti-map-pin"></i> {{ sp.name }}</div>
@@ -560,9 +560,9 @@ select.in-kind{width:120px;}
         {% endfor %}
         </tbody>
       </table>
-      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτόν τον χώρο — όρισε μετρήσεις & χώρο στους κόμβους («Δομή δικτύου»).</div>{% endif %}
+      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτή τη Ζώνη — όρισε μετρήσεις & Ζώνη στους κόμβους («Δομή δικτύου»).</div>{% endif %}
     </div>
-    {% else %}<div class="muted">Δεν υπάρχουν χώροι — πρόσθεσε στους «Χώρους».</div>{% endfor %}
+    {% else %}<div class="muted">Δεν υπάρχουν ζώνες — πρόσθεσε στις «Ζώνες».</div>{% endfor %}
   </div>
   <div class="card">
     <div class="card-title"><i class="ti ti-clock"></i> Ορισμός περιόδων ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών)</span></div>

@@ -61,7 +61,7 @@ class SamplingSpace(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
 DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 'Spa / Jacuzzi', 'Δώμα',
-                  'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'Απομακρυσμένο']
+                  'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Χώρος', 'Απομακρυσμένο']
 
 
 # ── Φ2 ρυθμίσεων: Συχνότητα = περίοδοι ημέρας + ανάθεση ανά χώρο × μέτρηση ──────
@@ -245,6 +245,17 @@ def seed_measurement_engine():
             except Exception as _e:
                 db.session.rollback()
                 print(f'[measurements] NodeParam backfill skipped: {_e}')
+            # Εφάπαξ (flagged) μετονομασίες ορολογίας σε υπάρχοντα δεδομένα (κόμβοι/σημεία/ζώνες).
+            try:
+                from app import SysFlag
+                if not SysFlag.query.filter_by(key='meas_rename_20260629').first():
+                    _rn = _apply_renames()
+                    db.session.add(SysFlag(key='meas_rename_20260629'))
+                    db.session.commit()
+                    print(f'[measurements] Μετονομασίες ορολογίας (εφάπαξ): {_rn} εγγραφές')
+            except Exception as _e:
+                db.session.rollback()
+                print(f'[measurements] renames skipped: {_e}')
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
         except Exception as e:
@@ -258,12 +269,12 @@ NODE_CATALOG = [
     ('water',           None,              'Δίκτυο Νερού (πόσιμο/οικιακό)',       'group',    'ti-droplet',  1),
     ('water_source',    'water',           'Πηγή / τροφοδοσία',                  'subgroup', '',            1),
     ('water_treatment', 'water',           'Επεξεργασία',                        'subgroup', '',            2),
-    ('water_ro',        'water_treatment', 'Όσμωση (RO)',                        'subgroup', '',            1),
-    ('water_storage',   'water',           'Αποθήκευση (δεξαμενές/calorifiers)', 'subgroup', '',            3),
-    ('water_cold',      'water',           'Κρύο νερό (ΨΝΧ)',                    'subgroup', '',            4),
-    ('water_hot',       'water',           'Ζεστό νερό (ΖΝΧ)',                   'subgroup', '',            5),
+    ('water_ro',        'water_treatment', 'Αντίστροφη Όσμωση (RO)',             'subgroup', '',            1),
+    ('water_storage',   'water',           'Αποθήκευση (Δεξαμενή)',              'subgroup', '',            3),
+    ('water_cold',      'water',           'Κρύο Νερό (ΨΝΧ)',                    'subgroup', '',            4),
+    ('water_hot',       'water',           'Ζεστό Νερό (ΖΝΧ)',                   'subgroup', '',            5),
     ('aerosol',         None,              'Αερόλυμα / υψηλού κινδύνου',         'group',    'ti-wind',     2),
-    ('aer_spa',         'aerosol',         'Spa / jacuzzi',                      'subgroup', '',            1),
+    ('aer_spa',         'aerosol',         'Spa / Jacuzzi',                      'subgroup', '',            1),
     ('aer_cooling',     'aerosol',         'Πύργοι ψύξης',                       'subgroup', '',            2),
     ('aer_misting',     'aerosol',         'Misting / δροσισμός',                'subgroup', '',            3),
     ('aer_fountain',    'aerosol',         'Σιντριβάνια',                        'subgroup', '',            4),
@@ -1146,10 +1157,10 @@ SCAFFOLD_POINTS = [
     ('Δεξαμενή', 'Μηχανοστάσιο', 'water_storage', ['temp_tank', 'clo2_tank', 'ph_tank']),
     ('Αναχώρηση ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_out', 'clo2_dhw_out']),
     ('Επιστροφή ΖΝΧ', 'Μηχανοστάσιο', 'water_hot', ['temp_dhw_return', 'clo2_dhw_return']),
-    ('Αντ. Όσμωση', 'Μηχανοστάσιο', 'water_ro', ['temp_ro', 'clo2_ro']),
-    ('Αντ. Όσμωση (Δωμάτιο)', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_ro', ['temp_ro', 'clo2_ro']),
-    ('Κρύο Νερό ΨΝΧ', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_cold', ['temp_cold', 'clo2_cold']),
-    ('Ζεστό Νερό ΖΝΧ', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'water_hot', ['temp_hot', 'clo2_hot']),
+    ('Αντίστροφη Όσμωση (RO)', 'Μηχανοστάσιο', 'water_ro', ['temp_ro', 'clo2_ro']),
+    ('Αντίστροφη Όσμωση (RO) - Ζώνης', 'Δωμάτιο / Τμήμα / Χώρος', 'water_ro', ['temp_ro', 'clo2_ro']),
+    ('Κρύο Νερό (ΨΝΧ)', 'Δωμάτιο / Τμήμα / Χώρος', 'water_cold', ['temp_cold', 'clo2_cold']),
+    ('Ζεστό Νερό (ΖΝΧ)', 'Δωμάτιο / Τμήμα / Χώρος', 'water_hot', ['temp_hot', 'clo2_hot']),
     ('Κύρια Πισίνα', 'Πισίνα', 'pools',
      ['free_chlorine', 'combined_chlorine', 'ph', 'temp', 'turbidity',
       'cyanuric_acid', 'total_alkalinity', 'orp', 'backwash_done']),
@@ -1254,6 +1265,48 @@ def _backfill_nodeparams(do=False):
     if do:
         db.session.commit()
     return report, applied
+
+
+# ── Μετονομασίες ορολογίας (εγκεκριμένο Giannis 29/06) — εφαρμόζεται και στα seeds
+#    (πιο πάνω) ΚΑΙ στα υπάρχοντα δεδομένα (SERGIOS) με εφάπαξ flagged migration ────
+RENAME_NODES = {
+    'Όσμωση (RO)': 'Αντίστροφη Όσμωση (RO)',
+    'Αποθήκευση (δεξαμενές/calorifiers)': 'Αποθήκευση (Δεξαμενή)',
+    'Κρύο νερό (ΨΝΧ)': 'Κρύο Νερό (ΨΝΧ)',
+    'Ζεστό νερό (ΖΝΧ)': 'Ζεστό Νερό (ΖΝΧ)',
+    'Spa / jacuzzi': 'Spa / Jacuzzi',
+}
+RENAME_POINTS = {
+    'Αντ. Όσμωση': 'Αντίστροφη Όσμωση (RO)',
+    'Αντ. Όσμωση (Δωμάτιο)': 'Αντίστροφη Όσμωση (RO) - Ζώνης',
+    'Κρύο Νερό ΨΝΧ': 'Κρύο Νερό (ΨΝΧ)',
+    'Ζεστό Νερό ΖΝΧ': 'Ζεστό Νερό (ΖΝΧ)',
+}
+RENAME_ZONES = {
+    'Δωμάτιο / Τμήμα / Άλλος Χώρος': 'Δωμάτιο / Τμήμα / Χώρος',
+}
+
+
+def _apply_renames():
+    """Εφάπαξ: μετονομάζει υπάρχοντα δεδομένα στη νέα ορολογία (κόμβοι/σημεία/ζώνες).
+    Μη καταστροφικό — αλλάζει ΜΟΝΟ τιμές που υπάρχουν στους χάρτες (old→new). Idempotent."""
+    n = 0
+    for node in MonitorNode.query.all():
+        nw = RENAME_NODES.get(node.name)
+        if nw and node.name != nw:
+            node.name = nw; n += 1
+    for a in Area.query.filter_by(engine_only=True).all():
+        nw = RENAME_POINTS.get(a.name)
+        if nw and a.name != nw:
+            a.name = nw; n += 1
+        zw = RENAME_ZONES.get(a.location or '')
+        if zw and a.location != zw:
+            a.location = zw; n += 1
+    for s in SamplingSpace.query.all():
+        zw = RENAME_ZONES.get(s.name)
+        if zw and s.name != zw:
+            s.name = zw; n += 1
+    return n
 
 
 @app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
