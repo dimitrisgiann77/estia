@@ -654,9 +654,40 @@ def measurements_node_hotel(nid):
     else:
         cur.add(hid); on = True
     n.hotels = ','.join(str(x) for x in sorted(cur))
+    # Δρόμος A: το τικ δημιουργεί/ενεργοποιεί σημείο (Area) για το ξεν., με τις μετρήσεις του κόμβου
+    a = Area.query.filter_by(hotel_id=hid, node_id=nid, engine_only=True).first()
+    if on:
+        if a:
+            a.is_active = True
+        else:
+            a = Area(hotel_id=hid, template_key='generic', name=n.name[:120], location='',
+                     is_active=True, engine_only=True, node_id=nid)
+            db.session.add(a); db.session.flush()
+            for i, np in enumerate(NodeParam.query.filter_by(node_id=nid)
+                                   .order_by(NodeParam.sort, NodeParam.id).all()):
+                db.session.add(AreaParam(area_id=a.id, pkey=np.pkey, sort=i))
+    elif a:
+        a.is_active = False
     db.session.commit()
     log_activity('meas_node_hotel', '%s h%s=%s' % (nid, hid, on))
     return jsonify(ok=True, on=on)
+
+
+@app.route('/dashboard/measurements/node/<int:nid>/hotel-loc', methods=['POST'])
+def measurements_node_hotel_loc(nid):
+    """Χώρος (location) του σημείου ενός ξενοδοχείου για αυτόν τον κόμβο."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    f = request.form
+    try:
+        hid = int(f.get('hotel_id'))
+    except (TypeError, ValueError):
+        return jsonify(ok=False), 400
+    loc = (f.get('location') or '').strip()[:120] or None
+    a = Area.query.filter_by(hotel_id=hid, node_id=nid, engine_only=True).first()
+    if a:
+        a.location = loc; db.session.commit()
+    return jsonify(ok=True)
 
 
 @app.route('/dashboard/measurements/node/save', methods=['POST'])
@@ -1040,6 +1071,7 @@ def measurements_console():
     node_kids = {}
     node_meas = {}
     node_np = {}
+    node_hotel_loc = {}
     if tab in ('structure', 'points'):
         node_tree = _node_tree()
         for row in node_tree:
@@ -1050,6 +1082,8 @@ def measurements_console():
         for np in NodeParam.query.order_by(NodeParam.sort, NodeParam.id).all():
             node_np.setdefault(np.node_id, []).append(np.pkey)
         node_meas = {k: [_lbl.get(pk, pk) for pk in v] for k, v in node_np.items()}
+        for a in Area.query.filter(Area.engine_only.is_(True), Area.node_id.isnot(None)).all():
+            node_hotel_loc.setdefault(a.node_id, {})[a.hotel_id] = a.location or ''
         if nh:
             for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
                 if getattr(a, 'node_id', None):
@@ -1129,6 +1163,7 @@ def measurements_console():
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
                            node_kids=node_kids, node_meas=node_meas, node_np=node_np,
+                           node_hotel_loc=node_hotel_loc,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,
