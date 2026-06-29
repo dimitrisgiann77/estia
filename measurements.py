@@ -523,13 +523,15 @@ def _library(include_inactive=False):
 
 
 def _lib_groups():
-    """Βιβλιοθήκη (όλες, incl ανενεργές) ομαδοποιημένη ανά κατηγορία για το UI."""
+    """Βιβλιοθήκη (όλες, incl ανενεργές) ομαδοποιημένη ανά κατηγορία για το UI.
+    #1: κάθε ομάδα φέρει το χρώμα της κατηγορίας → οι κάρτες βάφονται με fallback."""
+    catcolors = {c.name: c.color for c in MeasCategory.query.all() if c.color}
     groups = {}
     for m in _library(include_inactive=True):
         groups.setdefault(m['category'] or 'Γενικό', []).append(m)
     order = ['Πισίνα', 'Νερό', 'ΖΝΧ', 'Γενικό']
     keys = sorted(groups.keys(), key=lambda k: (order.index(k) if k in order else len(order), k))
-    return [{'name': k, 'rows': groups[k]} for k in keys]
+    return [{'name': k, 'rows': groups[k], 'color': catcolors.get(k, '')} for k in keys]
 
 
 def _slug_key(s):
@@ -1184,10 +1186,22 @@ def measurements_console():
             row['hotels'] = _hotels_set(row['n'])
             node_kids.setdefault(row['n'].parent_id or 0, []).append(row)
     if tab == 'structure':
-        _lbl = {m['pkey']: m['label'] for m in library}
+        _lbl = {m['pkey']: m for m in library}
+        _catcolors = {c.name: c.color for c in MeasCategory.query.all() if c.color}
         for np in NodeParam.query.order_by(NodeParam.sort, NodeParam.id).all():
             node_np.setdefault(np.node_id, []).append(np.pkey)
-        node_meas = {k: [_lbl.get(pk, pk) for pk in v] for k, v in node_np.items()}
+        # #1: chips κόμβου = {label, color}· χρώμα = είδους ή fallback κατηγορίας
+        node_meas = {}
+        for k, v in node_np.items():
+            chips = []
+            for pk in v:
+                m = _lbl.get(pk)
+                if m:
+                    col = m.get('color') or _catcolors.get(m.get('category') or '', '')
+                    chips.append({'label': m['label'], 'color': col})
+                else:
+                    chips.append({'label': pk, 'color': ''})
+            node_meas[k] = chips
         for a in Area.query.filter(Area.engine_only.is_(True), Area.node_id.isnot(None)).all():
             node_hotel_loc.setdefault(a.node_id, {})[a.hotel_id] = a.location or ''
         if nh:
@@ -1510,18 +1524,9 @@ def _migrate_reading_periods():
     return n
 
 
-@app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
-def measurements_nodeparams_migrate():
-    """Μετάβαση Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
-    GET = dry-run (αναφορά)· POST = εφαρμογή (μόνο κόμβοι χωρίς NodeParam· μη καταστροφικό)."""
-    if not is_admin():
-        return jsonify(ok=False), 403
-    do = (request.method == 'POST')
-    report, applied = _backfill_nodeparams(do=do)
-    if do:
-        log_activity('meas_nodeparams_migrate', 'applied=%d' % applied)
-    return jsonify(ok=True, applied=applied, report=report)
-
+# (v12.355 #5: αφαιρέθηκε το route /nodeparams/migrate + κουμπί «Μετάβαση μετρήσεων
+#  σε κόμβους». Ο auto-backfill έγινε flagged στο boot v12.342 — _backfill_nodeparams
+#  παραμένει γι' αυτόν.)
 
 
 @app.route('/dashboard/measurements/point/<int:pid>/delete', methods=['POST'])

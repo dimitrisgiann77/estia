@@ -240,7 +240,7 @@ select.in-kind{width:120px;}
       <span class="hcount" title="Σε πόσα ξενοδοχεία">{{ row.hotels|length }} <i class="ti ti-building"></i></span>
     </div>
     {% set ms = node_meas.get(row.n.id, []) %}
-    {% if ms %}<div class="nmeas">{% for l in ms %}<span class="mtag">{{ l }}</span>{% endfor %}</div>{% endif %}
+    {% if ms %}<div class="nmeas">{% for l in ms %}<span class="mtag"{% if l.color %} style="border-left:3px solid {{ l.color }};padding-left:6px;"{% endif %}>{{ l.label }}</span>{% endfor %}</div>{% endif %}
     <div class="children" data-parent="{{ row.n.id }}">{% for ch in node_kids.get(row.n.id, []) %}{{ nodecard(ch) }}{% endfor %}</div>
   </div>
   {% endmacro %}
@@ -249,7 +249,6 @@ select.in-kind{width:120px;}
     <p class="muted" style="margin-bottom:12px;">Σύρε κόμβους (⋮⋮) για σειρά / υποομάδα· κλικ σε κόμβο → επεξεργασία δεξιά (όνομα · χρώμα · <b>μετρήσεις δικτύου</b> · ξενοδοχεία). Οι μετρήσεις είναι κοινές & κληρονομούνται στα σημεία.</p>
     <div style="margin-bottom:10px;">
       <button class="btn alt" type="button" onclick="addNode('')"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
-      <button class="btn alt" type="button" onclick="migrateNP()" title="Μεταφορά μετρήσεων από τα υπάρχοντα σημεία στους κόμβους (με προεπισκόπηση)"><i class="ti ti-arrows-exchange"></i> Μετάβαση μετρήσεων σε κόμβους</button>
     </div>
     <div class="strlayout strtree">
       <div>
@@ -329,17 +328,6 @@ select.in-kind{width:120px;}
       var f=document.createElement('form'); f.method='POST'; f.action='/dashboard/measurements/node/save';
       [['name',n],['parent_id',parent||'']].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i);});
       document.body.appendChild(f); f.submit();
-    };
-    window.migrateNP=function(){
-      fetch('/dashboard/measurements/nodeparams/migrate').then(function(r){return r.json();}).then(function(d){
-        if(!d||!d.ok){alert('Σφάλμα.');return;}
-        if(!d.report.length){alert('Δεν βρέθηκαν μετρήσεις σε σημεία για μετάβαση.');return;}
-        var lines=d.report.map(function(x){return (x.skip?'• (έχει ήδη) ':'+ ')+x.node+': '+x.labels.join(', ');}).join('\n');
-        if(confirm('Θα μεταφερθούν οι μετρήσεις από τα σημεία στους κόμβους:\n\n'+lines+'\n\nΕφαρμογή;')){
-          fetch('/dashboard/measurements/nodeparams/migrate',{method:'POST'}).then(function(r){return r.json();}).then(function(d2){
-            alert('Εφαρμόστηκε σε '+(d2.applied||0)+' κόμβους.'); location.reload();});
-        }
-      }).catch(function(){alert('Σφάλμα δικτύου.');});
     };
     if(window.Sortable){
       document.querySelectorAll('.strtree .children').forEach(function(c){
@@ -588,7 +576,7 @@ select.in-kind{width:120px;}
         <div class="libcat">{{ g.name }}</div>
         <div class="libgrid" data-cat="{{ g.name }}">
           {% for m in g.rows %}
-          <div class="mcardL {{ cc }} {{ 'off' if not m.active }}" data-pkey="{{ m.pkey }}" data-label="{{ m.label }}" data-unit="{{ m.unit }}" data-min="{{ m.min_v if m.min_v is not none else '' }}" data-max="{{ m.max_v if m.max_v is not none else '' }}" data-low="{{ m.action_low }}" data-high="{{ m.action_high }}" data-kind="{{ m.kind }}" data-cat="{{ m.category }}" data-color="{{ m.color }}" data-active="{{ 1 if m.active else 0 }}"{% if m.color %} style="border-left:3px solid {{ m.color }};"{% endif %} onclick="libEdit(this)">
+          <div class="mcardL {{ cc }} {{ 'off' if not m.active }}" data-pkey="{{ m.pkey }}" data-label="{{ m.label }}" data-unit="{{ m.unit }}" data-min="{{ m.min_v if m.min_v is not none else '' }}" data-max="{{ m.max_v if m.max_v is not none else '' }}" data-low="{{ m.action_low }}" data-high="{{ m.action_high }}" data-kind="{{ m.kind }}" data-cat="{{ m.category }}" data-color="{{ m.color }}" data-active="{{ 1 if m.active else 0 }}"{% set cardcol = m.color or g.color %}{% if cardcol %} style="border-left:3px solid {{ cardcol }};"{% endif %} onclick="libEdit(this)">
             <div class="nm">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</div>
             <span class="lim">{% if m.min_v is not none and m.max_v is not none %}{{ m.min_v }}–{{ m.max_v }}{% elif m.min_v is not none %}≥{{ m.min_v }}{% elif m.max_v is not none %}≤{{ m.max_v }}{% else %}—{% endif %}{% if m.unit %} {{ m.unit }}{% endif %}</span>
             {% if m.action_low or m.action_high %}<div class="msg"><i class="ti ti-message-2"></i> μηνύματα</div>{% endif %}
@@ -609,7 +597,8 @@ select.in-kind{width:120px;}
           <div class="rw"><div><label>Κάτω όριο</label><input type="number" step="any" name="min_v" id="lf-min"></div><div><label>Άνω όριο</label><input type="number" step="any" name="max_v" id="lf-max"></div></div>
           <label>Μήνυμα αν χαμηλό</label><input type="text" name="action_low" id="lf-low">
           <label>Μήνυμα αν υψηλό</label><input type="text" name="action_high" id="lf-high">
-          <div class="rw"><div><label>Κατηγορία</label><select name="category" id="lf-cat"><option value="">— καμία —</option>{% for c in categories_list %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select></div><div><label>Χρώμα</label><input type="color" name="color" id="lf-color" value="#185FA5" style="width:46px;height:32px;padding:2px;border:1px solid #d6eef3;border-radius:6px;"></div></div>
+          <label>Κατηγορία</label><select name="category" id="lf-cat"><option value="">— καμία —</option>{% for c in categories_list %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select>
+          <p class="muted" style="font-size:11px;margin:4px 0 0;">Το χρώμα ορίζεται πλέον ανά <b>κατηγορία</b> (tab Παραμετροποίηση).</p>
           <div class="acts">
             <button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
             <button class="tgl" type="submit" id="lf-tgl" style="display:none;"></button>
@@ -633,7 +622,6 @@ select.in-kind{width:120px;}
       document.getElementById('lf-low').value=el.getAttribute('data-low');
       document.getElementById('lf-high').value=el.getAttribute('data-high');
       document.getElementById('lf-cat').value=el.getAttribute('data-cat');
-      document.getElementById('lf-color').value=el.getAttribute('data-color')||'#185FA5';
       setKind(el.getAttribute('data-kind')||'num');
       var t=document.getElementById('lf-tgl'),on=el.getAttribute('data-active')==='1';
       t.style.display='inline-block'; t.textContent=on?'Απενεργοποίηση':'Ενεργοποίηση';
@@ -644,7 +632,6 @@ select.in-kind{width:120px;}
       document.getElementById('lf-title').textContent='Νέο είδος μέτρησης';
       document.getElementById('lf-pkey').value=''; document.getElementById('lf-keyrow').style.display='block';
       ['lf-label','lf-unit','lf-min','lf-max','lf-low','lf-high','lf-cat','lf-key'].forEach(function(id){document.getElementById(id).value='';});
-      document.getElementById('lf-color').value='#185FA5';
       setKind('num'); document.getElementById('lf-tgl').style.display='none';
     };
     if(window.Sortable){
@@ -657,6 +644,10 @@ select.in-kind{width:120px;}
     }
   })();
   </script>
+  {# v12.355 #2: κρυμμένο container «Τύποι παρακολούθησης» (MonitorTemplate). Παλιό UI
+     των «Καταγραφών» (Δεξαμενές/Μετρητές) + τύποι pool/znx — δεν ανήκει στο νέο Είδη tab.
+     ΠΡΟΣ ΠΛΗΡΗ ΑΦΑΙΡΕΣΗ αφού μεταναστεύσουν pool/znx/tank/energy στο node-σύστημα.
+     Το μοντέλο MonitorTemplate παραμένει load-bearing — μην το σβήσεις πριν τη μετανάστευση.
   <div class="card">
     <div class="card-title"><i class="ti ti-template"></i> Τύποι παρακολούθησης</div>
     <p class="muted" style="margin-bottom:6px;">Οι τύποι (Πισίνα/ΖΝΧ/…) είναι το «είδος» κάθε σημείου και ομαδοποιούν τις περιόδους.</p>
@@ -674,6 +665,7 @@ select.in-kind{width:120px;}
       <button class="btn ghost" type="submit"><i class="ti ti-plus"></i> Νέος τύπος</button>
     </form>
   </div>
+  #}
   {% endif %}
 
   {% if tab=='params' %}
