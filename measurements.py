@@ -1198,12 +1198,6 @@ def measurements_console():
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
-    # periods
-    tpl_periods = []
-    for t in MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.sort, MonitorTemplate.name).all():
-        tpl_periods.append({'tpl': t, 'periods': MonitorPeriod.query.filter_by(template_key=t.key)
-                            .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
-                            'nparams': len(t.params or [])})
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
     # Παραμετροποίηση: κατηγορίες (λίστα + dropdown στα «Είδη») + μετρητής χρήσης
     categories_list = MeasCategory.query.order_by(MeasCategory.sort, MeasCategory.name).all()
@@ -1253,7 +1247,7 @@ def measurements_console():
     except Exception:
         _hcodes = {h.id: h.name for h in _active_hotels}
     return render_template('measurements_console.html', tab=tab,
-                           points_by_hotel=points_by_hotel, tpl_periods=tpl_periods,
+                           points_by_hotel=points_by_hotel,
                            st=migration_status(), msg=request.args.get('msg'),
                            all_hotels=_active_hotels, hcodes=_hcodes,
                            all_templates=MonitorTemplate.query.filter_by(is_active=True).order_by(MonitorTemplate.name).all(),
@@ -1653,46 +1647,10 @@ def measurements_migrate_run():
     return redirect(url_for('measurements_console') + '?tab=migrate&msg=' + msg)
 
 
-def _next_period_key(template_key):
-    keys = {p.key for p in MonitorPeriod.query.filter_by(template_key=template_key).all()}
-    n = 1
-    while f'p{n}' in keys:
-        n += 1
-    return f'p{n}'
-
-
-@app.route('/dashboard/measurements/period/save', methods=['POST'])
-def measurements_period_save():
-    if not is_admin():
-        return redirect(url_for('login'))
-    f = request.form
-    tk = (f.get('template_key') or '').strip()
-    label = (f.get('label') or '').strip()
-    tm = (f.get('time') or '').strip()
-    try:
-        sort = int(f.get('sort') or 0)
-    except (ValueError, TypeError):
-        sort = 0
-    pid = f.get('period_id')
-    if tk and label:
-        if pid:
-            p = MonitorPeriod.query.get(int(pid))
-            if p:
-                p.label = label[:40]; p.time = tm[:5]; p.sort = sort
-        else:
-            db.session.add(MonitorPeriod(template_key=tk, key=_next_period_key(tk), label=label[:40], time=tm[:5], sort=sort))
-        db.session.commit()
-    return redirect(url_for('measurements_console') + '?tab=periods')
-
-
-@app.route('/dashboard/measurements/period/<int:period_id>/delete', methods=['POST'])
-def measurements_period_delete(period_id):
-    if not is_admin():
-        return redirect(url_for('login'))
-    p = MonitorPeriod.query.get(period_id)
-    if p:
-        db.session.delete(p); db.session.commit()
-    return redirect(url_for('measurements_console') + '?tab=periods')
+# (C4 cleanup v12.353: αφαιρέθηκαν τα dead MonitorPeriod routes period/save & period/delete
+#  + _next_period_key — το UI τους (measurements_periods.html) ήταν ήδη ορφανό· οι περίοδοι
+#  ορίζονται πλέον στο tab «Παραμετροποίηση» (DayPeriod). Το μοντέλο MonitorPeriod μένει
+#  για ιστορική συμβατότητα/migration.)
 
 
 # ── ΦΟΡΜΑ ΚΑΤΑΧΩΡΗΣΗΣ (operational) ──────────────────────────────────────────
