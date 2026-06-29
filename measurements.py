@@ -233,6 +233,18 @@ def seed_measurement_engine():
                 for i, (k, nm, a, b) in enumerate(DEFAULT_DAYPERIODS):
                     db.session.add(DayPeriod(key=k, name=nm, t_from=a, t_to=b, sort=i))
                 db.session.commit()
+            # Εφάπαξ (flagged) backfill Δρόμος A: φόρτωσε υπάρχουσες μετρήσεις σημείων
+            # (AreaParam) πάνω στους κόμβους (NodeParam) — μη καταστροφικό, μόνο κενοί κόμβοι.
+            try:
+                from app import SysFlag
+                if not SysFlag.query.filter_by(key='meas_nodeparam_backfill').first():
+                    _rep, _ap = _backfill_nodeparams(do=True)
+                    db.session.add(SysFlag(key='meas_nodeparam_backfill'))
+                    db.session.commit()
+                    print(f'[measurements] NodeParam backfill (εφάπαξ): {_ap} κόμβοι γέμισαν')
+            except Exception as _e:
+                db.session.rollback()
+                print(f'[measurements] NodeParam backfill skipped: {_e}')
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
         except Exception as e:
@@ -1337,12 +1349,10 @@ def measurements_node_params(nid):
     return jsonify(ok=True, n=len(keys))
 
 
-@app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
-def measurements_nodeparams_migrate():
-    """Μετάβαση Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
-    GET = dry-run (αναφορά)· POST = εφαρμογή (μόνο κόμβοι χωρίς NodeParam· μη καταστροφικό)."""
-    if not is_admin():
-        return jsonify(ok=False), 403
+def _backfill_nodeparams(do=False):
+    """Πυρήνας Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
+    do=False → dry-run (report)· do=True → εφαρμογή (μόνο κόμβοι ΧΩΡΙΣ NodeParam· μη καταστροφικό).
+    Καλείται από το route (admin) ΚΑΙ από τον seeder (εφάπαξ, flagged)."""
     rows = (db.session.query(Area.node_id, AreaParam.pkey)
             .join(AreaParam, AreaParam.area_id == Area.id)
             .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
@@ -1353,7 +1363,6 @@ def measurements_nodeparams_migrate():
     nmap = {n.id: n.name for n in MonitorNode.query.all()}
     lbl = {m['pkey']: m['label'] for m in _library(include_inactive=True)}
     report, applied = [], 0
-    do = (request.method == 'POST')
     for nid, pks in plan.items():
         has = NodeParam.query.filter_by(node_id=nid).first()
         report.append({'node': nmap.get(nid, '#%d' % nid),
@@ -1364,6 +1373,18 @@ def measurements_nodeparams_migrate():
             applied += 1
     if do:
         db.session.commit()
+    return report, applied
+
+
+@app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
+def measurements_nodeparams_migrate():
+    """Μετάβαση Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
+    GET = dry-run (αναφορά)· POST = εφαρμογή (μόνο κόμβοι χωρίς NodeParam· μη καταστροφικό)."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    do = (request.method == 'POST')
+    report, applied = _backfill_nodeparams(do=do)
+    if do:
         log_activity('meas_nodeparams_migrate', 'applied=%d' % applied)
     return jsonify(ok=True, applied=applied, report=report)
 
