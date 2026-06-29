@@ -1782,7 +1782,25 @@ def measurements_entry_save():
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
 
 
+def _current_dayperiod():
+    """C1: το DayPeriod που ισχύει ΤΩΡΑ (ώρα Ελλάδος) βάσει t_from/t_to (με wrap-around)."""
+    now = _athens_now().strftime('%H:%M')
+    dps = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
+    for d in dps:
+        a, b = (d.t_from or ''), (d.t_to or '')
+        if not a or not b:
+            continue
+        if a <= b:
+            if a <= now <= b:
+                return d
+        else:  # διάστημα που «σπάει» τα μεσάνυχτα (π.χ. 20:00–05:59)
+            if now >= a or now <= b:
+                return d
+    return dps[0] if dps else None
+
+
 # ── Φ3c-2b: ΕΝΙΑΙΑ «Σήμερα» (engine) — σημεία ανά περιοχή + status ημέρας ─────
+# C1 (Δρόμος 2): οδηγείται από DayPeriod + MeasFreq — δείχνει «τι μετριέται τώρα» + εκκρεμή ανά μέτρηση.
 @app.route('/dashboard/measurements/today')
 def measurements_today():
     if 'user_id' not in session or not can_log():
@@ -1794,57 +1812,74 @@ def measurements_today():
         points = [a for a in points if a.hotel_id in _hids]
     today = date.today()
     aids = [a.id for a in points]
-    done = {}
+    hmap = {h.id: h.name for h in Hotel.query.all()}
+    amap = {a.id: a.name for a in points}
     cnt = {}
+    donepp = {}   # area_id -> {period_key -> set(pkey που μετρήθηκε σήμερα)}
+    alerts = []
     if aids:
         for r in Reading.query.filter(Reading.area_id.in_(aids), Reading.record_date == today).all():
-            done.setdefault(r.area_id, {})[r.period] = r
             cnt[r.area_id] = cnt.get(r.area_id, 0) + 1
-    hmap = {h.id: h.name for h in Hotel.query.all()}
-    _pcache = {}
-
-    def _periods(tk):
-        if tk not in _pcache:
-            _pcache[tk] = MonitorPeriod.query.filter_by(template_key=tk).order_by(
-                MonitorPeriod.sort, MonitorPeriod.id).all()
-        return _pcache[tk]
+            try:
+                _vals = _json.loads(r.values or '{}')
+            except Exception:
+                _vals = {}
+            d = donepp.setdefault(r.area_id, {}).setdefault(r.period or '', set())
+            for pk in _vals.keys():
+                d.add(pk)
+            try:
+                for act in area_actions(r):
+                    alerts.append({'point': amap.get(r.area_id, ''), 'label': act.get('label'),
+                                   'action': act.get('action')})
+            except Exception:
+                pass
+    # συχνότητα ανά (area, pkey) → due περίοδοι (DayPeriod keys)
+    freq = {}
+    for mf in MeasFreq.query.filter(MeasFreq.area_id.isnot(None)).all():
+        freq[(mf.area_id, mf.pkey)] = [p for p in (mf.periods or '').split(',') if p]
+    day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
+    cur = _current_dayperiod()
+    cur_key = cur.key if cur else None
 
     def _grp(a):
         loc = (a.location or '').strip()
         if loc:
             return (loc, 'ti-map-pin', loc.lower())
-        return ('Χωρίς χώρο', 'ti-map-pin', 'zzzz')
+        return ('Χωρίς ζώνη', 'ti-map-pin', 'zzzz')
 
     by_hotel = {}
-    alerts = []
-    total = donen = 0
+    pending_total = due_now_total = done_now_total = 0
     for a in points:
-        prs = _periods(a.template_key)
-        slots = []
-        for pr in prs:
-            r = done.get(a.id, {}).get(pr.key)
-            slots.append({'period': pr.key, 'label': pr.label, 'time': pr.time, 'done': bool(r)})
-            total += 1
-            if r:
-                donen += 1
-                try:
-                    for act in area_actions(r):
-                        alerts.append({'point': a.name, 'label': act.get('label'), 'action': act.get('action')})
-                except Exception:
-                    pass
+        adone = donepp.get(a.id, {})
+        meas = []
+        p_now = 0
+        for p in point_params(a):
+            due = freq.get((a.id, p.pkey), [])
+            due_now = bool(cur_key) and (cur_key in due)
+            done_now = p.pkey in adone.get(cur_key or '', set())
+            if due_now:
+                due_now_total += 1
+                if done_now:
+                    done_now_total += 1
+                else:
+                    p_now += 1
+            meas.append({'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
+                         'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
+                         'kind': _param_input_kind(p), 'due': due,
+                         'due_now': due_now, 'done_now': done_now})
+        pending_total += p_now
         cat, icon, order = _grp(a)
         groups = by_hotel.setdefault(a.hotel_id, {})
         g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
-        prm = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
-                'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
-                'kind': _param_input_kind(p)} for p in point_params(a)]
-        g['areas'].append({'area': a, 'slots': slots, 'count': cnt.get(a.id, 0), 'params': prm})
+        g['areas'].append({'area': a, 'meas': meas, 'count': cnt.get(a.id, 0), 'pending_now': p_now})
     today_by_hotel = []
     for hid, groups in by_hotel.items():
         glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
         today_by_hotel.append({'hotel': hmap.get(hid, '—'), 'groups': glist})
     return render_template('measurements_today.html', today_by_hotel=today_by_hotel,
-                           alerts=alerts, total=total, donen=donen,
+                           alerts=alerts, day_periods=day_periods, cur=cur,
+                           pending_total=pending_total, due_now_total=due_now_total,
+                           done_now_total=done_now_total,
                            today=_athens_now().date().isoformat(),
                            now_time=_athens_now().strftime('%H:%M'))
 

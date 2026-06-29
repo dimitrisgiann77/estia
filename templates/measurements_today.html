@@ -46,6 +46,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .alert{font-size:13px;color:#9a3412;padding:4px 0;}
 .muted{color:#888;font-size:12px;}
 .savedmsg{background:#dcfce7;border:1px solid #bbf7d0;color:#166534;border-radius:8px;padding:8px 11px;font-size:12px;margin-top:10px;display:none;}
+.nowbar{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#e6f1fb;border:1px solid #b5d4f4;border-radius:12px;padding:10px 14px;margin-bottom:10px;font-size:13px;flex-wrap:wrap;}
+.nowbar b{color:#185FA5;}
+.nowpend{font-weight:700;color:#A32D2D;background:#fff;border:1px solid #f0b9b9;border-radius:20px;padding:3px 10px;white-space:nowrap;}
+.nowpend.zero{color:#0F6E56;border-color:#bbf7d0;}
+.onlyf{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#5f7682;margin-bottom:12px;cursor:pointer;}
+.duebadge{font-size:10px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;}
+.duebadge.now{background:#fde8e8;color:#A32D2D;}
+.duebadge.now.done{background:#dcfce7;color:#166534;}
 :root{--brand:{{ theme.primary if theme else '#193847' }};}
 .topbar{background:var(--brand)!important;}
 .embed .topbar{display:none!important;}.embed body{background:transparent!important;}
@@ -58,10 +66,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="topbar-title"><i class="ti ti-calendar-check"></i> Σήμερα — Μετρήσεις</div>
     <div class="topbar-sub">Πάτα ένα σημείο, συμπλήρωσε, αποθήκευσε. Πράσινο = έγινε.</div>
   </div>
-  <div class="prog"><span id="donen">{{ donen }}</span> / {{ total }} σήμερα</div>
+  <div class="prog"><span id="donen">{{ done_now_total }}</span> / {{ due_now_total }} τώρα</div>
 </div>
 <div class="container">
-  <div class="pbar"><i id="pbar" style="width:{{ ((donen/total*100)|round|int) if total else 0 }}%;"></i></div>
+  {% if cur %}
+  <div class="nowbar">
+    <div><i class="ti ti-clock-hour-4"></i> Τρέχουσα περίοδος: <b>{{ cur.name }}</b> <span class="muted">({{ cur.t_from }}–{{ cur.t_to }})</span></div>
+    <div class="nowpend {{ 'zero' if not pending_total }}"><i class="ti ti-alert-circle"></i> {{ pending_total }} εκκρεμείς τώρα</div>
+  </div>
+  <label class="onlyf"><input type="checkbox" id="onlyPending" onchange="filterPending(this)"> Μόνο όσα εκκρεμούν τώρα</label>
+  {% endif %}
+  <div class="pbar"><i id="pbar" style="width:{{ ((done_now_total/due_now_total*100)|round|int) if due_now_total else 0 }}%;"></i></div>
 
   {% if alerts %}
   <div class="alerts">
@@ -76,14 +91,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="section">
       <div class="sechead"><i class="ti {{ g.icon }}"></i> {{ g.title }} <span class="secn">{{ g.areas|length }}</span></div>
       {% for c in g.areas %}
-      {% set anydone = c.count > 0 %}
-      <div class="pt" data-aid="{{ c.area.id }}">
+      {% set pend = c.pending_now %}
+      <div class="pt" data-aid="{{ c.area.id }}" data-pending="{{ pend }}">
         <div class="pthead" onclick="togglePt(this)">
-          <i class="ti st {{ 'ok' if anydone else 'no' }} {{ 'ti-circle-check' if anydone else 'ti-circle' }}"></i>
+          <i class="ti st {{ 'bad' if pend else ('ok' if c.count else 'no') }} {{ 'ti-alert-circle' if pend else ('ti-circle-check' if c.count else 'ti-circle') }}"></i>
           <span class="nm">{{ c.area.name }}</span>
           {% if c.area.pos_label %}<span class="loc">· {{ c.area.pos_label }}</span>{% endif %}
           {% if c.area.location %}<span class="loc">· {{ c.area.location }}</span>{% endif %}
-          <span class="cnt" style="{{ '' if c.count else 'display:none;' }}">{{ c.count }} σήμερα</span>
+          {% if pend %}<span class="cnt" style="background:#fde8e8;color:#A32D2D;">{{ pend }} εκκρεμή τώρα</span>
+          {% elif c.count %}<span class="cnt">{{ c.count }} σήμερα</span>{% endif %}
           <i class="ti ti-chevron-down chev"></i>
         </div>
         <div class="det">
@@ -92,17 +108,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <input type="hidden" name="ajax" value="1">
             <input type="hidden" name="record_date" value="{{ today }}">
             <div class="fgrid">
-              <div class="f"><label>Περίοδος / Βάρδια</label>
+              <div class="f"><label>Περίοδος</label>
                 <select name="period">
-                  {% for s in c.slots %}<option value="{{ s.period }}">{{ s.label }}{% if s.time %} ({{ s.time }}){% endif %}</option>{% endfor %}
-                  {% if not c.slots %}<option value="day">Ημέρα</option>{% endif %}
+                  {% for d in day_periods %}<option value="{{ d.key }}"{{ ' selected' if cur and d.key==cur.key }}>{{ d.name }} ({{ d.t_from }}–{{ d.t_to }})</option>{% endfor %}
+                  {% if not day_periods %}<option value="day">Ημέρα</option>{% endif %}
                 </select></div>
               <div class="f"><label>Ώρα</label><input type="time" name="record_time" value="{{ now_time }}"></div>
               <div class="f"><label>Θέση δειγματοληψίας</label>
                 <select name="position"><option value="">—</option><option>Απομακρυσμένο</option><option>Μεσαίο</option><option>Κοντινό</option></select></div>
               <div class="f"><label>Χώρος δείγματος</label><input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar"></div>
-              {% for p in c.params %}
-              <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.min_v is not none or p.max_v is not none %} <span class="lim">{{ p.min_v if p.min_v is not none else '' }}{% if p.min_v is not none and p.max_v is not none %}–{% endif %}{{ p.max_v if p.max_v is not none else '' }}</span>{% endif %}</label>
+              {% for p in c.meas %}
+              <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.min_v is not none or p.max_v is not none %} <span class="lim">{{ p.min_v if p.min_v is not none else '' }}{% if p.min_v is not none and p.max_v is not none %}–{% endif %}{{ p.max_v if p.max_v is not none else '' }}</span>{% endif %}{% if p.due_now %}<span class="duebadge now {{ 'done' if p.done_now else '' }}">{{ '✓ τώρα' if p.done_now else '● τώρα' }}</span>{% endif %}</label>
                 {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
                 {% elif p.kind=='text' %}<input type="text" name="{{ p.pkey }}">
                 {% else %}<input type="number" step="any" name="{{ p.pkey }}" class="measin" data-min="{{ p.min_v if p.min_v is not none else '' }}" data-max="{{ p.max_v if p.max_v is not none else '' }}" data-low="{{ p.low or '' }}" data-high="{{ p.high or '' }}" data-label="{{ p.label }}" oninput="liveCheck(this)">{% endif %}
@@ -129,6 +145,21 @@ function togglePt(head){
   var pt=head.parentNode, open=pt.classList.contains('open');
   document.querySelectorAll('.pt.open').forEach(function(x){ if(x!==pt) x.classList.remove('open'); });
   pt.classList.toggle('open', !open);
+}
+function filterPending(cb){
+  var on=cb.checked;
+  document.querySelectorAll('.pt').forEach(function(pt){
+    pt.style.display=(on && (pt.getAttribute('data-pending')||'0')==='0')?'none':'';
+  });
+  document.querySelectorAll('.section').forEach(function(s){
+    var any=[].some.call(s.querySelectorAll('.pt'),function(p){return p.style.display!=='none';});
+    s.style.display=any?'':'none';
+  });
+  document.querySelectorAll('.hotel').forEach(function(h){
+    var sib=h.nextElementSibling, any=false;
+    while(sib && sib.classList && sib.classList.contains('section')){ if(sib.style.display!=='none'){any=true;break;} sib=sib.nextElementSibling; }
+    h.style.display=any?'':'none';
+  });
 }
 function liveCheck(el){
   var v=el.value; el.classList.remove('ok','bad');
