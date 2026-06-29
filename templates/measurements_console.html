@@ -427,8 +427,51 @@ select.in-kind{width:120px;}
       </div>
     </div>
   </div>
+  <style>
+  .zpts-tbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .zpts-tbl th{font-size:11px;color:#5f7682;text-align:left;padding:5px 8px;font-weight:700;}
+  .zpts-tbl td{padding:5px 8px;border-top:1px solid #eef3f7;vertical-align:middle;}
+  .zpts-tbl tr.off{opacity:.5;}
+  .zpts-tbl .hb{font-size:10px;font-weight:700;background:#e7f2f8;color:#2c6079;border-radius:6px;padding:1px 6px;}
+  .zpts-tbl .pm{font-size:11px;background:#fff;border:1px solid #dbecf3;border-radius:6px;padding:1px 6px;color:#3a6b82;margin:0 3px 2px 0;display:inline-block;}
+  .zpts-tbl .ppos{padding:4px 6px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
+  .zpts-tbl .pcol{width:38px;height:26px;padding:1px;border:1px solid #d6eef3;border-radius:5px;}
+  .zpts-tbl .dlink{font-size:11px;color:#185FA5;text-decoration:none;white-space:nowrap;}
+  </style>
+  <div class="card" id="zpts-wrap" style="display:none;margin-top:14px;">
+    <div class="card-title"><i class="ti ti-flask"></i> Σημεία Δειγματοληψίας — <span id="zpts-zone" style="color:#185FA5;"></span></div>
+    <p class="muted" style="margin-bottom:10px;font-size:12px;">Θέση & χρώμα ρυθμίζονται εδώ (auto-save). Οι μετρήσεις & η ανάθεση ορίζονται στη «Δομή δικτύου».</p>
+    {% for s in spaces_list %}{% set pts = zone_points.get(s.name, []) %}
+    <div class="zpts-panel" id="zpts-{{ s.id }}" style="display:none;">
+      {% if pts %}
+      <table class="zpts-tbl">
+        <thead><tr><th>Ξεν.</th><th>Σημείο Δειγματοληψίας</th><th>Μετρήσεις</th><th>Θέση</th><th>Χρώμα</th><th></th></tr></thead>
+        <tbody>
+        {% for p in pts %}
+        <tr data-pid="{{ p.id }}" class="{{ '' if p.active else 'off' }}">
+          <td><span class="hb">{{ hcodes.get(p.hotel_id) or p.hotel }}</span></td>
+          <td>{{ p.name }}{% if not p.active %} <span class="muted">(ανενεργό)</span>{% endif %}</td>
+          <td>{% for m in p.meas %}<span class="pm">{{ m }}</span>{% endfor %}{% if not p.meas %}<span class="muted">—</span>{% endif %}</td>
+          <td><select class="ppos" onchange="psave(this)"><option value="">—</option><option value="near"{{ ' selected' if p.position=='near' }}>Κοντινό</option><option value="mid"{{ ' selected' if p.position=='mid' }}>Μεσαίο</option><option value="far"{{ ' selected' if p.position=='far' }}>Μακρινό</option></select></td>
+          <td><input type="color" class="pcol" value="{{ p.color or '#185FA5' }}" onchange="psave(this)"></td>
+          <td>{% if p.node_id %}<a class="dlink" href="/dashboard/measurements?tab=structure" title="Επεξεργασία μετρήσεων στη Δομή («{{ p.node }}»)"><i class="ti ti-external-link"></i> Δομή</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<div class="muted" style="font-size:12px;">Κανένα Σημείο Δειγματοληψίας σε αυτή τη ζώνη — όρισέ τα στη «Δομή δικτύου» (τικ ξενοδοχείου + επίλεξε αυτή τη ζώνη).</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
   <script>
   function zicon(){var ic=document.getElementById('z-icon').value||'ti-map-pin';var c=document.getElementById('z-color').value;var p=document.getElementById('z-prev');p.className='ti '+ic;p.style.color=c;}
+  function psave(el){
+    var tr=el.closest('tr');var pid=tr.getAttribute('data-pid');var fd=new FormData();
+    if(el.classList.contains('ppos')) fd.append('position', el.value); else fd.append('color', el.value);
+    el.disabled=true;
+    fetch('/dashboard/measurements/point/'+pid+'/attrs',{method:'POST',body:fd})
+      .then(function(r){return r.json();}).then(function(d){el.disabled=false;}).catch(function(){el.disabled=false;});
+  }
   function zpick(el){
     document.querySelectorAll('.zcard.sel').forEach(function(c){c.classList.remove('sel');});
     el.classList.add('sel');
@@ -444,6 +487,11 @@ select.in-kind{width:120px;}
     b.setAttribute('data-name',el.getAttribute('data-name'));
     b.setAttribute('data-id',el.getAttribute('data-id'));
     zicon();
+    var w=document.getElementById('zpts-wrap');
+    document.querySelectorAll('.zpts-panel').forEach(function(p){p.style.display='none';});
+    var panel=document.getElementById('zpts-'+el.getAttribute('data-id'));
+    if(panel){panel.style.display='block';w.style.display='block';document.getElementById('zpts-zone').textContent=el.getAttribute('data-name');}
+    else{w.style.display='none';}
   }
   function zdel(){
     var b=document.getElementById('z-del');var u=parseInt(b.getAttribute('data-use')||'0',10);

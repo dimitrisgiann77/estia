@@ -903,6 +903,26 @@ def measurements_space_reorder():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/measurements/point/<int:pid>/attrs', methods=['POST'])
+def measurements_point_attrs(pid):
+    """Φ2 Ζώνες: αποθήκευση πεδίων επιπέδου-σημείου (Θέση/Χρώμα). Field-aware AJAX.
+    Μετρήσεις/ανάθεση/ενεργό = owned από Δομή — ΔΕΝ γράφονται εδώ."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    a = Area.query.get(pid)
+    if not a:
+        return jsonify(ok=False), 404
+    f = request.form
+    if 'position' in f:
+        v = (f.get('position') or '').strip()
+        a.position = v if v in ('near', 'mid', 'far') else None
+    if 'color' in f:
+        a.color = (f.get('color') or '').strip()[:20] or None
+    db.session.commit()
+    log_activity('meas_point_attrs', '%s pos=%s' % (a.name, a.position))
+    return jsonify(ok=True, position=a.position or '', color=a.color or '')
+
+
 @app.route('/dashboard/measurements/freq/period/save', methods=['POST'])
 def measurements_freq_period_save():
     """Ορισμός περιόδου ημέρας (όνομα + από/έως)."""
@@ -1093,6 +1113,7 @@ def measurements_console():
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
     # Φ1 Ζώνες: μετρητής χρήσης ανά ζώνη = πόσα ενεργά Σημεία τη χρησιμοποιούν (location)
     space_usage = {}
+    zone_points = {}
     if tab == 'spaces':
         for loc, cnt in (db.session.query(Area.location, db.func.count(Area.id))
                          .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
@@ -1100,6 +1121,19 @@ def measurements_console():
                          .group_by(Area.location).all()):
             if loc:
                 space_usage[loc] = cnt
+        # Φ2 Ζώνες: τα Σημεία Δειγματοληψίας ανά ζώνη (για το panel κάτω από τον editor)
+        _hc = {h.id: h.name for h in Hotel.query.all()}
+        _nn = {n.id: n.name for n in MonitorNode.query.all()}
+        for a in (Area.query.filter(Area.engine_only.is_(True), Area.location.isnot(None))
+                  .order_by(Area.location, Area.hotel_id, Area.name).all()):
+            loc = (a.location or '').strip()
+            if not loc:
+                continue
+            zone_points.setdefault(loc, []).append({
+                'id': a.id, 'name': a.name, 'hotel_id': a.hotel_id,
+                'hotel': _hc.get(a.hotel_id, ''), 'position': a.position or '',
+                'color': a.color or '', 'active': a.is_active, 'node_id': a.node_id,
+                'node': _nn.get(a.node_id, ''), 'meas': [p.label for p in point_params(a)]})
     lib_map_json = _json.dumps({m['pkey']: m for m in library}, ensure_ascii=False)
     day_periods = []
     freq_spaces = []
@@ -1137,7 +1171,8 @@ def measurements_console():
                            node_kids=node_kids, node_meas=node_meas, node_np=node_np,
                            node_hotel_loc=node_hotel_loc,
                            group_points=group_points, pool_points=pool_points,
-                           spaces_list=spaces_list, space_usage=space_usage, lib_map_json=lib_map_json,
+                           spaces_list=spaces_list, space_usage=space_usage,
+                           zone_points=zone_points, lib_map_json=lib_map_json,
                            day_periods=day_periods, freq_spaces=freq_spaces)
 
 

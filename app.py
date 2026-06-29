@@ -362,11 +362,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.346'
-APP_BUILD   = '627'
+APP_VERSION = '12.347'
+APP_BUILD   = '628'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.347', 'b': '628', 'date': '29/06/2026', 'time': '14:30', 'title': 'Ζώνες → Σημεία Δειγματοληψίας: Θέση + Χρώμα + μετρήσεις read-only (Φ2)',
+     'items': ['Κλικ σε ζώνη → εμφανίζονται τα Σημεία Δειγματοληψίας της (ανά ξενοδοχείο): Θέση (Κοντινό/Μεσαίο/Μακρινό) + Χρώμα σημείου (auto-save), οι μετρήσεις τους read-only (+ link «Δομή»), ένδειξη ενεργό/ανενεργό.',
+               'Νέα στήλη Area.color. Οι μετρήσεις/ανάθεση παραμένουν owned από τη «Δομή δικτύου».']},
     {'v': '12.346', 'b': '627', 'date': '29/06/2026', 'time': '14:00', 'title': 'Ζώνες ως κάρτες: εικονίδιο/χρώμα/περιγραφή + μετρητής χρήσης + guard διαγραφής (Φ1)',
      'items': ['Το tab «Ζώνες» έγινε κάρτες με editor (όνομα/εικονίδιο/χρώμα/περιγραφή). Κάθε ζώνη δείχνει πόσα Σημεία Δειγματοληψίας τη χρησιμοποιούν.',
                'Η διαγραφή προειδοποιεί αν η ζώνη είναι σε χρήση. Η μετονομασία ζώνης ενημερώνει αυτόματα και τα Σημεία/συχνότητες που τη χρησιμοποιούν (όχι ορφανά).']},
@@ -1783,6 +1786,7 @@ class Area(db.Model):
     legacy_id    = db.Column(db.Integer)                  # Φ2: Pool.id / WaterSystem.id
     node_id      = db.Column(db.Integer)                  # Φ-Α: κόμβος δέντρου δικτύων (MonitorNode.id· null=σημερινή συμπεριφορά)
     position     = db.Column(db.String(10))               # χαρακτηρισμός θέσης δειγματοληψίας: near|mid|far|None
+    color        = db.Column(db.String(20))               # Φ2 Ζώνες: χρωματικός κωδικός σημείου
     hotel        = db.relationship('Hotel')
     @property
     def pos_label(self):
@@ -4477,6 +4481,8 @@ def ensure_columns():
     _add_col('sampling_space', 'icon', 'icon VARCHAR(40)')
     _add_col('sampling_space', 'color', 'color VARCHAR(20)')
     _add_col('sampling_space', 'description', 'description VARCHAR(200)')
+    # v12.347 — Φ2 Ζώνες: χρωματικός κωδικός ανά Σημείο Δειγματοληψίας
+    _add_col('area', 'color', 'color VARCHAR(20)')
 
 def init_db():
     with app.app_context():
