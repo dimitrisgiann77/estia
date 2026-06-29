@@ -270,7 +270,7 @@ select.in-kind{width:120px;}
           <div id="st-meas" class="zone"></div>
           <div id="st-pal" class="pal">{% for m in library %}<div class="pchip" data-pkey="{{ m.pkey }}">{{ m.label }}</div>{% endfor %}</div>
           <label>Ξενοδοχεία &amp; χώρος δειγματοληψίας</label>
-          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span><input class="loc" placeholder="χώρος…" onchange="nodeHotelLoc(this)" disabled></div>{% endfor %}</div>
+          <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span><select class="loc" onchange="nodeHotelLoc(this)" disabled><option value="">— χώρος —</option>{% for s in spaces_list %}<option value="{{ s.name }}">{{ s.name }}</option>{% endfor %}</select></div>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
           <button class="addsub" type="button" id="st-addsub"><i class="ti ti-plus"></i> Νέα υποομάδα εδώ</button>
         </form>
@@ -303,7 +303,9 @@ select.in-kind{width:120px;}
       document.querySelectorAll('#st-hotels .hrow').forEach(function(r){
         var hid=r.getAttribute('data-h'); var on=hs.indexOf(hid)>=0;
         var hck=r.querySelector('.hck'); hck.classList.toggle('on',on); hck.querySelector('i').className='ti '+(on?'ti-square-check':'ti-square');
-        var loc=r.querySelector('.loc'); loc.value=locs[hid]||''; loc.disabled=!on;
+        var loc=r.querySelector('.loc'); var lv=locs[hid]||'';
+        if(lv && !Array.prototype.some.call(loc.options,function(o){return o.value===lv;})){var op=document.createElement('option');op.value=lv;op.textContent=lv+' (παλιό)';loc.appendChild(op);}
+        loc.value=lv; loc.disabled=!on;
       });
       renderMeas(el.getAttribute('data-meas')||'');
     };
@@ -558,7 +560,7 @@ select.in-kind{width:120px;}
         {% endfor %}
         </tbody>
       </table>
-      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτόν τον χώρο — όρισε σημεία στα «Σημεία».</div>{% endif %}
+      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτόν τον χώρο — όρισε μετρήσεις & χώρο στους κόμβους («Δομή δικτύου»).</div>{% endif %}
     </div>
     {% else %}<div class="muted">Δεν υπάρχουν χώροι — πρόσθεσε στους «Χώρους».</div>{% endfor %}
   </div>
