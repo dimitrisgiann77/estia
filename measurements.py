@@ -64,6 +64,27 @@ DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 
                   'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Άλλος Χώρος', 'Απομακρυσμένο']
 
 
+# ── Φ2 ρυθμίσεων: Συχνότητα = περίοδοι ημέρας + ανάθεση ανά χώρο × μέτρηση ──────
+class DayPeriod(db.Model):
+    id     = db.Column(db.Integer, primary_key=True)
+    key    = db.Column(db.String(20), unique=True)
+    name   = db.Column(db.String(40), nullable=False)
+    t_from = db.Column(db.String(5))
+    t_to   = db.Column(db.String(5))
+    sort   = db.Column(db.Integer, default=0)
+
+class MeasFreq(db.Model):
+    id      = db.Column(db.Integer, primary_key=True)
+    space   = db.Column(db.String(80), index=True)   # = Area.location (όνομα χώρου)
+    pkey    = db.Column(db.String(40))
+    periods = db.Column(db.String(160))              # CSV από DayPeriod.key
+
+DEFAULT_DAYPERIODS = [('morning', 'Πρωί', '06:00', '11:59'),
+                      ('noon', 'Μεσημέρι', '12:00', '17:29'),
+                      ('afternoon', 'Απόγευμα', '17:30', '19:59'),
+                      ('night', 'Βράδυ', '20:00', '05:59')]
+
+
 # ── Ώρα Ελλάδος (αποθήκευση UTC, χρήση Europe/Athens στη φόρμα/μετατροπή) ──
 def _athens_now():
     from datetime import timezone as _tz
@@ -199,6 +220,10 @@ def seed_measurement_engine():
             if not SamplingSpace.query.first():
                 for i, nm in enumerate(DEFAULT_SPACES):
                     db.session.add(SamplingSpace(name=nm, sort=i))
+                db.session.commit()
+            if not DayPeriod.query.first():
+                for i, (k, nm, a, b) in enumerate(DEFAULT_DAYPERIODS):
+                    db.session.add(DayPeriod(key=k, name=nm, t_from=a, t_to=b, sort=i))
                 db.session.commit()
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
@@ -815,6 +840,51 @@ def measurements_space_reorder():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/measurements/freq/period/save', methods=['POST'])
+def measurements_freq_period_save():
+    """Ορισμός περιόδου ημέρας (όνομα + από/έως)."""
+    if not is_admin():
+        return redirect(url_for('login'))
+    f = request.form
+    pid = f.get('id')
+    if pid:
+        p = DayPeriod.query.get(int(pid))
+        if p:
+            p.name = (f.get('name') or p.name).strip()[:40]
+            p.t_from = (f.get('t_from') or '').strip()[:5]
+            p.t_to = (f.get('t_to') or '').strip()[:5]
+            db.session.commit()
+    return redirect(url_for('measurements_console') + '?tab=periods')
+
+
+@app.route('/dashboard/measurements/freq/set', methods=['POST'])
+def measurements_freq_set():
+    """AJAX toggle: συχνότητα μιας μέτρησης σε έναν χώρο για μια περίοδο."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    f = request.form
+    space = (f.get('space') or '').strip()[:80]
+    pkey = (f.get('pkey') or '').strip()[:40]
+    per = (f.get('period') or '').strip()[:20]
+    if not (space and pkey and per):
+        return jsonify(ok=False), 400
+    row = MeasFreq.query.filter_by(space=space, pkey=pkey).first()
+    cur = set([x for x in ((row.periods or '').split(',')) if x]) if row else set()
+    on = per not in cur
+    if on:
+        cur.add(per)
+    else:
+        cur.discard(per)
+    order = [d.key for d in DayPeriod.query.order_by(DayPeriod.sort).all()]
+    val = ','.join([k for k in order if k in cur])
+    if not row:
+        row = MeasFreq(space=space, pkey=pkey, periods=val); db.session.add(row)
+    else:
+        row.periods = val
+    db.session.commit()
+    return jsonify(ok=True, on=on, count=len(cur))
+
+
 @app.route('/dashboard/measurements/lib/reorder', methods=['POST'])
 def measurements_lib_reorder():
     """Αναδιάταξη ειδών μετρήσεων (drag): θέτει MonitorParam.sort ανά pkey (όλες οι εμφανίσεις)."""
@@ -1021,6 +1091,24 @@ def measurements_console():
                             'nparams': len(t.params or [])})
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
     lib_map_json = _json.dumps({m['pkey']: m for m in library}, ensure_ascii=False)
+    day_periods = []
+    freq_spaces = []
+    if tab == 'periods':
+        day_periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
+        _lbl = {m['pkey']: m['label'] for m in library}
+        _sp = {}
+        for loc, pk in (db.session.query(Area.location, AreaParam.pkey)
+                        .join(AreaParam, AreaParam.area_id == Area.id)
+                        .filter(Area.engine_only.is_(True), Area.is_active.is_(True)).all()):
+            loc = (loc or '').strip()
+            if loc:
+                _sp.setdefault(loc, set()).add(pk)
+        _fr = {(mf.space, mf.pkey): [p for p in (mf.periods or '').split(',') if p]
+               for mf in MeasFreq.query.all()}
+        for s in SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all():
+            meas = [{'pkey': pk, 'label': _lbl.get(pk, pk), 'periods': _fr.get((s.name, pk), [])}
+                    for pk in sorted(_sp.get(s.name, set()), key=lambda k: _lbl.get(k, k))]
+            freq_spaces.append({'name': s.name, 'meas': meas})
     _active_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
     try:
         from schedule import _hotel_short
@@ -1040,7 +1128,8 @@ def measurements_console():
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,
-                           spaces_list=spaces_list, lib_map_json=lib_map_json)
+                           spaces_list=spaces_list, lib_map_json=lib_map_json,
+                           day_periods=day_periods, freq_spaces=freq_spaces)
 
 
 @app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])

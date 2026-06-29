@@ -584,28 +584,67 @@ select.in-kind{width:120px;}
   {% endif %}
 
   {% if tab=='periods' %}
-  {% for r in tpl_periods %}
+  <style>
+  .fqcard{border:1px solid #e1edf4;border-left:3px solid #1D9E75;border-radius:0 10px 10px 0;padding:10px 12px;margin-bottom:10px;background:#fbfdff;}
+  .fqh{font-weight:600;font-size:14px;margin-bottom:6px;}
+  .fqtbl{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .fqtbl th{font-size:11px;color:#5f7682;padding:4px 6px;text-align:left;font-weight:700;}
+  .fqtbl td{padding:4px 6px;border-top:1px solid #eef3f7;}
+  .fqtbl th.fqp,.fqtbl td.fqp{text-align:center;}
+  .fqcell{border:none;background:none;cursor:pointer;color:#cfd8de;font-size:18px;padding:0;line-height:1;}
+  .fqcell.on{color:#185FA5;}
+  .fqcount{font-weight:600;color:#5f7682;text-align:center;}
+  .fqper{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .fqper input[type=time]{padding:5px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;}
+  .fqper .in-name{padding:5px 8px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;width:140px;}
+  </style>
   <div class="card">
-    <div class="card-title"><i class="ti {{ r.tpl.icon or 'ti-checklist' }}"></i> {{ r.tpl.name }} <span class="muted">— {{ r.nparams }} παράμετροι</span></div>
-    {% for p in r.periods %}
-    <form method="POST" action="/dashboard/measurements/period/save" class="row">
-      <input type="hidden" name="template_key" value="{{ r.tpl.key }}"><input type="hidden" name="period_id" value="{{ p.id }}">
-      <div><span class="lbl">Όνομα</span><input class="in-name" type="text" name="label" value="{{ p.label }}" required></div>
-      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" value="{{ p.time or '' }}" placeholder="08:00"></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ p.sort or 0 }}"></div>
-      <button class="btn ghost" type="submit"><i class="ti ti-device-floppy"></i></button>
-      <button class="btn del" type="submit" formaction="/dashboard/measurements/period/{{ p.id }}/delete" onclick="return confirm('Διαγραφή; (οι καταγραφές δεν θίγονται)');"><i class="ti ti-trash"></i></button>
+    <div class="card-title"><i class="ti ti-clock-cog"></i> Συχνότητα μετρήσεων <span class="muted" style="font-weight:400;">(ανά χώρο × μέτρηση)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Για κάθε χώρο, τίκαρε σε ποιες περιόδους μετριέται η κάθε μέτρηση. Τα διαστήματα ωρών ορίζονται πιο κάτω.</p>
+    {% for sp in freq_spaces %}
+    <div class="fqcard">
+      <div class="fqh"><i class="ti ti-map-pin"></i> {{ sp.name }}</div>
+      {% if sp.meas %}
+      <table class="fqtbl">
+        <thead><tr><th>Μέτρηση</th>{% for d in day_periods %}<th class="fqp">{{ d.name }}</th>{% endfor %}<th class="fqp">Σύνολο</th></tr></thead>
+        <tbody>
+        {% for m in sp.meas %}
+        <tr data-space="{{ sp.name }}" data-pkey="{{ m.pkey }}">
+          <td>{{ m.label }}</td>
+          {% for d in day_periods %}<td class="fqp"><button type="button" class="fqcell {{ 'on' if d.key in m.periods }}" data-period="{{ d.key }}" onclick="freqToggle(this)"><i class="ti {{ 'ti-square-check' if d.key in m.periods else 'ti-square' }}"></i></button></td>{% endfor %}
+          <td class="fqcount">{{ m.periods|length }}×</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<div class="muted" style="font-size:12px;">Καμία μέτρηση σε αυτόν τον χώρο — όρισε σημεία στα «Σημεία».</div>{% endif %}
+    </div>
+    {% else %}<div class="muted">Δεν υπάρχουν χώροι — πρόσθεσε στους «Χώρους».</div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-title"><i class="ti ti-clock"></i> Ορισμός περιόδων ημέρας <span class="muted" style="font-weight:400;">(κοινά διαστήματα ωρών)</span></div>
+    {% for d in day_periods %}
+    <form method="POST" action="/dashboard/measurements/freq/period/save" class="fqper">
+      <input type="hidden" name="id" value="{{ d.id }}">
+      <input class="in-name" type="text" name="name" value="{{ d.name }}">
+      <span class="muted">από</span><input type="time" name="t_from" value="{{ d.t_from }}">
+      <span class="muted">έως</span><input type="time" name="t_to" value="{{ d.t_to }}">
+      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
     </form>
     {% endfor %}
-    <form method="POST" action="/dashboard/measurements/period/save" class="row">
-      <input type="hidden" name="template_key" value="{{ r.tpl.key }}">
-      <div><span class="lbl">Νέα — Όνομα</span><input class="in-name" type="text" name="label" placeholder="π.χ. Βράδυ" required></div>
-      <div><span class="lbl">Ώρα</span><input class="in-sm" type="text" name="time" placeholder="20:00"></div>
-      <div><span class="lbl">Σειρά</span><input class="in-sm" type="text" name="sort" value="{{ (r.periods|length)+1 }}"></div>
-      <button class="btn alt" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
   </div>
-  {% endfor %}
+  <script>
+  function freqToggle(btn){
+    var tr=btn.closest('tr'); var fd=new FormData();
+    fd.append('space',tr.getAttribute('data-space')); fd.append('pkey',tr.getAttribute('data-pkey')); fd.append('period',btn.getAttribute('data-period'));
+    btn.disabled=true;
+    fetch('/dashboard/measurements/freq/set',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+      btn.disabled=false; if(!d||!d.ok){alert('Σφάλμα.');return;}
+      btn.classList.toggle('on',d.on); btn.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
+      tr.querySelector('.fqcount').textContent=d.count+'×';
+    }).catch(function(){btn.disabled=false;});
+  }
+  </script>
   {% endif %}
 
 </div>
