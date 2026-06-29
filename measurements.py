@@ -960,11 +960,22 @@ def measurements_console():
     _nh = request.args.get('nh')
     nh = int(_nh) if (_nh and _nh.isdigit()) else None
     node_kids = {}
+    node_meas = {}
     if tab in ('structure', 'points'):
         node_tree = _node_tree()
         for row in node_tree:
             row['hotels'] = _hotels_set(row['n'])
             node_kids.setdefault(row['n'].parent_id or 0, []).append(row)
+    if tab == 'structure':
+        _lbl = {m['pkey']: m['label'] for m in library}
+        _rows = (db.session.query(Area.node_id, AreaParam.pkey)
+                 .join(AreaParam, AreaParam.area_id == Area.id)
+                 .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
+                         Area.node_id.isnot(None)).all())
+        _tmp = {}
+        for _nid, _pk in _rows:
+            _tmp.setdefault(_nid, set()).add(_pk)
+        node_meas = {k: sorted({_lbl.get(pk, pk) for pk in v}) for k, v in _tmp.items()}
         if nh:
             for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
                 if getattr(a, 'node_id', None):
@@ -1025,7 +1036,7 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
-                           node_kids=node_kids,
+                           node_kids=node_kids, node_meas=node_meas,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,

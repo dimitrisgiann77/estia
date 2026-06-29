@@ -186,13 +186,18 @@ select.in-kind{width:120px;}
   <style>
   .strtree .hcount{font-size:11px;color:#5f7682;background:#eef6fb;border-radius:5px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px;}
   .stred input[type=color]{width:48px;height:32px;padding:2px;}
-  .hotch{display:flex;flex-direction:column;gap:4px;}
-  .hck{display:flex;align-items:center;gap:7px;font-size:13px;background:#f6fafd;border:1px solid #e3edf4;border-radius:7px;padding:6px 9px;cursor:pointer;}
-  .hck input{width:auto;}
-  .strlayout{display:grid;grid-template-columns:1fr 290px;gap:14px;align-items:start;}
+  .strlayout{display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start;}
   .strtree .children{display:flex;flex-direction:column;gap:7px;min-height:8px;}
   .strtree .children .children{margin-left:22px;border-left:2px solid #e8f0f6;padding-left:10px;margin-top:7px;}
-  .strtree .nrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e1edf4;border-left:3px solid #185FA5;border-radius:0 9px 9px 0;padding:8px 10px;cursor:pointer;}
+  .strtree .nrow{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #e1edf4;border-left:3px solid #185FA5;border-radius:0 8px 8px 0;padding:4px 9px;cursor:pointer;}
+  .strtree .children{gap:5px!important;}
+  .strtree .nm{font-size:13px!important;}
+  .strtree .nmeas{display:flex;flex-wrap:wrap;gap:3px;margin:2px 0 0 28px;}
+  .strtree .nmeas .mtag{font-size:10px;background:#fff;border:1px solid #dbecf3;border-radius:5px;padding:1px 6px;color:#5f7682;}
+  .hotch{display:flex;flex-wrap:wrap;gap:6px;}
+  .hck{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;background:#fff;border:1px solid #d6eef3;color:#5a6b73;border-radius:7px;padding:6px 11px;cursor:pointer;}
+  .hck input{display:none;}
+  .hck.on{background:#193847;color:#fff;border-color:#193847;}
   .strtree .nrow.top{border-left-color:#193847;background:#fbfdff;}
   .strtree .nrow.sel{box-shadow:0 0 0 2px #E6F1FB;}
   .strtree .grip{cursor:grab;color:#9fb2bd;font-size:17px;}
@@ -222,6 +227,8 @@ select.in-kind{width:120px;}
       <span class="nm">{{ row.n.name }}</span>
       <span class="hcount" title="Σε πόσα ξενοδοχεία">{{ row.hotels|length }} <i class="ti ti-building"></i></span>
     </div>
+    {% set ms = node_meas.get(row.n.id, []) %}
+    {% if ms %}<div class="nmeas">{% for l in ms %}<span class="mtag">{{ l }}</span>{% endfor %}</div>{% endif %}
     <div class="children" data-parent="{{ row.n.id }}">{% for ch in node_kids.get(row.n.id, []) %}{{ nodecard(ch) }}{% endfor %}</div>
   </div>
   {% endmacro %}
@@ -245,7 +252,7 @@ select.in-kind{width:120px;}
           <select name="parent_id" id="st-parent"><option value="">— κορυφή —</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select>
           <label>Χρώμα κάρτας</label><input type="color" name="color" id="st-color" value="#185FA5">
           <label>Ξενοδοχεία που το έχουν</label>
-          <div id="st-hotels" class="hotch">{% for h in all_hotels %}<label class="hck"><input type="checkbox" value="{{ h.id }}" onchange="nodeHotelCk(this)"> {{ h.name }}</label>{% endfor %}</div>
+          <div id="st-hotels" class="hotch">{% for h in all_hotels %}<label class="hck" title="{{ h.name }}"><input type="checkbox" value="{{ h.id }}" onchange="nodeHotelCk(this)"> {{ hcodes.get(h.id) or h.name }}</label>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
           <button class="addsub" type="button" id="st-addsub"><i class="ti ti-plus"></i> Νέα υποομάδα εδώ</button>
         </form>
@@ -266,12 +273,12 @@ select.in-kind{width:120px;}
       document.getElementById('st-del').setAttribute('formaction','/dashboard/measurements/node/'+nid+'/delete');
       document.getElementById('st-addsub').onclick=function(){addNode(nid);};
       var hs=(el.getAttribute('data-hotels')||'').split(',');
-      document.querySelectorAll('#st-hotels input').forEach(function(c){c.checked=hs.indexOf(c.value)>=0;});
+      document.querySelectorAll('#st-hotels .hck').forEach(function(l){var c=l.querySelector('input');c.checked=hs.indexOf(c.value)>=0;l.classList.toggle('on',c.checked);});
     };
     window.nodeHotelCk=function(cb){
       var nid=document.getElementById('st-id').value; if(!nid)return;
       fetch('/dashboard/measurements/node/'+nid+'/hotel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hotel_id:cb.value})})
-        .then(function(r){return r.json();}).then(function(d){if(d&&typeof d.on!=='undefined')cb.checked=d.on;});
+        .then(function(r){return r.json();}).then(function(d){if(d&&typeof d.on!=='undefined'){cb.checked=d.on;cb.closest('.hck').classList.toggle('on',d.on);}});
     };
     window.addNode=function(parent){
       var n=prompt('Όνομα νέου κόμβου;'); if(!n)return;
