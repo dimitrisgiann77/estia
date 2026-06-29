@@ -288,6 +288,17 @@ def seed_measurement_engine():
             except Exception as _e:
                 db.session.rollback()
                 print(f'[measurements] freq→point skipped: {_e}')
+            # Εφάπαξ (flagged) C3: εναρμόνιση ιστορικού Reading.period (custom → DayPeriod).
+            try:
+                from app import SysFlag
+                if not SysFlag.query.filter_by(key='meas_readperiod_20260629').first():
+                    _rp = _migrate_reading_periods()
+                    db.session.add(SysFlag(key='meas_readperiod_20260629'))
+                    db.session.commit()
+                    print(f'[measurements] Reading.period εναρμόνιση (εφάπαξ): {_rp} εγγραφές')
+            except Exception as _e:
+                db.session.rollback()
+                print(f'[measurements] readperiod skipped: {_e}')
             if created:
                 print('[measurements] Φ1 seed: templates pool/znx + periods OK')
         except Exception as e:
@@ -1477,6 +1488,31 @@ def _migrate_freq_to_points():
     return n
 
 
+def _migrate_reading_periods():
+    """C3 εφάπαξ: ιστορικά Reading.period με custom keys (p1,p2…) → DayPeriod key
+    βάσει της ώρας του αντίστοιχου MonitorPeriod. Τα morning/afternoon/… μένουν ως έχουν.
+    Μη καταστροφικό (καμία απώλεια τιμών — μόνο εναρμόνιση του key περιόδου)."""
+    dp_keys = {d.key for d in DayPeriod.query.all()}
+    if not dp_keys:
+        return 0
+    mp_map = {}
+    for mp in MonitorPeriod.query.all():
+        if mp.key in dp_keys:
+            continue
+        d = _dayperiod_at(mp.time or '')
+        if d:
+            mp_map[(mp.template_key, mp.key)] = d.key
+    if not mp_map:
+        return 0
+    n = 0
+    for r in Reading.query.filter(Reading.period.isnot(None), ~Reading.period.in_(list(dp_keys))).all():
+        nk = mp_map.get((r.template_key, r.period))
+        if nk and r.period != nk:
+            r.period = nk
+            n += 1
+    return n
+
+
 @app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
 def measurements_nodeparams_migrate():
     """Μετάβαση Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
@@ -1786,9 +1822,8 @@ def measurements_entry_save():
     return redirect(url_for('measurements_entry') + '?point=%d&ok=1' % area.id)
 
 
-def _current_dayperiod():
-    """C1: το DayPeriod που ισχύει ΤΩΡΑ (ώρα Ελλάδος) βάσει t_from/t_to (με wrap-around)."""
-    now = _athens_now().strftime('%H:%M')
+def _dayperiod_at(now):
+    """Το DayPeriod στο οποίο πέφτει η ώρα `now` (HH:MM) βάσει t_from/t_to (με wrap-around)."""
     dps = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
     for d in dps:
         a, b = (d.t_from or ''), (d.t_to or '')
@@ -1801,6 +1836,11 @@ def _current_dayperiod():
             if now >= a or now <= b:
                 return d
     return dps[0] if dps else None
+
+
+def _current_dayperiod():
+    """C1: το DayPeriod που ισχύει ΤΩΡΑ (ώρα Ελλάδος)."""
+    return _dayperiod_at(_athens_now().strftime('%H:%M'))
 
 
 # ── Φ3c-2b: ΕΝΙΑΙΑ «Σήμερα» (engine) — σημεία ανά περιοχή + status ημέρας ─────
@@ -1965,19 +2005,42 @@ def _stats_range():
 
 
 def _coverage(points, dfrom, dto):
-    """Κάλυψη: αναμενόμενες (μέρες × περίοδοι/template) vs πραγματικές (distinct ημέρα/περίοδος)."""
+    """C3 Κάλυψη (από συχνότητα): αναμενόμενες = μέρες × Σ(μέτρηση × due-περίοδοι από MeasFreq)·
+    πραγματικές = distinct (ημέρα, περίοδος, μέτρηση) που μετρήθηκαν σε due περίοδο.
+    Σημείο χωρίς ορισμένη συχνότητα = καμία υποχρέωση (cov 100%)."""
     days = (dto - dfrom).days + 1
     if days < 1:
         days = 1
+    aids = [a.id for a in points]
+    freq = {}   # area_id -> {pkey: set(period keys)}
+    if aids:
+        for mf in MeasFreq.query.filter(MeasFreq.area_id.in_(aids)).all():
+            freq.setdefault(mf.area_id, {})[mf.pkey] = set(
+                p for p in (mf.periods or '').split(',') if p)
     out = []
     for a in points:
-        nper = MonitorPeriod.query.filter_by(template_key=a.template_key).count() or 1
-        expected = days * nper
-        actual = (db.session.query(Reading.record_date, Reading.period)
-                  .filter(Reading.area_id == a.id, Reading.record_date >= dfrom, Reading.record_date <= dto)
-                  .distinct().count())
-        missing = max(0, expected - actual)
-        cov = round(100.0 * min(actual, expected) / expected) if expected else 100
+        af = freq.get(a.id, {})
+        per_day = sum(len(v) for v in af.values())   # μετρήσεις × περίοδοι ανά ημέρα
+        expected = days * per_day
+        actual = 0
+        if expected:
+            seen = set()
+            for r in Reading.query.filter(Reading.area_id == a.id,
+                                          Reading.record_date >= dfrom,
+                                          Reading.record_date <= dto).all():
+                try:
+                    vals = _json.loads(r.values or '{}')
+                except Exception:
+                    vals = {}
+                for pk in vals.keys():
+                    if r.period in af.get(pk, ()):   # μετρήθηκε σε due περίοδο
+                        seen.add((r.record_date, r.period, pk))
+            actual = len(seen)
+        if expected:
+            missing = max(0, expected - actual)
+            cov = round(100.0 * min(actual, expected) / expected)
+        else:
+            missing, cov = 0, 100
         out.append({'point': a, 'expected': expected, 'actual': actual, 'missing': missing, 'cov': cov})
     return out
 
