@@ -1164,6 +1164,24 @@ def measurements_points_scaffold():
     return redirect(url_for('measurements_console') + '?tab=points&nh=' + _nh + '&msg=' + msg)
 
 
+@app.route('/dashboard/measurements/point/<int:pid>/quickedit', methods=['POST'])
+def measurements_point_quickedit(pid):
+    """AJAX inline edit ονόματος/χώρου σημείου (Board). Ενημερώνει μόνο όσα δίνονται."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    a = Area.query.get(pid)
+    if not a:
+        return jsonify(ok=False), 404
+    f = request.form
+    if 'name' in f and (f.get('name') or '').strip():
+        a.name = f.get('name').strip()[:120]
+    if 'location' in f:
+        a.location = (f.get('location') or '').strip()[:120] or None
+    db.session.commit()
+    log_activity('meas_point_quickedit', a.name)
+    return jsonify(ok=True, name=a.name, location=a.location or '')
+
+
 @app.route('/dashboard/measurements/point/assign', methods=['POST'])
 def measurements_point_assign():
     """Πίνακας ανάθεσης: tick = δημιουργία/ενεργοποίηση σημείου σε ξενοδοχείο (από scaffold),

@@ -82,6 +82,12 @@ select.in-kind{width:120px;}
 .bd-pt{border:1px solid #e1edf4;border-radius:7px;padding:7px 9px;background:#fbfdff;}
 .bd-pt.off{opacity:.5;}
 .bd-pth{font-size:13px;font-weight:600;cursor:grab;margin-bottom:5px;display:flex;align-items:center;gap:6px;}
+.bd-pth .ptacts{margin-left:auto;display:flex;gap:9px;opacity:0;transition:opacity .12s;}
+.bd-pt:hover .ptacts{opacity:1;}
+.bd-pth .ptacts i{cursor:pointer;color:#9fb2bd;font-weight:400;font-size:14px;}
+.bd-pth .ptacts i:hover{color:#185FA5;} .bd-pth .ptacts .ti-trash:hover{color:#A32D2D;}
+.bdadd{margin-top:6px;width:100%;background:#fff;border:1px dashed #cfe0ea;color:#5f7682;border-radius:7px;padding:6px;font-size:12px;cursor:pointer;}
+.bdadd:hover{border-color:#185FA5;color:#185FA5;}
 .bd-zone{display:flex;flex-wrap:wrap;gap:4px;min-height:28px;border:1px dashed #cfe0ea;border-radius:6px;padding:5px;}
 .bd-zone:empty::before{content:"σύρε μετρήσεις";color:#9fb2bd;font-size:11px;font-style:italic;}
 .bd-m{background:#E6F1FB;border:1px solid #B5D4F4;border-radius:6px;padding:2px 7px;font-size:11px;color:#185FA5;font-weight:600;display:inline-flex;gap:4px;align-items:center;}
@@ -178,7 +184,6 @@ select.in-kind{width:120px;}
     <a class="tab {{ 'active' if tab=='structure' }}" href="/dashboard/measurements?tab=structure"><i class="ti ti-sitemap"></i> Δομή δικτύου</a>
     <a class="tab {{ 'active' if tab=='periods' }}" href="/dashboard/measurements?tab=periods"><i class="ti ti-clock-cog"></i> Συχνότητα</a>
     <span class="tabsep">|</span>
-    <span class="tabgrp">Ανά ξενοδοχείο</span>
     <a class="tab {{ 'active' if tab=='points' }}" href="/dashboard/measurements?tab=points"><i class="ti ti-checkbox"></i> Σημεία</a>
   </div>
 
@@ -302,17 +307,14 @@ select.in-kind{width:120px;}
   {% if tab=='points' %}
   <datalist id="spaces">{% for s in spaces_list %}<option value="{{ s.name }}">{% endfor %}{% for s in space_opts %}<option value="{{ s }}">{% endfor %}</datalist>
   {% macro point_card(a) %}
-  <div class="bd-pt {{ 'off' if not a.is_active }}" data-aid="{{ a.id }}">
-    <div class="bd-pth"><i class="ti ti-grip-vertical"></i> {{ a.name }}{% if a.location %} <span class="muted">· {{ a.location }}</span>{% endif %}</div>
+  <div class="bd-pt {{ 'off' if not a.is_active }}" data-aid="{{ a.id }}" data-name="{{ a.name }}" data-loc="{{ a.location or '' }}">
+    <div class="bd-pth"><i class="ti ti-grip-vertical"></i> <span class="ptn">{{ a.name }}</span><span class="ptl muted">{% if a.location %} · {{ a.location }}{% endif %}</span>
+      <span class="ptacts"><i class="ti ti-pencil" title="Μετονομασία" onclick="ptRename(this)"></i><i class="ti ti-map-pin" title="Χώρος δειγματοληψίας" onclick="ptLoc(this)"></i><i class="ti ti-trash" title="Διαγραφή" onclick="ptDel(this)"></i></span>
+    </div>
     <div class="bd-zone" data-aid="{{ a.id }}">{% for c in area_chips.get(a.id, []) %}<span class="bd-m" data-pkey="{{ c.pkey }}">{{ c.label }}<span class="x">×</span></span>{% endfor %}</div>
   </div>
   {% endmacro %}
-  <div class="vtog2">
-    <a class="{{ 'on' if request.args.get('view')!='board' }}" href="/dashboard/measurements?tab=points{{ ('&nh=' ~ nh) if nh else '' }}"><i class="ti ti-table"></i> Πίνακας ανάθεσης</a>
-    <a class="{{ 'on' if request.args.get('view')=='board' }}" href="/dashboard/measurements?tab=points&view=board{{ ('&nh=' ~ nh) if nh else '' }}"><i class="ti ti-layout-board"></i> Board (σύρε &amp; άσε)</a>
-  </div>
-  {% if request.args.get('view')=='board' %}
-  <div class="hpick">{% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&view=board&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }}</a>{% endfor %}</div>
+  <div class="hpick">{% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}</div>
   {% if not nh %}
   <div class="card"><div class="muted">Διάλεξε ξενοδοχείο για το board.</div></div>
   {% else %}
@@ -337,11 +339,13 @@ select.in-kind{width:120px;}
         <div class="bd-net">
           <div class="bd-neth" style="padding-left:{{ row.depth*12 }}px;"><i class="ti ti-droplet"></i> {{ row.n.name }}</div>
           <div class="bd-pts" data-node="{{ row.n.id }}">{% for a in group_points.get(row.n.id, []) %}{{ point_card(a) }}{% endfor %}</div>
+          <button class="bdadd" type="button" onclick="addpoint('{{ row.n.id }}',{{ nh }})"><i class="ti ti-plus"></i> σημείο εδώ</button>
         </div>
         {% endif %}{% endfor %}
         <div class="bd-net">
           <div class="bd-neth"><i class="ti ti-help-circle"></i> Χωρίς δίκτυο</div>
           <div class="bd-pts" data-node="">{% for a in pool_points %}{{ point_card(a) }}{% endfor %}</div>
+          <button class="bdadd" type="button" onclick="addpoint('',{{ nh }})"><i class="ti ti-plus"></i> σημείο χωρίς δίκτυο</button>
         </div>
       </div>
     </div>
@@ -366,6 +370,23 @@ select.in-kind{width:120px;}
       fetch('/dashboard/measurements/point/'+aid+'/node',{method:'POST',body:fd});
     }});});
   })();
+  </script>
+  <script>
+  function ptRename(el){var c=el.closest('.bd-pt'),aid=c.getAttribute('data-aid');
+    var v=prompt('Όνομα σημείου;',c.getAttribute('data-name')); if(v===null)return;
+    var fd=new FormData();fd.append('name',v);
+    fetch('/dashboard/measurements/point/'+aid+'/quickedit',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){c.setAttribute('data-name',d.name);c.querySelector('.ptn').textContent=d.name;}});}
+  function ptLoc(el){var c=el.closest('.bd-pt'),aid=c.getAttribute('data-aid');
+    var v=prompt('Χώρος δειγματοληψίας;',c.getAttribute('data-loc')); if(v===null)return;
+    var fd=new FormData();fd.append('location',v);
+    fetch('/dashboard/measurements/point/'+aid+'/quickedit',{method:'POST',body:fd}).then(function(r){return r.json();}).then(function(d){
+      if(d&&d.ok){c.setAttribute('data-loc',d.location);c.querySelector('.ptl').textContent=d.location?(' · '+d.location):'';}});}
+  function ptDel(el){var c=el.closest('.bd-pt'),aid=c.getAttribute('data-aid');
+    if(!confirm('Διαγραφή σημείου;'))return;
+    var f=document.createElement('form');f.method='POST';f.action='/dashboard/measurements/point/'+aid+'/delete';
+    var i=document.createElement('input');i.type='hidden';i.name='nh';i.value='{{ nh }}';f.appendChild(i);
+    document.body.appendChild(f);f.submit();}
   </script>
   <div class="bd-pop" id="bd-pop">
     <h4 id="bdp-title">Όρια μέτρησης</h4>
@@ -396,74 +417,6 @@ select.in-kind{width:120px;}
       m.action_low=document.getElementById('bdp-low').value;m.action_high=document.getElementById('bdp-high').value;bdpClose();});}
   document.addEventListener('click',function(e){var c=e.target.closest('.bd-m');if(!c)return;if(e.target.classList.contains('x'))return;bdOpenLim(c.getAttribute('data-pkey'),e.clientX,e.clientY);});
   </script>
-  {% endif %}
-  {% else %}
-  <div class="card">
-    <div class="card-title"><i class="ti ti-table"></i> Ανάθεση σημείων ανά ξενοδοχείο</div>
-    <p class="muted" style="margin-bottom:10px;">Τικ = το ξενοδοχείο έχει αυτό το σημείο (untick = απενεργοποίηση, κρατά ιστορικό). Κλικ στο <b>όνομα ξενοδοχείου</b> (κεφαλίδα) για λεπτομερή επεξεργασία ορίων/μετρήσεων παρακάτω.</p>
-    <div style="overflow-x:auto;">
-    <table class="amx">
-      <thead><tr><th class="rn">Σημείο</th>
-        {% for h in all_hotels %}<th><a class="hcol {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=points&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}" title="{{ h.name }}">{{ hcodes.get(h.id) or h.name }}</a></th>{% endfor %}
-      </tr></thead>
-      <tbody>
-        {% for r in assign_rows %}
-        <tr><td class="rn">{{ r.name }}{% if not r.scaffold %}<span class="cust">custom</span>{% endif %}</td>
-          {% for h in all_hotels %}
-          <td><button type="button" class="amxcell {{ 'on' if r.cells[h.id] }}" data-hotel="{{ h.id }}" data-name="{{ r.name }}" onclick="toggleAssign(this)"><i class="ti {{ 'ti-square-check' if r.cells[h.id] else 'ti-square' }}"></i></button></td>
-          {% endfor %}
-        </tr>
-        {% else %}
-        <tr><td class="rn muted" colspan="{{ all_hotels|length + 1 }}">Δεν υπάρχουν τύποι σημείων.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  </div>
-  <script>
-  function toggleAssign(btn){
-    var on=btn.classList.contains('on');
-    var fd=new FormData(); fd.append('hotel_id',btn.dataset.hotel); fd.append('name',btn.dataset.name); fd.append('on', on?'0':'1');
-    btn.disabled=true;
-    fetch('/dashboard/measurements/point/assign',{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}})
-      .then(function(r){return r.json();}).then(function(d){
-        btn.disabled=false;
-        if(!d||!d.ok){ alert('Σφάλμα ανάθεσης.'); return; }
-        btn.classList.toggle('on', d.on);
-        btn.querySelector('i').className='ti '+(d.on?'ti-square-check':'ti-square');
-      }).catch(function(){ btn.disabled=false; alert('Σφάλμα δικτύου.'); });
-  }
-  </script>
-  {% if not nh %}
-  <div class="card"><div class="muted">Κλικ σε ξενοδοχείο (κεφαλίδα πίνακα) για λεπτομερή επεξεργασία των σημείων του.</div></div>
-  {% endif %}
-  {% if nh %}
-  <div class="card">
-    <div class="card-title"><i class="ti ti-map-pin"></i> Σημεία — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Για κάθε σημείο: όνομα, χώρος, <b>δίκτυο</b> + <i class="ti ti-device-floppy"></i> αποθήκευση. Μετρήσεις & όρια → όψη <b>«Board»</b> (πάνω). Είδη/όρια μετρήσεων → καρτέλα «Είδη μετρήσεων».</p>
-    {% for a in hotel_points %}
-    <form class="ptrow {{ 'off' if not a.is_active }}" method="POST" action="/dashboard/measurements/point/save">
-      <input type="hidden" name="point_id" value="{{ a.id }}"><input type="hidden" name="nh" value="{{ nh }}">
-      <input class="in-name" type="text" name="name" value="{{ a.name }}">
-      <input class="in-loc" type="text" name="location" list="spaces" value="{{ a.location or '' }}" placeholder="Χώρος / περιοχή">
-      <select name="node_id"><option value="">— χωρίς δίκτυο —</option>{% for o in node_opts %}<option value="{{ o.id }}" {{ 'selected' if o.id==a.node_id }}>{{ o.label }}</option>{% endfor %}</select>
-      <button class="iconbtn" type="submit" title="Αποθήκευση"><i class="ti ti-device-floppy"></i></button>
-      <button class="iconbtn" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/toggle" title="Ενεργό/Ανενεργό"><i class="ti ti-power"></i></button>
-      <button class="iconbtn del" type="submit" formaction="/dashboard/measurements/point/{{ a.id }}/delete" onclick="return confirm('Διαγραφή σημείου «{{ a.name }}»;');" title="Διαγραφή"><i class="ti ti-trash"></i></button>
-    </form>
-    {% else %}
-    <div class="scaffold-empty">
-      <div class="muted" style="margin-bottom:10px;">Κανένα σημείο ακόμη σε αυτό το ξενοδοχείο.</div>
-      <form method="POST" action="/dashboard/measurements/points/scaffold" style="display:inline;">
-        <input type="hidden" name="nh" value="{{ nh }}">
-        <button class="btn" type="submit"><i class="ti ti-wand"></i> Δημιουργία προτεινόμενων σημείων</button>
-      </form>
-      <div class="muted" style="margin-top:8px;font-size:12px;">Φτιάχνει το standard σετ (Δεξαμενή, Αναχώρηση/Επιστροφή ΖΝΧ, Αντ. Όσμωση ×2, Κρύο/Ζεστό Νερό, Κύρια Πισίνα). Μετά διόρθωσε/σβήσε ό,τι δεν ισχύει εδώ.</div>
-    </div>
-    {% endfor %}
-    <button class="btn alt" type="button" onclick="addpoint('',{{ nh }})" style="margin-top:10px;"><i class="ti ti-plus"></i> Νέο σημείο</button>
-  </div>
-  {% endif %}
   {% endif %}
   {% endif %}
 
