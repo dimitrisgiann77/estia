@@ -830,22 +830,6 @@ def measurements_node_delete(nid):
     return go('Διαγράφηκε: ' + n.name)
 
 
-@app.route('/dashboard/measurements/point/<int:pid>/node', methods=['POST'])
-def measurements_point_node(pid):
-    """Ανάθεση σημείου σε κόμβο (node_id). Κενό = καμία (σημερινή συμπεριφορά)."""
-    if not is_admin():
-        return redirect(url_for('login'))
-    a = Area.query.get(pid)
-    if a:
-        v = request.form.get('node_id') or None
-        a.node_id = int(v) if v else None
-        db.session.commit()
-        log_activity('meas_point_node', '%s -> %s' % (a.name, a.node_id))
-    if request.form.get('ajax'):
-        return jsonify(ok=bool(a))
-    return redirect(url_for('measurements_console') + '?tab=structure')
-
-
 # ── Φ2 ρυθμίσεων: CRUD Χώρων δειγματοληψίας ──────────────────────────────────
 @app.route('/dashboard/measurements/space/save', methods=['POST'])
 def measurements_space_save():
@@ -947,41 +931,6 @@ def measurements_lib_reorder():
             p.sort = i
     db.session.commit()
     return jsonify(ok=True)
-
-
-# ── Φ3 ρυθμίσεων: αντιγραφή setup σημείων από ένα ξενοδοχείο σε άλλο ──────────
-@app.route('/dashboard/measurements/copy-setup', methods=['POST'])
-def measurements_copy_setup():
-    if not is_admin():
-        return redirect(url_for('login'))
-    f = request.form
-    try:
-        src = int(f.get('from_hotel')); dst = int(f.get('to_hotel'))
-    except (TypeError, ValueError):
-        return redirect(url_for('measurements_console') + '?tab=points')
-    n = 0
-    if src and dst and src != dst:
-        existing = {a.name for a in Area.query.filter_by(hotel_id=dst, engine_only=True).all()}
-        for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == src,
-                                   Area.is_active.is_(True)).all():
-            if a.name in existing:
-                continue
-            na = Area(hotel_id=dst, template_key=a.template_key, name=a.name, location=a.location,
-                      is_active=True, engine_only=True, node_id=a.node_id, position=a.position)
-            db.session.add(na); db.session.flush()
-            for i, p in enumerate(point_params(a), 1):
-                db.session.add(AreaParam(area_id=na.id, pkey=p.pkey, sort=i))
-            if a.node_id:
-                nd = MonitorNode.query.get(a.node_id)
-                if nd:
-                    cur = _hotels_set(nd)
-                    if dst not in cur:
-                        cur.add(dst); nd.hotels = ','.join(str(x) for x in sorted(cur))
-            n += 1
-        db.session.commit()
-        log_activity('meas_copy_setup', '%d->%d (%d)' % (src, dst, n))
-    msg = 'Αντιγράφηκαν %d σημεία.' % n if n else 'Τίποτα νέο (υπάρχουν ήδη).'
-    return redirect(url_for('measurements_console') + '?tab=points&view=board&nh=%d&msg=%s' % (dst, msg))
 
 
 # ── Φ-Γ: αυτόματη αντιστοίχιση υπαρχόντων σημείων σε κόμβους (conservative) ───
@@ -1102,34 +1051,8 @@ def measurements_console():
                     group_points.setdefault(a.node_id, []).append(a)
                 else:
                     pool_points.append(a)
-    assign_rows = []
-    if tab == 'points':
-        space_opts = sorted({(a.location or '').strip() for a in pts if (a.location or '').strip()})
-        # Πίνακας ανάθεσης: γραμμές=τύποι σημείων (scaffold + custom), στήλες=ξενοδοχεία
-        _ahp = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
-        amap = {}
-        for a in pts:
-            if a.is_active:
-                amap.setdefault(a.name, {})[a.hotel_id] = a.id
-        _scaffn = [s[0] for s in SCAFFOLD_POINTS]
-        _rownames = _scaffn + [n for n in sorted(amap) if n not in _scaffn]
-        for n in _rownames:
-            assign_rows.append({'name': n, 'scaffold': n in _scaffn,
-                                'cells': {h.id: amap.get(n, {}).get(h.id) for h in _ahp}})
-    hotel_points = []
-    area_pkeys = {}
-    point_meas = {}
-    if tab in ('points', 'library', 'templates') and nh:
-        hotel_points = (Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh)
-                        .order_by(Area.name).all())
-        for a in hotel_points:
-            pps = point_params(a)
-            area_pkeys[a.id] = [p.pkey for p in pps]
-            point_meas[a.id] = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit or '',
-                                 'min_v': p.min_v, 'max_v': p.max_v,
-                                 'low': p.action_low or '', 'high': p.action_high or '',
-                                 'kind': _param_input_kind(p),
-                                 'category': (getattr(p, 'category', '') or '')} for p in pps]
+    # (v12.343 cleanup: αφαιρέθηκαν dead Board computations assign_rows/hotel_points/
+    #  area_pkeys/point_meas — ανήκαν στο καταργημένο tab «Σημεία»/Board.)
     area_chips = {}
     for a in pts:
         area_chips[a.id] = [{'pkey': pp.pkey, 'label': pp.label, 'unit': pp.unit or ''} for pp in point_params(a)]
@@ -1177,33 +1100,8 @@ def measurements_console():
                            node_kids=node_kids, node_meas=node_meas, node_np=node_np,
                            node_hotel_loc=node_hotel_loc,
                            group_points=group_points, pool_points=pool_points,
-                           hotel_points=hotel_points, area_pkeys=area_pkeys,
-                           assign_rows=assign_rows, point_meas=point_meas,
                            spaces_list=spaces_list, lib_map_json=lib_map_json,
                            day_periods=day_periods, freq_spaces=freq_spaces)
-
-
-@app.route('/dashboard/measurements/point/<int:area_id>/params', methods=['POST'])
-def measurements_point_params(area_id):
-    """Φ2: αποθήκευση μετρήσεων ενός σημείου (drag&drop) → ξαναχτίζει AreaParam."""
-    if not is_admin():
-        return jsonify(ok=False), 403
-    area = Area.query.get(area_id)
-    if not area:
-        return jsonify(ok=False), 404
-    data = request.get_json(silent=True) or {}
-    keys, seen = [], set()
-    for k in (data.get('pkeys') or []):
-        k = str(k)[:40]
-        if k and k not in seen:
-            seen.add(k)
-            keys.append(k)
-    AreaParam.query.filter_by(area_id=area_id).delete()
-    for i, k in enumerate(keys):
-        db.session.add(AreaParam(area_id=area_id, pkey=k, sort=i))
-    db.session.commit()
-    log_activity('meas_point_params', '%s: %d' % (area.name, len(keys)))
-    return jsonify(ok=True, n=len(keys))
 
 
 @app.route('/dashboard/measurements/autocreate', methods=['POST'])
@@ -1304,24 +1202,6 @@ def measurements_points_scaffold():
     return redirect(url_for('measurements_console') + '?tab=points&nh=' + _nh + '&msg=' + msg)
 
 
-@app.route('/dashboard/measurements/point/<int:pid>/quickedit', methods=['POST'])
-def measurements_point_quickedit(pid):
-    """AJAX inline edit ονόματος/χώρου σημείου (Board). Ενημερώνει μόνο όσα δίνονται."""
-    if not is_admin():
-        return jsonify(ok=False), 403
-    a = Area.query.get(pid)
-    if not a:
-        return jsonify(ok=False), 404
-    f = request.form
-    if 'name' in f and (f.get('name') or '').strip():
-        a.name = f.get('name').strip()[:120]
-    if 'location' in f:
-        a.location = (f.get('location') or '').strip()[:120] or None
-    db.session.commit()
-    log_activity('meas_point_quickedit', a.name)
-    return jsonify(ok=True, name=a.name, location=a.location or '')
-
-
 @app.route('/dashboard/measurements/node/<int:nid>/params', methods=['POST'])
 def measurements_node_params(nid):
     """Δρόμος A: μετρήσεις κόμβου (NodeParam) + προώθηση στα σημεία του (AreaParam)
@@ -1388,55 +1268,6 @@ def measurements_nodeparams_migrate():
         log_activity('meas_nodeparams_migrate', 'applied=%d' % applied)
     return jsonify(ok=True, applied=applied, report=report)
 
-
-@app.route('/dashboard/measurements/point/assign', methods=['POST'])
-def measurements_point_assign():
-    """Πίνακας ανάθεσης: tick = δημιουργία/ενεργοποίηση σημείου σε ξενοδοχείο (από scaffold),
-    untick = απενεργοποίηση (is_active=False, κρατά ιστορικό). AJAX."""
-    if not is_admin():
-        return jsonify(ok=False), 403
-    f = request.form
-    try:
-        hid = int(f.get('hotel_id'))
-    except (TypeError, ValueError):
-        return jsonify(ok=False), 400
-    name = (f.get('name') or '').strip()
-    on = f.get('on') == '1'
-    if not name:
-        return jsonify(ok=False), 400
-    existing = Area.query.filter_by(hotel_id=hid, name=name, engine_only=True).first()
-    if on:
-        if existing:
-            if not existing.is_active:
-                existing.is_active = True
-            aid = existing.id
-        else:
-            entry = next((s for s in SCAFFOLD_POINTS if s[0] == name), None)
-            nd = None
-            if entry:
-                _, loc, nkey, pkeys = entry
-                nd = MonitorNode.query.filter_by(key=nkey).first()
-            else:
-                loc, pkeys = '', []
-            a = Area(hotel_id=hid, template_key='generic', name=name[:120], location=loc[:120],
-                     is_active=True, engine_only=True, node_id=(nd.id if nd else None))
-            db.session.add(a); db.session.flush()
-            for i, pk in enumerate(pkeys, 1):
-                db.session.add(AreaParam(area_id=a.id, pkey=pk, sort=i))
-            if nd:
-                cur = _hotels_set(nd)
-                if hid not in cur:
-                    cur.add(hid); nd.hotels = ','.join(str(x) for x in sorted(cur))
-            aid = a.id
-        db.session.commit()
-        log_activity('meas_point_assign', 'on %s @%d' % (name, hid))
-        return jsonify(ok=True, on=True, area_id=aid)
-    else:
-        if existing and existing.is_active:
-            existing.is_active = False
-            db.session.commit()
-            log_activity('meas_point_assign', 'off %s @%d' % (name, hid))
-        return jsonify(ok=True, on=False)
 
 
 @app.route('/dashboard/measurements/point/<int:pid>/delete', methods=['POST'])

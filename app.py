@@ -362,11 +362,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.342'
-APP_BUILD   = '623'
+APP_VERSION = '12.343'
+APP_BUILD   = '624'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.343', 'b': '624', 'date': '29/06/2026', 'time': '12:30', 'title': 'Καθάρισμα dead backend του καταργημένου «Σημεία»/Board',
+     'items': ['Αφαιρέθηκαν αχρησιμοποίητα routes (point/assign, point/params, point/node, point/quickedit, copy-setup), dead computations της κονσόλας (assign_rows/hotel_points/area_pkeys/point_meas) και τα νεκρά JS blocks του παλιού Board στο template. Καμία αλλαγή στη λειτουργία — μόνο εκκαθάριση κώδικα.']},
     {'v': '12.342', 'b': '623', 'date': '29/06/2026', 'time': '12:00', 'title': 'Αυto-φόρτωση υπαρχουσών μετρήσεων στους κόμβους (Δρόμος A)',
      'items': ['Οι υπάρχουσες μετρήσεις των σημείων (AreaParam) φορτώνονται αυτόματα πάνω στους κόμβους (NodeParam) με εφάπαξ flagged backfill στο boot — μη καταστροφικό, μόνο κόμβοι χωρίς μετρήσεις. Έτσι π.χ. το «Ζεστό νερό ΖΝΧ» εμφανίζει πλέον τις μετρήσεις του χωρίς χειροκίνητη ενέργεια.',
                'Το κουμπί «Μετάβαση μετρήσεων σε κόμβους» παραμένει ως χειροκίνητος επανασυγχρονισμός (dry-run + εφαρμογή).']},
