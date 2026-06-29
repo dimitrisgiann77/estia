@@ -223,10 +223,16 @@ select.in-kind{width:120px;}
   .stred .del{background:#fff;border:1px solid #F09595;color:#A32D2D;border-radius:6px;padding:9px 11px;cursor:pointer;}
   .stred .addsub{width:100%;margin-top:8px;background:#eef6fb;border:1px solid #d6eef3;color:#185FA5;border-radius:6px;padding:8px;font-size:12px;font-weight:600;cursor:pointer;}
   .stred .empty{color:#9fb2bd;font-size:13px;text-align:center;padding:24px 8px;}
+  .stred .zone{display:flex;flex-wrap:wrap;gap:5px;min-height:34px;border:1px dashed #cfe0ea;border-radius:7px;padding:6px;background:#fbfdff;}
+  .stred .zone:empty::before{content:"σύρε μετρήσεις εδώ";color:#b6c4cd;font-size:11px;font-style:italic;}
+  .stred .mm{background:#E6F1FB;border:1px solid #B5D4F4;border-radius:6px;padding:2px 8px;font-size:11px;color:#185FA5;font-weight:600;display:inline-flex;gap:5px;align-items:center;}
+  .stred .mm .x{cursor:pointer;color:#9fb2bd;font-weight:700;}
+  .stred .pal{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+  .stred .pchip{background:#fff;border:1px solid #85B7EB;border-radius:6px;padding:4px 8px;font-size:11px;color:#185FA5;font-weight:600;cursor:grab;}
   </style>
   {% macro nodecard(row) %}
   <div class="node" data-nid="{{ row.n.id }}">
-    <div class="nrow {{ 'top' if not row.depth }}" style="border-left-color:{{ row.n.color or ('#193847' if not row.depth else '#185FA5') }};" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" data-color="{{ row.n.color or '' }}" data-hotels="{{ row.hotels|join(',') }}" onclick="pickNode(this)">
+    <div class="nrow {{ 'top' if not row.depth }}" style="border-left-color:{{ row.n.color or ('#193847' if not row.depth else '#185FA5') }};" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" data-color="{{ row.n.color or '' }}" data-hotels="{{ row.hotels|join(',') }}" data-meas="{{ node_np.get(row.n.id, [])|join(',') }}" onclick="pickNode(this)">
       <i class="ti ti-grip-vertical grip"></i>
       {% if not row.depth %}<i class="ti {{ row.n.icon or 'ti-folder' }}" style="color:{{ row.n.color or '#185FA5' }};"></i>{% endif %}
       <span class="nm">{{ row.n.name }}</span>
@@ -239,10 +245,13 @@ select.in-kind{width:120px;}
   {% endmacro %}
   <div class="card">
     <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου <span class="muted" style="font-weight:400;">(κοινή — ανάθεση σε ξενοδοχεία ανά κόμβο)</span></div>
-    <p class="muted" style="margin-bottom:12px;">Σύρε κόμβους (⋮⋮) για σειρά / υποομάδα· κλικ σε κόμβο → επεξεργασία δεξιά (όνομα · χρώμα · ξενοδοχεία). Τα σημεία ανά ξενοδοχείο τα δουλεύεις στην καρτέλα «Σημεία».</p>
+    <p class="muted" style="margin-bottom:12px;">Σύρε κόμβους (⋮⋮) για σειρά / υποομάδα· κλικ σε κόμβο → επεξεργασία δεξιά (όνομα · χρώμα · <b>μετρήσεις δικτύου</b> · ξενοδοχεία). Οι μετρήσεις είναι κοινές & κληρονομούνται στα σημεία.</p>
+    <div style="margin-bottom:10px;">
+      <button class="btn alt" type="button" onclick="addNode('')"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
+      <button class="btn alt" type="button" onclick="migrateNP()" title="Μεταφορά μετρήσεων από τα υπάρχοντα σημεία στους κόμβους (με προεπισκόπηση)"><i class="ti ti-arrows-exchange"></i> Μετάβαση μετρήσεων σε κόμβους</button>
+    </div>
     <div class="strlayout strtree">
       <div>
-        <button class="btn alt" type="button" onclick="addNode('')" style="margin-bottom:10px;"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
         <div class="children" data-parent="">
           {% for r in node_kids.get(0, []) %}{{ nodecard(r) }}{% else %}<div class="muted" style="padding:8px 0;">Κανένας κόμβος — «Νέα ομάδα».</div>{% endfor %}
         </div>
@@ -256,6 +265,9 @@ select.in-kind{width:120px;}
           <label>Ανήκει σε (γονέας)</label>
           <select name="parent_id" id="st-parent"><option value="">— κορυφή —</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select>
           <label>Χρώμα κάρτας</label><input type="color" name="color" id="st-color" value="#185FA5">
+          <label>Μετρήσεις δικτύου <span class="muted" style="font-weight:400;">(κοινές για όλα τα ξεν.· σύρε από κάτω)</span></label>
+          <div id="st-meas" class="zone"></div>
+          <div id="st-pal" class="pal">{% for m in library %}<div class="pchip" data-pkey="{{ m.pkey }}">{{ m.label }}</div>{% endfor %}</div>
           <label>Ξενοδοχεία που το έχουν</label>
           <div id="st-hotels" class="hotch">{% for h in all_hotels %}<label class="hck" title="{{ h.name }}"><input type="checkbox" value="{{ h.id }}" onchange="nodeHotelCk(this)"> {{ hcodes.get(h.id) or h.name }}</label>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
@@ -266,6 +278,14 @@ select.in-kind{width:120px;}
   </div>
   <script>
   (function(){
+    var LIB={{ lib_map_json|safe }};
+    function lbl(pk){return (LIB[pk]&&LIB[pk].label)||pk;}
+    function meChip(pk){var s=document.createElement('span');s.className='mm';s.setAttribute('data-pkey',pk);s.innerHTML=lbl(pk)+' <span class="x">×</span>';s.querySelector('.x').onclick=function(){s.remove();saveMeas();};return s;}
+    function renderMeas(csv){var z=document.getElementById('st-meas');z.innerHTML='';(csv?csv.split(','):[]).forEach(function(pk){if(pk)z.appendChild(meChip(pk));});}
+    function saveMeas(){var nid=document.getElementById('st-id').value;if(!nid)return;
+      var pks=[].map.call(document.querySelectorAll('#st-meas .mm'),function(m){return m.getAttribute('data-pkey');});
+      fetch('/dashboard/measurements/node/'+nid+'/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pkeys:pks})});
+      var sel=document.querySelector('.strtree .nrow.sel'); if(sel) sel.setAttribute('data-meas',pks.join(','));}
     window.pickNode=function(el){
       document.querySelectorAll('.strtree .nrow.sel').forEach(function(n){n.classList.remove('sel');}); el.classList.add('sel');
       document.getElementById('stred-empty').style.display='none';
@@ -279,6 +299,7 @@ select.in-kind{width:120px;}
       document.getElementById('st-addsub').onclick=function(){addNode(nid);};
       var hs=(el.getAttribute('data-hotels')||'').split(',');
       document.querySelectorAll('#st-hotels .hck').forEach(function(l){var c=l.querySelector('input');c.checked=hs.indexOf(c.value)>=0;l.classList.toggle('on',c.checked);});
+      renderMeas(el.getAttribute('data-meas')||'');
     };
     window.nodeHotelCk=function(cb){
       var nid=document.getElementById('st-id').value; if(!nid)return;
@@ -291,6 +312,17 @@ select.in-kind{width:120px;}
       [['name',n],['parent_id',parent||'']].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i);});
       document.body.appendChild(f); f.submit();
     };
+    window.migrateNP=function(){
+      fetch('/dashboard/measurements/nodeparams/migrate').then(function(r){return r.json();}).then(function(d){
+        if(!d||!d.ok){alert('Σφάλμα.');return;}
+        if(!d.report.length){alert('Δεν βρέθηκαν μετρήσεις σε σημεία για μετάβαση.');return;}
+        var lines=d.report.map(function(x){return (x.skip?'• (έχει ήδη) ':'+ ')+x.node+': '+x.labels.join(', ');}).join('\n');
+        if(confirm('Θα μεταφερθούν οι μετρήσεις από τα σημεία στους κόμβους:\n\n'+lines+'\n\nΕφαρμογή;')){
+          fetch('/dashboard/measurements/nodeparams/migrate',{method:'POST'}).then(function(r){return r.json();}).then(function(d2){
+            alert('Εφαρμόστηκε σε '+(d2.applied||0)+' κόμβους.'); location.reload();});
+        }
+      }).catch(function(){alert('Σφάλμα δικτύου.');});
+    };
     if(window.Sortable){
       document.querySelectorAll('.strtree .children').forEach(function(c){
         new Sortable(c,{group:'snodes',handle:'.grip',animation:150,fallbackOnBody:true,invertSwap:true,onSort:function(){
@@ -299,6 +331,14 @@ select.in-kind{width:120px;}
           fetch('/dashboard/measurements/node/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent_id:pid||null,ids:ids})});
         }});
       });
+      var pal=document.getElementById('st-pal');
+      if(pal) new Sortable(pal,{group:{name:'nm',pull:'clone',put:false},sort:false,animation:150});
+      var mz=document.getElementById('st-meas');
+      if(mz) new Sortable(mz,{group:'nm',animation:150,onAdd:function(ev){
+        var pk=ev.item.getAttribute('data-pkey');
+        var dup=[].some.call(mz.querySelectorAll('.mm'),function(m){return m.getAttribute('data-pkey')===pk;});
+        ev.item.remove(); if(!dup) mz.appendChild(meChip(pk)); saveMeas();
+      }});
     }
   })();
   </script>

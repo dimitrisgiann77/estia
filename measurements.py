@@ -79,6 +79,14 @@ class MeasFreq(db.Model):
     pkey    = db.Column(db.String(40))
     periods = db.Column(db.String(160))              # CSV από DayPeriod.key
 
+
+# ── Δρόμος A: μετρήσεις ΣΤΟΝ ΚΟΜΒΟ (κοινές για όλα τα ξεν.)· τα σημεία κληρονομούν ──
+class NodeParam(db.Model):
+    id      = db.Column(db.Integer, primary_key=True)
+    node_id = db.Column(db.Integer, index=True)
+    pkey    = db.Column(db.String(40))
+    sort    = db.Column(db.Integer, default=0)
+
 DEFAULT_DAYPERIODS = [('morning', 'Πρωί', '06:00', '11:59'),
                       ('noon', 'Μεσημέρι', '12:00', '17:29'),
                       ('afternoon', 'Απόγευμα', '17:30', '19:59'),
@@ -1031,6 +1039,7 @@ def measurements_console():
     nh = int(_nh) if (_nh and _nh.isdigit()) else None
     node_kids = {}
     node_meas = {}
+    node_np = {}
     if tab in ('structure', 'points'):
         node_tree = _node_tree()
         for row in node_tree:
@@ -1038,14 +1047,9 @@ def measurements_console():
             node_kids.setdefault(row['n'].parent_id or 0, []).append(row)
     if tab == 'structure':
         _lbl = {m['pkey']: m['label'] for m in library}
-        _rows = (db.session.query(Area.node_id, AreaParam.pkey)
-                 .join(AreaParam, AreaParam.area_id == Area.id)
-                 .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
-                         Area.node_id.isnot(None)).all())
-        _tmp = {}
-        for _nid, _pk in _rows:
-            _tmp.setdefault(_nid, set()).add(_pk)
-        node_meas = {k: sorted({_lbl.get(pk, pk) for pk in v}) for k, v in _tmp.items()}
+        for np in NodeParam.query.order_by(NodeParam.sort, NodeParam.id).all():
+            node_np.setdefault(np.node_id, []).append(np.pkey)
+        node_meas = {k: [_lbl.get(pk, pk) for pk in v] for k, v in node_np.items()}
         if nh:
             for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
                 if getattr(a, 'node_id', None):
@@ -1124,7 +1128,7 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
-                           node_kids=node_kids, node_meas=node_meas,
+                           node_kids=node_kids, node_meas=node_meas, node_np=node_np,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,
@@ -1269,6 +1273,64 @@ def measurements_point_quickedit(pid):
     db.session.commit()
     log_activity('meas_point_quickedit', a.name)
     return jsonify(ok=True, name=a.name, location=a.location or '')
+
+
+@app.route('/dashboard/measurements/node/<int:nid>/params', methods=['POST'])
+def measurements_node_params(nid):
+    """Δρόμος A: μετρήσεις κόμβου (NodeParam) + προώθηση στα σημεία του (AreaParam)
+    ώστε η καταγραφή να βλέπει τις ίδιες χωρίς αλλαγή."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    n = MonitorNode.query.get(nid)
+    if not n:
+        return jsonify(ok=False), 404
+    data = request.get_json(silent=True) or {}
+    keys, seen = [], set()
+    for k in (data.get('pkeys') or []):
+        k = str(k)[:40]
+        if k and k not in seen:
+            seen.add(k); keys.append(k)
+    NodeParam.query.filter_by(node_id=nid).delete()
+    for i, k in enumerate(keys):
+        db.session.add(NodeParam(node_id=nid, pkey=k, sort=i))
+    for a in Area.query.filter_by(node_id=nid, engine_only=True).all():
+        AreaParam.query.filter_by(area_id=a.id).delete()
+        for i, k in enumerate(keys):
+            db.session.add(AreaParam(area_id=a.id, pkey=k, sort=i))
+    db.session.commit()
+    log_activity('meas_node_params', '%s: %d' % (n.name, len(keys)))
+    return jsonify(ok=True, n=len(keys))
+
+
+@app.route('/dashboard/measurements/nodeparams/migrate', methods=['GET', 'POST'])
+def measurements_nodeparams_migrate():
+    """Μετάβαση Δρόμος A: από υπάρχοντα AreaParam → NodeParam (ανά κόμβο, union).
+    GET = dry-run (αναφορά)· POST = εφαρμογή (μόνο κόμβοι χωρίς NodeParam· μη καταστροφικό)."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    rows = (db.session.query(Area.node_id, AreaParam.pkey)
+            .join(AreaParam, AreaParam.area_id == Area.id)
+            .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
+                    Area.node_id.isnot(None)).all())
+    plan = {}
+    for nid, pk in rows:
+        plan.setdefault(nid, set()).add(pk)
+    nmap = {n.id: n.name for n in MonitorNode.query.all()}
+    lbl = {m['pkey']: m['label'] for m in _library(include_inactive=True)}
+    report, applied = [], 0
+    do = (request.method == 'POST')
+    for nid, pks in plan.items():
+        has = NodeParam.query.filter_by(node_id=nid).first()
+        report.append({'node': nmap.get(nid, '#%d' % nid),
+                       'labels': sorted(lbl.get(p, p) for p in pks), 'skip': bool(has)})
+        if do and not has:
+            for i, pk in enumerate(sorted(pks)):
+                db.session.add(NodeParam(node_id=nid, pkey=pk, sort=i))
+            applied += 1
+    if do:
+        db.session.commit()
+        log_activity('meas_nodeparams_migrate', 'applied=%d' % applied)
+    return jsonify(ok=True, applied=applied, report=report)
 
 
 @app.route('/dashboard/measurements/point/assign', methods=['POST'])
