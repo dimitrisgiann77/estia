@@ -692,6 +692,28 @@ def measurements_node_move(nid):
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/measurements/node/reorder', methods=['POST'])
+def measurements_node_reorder():
+    """Drag: ακριβής σειρά + reparent. {parent_id, ids:[...]} → set parent+sort ανά κόμβο."""
+    if not is_admin():
+        return jsonify(ok=False), 403
+    data = request.get_json(silent=True) or {}
+    pv = data.get('parent_id')
+    pid = int(pv) if pv else None
+    for i, nid in enumerate(data.get('ids') or []):
+        try:
+            n = MonitorNode.query.get(int(nid))
+        except (TypeError, ValueError):
+            n = None
+        if not n:
+            continue
+        if pid and (pid == n.id or _would_cycle(n.id, pid)):
+            continue
+        n.parent_id = pid; n.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @app.route('/dashboard/measurements/node/<int:nid>/toggle', methods=['POST'])
 def measurements_node_toggle(nid):
     if not is_admin():
@@ -934,10 +956,12 @@ def measurements_console():
     pool_points = []
     _nh = request.args.get('nh')
     nh = int(_nh) if (_nh and _nh.isdigit()) else None
+    node_kids = {}
     if tab in ('structure', 'points'):
         node_tree = _node_tree()
         for row in node_tree:
             row['hotels'] = _hotels_set(row['n'])
+            node_kids.setdefault(row['n'].parent_id or 0, []).append(row)
         if nh:
             for a in Area.query.filter(Area.engine_only.is_(True), Area.hotel_id == nh).all():
                 if getattr(a, 'node_id', None):
@@ -998,6 +1022,7 @@ def measurements_console():
                            freq_label=FREQ_LABEL, library=library, area_chips=area_chips,
                            lib_groups=lib_groups,
                            node_tree=node_tree, node_opts=node_opts, space_opts=space_opts, nh=nh,
+                           node_kids=node_kids,
                            group_points=group_points, pool_points=pool_points,
                            hotel_points=hotel_points, area_pkeys=area_pkeys,
                            assign_rows=assign_rows, point_meas=point_meas,
