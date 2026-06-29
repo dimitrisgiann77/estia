@@ -183,14 +183,12 @@ select.in-kind{width:120px;}
   </div>
 
   {% if tab=='structure' %}
-  <div class="hpick">
-    {% for h in all_hotels %}<a class="hbtn {{ 'on' if h.id==nh }}" href="/dashboard/measurements?tab=structure&nh={{ h.id }}{{ '&embed=1' if request.args.get('embed') else '' }}">{{ hcodes.get(h.id) or h.name }} · {{ h.name }}</a>{% endfor %}
-  </div>
-  {% if not nh %}
-  <div class="card"><div class="muted">Διάλεξε ξενοδοχείο πάνω για να ορίσεις τη δομή του δικτύου του.</div></div>
-  {% endif %}
-  {% if nh %}
   <style>
+  .strtree .hcount{font-size:11px;color:#5f7682;background:#eef6fb;border-radius:5px;padding:1px 7px;display:inline-flex;align-items:center;gap:3px;}
+  .stred input[type=color]{width:48px;height:32px;padding:2px;}
+  .hotch{display:flex;flex-direction:column;gap:4px;}
+  .hck{display:flex;align-items:center;gap:7px;font-size:13px;background:#f6fafd;border:1px solid #e3edf4;border-radius:7px;padding:6px 9px;cursor:pointer;}
+  .hck input{width:auto;}
   .strlayout{display:grid;grid-template-columns:1fr 290px;gap:14px;align-items:start;}
   .strtree .children{display:flex;flex-direction:column;gap:7px;min-height:8px;}
   .strtree .children .children{margin-left:22px;border-left:2px solid #e8f0f6;padding-left:10px;margin-top:7px;}
@@ -218,41 +216,36 @@ select.in-kind{width:120px;}
   </style>
   {% macro nodecard(row) %}
   <div class="node" data-nid="{{ row.n.id }}">
-    <div class="nrow {{ 'top' if not row.depth }}" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" onclick="pickNode(this)">
+    <div class="nrow {{ 'top' if not row.depth }}" style="border-left-color:{{ row.n.color or ('#193847' if not row.depth else '#185FA5') }};" data-nid="{{ row.n.id }}" data-name="{{ row.n.name }}" data-parent="{{ row.n.parent_id or '' }}" data-color="{{ row.n.color or '' }}" data-hotels="{{ row.hotels|join(',') }}" onclick="pickNode(this)">
       <i class="ti ti-grip-vertical grip"></i>
-      {% if not row.depth %}<i class="ti {{ row.n.icon or 'ti-folder' }}" style="color:#185FA5;"></i>{% endif %}
+      {% if not row.depth %}<i class="ti {{ row.n.icon or 'ti-folder' }}" style="color:{{ row.n.color or '#185FA5' }};"></i>{% endif %}
       <span class="nm">{{ row.n.name }}</span>
-      {% if row.np %}<span class="cnt">{{ row.np }} σημ.</span>{% endif %}
-      <span class="hd {{ 'on' if nh in row.hotels }}" title="Το έχει το ξενοδοχείο" onclick="event.stopPropagation();nodeHotel(this,{{ row.n.id }},{{ nh }})"><i class="ti ti-check"></i></span>
+      <span class="hcount" title="Σε πόσα ξενοδοχεία">{{ row.hotels|length }} <i class="ti ti-building"></i></span>
     </div>
-    <div class="pts" data-node="{{ row.n.id }}">{% for a in group_points.get(row.n.id, []) %}<span class="pt {{ 'off' if not a.is_active }}" data-aid="{{ a.id }}"><i class="ti ti-map-pin"></i> {{ a.name }}</span>{% endfor %}</div>
     <div class="children" data-parent="{{ row.n.id }}">{% for ch in node_kids.get(row.n.id, []) %}{{ nodecard(ch) }}{% endfor %}</div>
   </div>
   {% endmacro %}
   <div class="card">
-    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου — {% for h in all_hotels %}{% if h.id==nh %}{{ h.name }}{% endif %}{% endfor %}</div>
-    <p class="muted" style="margin-bottom:12px;">Σύρε κόμβους (⋮⋮) για σειρά / υποομάδα· σύρε σημεία (📍) σε άλλο δίκτυο· κλικ σε κόμβο για επεξεργασία δεξιά· ✓ = το έχει το ξενοδοχείο.</p>
+    <div class="card-title"><i class="ti ti-sitemap"></i> Δομή δικτύου <span class="muted" style="font-weight:400;">(κοινή — ανάθεση σε ξενοδοχεία ανά κόμβο)</span></div>
+    <p class="muted" style="margin-bottom:12px;">Σύρε κόμβους (⋮⋮) για σειρά / υποομάδα· κλικ σε κόμβο → επεξεργασία δεξιά (όνομα · χρώμα · ξενοδοχεία). Τα σημεία ανά ξενοδοχείο τα δουλεύεις στην καρτέλα «Σημεία».</p>
     <div class="strlayout strtree">
       <div>
         <button class="btn alt" type="button" onclick="addNode('')" style="margin-bottom:10px;"><i class="ti ti-plus"></i> Νέα ομάδα (κορυφή)</button>
         <div class="children" data-parent="">
           {% for r in node_kids.get(0, []) %}{{ nodecard(r) }}{% else %}<div class="muted" style="padding:8px 0;">Κανένας κόμβος — «Νέα ομάδα».</div>{% endfor %}
         </div>
-        {% if pool_points %}
-        <div style="margin-top:14px;">
-          <div class="muted" style="font-size:12px;font-weight:600;margin-bottom:4px;">Χωρίς δίκτυο — σύρε σε δίκτυο:</div>
-          <div class="pts" data-node="">{% for a in pool_points %}<span class="pt {{ 'off' if not a.is_active }}" data-aid="{{ a.id }}"><i class="ti ti-map-pin"></i> {{ a.name }}</span>{% endfor %}</div>
-        </div>
-        {% endif %}
       </div>
       <div class="stred" id="stred">
         <div class="empty" id="stred-empty">Διάλεξε κόμβο για επεξεργασία<br>ή «+ Νέα ομάδα».</div>
         <form method="POST" action="/dashboard/measurements/node/save" id="stform" style="display:none;">
           <h3>Επεξεργασία κόμβου</h3>
-          <input type="hidden" name="id" id="st-id"><input type="hidden" name="nh" value="{{ nh }}"><input type="hidden" name="sort" id="st-sort" value="0">
+          <input type="hidden" name="id" id="st-id"><input type="hidden" name="sort" id="st-sort" value="0">
           <label>Όνομα</label><input type="text" name="name" id="st-name" required>
           <label>Ανήκει σε (γονέας)</label>
           <select name="parent_id" id="st-parent"><option value="">— κορυφή —</option>{% for o in node_opts %}<option value="{{ o.id }}">{{ o.label }}</option>{% endfor %}</select>
+          <label>Χρώμα κάρτας</label><input type="color" name="color" id="st-color" value="#185FA5">
+          <label>Ξενοδοχεία που το έχουν</label>
+          <div id="st-hotels" class="hotch">{% for h in all_hotels %}<label class="hck"><input type="checkbox" value="{{ h.id }}" onchange="nodeHotelCk(this)"> {{ h.name }}</label>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
           <button class="addsub" type="button" id="st-addsub"><i class="ti ti-plus"></i> Νέα υποομάδα εδώ</button>
         </form>
@@ -261,7 +254,6 @@ select.in-kind{width:120px;}
   </div>
   <script>
   (function(){
-    var NH={{ nh }};
     window.pickNode=function(el){
       document.querySelectorAll('.strtree .nrow.sel').forEach(function(n){n.classList.remove('sel');}); el.classList.add('sel');
       document.getElementById('stred-empty').style.display='none';
@@ -270,17 +262,21 @@ select.in-kind{width:120px;}
       document.getElementById('st-id').value=nid;
       document.getElementById('st-name').value=el.getAttribute('data-name');
       document.getElementById('st-parent').value=el.getAttribute('data-parent')||'';
+      document.getElementById('st-color').value=el.getAttribute('data-color')||'#185FA5';
       document.getElementById('st-del').setAttribute('formaction','/dashboard/measurements/node/'+nid+'/delete');
       document.getElementById('st-addsub').onclick=function(){addNode(nid);};
+      var hs=(el.getAttribute('data-hotels')||'').split(',');
+      document.querySelectorAll('#st-hotels input').forEach(function(c){c.checked=hs.indexOf(c.value)>=0;});
     };
-    window.nodeHotel=function(b,nid,hid){
-      fetch('/dashboard/measurements/node/'+nid+'/hotel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hotel_id:hid})})
-        .then(function(r){return r.json();}).then(function(d){if(d&&d.ok)b.classList.toggle('on',d.on);});
+    window.nodeHotelCk=function(cb){
+      var nid=document.getElementById('st-id').value; if(!nid)return;
+      fetch('/dashboard/measurements/node/'+nid+'/hotel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hotel_id:cb.value})})
+        .then(function(r){return r.json();}).then(function(d){if(d&&typeof d.on!=='undefined')cb.checked=d.on;});
     };
     window.addNode=function(parent){
       var n=prompt('Όνομα νέου κόμβου;'); if(!n)return;
       var f=document.createElement('form'); f.method='POST'; f.action='/dashboard/measurements/node/save';
-      [['name',n],['parent_id',parent||''],['nh',NH]].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i);});
+      [['name',n],['parent_id',parent||'']].forEach(function(kv){var i=document.createElement('input');i.type='hidden';i.name=kv[0];i.value=kv[1];f.appendChild(i);});
       document.body.appendChild(f); f.submit();
     };
     if(window.Sortable){
@@ -291,17 +287,9 @@ select.in-kind{width:120px;}
           fetch('/dashboard/measurements/node/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent_id:pid||null,ids:ids})});
         }});
       });
-      document.querySelectorAll('.strtree .pts').forEach(function(p){
-        new Sortable(p,{group:'spts',animation:150,onAdd:function(ev){
-          var aid=ev.item.getAttribute('data-aid'); var node=p.getAttribute('data-node');
-          var fd=new FormData(); fd.append('node_id',node); fd.append('ajax','1');
-          fetch('/dashboard/measurements/point/'+aid+'/node',{method:'POST',body:fd});
-        }});
-      });
     }
   })();
   </script>
-  {% endif %}
   {% endif %}
 
   {% if tab=='points' %}

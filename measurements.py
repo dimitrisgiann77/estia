@@ -47,6 +47,7 @@ class MonitorNode(db.Model):
     name      = db.Column(db.String(80), nullable=False)
     node_kind = db.Column(db.String(20))                 # 'group' | 'subgroup' (ενημερωτικό)
     icon      = db.Column(db.String(40), default='')
+    color     = db.Column(db.String(20))    # Φ2: χρωματικός κωδικός κάρτας (ομάδα/υποομάδα)
     sort      = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     hotels    = db.Column(db.String(120))   # Φ: λίστα hotel ids που «έχουν» τον κόμβο (κενό=όλα)
@@ -637,6 +638,7 @@ def measurements_node_save():
     pid = int(pid) if pid else None
     node_kind = (f.get('node_kind') or ('group' if not pid else 'subgroup')).strip()[:20]
     icon = (f.get('icon') or '').strip()[:40]
+    color = (f.get('color') or '').strip()[:20] or None
     try:
         sort = int(f.get('sort') or 0)
     except (TypeError, ValueError):
@@ -660,11 +662,12 @@ def measurements_node_save():
         if pid and (pid == n.id or _would_cycle(n.id, pid)):
             return go('Μη έγκυρος γονέας (κύκλος).')
         n.name, n.parent_id, n.node_kind, n.icon, n.sort = name, pid, node_kind, icon, sort
+        n.color = color
         db.session.commit()
         log_activity('meas_node_save', 'edit %s' % name)
         return go('Αποθηκεύτηκε: ' + name)
     db.session.add(MonitorNode(key=_unique_node_key(name), parent_id=pid, name=name,
-                               node_kind=node_kind, icon=icon, sort=sort, is_active=True))
+                               node_kind=node_kind, icon=icon, color=color, sort=sort, is_active=True))
     db.session.commit()
     log_activity('meas_node_save', 'add %s' % name)
     return go('Προστέθηκε: ' + name)
