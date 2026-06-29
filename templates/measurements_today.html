@@ -92,7 +92,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="sechead"><i class="ti {{ g.icon }}"></i> {{ g.title }} <span class="secn">{{ g.areas|length }}</span></div>
       {% for c in g.areas %}
       {% set pend = c.pending_now %}
-      <div class="pt" data-aid="{{ c.area.id }}" data-pending="{{ pend }}">
+      <div class="pt" data-aid="{{ c.area.id }}" data-pending="{{ pend }}"{% if c.color %} style="border-left:4px solid {{ c.color }};"{% endif %}>
         <div class="pthead" onclick="togglePt(this)">
           <i class="ti st {{ 'bad' if pend else ('ok' if c.count else 'no') }} {{ 'ti-alert-circle' if pend else ('ti-circle-check' if c.count else 'ti-circle') }}"></i>
           <span class="nm">{{ c.area.name }}</span>
@@ -118,7 +118,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
                 <select name="position"><option value="">—</option><option>Απομακρυσμένο</option><option>Μεσαίο</option><option>Κοντινό</option></select></div>
               <div class="f"><label>Χώρος δείγματος</label><input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar"></div>
               {% for p in c.meas %}
-              <div class="f"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.min_v is not none or p.max_v is not none %} <span class="lim">{{ p.min_v if p.min_v is not none else '' }}{% if p.min_v is not none and p.max_v is not none %}–{% endif %}{{ p.max_v if p.max_v is not none else '' }}</span>{% endif %}{% if p.due_now %}<span class="duebadge now {{ 'done' if p.done_now else '' }}">{{ '✓ τώρα' if p.done_now else '● τώρα' }}</span>{% endif %}</label>
+              <div class="f"><label>{% if p.color %}<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{{ p.color }};margin-right:5px;vertical-align:middle;"></span>{% endif %}{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.min_v is not none or p.max_v is not none %} <span class="lim">{{ p.min_v if p.min_v is not none else '' }}{% if p.min_v is not none and p.max_v is not none %}–{% endif %}{{ p.max_v if p.max_v is not none else '' }}</span>{% endif %}{% if p.due_now %}<span class="duebadge now {{ 'done' if p.done_now else '' }}">{{ '✓ τώρα' if p.done_now else '● τώρα' }}</span>{% endif %}</label>
                 {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
                 {% elif p.kind=='text' %}<input type="text" name="{{ p.pkey }}">
                 {% else %}<input type="number" step="any" name="{{ p.pkey }}" class="measin" data-min="{{ p.min_v if p.min_v is not none else '' }}" data-max="{{ p.max_v if p.max_v is not none else '' }}" data-low="{{ p.low or '' }}" data-high="{{ p.high or '' }}" data-label="{{ p.label }}" oninput="liveCheck(this)">{% endif %}

@@ -114,7 +114,7 @@ table.m thead th{cursor:grab;} table.m thead th.dragging{opacity:.45;} table.m t
         <tr data-rid="{{ r.rid }}" data-point="{{ r.point }}" data-ok="{{ 1 if r.ok else 0 }}">
           <td class="d" data-key="date" style="white-space:nowrap;">{{ r.dt_disp }}</td>
           {% if view!='byspace' %}<td class="l" data-key="xoros">{% if r.xoros and r.xoros!='—' %}<span class="cell-chip">{{ r.xoros }}</span>{% else %}—{% endif %}</td>{% endif %}
-          <td class="l" data-key="point"><span class="cell-chip">{{ r.point }}</span></td>
+          <td class="l" data-key="point"><span class="cell-chip"{% if r.color %} style="border-left:3px solid {{ r.color }};padding-left:6px;"{% endif %}>{{ r.point }}</span></td>
           <td data-key="pos">{% if r.pos %}<span class="cell-chip">{{ r.pos }}</span>{% else %}—{% endif %}</td>
           <td data-key="place">{% if r.place %}<span class="cell-chip">{{ r.place }}</span>{% else %}—{% endif %}</td>
           <td class="{{ 'bad' if r.temp_bad else 'ok' }}" data-key="temp">{% if r.temp is not none %}{{ r.temp }}{% if r.net %}<span class="{{ 'nz' if r.net=='ΖΝΧ' else 'np' }}">{{ r.net }}</span>{% endif %}{% else %}—{% endif %}</td>

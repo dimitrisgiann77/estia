@@ -362,11 +362,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.353'
-APP_BUILD   = '634'
+APP_VERSION = '12.354'
+APP_BUILD   = '635'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.354', 'b': '635', 'date': '29/06/2026', 'time': '18:00', 'title': 'Χρώματα ζωντανεύουν — κατηγορία/μέτρηση + χρωματισμός Σήμερα/Φόρμα/Κονσόλα (B)',
+     'items': ['Προστέθηκε χρώμα σε Κατηγορίες (Παραμετροποίηση) & Είδη μετρήσεων — μαζί με τα ήδη υπάρχοντα (Ζώνη/Σημείο/Κόμβος).',
+               'Τα χρώματα «βάφουν» πλέον: «Σήμερα» (κάρτα σημείου + κουκκίδα μέτρησης), Φόρμα καταχώρησης (κουκκίδα μέτρησης) και Κονσόλα Μετρήσεων (σημείο). Κανόνες fallback: μέτρηση→κατηγορία, σημείο→ζώνη.']},
     {'v': '12.353', 'b': '634', 'date': '29/06/2026', 'time': '17:30', 'title': 'Καθάρισμα παλιού συστήματος περιόδων (C4) — ένα μόνο σημείο για περιόδους',
      'items': ['Αφαιρέθηκε το αχρησιμοποίητο (ορφανό) UI/routes των παλιών περιόδων ανά τύπο. Οι περίοδοι ορίζονται πλέον αποκλειστικά στο tab «Παραμετροποίηση».',
                'Το μοντέλο των παλιών περιόδων διατηρείται για ιστορική συμβατότητα. Ολοκληρώθηκε η ενοποίηση σε περιόδους ημέρας + συχνότητα (C1–C4).']},
@@ -1790,6 +1793,7 @@ class MonitorParam(db.Model):
     kind         = db.Column(db.String(10))               # 'num' | 'bool' | 'text' (κενό = heuristic)
     category     = db.Column(db.String(40), default='')   # ομαδοποίηση παλέτας (Πισίνα/Νερό/Γενικό)
     is_active    = db.Column(db.Boolean, default=True)
+    color        = db.Column(db.String(20))               # B: χρώμα μέτρησης (βάφει chips/labels)
 
 class Area(db.Model):
     id           = db.Column(db.Integer, primary_key=True)
@@ -4503,6 +4507,9 @@ def ensure_columns():
     _add_col('area', 'color', 'color VARCHAR(20)')
     # v12.348 — Φ3: συχνότητα ανά Σημείο × Μέτρηση (MeasFreq.area_id)
     _add_col('meas_freq', 'area_id', 'area_id INTEGER')
+    # v12.354 — B: χρώματα κατηγορίας & μέτρησης
+    _add_col('meas_category', 'color', 'color VARCHAR(20)')
+    _add_col('monitor_param', 'color', 'color VARCHAR(20)')
 
 def init_db():
     with app.app_context():

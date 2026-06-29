@@ -96,7 +96,7 @@ td,th{padding:7px;border-bottom:1px solid #f3f3f3;text-align:left;}
           <input type="text" name="place" maxlength="60" placeholder="π.χ. Lobby Bar / Ζαχαροπλαστείο (προαιρετικό)"></div>
         <div class="f" style="grid-column:1/-1;"><label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:#5f7682;"><input type="checkbox" id="ent-all" onchange="filterDue()"> Όλες οι μετρήσεις (όχι μόνο της περιόδου)</label></div>
         {% for p in params %}
-        <div class="f meas-field" data-due="{{ p.due|join(',') }}"><label>{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.due %} <span class="hint" style="display:inline;color:#185FA5;">· {{ p.due|length }} περ./ημ.</span>{% endif %}</label>
+        <div class="f meas-field" data-due="{{ p.due|join(',') }}"><label>{% if p.color %}<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:{{ p.color }};margin-right:5px;vertical-align:middle;"></span>{% endif %}{{ p.label }}{% if p.unit %} ({{ p.unit }}){% endif %}{% if p.due %} <span class="hint" style="display:inline;color:#185FA5;">· {{ p.due|length }} περ./ημ.</span>{% endif %}</label>
           {% if p.kind=='bool' %}<select name="{{ p.pkey }}"><option value="">—</option><option value="1">Ναι</option></select>
           {% elif p.kind=='text' %}<input type="text" name="{{ p.pkey }}">
           {% else %}<input type="number" step="any" name="{{ p.pkey }}" class="measin" oninput="recalcActions()" data-label="{{ p.label }}" data-min="{{ p.min_v if p.min_v is not none else '' }}" data-max="{{ p.max_v if p.max_v is not none else '' }}" data-low="{{ p.low or '' }}" data-high="{{ p.high or '' }}">{% endif %}

@@ -67,9 +67,10 @@ class SamplingSpace(db.Model):
 class MeasCategory(db.Model):
     """Παραμετροποίηση: διαχειριζόμενη λίστα κατηγοριών ειδών μετρήσεων (owner).
     Τα MonitorParam.category τη διαβάζουν (dropdown στα «Είδη»)."""
-    id   = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(40), nullable=False)
-    sort = db.Column(db.Integer, default=0)
+    id    = db.Column(db.Integer, primary_key=True)
+    name  = db.Column(db.String(40), nullable=False)
+    sort  = db.Column(db.Integer, default=0)
+    color = db.Column(db.String(20))   # B: χρώμα κατηγορίας (βάφει μετρήσεις/labels)
 
 DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 'Spa / Jacuzzi', 'Δώμα',
                   'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Χώρος', 'Απομακρυσμένο']
@@ -517,7 +518,7 @@ def _library(include_inactive=False):
                     'min_v': p.min_v, 'max_v': p.max_v,
                     'action_low': p.action_low or '', 'action_high': p.action_high or '',
                     'kind': _param_input_kind(p), 'category': (getattr(p, 'category', '') or ''),
-                    'active': active})
+                    'color': (getattr(p, 'color', '') or ''), 'active': active})
     return out
 
 
@@ -975,12 +976,14 @@ def measurements_category_save():
         return redirect(url_for('measurements_console') + '?tab=params')
     if not c:
         mx = (db.session.query(db.func.max(MeasCategory.sort)).scalar() or 0) + 1
-        db.session.add(MeasCategory(name=name, sort=mx))
+        c = MeasCategory(name=name, sort=mx); db.session.add(c)
     elif name and name != c.name:
         old = c.name; c.name = name
         # cascade → ενημέρωσε όλα τα Είδη που είχαν την παλιά κατηγορία (όχι ορφανά)
         for p in MonitorParam.query.filter_by(category=old).all():
             p.category = name
+    if 'color' in f:
+        c.color = (f.get('color') or '').strip()[:20] or None
     db.session.commit()
     return redirect(url_for('measurements_console') + '?tab=params')
 
@@ -1576,6 +1579,7 @@ def measurements_lib_save():
     kind  = (f.get('kind') or 'num').strip()
     kind  = kind if kind in ('num', 'bool', 'text') else 'num'
     category = (f.get('category') or '').strip()[:40]
+    color = (f.get('color') or '').strip()[:20] or None
 
     def _go(m):
         bp = (f.get('back_points') or '').strip()
@@ -1595,6 +1599,7 @@ def measurements_lib_save():
             p.min_v, p.max_v = mn, mx
             p.action_low, p.action_high = low, high
             p.kind, p.category = kind, category
+            p.color = color
         db.session.commit()
         log_activity('meas_lib_save', 'edit %s' % pkey)
         return _go('Ενημερώθηκε: ' + label)
@@ -1609,7 +1614,7 @@ def measurements_lib_save():
     nsort = (db.session.query(db.func.max(MonitorParam.sort)).scalar() or 0) + 1
     db.session.add(MonitorParam(template_key=None, pkey=newkey, label=label[:80], unit=unit,
                                 min_v=mn, max_v=mx, action_low=low, action_high=high,
-                                kind=kind, category=category, is_active=True, sort=nsort))
+                                kind=kind, category=category, color=color, is_active=True, sort=nsort))
     db.session.commit()
     log_activity('meas_lib_save', 'add %s' % newkey)
     return _go('Προστέθηκε: ' + label)
@@ -1704,9 +1709,12 @@ def measurements_entry():
             # C2: συχνότητα ανά μέτρηση (DayPeriod keys) → η φόρμα δείχνει τις due ανά περίοδο
             _fr = {mf.pkey: [p for p in (mf.periods or '').split(',') if p]
                    for mf in MeasFreq.query.filter_by(area_id=sel.id).all()}
+            _catmap, _ = _color_maps()
             params = [{'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
                        'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
-                       'kind': _param_input_kind(p), 'due': _fr.get(p.pkey, [])} for p in point_params(sel)]
+                       'kind': _param_input_kind(p), 'due': _fr.get(p.pkey, []),
+                       'color': (getattr(p, 'color', '') or _catmap.get(p.category or '', ''))}
+                      for p in point_params(sel)]
             periods = DayPeriod.query.order_by(DayPeriod.sort, DayPeriod.id).all()
             recent = Reading.query.filter_by(area_id=sel.id).order_by(Reading.recorded_at.desc()).limit(10).all()
             if recent:
@@ -1801,6 +1809,13 @@ def _current_dayperiod():
     return _dayperiod_at(_athens_now().strftime('%H:%M'))
 
 
+def _color_maps():
+    """B: χάρτες χρωμάτων για fallback — μέτρηση→κατηγορία, σημείο→ζώνη."""
+    catmap = {c.name: c.color for c in MeasCategory.query.all() if c.color}
+    zonemap = {s.name: s.color for s in SamplingSpace.query.all() if s.color}
+    return catmap, zonemap
+
+
 # ── Φ3c-2b: ΕΝΙΑΙΑ «Σήμερα» (engine) — σημεία ανά περιοχή + status ημέρας ─────
 # C1 (Δρόμος 2): οδηγείται από DayPeriod + MeasFreq — δείχνει «τι μετριέται τώρα» + εκκρεμή ανά μέτρηση.
 @app.route('/dashboard/measurements/today')
@@ -1849,6 +1864,7 @@ def measurements_today():
             return (loc, 'ti-map-pin', loc.lower())
         return ('Χωρίς ζώνη', 'ti-map-pin', 'zzzz')
 
+    catmap, zonemap = _color_maps()
     by_hotel = {}
     pending_total = due_now_total = done_now_total = 0
     for a in points:
@@ -1868,12 +1884,14 @@ def measurements_today():
             meas.append({'pkey': p.pkey, 'label': p.label, 'unit': p.unit, 'min_v': p.min_v,
                          'max_v': p.max_v, 'low': p.action_low, 'high': p.action_high,
                          'kind': _param_input_kind(p), 'due': due,
-                         'due_now': due_now, 'done_now': done_now})
+                         'due_now': due_now, 'done_now': done_now,
+                         'color': (getattr(p, 'color', '') or catmap.get(p.category or '', ''))})
         pending_total += p_now
         cat, icon, order = _grp(a)
         groups = by_hotel.setdefault(a.hotel_id, {})
         g = groups.setdefault(cat, {'title': cat, 'icon': icon, 'order': order, 'areas': []})
-        g['areas'].append({'area': a, 'meas': meas, 'count': cnt.get(a.id, 0), 'pending_now': p_now})
+        g['areas'].append({'area': a, 'meas': meas, 'count': cnt.get(a.id, 0), 'pending_now': p_now,
+                           'color': (a.color or zonemap.get((a.location or '').strip(), ''))})
     today_by_hotel = []
     for hid, groups in by_hotel.items():
         glist = sorted(groups.values(), key=lambda x: (x['order'], x['title']))
@@ -2437,6 +2455,7 @@ def _console_ctx():
     view = (request.args.get('view') or 'table').strip()
 
     pmap = {p.pkey: p for p in MonitorParam.query.all()}
+    _, _zonemap = _color_maps()
     areas = {a.id: a for a in Area.query.filter(Area.engine_only.is_(True), Area.is_active.is_(True),
                                                 Area.hotel_id == nh).all()} if nh else {}
     aids = list(areas.keys())
@@ -2495,6 +2514,7 @@ def _console_ctx():
             rows.append({'rid': r.id, 'date': r.record_date, 'dt_disp': _dtd,
                          'user': (r.user.full_name if r.user else '—'),
                          'xoros': loc or '—', 'point': a.name,
+                         'color': (a.color or _zonemap.get(loc, '')),
                          'pos': r.position or '', 'place': (r.place or ''), 'net': net,
                          'temp': cells['temp'], 'temp_bad': cell_bad['temp'],
                          'clo2': cells['clo2'], 'clo2_bad': cell_bad['clo2'],

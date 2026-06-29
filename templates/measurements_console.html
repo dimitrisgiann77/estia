@@ -588,7 +588,7 @@ select.in-kind{width:120px;}
         <div class="libcat">{{ g.name }}</div>
         <div class="libgrid" data-cat="{{ g.name }}">
           {% for m in g.rows %}
-          <div class="mcardL {{ cc }} {{ 'off' if not m.active }}" data-pkey="{{ m.pkey }}" data-label="{{ m.label }}" data-unit="{{ m.unit }}" data-min="{{ m.min_v if m.min_v is not none else '' }}" data-max="{{ m.max_v if m.max_v is not none else '' }}" data-low="{{ m.action_low }}" data-high="{{ m.action_high }}" data-kind="{{ m.kind }}" data-cat="{{ m.category }}" data-active="{{ 1 if m.active else 0 }}" onclick="libEdit(this)">
+          <div class="mcardL {{ cc }} {{ 'off' if not m.active }}" data-pkey="{{ m.pkey }}" data-label="{{ m.label }}" data-unit="{{ m.unit }}" data-min="{{ m.min_v if m.min_v is not none else '' }}" data-max="{{ m.max_v if m.max_v is not none else '' }}" data-low="{{ m.action_low }}" data-high="{{ m.action_high }}" data-kind="{{ m.kind }}" data-cat="{{ m.category }}" data-color="{{ m.color }}" data-active="{{ 1 if m.active else 0 }}"{% if m.color %} style="border-left:3px solid {{ m.color }};"{% endif %} onclick="libEdit(this)">
             <div class="nm">{{ m.label }}{% if m.unit %} <span class="u">{{ m.unit }}</span>{% endif %}</div>
             <span class="lim">{% if m.min_v is not none and m.max_v is not none %}{{ m.min_v }}–{{ m.max_v }}{% elif m.min_v is not none %}≥{{ m.min_v }}{% elif m.max_v is not none %}≤{{ m.max_v }}{% else %}—{% endif %}{% if m.unit %} {{ m.unit }}{% endif %}</span>
             {% if m.action_low or m.action_high %}<div class="msg"><i class="ti ti-message-2"></i> μηνύματα</div>{% endif %}
@@ -609,7 +609,7 @@ select.in-kind{width:120px;}
           <div class="rw"><div><label>Κάτω όριο</label><input type="number" step="any" name="min_v" id="lf-min"></div><div><label>Άνω όριο</label><input type="number" step="any" name="max_v" id="lf-max"></div></div>
           <label>Μήνυμα αν χαμηλό</label><input type="text" name="action_low" id="lf-low">
           <label>Μήνυμα αν υψηλό</label><input type="text" name="action_high" id="lf-high">
-          <label>Κατηγορία</label><select name="category" id="lf-cat"><option value="">— καμία —</option>{% for c in categories_list %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select>
+          <div class="rw"><div><label>Κατηγορία</label><select name="category" id="lf-cat"><option value="">— καμία —</option>{% for c in categories_list %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select></div><div><label>Χρώμα</label><input type="color" name="color" id="lf-color" value="#185FA5" style="width:46px;height:32px;padding:2px;border:1px solid #d6eef3;border-radius:6px;"></div></div>
           <div class="acts">
             <button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
             <button class="tgl" type="submit" id="lf-tgl" style="display:none;"></button>
@@ -633,6 +633,7 @@ select.in-kind{width:120px;}
       document.getElementById('lf-low').value=el.getAttribute('data-low');
       document.getElementById('lf-high').value=el.getAttribute('data-high');
       document.getElementById('lf-cat').value=el.getAttribute('data-cat');
+      document.getElementById('lf-color').value=el.getAttribute('data-color')||'#185FA5';
       setKind(el.getAttribute('data-kind')||'num');
       var t=document.getElementById('lf-tgl'),on=el.getAttribute('data-active')==='1';
       t.style.display='inline-block'; t.textContent=on?'Απενεργοποίηση':'Ενεργοποίηση';
@@ -643,6 +644,7 @@ select.in-kind{width:120px;}
       document.getElementById('lf-title').textContent='Νέο είδος μέτρησης';
       document.getElementById('lf-pkey').value=''; document.getElementById('lf-keyrow').style.display='block';
       ['lf-label','lf-unit','lf-min','lf-max','lf-low','lf-high','lf-cat','lf-key'].forEach(function(id){document.getElementById(id).value='';});
+      document.getElementById('lf-color').value='#185FA5';
       setKind('num'); document.getElementById('lf-tgl').style.display='none';
     };
     if(window.Sortable){
@@ -703,7 +705,7 @@ select.in-kind{width:120px;}
     <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία (ενημερώνει & τα Είδη)· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Ο μετρητής = πόσα Είδη την έχουν.</p>
     <div class="catgrid" id="catgrid">
       {% for c in categories_list %}{% set u = category_usage.get(c.name, 0) %}
-      <div class="catchip" data-id="{{ c.id }}">
+      <div class="catchip" data-id="{{ c.id }}" style="border-left:3px solid {{ c.color or '#185FA5' }};">
         <span class="grip"><i class="ti ti-grip-vertical"></i></span>
         <span class="cn">{{ c.name }}</span>
         <span class="cu {{ 'free' if not u }}" title="Είδη">{{ u }}</span>
@@ -712,6 +714,7 @@ select.in-kind{width:120px;}
           <button class="ic" type="submit" title="Αποθήκευση"><i class="ti ti-check"></i></button>
         </form>
         <button class="ic" type="button" onclick="catRename(this)" title="Μετονομασία"><i class="ti ti-pencil"></i></button>
+        <form method="POST" action="/dashboard/measurements/category/save" style="display:inline;"><input type="hidden" name="id" value="{{ c.id }}"><input type="color" name="color" value="{{ c.color or '#185FA5' }}" title="Χρώμα κατηγορίας" onchange="this.form.submit()" style="width:24px;height:22px;padding:1px;border:1px solid #d6eef3;border-radius:5px;vertical-align:middle;cursor:pointer;"></form>
         <form method="POST" action="/dashboard/measurements/category/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή κατηγορίας «{{ c.name }}»{{ (' — έχει ' + (u|string) + ' είδη') if u else '' }};');"><button class="ic del" type="submit" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>
       </div>
       {% else %}<div class="muted">Καμία κατηγορία ακόμη.</div>{% endfor %}
