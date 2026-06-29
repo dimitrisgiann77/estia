@@ -59,6 +59,9 @@ class SamplingSpace(db.Model):
     name      = db.Column(db.String(80), nullable=False)
     sort      = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+    icon      = db.Column(db.String(40))    # Φ1 Ζώνες: Tabler icon (π.χ. 'ti-map-pin')
+    color     = db.Column(db.String(20))    # Φ1 Ζώνες: χρώμα κάρτας/chip
+    description = db.Column(db.String(200)) # Φ1 Ζώνες: περιγραφή/σημειώσεις
 
 DEFAULT_SPACES = ['Μηχανοστάσιο', 'Κουζίνα', 'Πισίνα', 'Spa / Jacuzzi', 'Δώμα',
                   'Πύργοι ψύξης', 'Δωμάτια', 'Δωμάτιο / Τμήμα / Χώρος', 'Απομακρυσμένο']
@@ -848,15 +851,29 @@ def measurements_space_save():
         return redirect(url_for('login'))
     f = request.form
     sid = f.get('id'); name = (f.get('name') or '').strip()[:80]
-    if name:
-        if sid:
-            s = SamplingSpace.query.get(int(sid))
-            if s:
-                s.name = name
-        else:
-            mx = (db.session.query(db.func.max(SamplingSpace.sort)).scalar() or 0) + 1
-            db.session.add(SamplingSpace(name=name, sort=mx))
-        db.session.commit()
+    old_name = None
+    s = SamplingSpace.query.get(int(sid)) if sid else None
+    if not s and not name:
+        return redirect(url_for('measurements_console') + '?tab=spaces')
+    if not s:
+        mx = (db.session.query(db.func.max(SamplingSpace.sort)).scalar() or 0) + 1
+        s = SamplingSpace(name=name, sort=mx); db.session.add(s)
+    elif name and name != s.name:
+        old_name = s.name; s.name = name
+    # field-aware (το inline rename στέλνει μόνο name — μην μηδενίζεις τα υπόλοιπα)
+    if 'icon' in f:
+        s.icon = (f.get('icon') or '').strip()[:40] or None
+    if 'color' in f:
+        s.color = (f.get('color') or '').strip()[:20] or None
+    if 'description' in f:
+        s.description = (f.get('description') or '').strip()[:200] or None
+    # μετονομασία ζώνης → ενημέρωσε & τα Σημεία που τη χρησιμοποιούν (location) + MeasFreq
+    if old_name:
+        for a in Area.query.filter_by(location=old_name, engine_only=True).all():
+            a.location = s.name
+        for mf in MeasFreq.query.filter_by(space=old_name).all():
+            mf.space = s.name
+    db.session.commit()
     return redirect(url_for('measurements_console') + '?tab=spaces')
 
 
@@ -1074,6 +1091,15 @@ def measurements_console():
                             .order_by(MonitorPeriod.sort, MonitorPeriod.id).all(),
                             'nparams': len(t.params or [])})
     spaces_list = SamplingSpace.query.order_by(SamplingSpace.sort, SamplingSpace.name).all()
+    # Φ1 Ζώνες: μετρητής χρήσης ανά ζώνη = πόσα ενεργά Σημεία τη χρησιμοποιούν (location)
+    space_usage = {}
+    if tab == 'spaces':
+        for loc, cnt in (db.session.query(Area.location, db.func.count(Area.id))
+                         .filter(Area.engine_only.is_(True), Area.is_active.is_(True),
+                                 Area.location.isnot(None))
+                         .group_by(Area.location).all()):
+            if loc:
+                space_usage[loc] = cnt
     lib_map_json = _json.dumps({m['pkey']: m for m in library}, ensure_ascii=False)
     day_periods = []
     freq_spaces = []
@@ -1111,7 +1137,7 @@ def measurements_console():
                            node_kids=node_kids, node_meas=node_meas, node_np=node_np,
                            node_hotel_loc=node_hotel_loc,
                            group_points=group_points, pool_points=pool_points,
-                           spaces_list=spaces_list, lib_map_json=lib_map_json,
+                           spaces_list=spaces_list, space_usage=space_usage, lib_map_json=lib_map_json,
                            day_periods=day_periods, freq_spaces=freq_spaces)
 
 

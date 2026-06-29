@@ -365,40 +365,98 @@ select.in-kind{width:120px;}
 
   {% if tab=='spaces' %}
   <style>
-  .spgrid{display:flex;flex-wrap:wrap;gap:8px;}
-  .spchip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e1edf4;border-left:3px solid #1D9E75;border-radius:0 10px 10px 0;padding:7px 10px;font-size:13px;}
-  .spchip .grip{cursor:grab;color:#9fb2bd;} .spchip .spn{font-weight:600;}
-  .spchip .ic{border:none;background:none;cursor:pointer;color:#9fb2bd;padding:2px;} .spchip .ic.del:hover{color:#A32D2D;}
-  .spchip .sped input{padding:4px 7px;border:1px solid #d6eef3;border-radius:6px;font-size:12px;width:130px;}
+  .zlayout{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;}
+  .zgrid{display:flex;flex-wrap:wrap;gap:9px;}
+  .zcard{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #e1edf4;border-left:4px solid #1D9E75;border-radius:0 10px 10px 0;padding:9px 12px;cursor:pointer;min-width:190px;}
+  .zcard.sel{box-shadow:0 0 0 2px #E6F1FB;}
+  .zcard .grip{cursor:grab;color:#9fb2bd;}
+  .zcard .zi{font-size:18px;}
+  .zcard .znm{font-weight:600;font-size:13px;}
+  .zcard .zu{font-size:10px;color:#5f7682;background:#eef6fb;border-radius:6px;padding:1px 6px;margin-left:auto;white-space:nowrap;}
+  .zcard .zu.free{color:#b6c4cd;background:#f4f7f9;}
+  .zed label{font-size:11px;color:#5f7682;display:block;margin:9px 0 3px;font-weight:600;}
+  .zed input,.zed select,.zed textarea{width:100%;padding:7px 9px;border:1px solid #d6eef3;border-radius:6px;font-size:13px;font-family:inherit;}
+  .zed input[type=color]{width:46px;height:30px;padding:2px;}
+  .zacts{display:flex;gap:8px;margin-top:14px;}
+  .zacts .save{flex:1;background:var(--brand,#193847);color:#fff;border:none;border-radius:6px;padding:9px;font-weight:600;font-size:13px;cursor:pointer;}
+  .zacts .del{background:#fff;border:1px solid #F09595;color:#A32D2D;border-radius:6px;padding:9px 11px;cursor:pointer;}
   </style>
   <div class="card">
     <div class="card-title"><i class="ti ti-map-pin"></i> Ζώνες δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινά για όλα)</span></div>
-    <p class="muted" style="margin-bottom:12px;">Κλικ <i class="ti ti-pencil"></i> για μετονομασία· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Χρησιμοποιούνται στο πεδίο «Ζώνη» των Σημείων Δειγματοληψίας.</p>
-    <div class="spgrid" id="spgrid">
-      {% for s in spaces_list %}
-      <div class="spchip" data-id="{{ s.id }}">
-        <span class="grip"><i class="ti ti-grip-vertical"></i></span>
-        <span class="spn">{{ s.name }}</span>
-        <form method="POST" action="/dashboard/measurements/space/save" class="sped" style="display:none;align-items:center;gap:4px;">
-          <input type="hidden" name="id" value="{{ s.id }}"><input type="text" name="name" value="{{ s.name }}">
-          <button class="ic" type="submit" title="Αποθήκευση"><i class="ti ti-check"></i></button>
+    <p class="muted" style="margin-bottom:12px;">Κλικ σε ζώνη → επεξεργασία δεξιά (όνομα/εικονίδιο/χρώμα/περιγραφή)· σύρε <i class="ti ti-grip-vertical"></i> για σειρά. Ο μετρητής = πόσα Σημεία Δειγματοληψίας τη χρησιμοποιούν.</p>
+    <div class="zlayout">
+      <div>
+        <div class="zgrid" id="zgrid">
+          {% for s in spaces_list %}{% set u = space_usage.get(s.name, 0) %}
+          <div class="zcard" data-id="{{ s.id }}" data-name="{{ s.name }}" data-icon="{{ s.icon or '' }}" data-color="{{ s.color or '' }}" data-desc="{{ s.description or '' }}" data-use="{{ u }}" style="border-left-color:{{ s.color or '#1D9E75' }};" onclick="zpick(this)">
+            <span class="grip"><i class="ti ti-grip-vertical"></i></span>
+            <i class="ti {{ s.icon or 'ti-map-pin' }} zi" style="color:{{ s.color or '#1D9E75' }};"></i>
+            <span class="znm">{{ s.name }}</span>
+            <span class="zu {{ 'free' if not u }}">{{ u }} σημ.</span>
+          </div>
+          {% else %}<div class="muted">Καμία ζώνη ακόμη.</div>{% endfor %}
+        </div>
+        <form method="POST" action="/dashboard/measurements/space/save" style="margin-top:14px;display:flex;gap:6px;">
+          <input type="text" name="name" placeholder="Νέα ζώνη…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
+          <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
         </form>
-        <button class="ic" type="button" onclick="spRename(this)" title="Μετονομασία"><i class="ti ti-pencil"></i></button>
-        <form method="POST" action="/dashboard/measurements/space/{{ s.id }}/delete" style="display:inline;" onsubmit="return confirm('Διαγραφή «{{ s.name }}»;');"><button class="ic del" type="submit" title="Διαγραφή"><i class="ti ti-trash"></i></button></form>
       </div>
-      {% else %}<div class="muted">Καμία ζώνη ακόμη.</div>{% endfor %}
+      <div class="card zed" style="background:#fbfdff;">
+        <div class="muted" id="zempty">Διάλεξε ζώνη για επεξεργασία.</div>
+        <form method="POST" action="/dashboard/measurements/space/save" id="zform" style="display:none;">
+          <input type="hidden" name="id" id="z-id">
+          <label>Όνομα</label><input type="text" name="name" id="z-name" required>
+          <div style="display:flex;gap:10px;align-items:flex-end;">
+            <div style="flex:1;"><label>Εικονίδιο</label>
+              <select name="icon" id="z-icon" onchange="zicon()">
+                <option value="">— κανένα —</option>
+                {% for ic in ['ti-map-pin','ti-tools','ti-tools-kitchen-2','ti-pool','ti-bath','ti-building','ti-building-factory-2','ti-temperature-snow','ti-droplet','ti-air-conditioning','ti-door','ti-building-cottage','ti-map-2','ti-flask'] %}
+                <option value="{{ ic }}">{{ ic.replace('ti-','') }}</option>{% endfor %}
+              </select>
+            </div>
+            <div><label>Χρώμα</label><input type="color" name="color" id="z-color" value="#1D9E75"></div>
+            <div style="padding-bottom:4px;"><i class="ti ti-map-pin" id="z-prev" style="font-size:26px;color:#1D9E75;"></i></div>
+          </div>
+          <label>Περιγραφή / σημειώσεις</label>
+          <textarea name="description" id="z-desc" rows="2" data-nocap></textarea>
+          <div class="zacts">
+            <button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+            <button class="del" type="button" id="z-del" onclick="zdel()" title="Διαγραφή"><i class="ti ti-trash"></i></button>
+          </div>
+        </form>
+      </div>
     </div>
-    <form method="POST" action="/dashboard/measurements/space/save" style="margin-top:14px;display:flex;gap:6px;">
-      <input type="text" name="name" placeholder="Νέα ζώνη…" style="padding:8px 10px;border:1px solid #d6eef3;border-radius:7px;font-size:13px;">
-      <button class="btn" type="submit"><i class="ti ti-plus"></i> Προσθήκη</button>
-    </form>
   </div>
   <script>
-  function spRename(b){var c=b.closest('.spchip');c.querySelector('.spn').style.display='none';b.style.display='none';c.querySelector('.sped').style.display='inline-flex';c.querySelector('.sped input[name=name]').focus();}
-  (function(){if(window.Sortable){var g=document.getElementById('spgrid');if(g)new Sortable(g,{handle:'.grip',animation:150,onSort:function(){
-    var ids=[].map.call(g.querySelectorAll('.spchip'),function(c){return c.getAttribute('data-id');});
-    fetch('/dashboard/measurements/space/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
-  }});}})();
+  function zicon(){var ic=document.getElementById('z-icon').value||'ti-map-pin';var c=document.getElementById('z-color').value;var p=document.getElementById('z-prev');p.className='ti '+ic;p.style.color=c;}
+  function zpick(el){
+    document.querySelectorAll('.zcard.sel').forEach(function(c){c.classList.remove('sel');});
+    el.classList.add('sel');
+    document.getElementById('zempty').style.display='none';
+    document.getElementById('zform').style.display='block';
+    document.getElementById('z-id').value=el.getAttribute('data-id');
+    document.getElementById('z-name').value=el.getAttribute('data-name');
+    document.getElementById('z-icon').value=el.getAttribute('data-icon')||'';
+    document.getElementById('z-color').value=el.getAttribute('data-color')||'#1D9E75';
+    document.getElementById('z-desc').value=el.getAttribute('data-desc')||'';
+    var b=document.getElementById('z-del');
+    b.setAttribute('data-use',el.getAttribute('data-use')||'0');
+    b.setAttribute('data-name',el.getAttribute('data-name'));
+    b.setAttribute('data-id',el.getAttribute('data-id'));
+    zicon();
+  }
+  function zdel(){
+    var b=document.getElementById('z-del');var u=parseInt(b.getAttribute('data-use')||'0',10);
+    var nm=b.getAttribute('data-name');var id=b.getAttribute('data-id');
+    var msg=u>0?('Η ζώνη «'+nm+'» χρησιμοποιείται από '+u+' Σημεία Δειγματοληψίας.\nΑν τη διαγράψεις, θα κρατήσουν το όνομα ως «(παλιό)».\n\nΣίγουρα διαγραφή;'):('Διαγραφή ζώνης «'+nm+'»;');
+    if(!confirm(msg))return;
+    var f=document.createElement('form');f.method='POST';f.action='/dashboard/measurements/space/'+id+'/delete';document.body.appendChild(f);f.submit();
+  }
+  (function(){var ce=document.getElementById('z-color');if(ce)ce.addEventListener('input',zicon);
+    if(window.Sortable){var g=document.getElementById('zgrid');if(g)new Sortable(g,{handle:'.grip',animation:150,onSort:function(){
+      var ids=[].map.call(g.querySelectorAll('.zcard'),function(c){return c.getAttribute('data-id');});
+      fetch('/dashboard/measurements/space/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:ids})});
+    }});}})();
   </script>
   {% endif %}
 
