@@ -202,10 +202,36 @@ select.in-kind{width:120px;}
   .hck.on{background:#193847;color:#fff;border-color:#193847;}
   #st-hotels .hrow{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
   #st-hotels .hck{min-width:66px;}
-  #st-zones{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
-  #st-zones .zrow{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;}
-  #st-zones .zrow:has(.zck:checked){background:#E6F1FB;border-color:#9cc6ea;font-weight:600;}
-  #st-zinfo{background:#f0f7ff;border-radius:7px;padding:6px 9px;white-space:pre-line;color:#185FA5;font-weight:600;}
+  /* #6 polish — ζώνες ως toggle-chips με εικονίδιο/χρώμα + sparkle */
+  #st-zones{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;}
+  #st-zones .zrow{position:relative;display:inline-flex;align-items:center;gap:7px;background:#fff;
+    border:1.5px solid #e1edf4;border-radius:10px;padding:7px 12px 7px 11px;font-size:12.5px;
+    cursor:pointer;transition:all .16s ease;user-select:none;box-shadow:0 1px 2px rgba(20,58,82,.04);}
+  #st-zones .zrow:hover{border-color:#bcd9ef;transform:translateY(-1px);box-shadow:0 3px 9px rgba(24,95,165,.12);}
+  #st-zones .zck{position:absolute;opacity:0;pointer-events:none;}
+  #st-zones .zdot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #fff,0 0 0 3px rgba(0,0,0,.05);}
+  #st-zones .zrow .ti{font-size:14px;color:#7c93a1;transition:color .16s;}
+  #st-zones .zname{font-weight:600;color:#3a4f5c;letter-spacing:.01em;}
+  #st-zones .zchk{margin-left:1px;font-size:14px;color:#cfe0ec;transition:all .16s;}
+  #st-zones .zrow:has(.zck:checked){background:linear-gradient(135deg,#eaf4ff,#dcecfb);
+    border-color:#5ba0e0;box-shadow:0 2px 10px rgba(24,95,165,.18);}
+  #st-zones .zrow:has(.zck:checked) .zname{color:#13386a;}
+  #st-zones .zrow:has(.zck:checked) .ti{color:#185FA5;}
+  #st-zones .zrow:has(.zck:checked) .zchk{color:#0F6E56;transform:scale(1.15);}
+  #st-zones .zrow:active{transform:scale(.97);}
+  .zinfo{display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,#f3f9ff,#e8f1fb);
+    border:1px solid #d4e6f5;border-radius:11px;padding:10px 14px;margin-bottom:10px;}
+  .zinfo .zi-ico{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;
+    border-radius:9px;background:#185FA5;color:#fff;font-size:18px;box-shadow:0 2px 7px rgba(24,95,165,.32);}
+  .zinfo .zi-txt{line-height:1.25;}
+  .zinfo .zi-num{font-size:19px;font-weight:800;color:#13386a;}
+  .zinfo .zi-num b{font-size:22px;}
+  .zinfo .zi-sub{font-size:11.5px;color:#5f7682;font-weight:600;}
+  .zinfo .zi-zero{color:#9fb2bd;}
+  .zinfo.bump{animation:ziBump .42s cubic-bezier(.3,1.3,.5,1);}
+  @keyframes ziBump{0%{transform:scale(.94);}45%{transform:scale(1.035);}100%{transform:scale(1);}}
+  .zinfo .zi-warn{font-size:11px;color:#9a3412;font-weight:600;margin-top:3px;display:block;}
+  #stform > label{margin-top:13px;}
   .strtree .nrow.top{border-left-color:#193847;background:#fbfdff;}
   .strtree .nrow.sel{box-shadow:0 0 0 2px #E6F1FB;}
   .strtree .grip{cursor:grab;color:#9fb2bd;font-size:17px;}
@@ -271,8 +297,8 @@ select.in-kind{width:120px;}
           <div id="st-meas" class="zone"></div>
           <div id="st-pal" class="pal">{% for m in library %}<div class="pchip" data-pkey="{{ m.pkey }}">{{ m.label }}</div>{% endfor %}</div>
           <label>Ζώνες δειγματοληψίας <span class="muted" style="font-weight:400;">(κοινές· κάθε ζώνη × ξενοδοχείο = ένα σημείο που μετριέται χωριστά)</span></label>
-          <div id="st-zones">{% for s in spaces_list %}<label class="zrow"><input type="checkbox" class="zck" value="{{ s.id }}" onchange="nodeZoneCk()"> {{ s.name }}</label>{% endfor %}</div>
-          <div id="st-zinfo" class="muted"></div>
+          <div id="st-zones">{% for s in spaces_list %}<label class="zrow"><input type="checkbox" class="zck" value="{{ s.id }}" onchange="nodeZoneCk()"><span class="zdot" style="background:{{ s.color or '#185FA5' }};"></span>{% if s.icon %}<i class="ti {{ s.icon }}"></i>{% endif %}<span class="zname">{{ s.name }}</span><i class="ti ti-circle-check-filled zchk"></i></label>{% endfor %}</div>
+          <div id="st-zinfo" class="zinfo" style="display:none;"></div>
           <label>Ξενοδοχεία <span class="muted" style="font-weight:400;">(ποια έχουν τον κόμβο)</span></label>
           <div id="st-hotels">{% for h in all_hotels %}<div class="hrow" data-h="{{ h.id }}"><span class="hck" title="{{ h.name }}" onclick="nodeHotelCk(this)"><i class="ti ti-square"></i> {{ hcodes.get(h.id) or h.name }}</span></div>{% endfor %}</div>
           <div class="acts"><button class="save" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button><button class="del" type="submit" id="st-del" formaction="" onclick="return confirm('Διαγραφή; (μόνο αν δεν έχει υπο-κόμβους/σημεία)');"><i class="ti ti-trash"></i></button></div>
@@ -313,12 +339,22 @@ select.in-kind{width:120px;}
       recalcZInfo();
     };
     function recalcZInfo(warnings){
+      var el=document.getElementById('st-zinfo'); if(!el)return;
       var zc=document.querySelectorAll('#st-zones .zck:checked').length;
       var hc=document.querySelectorAll('#st-hotels .hck.on').length;
       var pts=(zc&&hc)?(zc*hc):hc;
-      var msg='→ '+pts+' σημεία δειγματοληψίας ('+zc+' ζώνες × '+hc+' ξεν.)';
-      if(warnings&&warnings.length) msg+='\n⚠ '+warnings.join(' ');
-      document.getElementById('st-zinfo').textContent=msg;
+      var pl=function(n,a,b){return n+' '+(n===1?a:b);};
+      var noun = (pts===1)?'σημείο δειγματοληψίας':'σημεία δειγματοληψίας';
+      var sub = (zc&&hc) ? (pl(zc,'ζώνη','ζώνες')+' × '+pl(hc,'ξενοδοχείο','ξενοδοχεία'))
+                         : (hc? (pl(hc,'ξενοδοχείο','ξενοδοχεία')+' · χωρίς ζώνη') : 'διάλεξε ζώνες & ξενοδοχεία');
+      var numcls = pts? 'zi-num' : 'zi-num zi-zero';
+      var html='<span class="zi-ico"><i class="ti ti-map-pins"></i></span>'
+             + '<span class="zi-txt"><span class="'+numcls+'"><b>'+pts+'</b> '+noun+'</span>'
+             + '<span class="zi-sub">'+sub+'</span>';
+      if(warnings&&warnings.length) html+='<span class="zi-warn"><i class="ti ti-alert-triangle"></i> '+warnings.join(' ')+'</span>';
+      html+='</span>';
+      el.innerHTML=html; el.style.display='flex';
+      el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
     }
     window.nodeHotelCk=function(hck){
       var nid=document.getElementById('st-id').value; if(!nid)return;

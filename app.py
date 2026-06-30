@@ -362,11 +362,17 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.356'
-APP_BUILD   = '637'
+APP_VERSION = '12.358'
+APP_BUILD   = '639'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.358', 'b': '639', 'date': '30/06/2026', 'time': '15:30', 'title': 'Διόρθωση: εμφάνιση μετρήσεων & ειδοποιήσεις ορίων σε όλα τα σημεία',
+     'items': ['Διορθώθηκε σοβαρό κενό: σε σημεία με δικές τους μετρήσεις (π.χ. RO «Αντίστροφη Όσμωση», «Επιστροφή ΖΝΧ») δεν εμφανίζονταν οι τιμές στο Log και — κυρίως — δεν γινόταν **κανένας έλεγχος ορίων** (καμία ειδοποίηση αν χλώριο/θερμοκρασία έβγαινε εκτός ορίου).',
+               'Πλέον ο έλεγχος ορίων + η εμφάνιση τιμών διαβάζουν τις μετρήσεις του ίδιου του σημείου (όχι ένα γενικό πρότυπο). Αφορά Log Μετρήσεων και τις ειδοποιήσεις στη «Σήμερα».']},
+    {'v': '12.357', 'b': '638', 'date': '30/06/2026', 'time': '14:30', 'title': 'Δομή δικτύου — γυάλισμα πάνελ ζωνών (toggle-chips + ζωντανός μετρητής σημείων)',
+     'items': ['Οι «Ζώνες δειγματοληψίας» στον editor κόμβου έγιναν κομψά toggle-chips (εικονίδιο + χρώμα ζώνης + ✓ όταν επιλεγούν).',
+               'Ο μετρητής «N σημεία» έγινε ευδιάκριτη κάρτα με εικονίδιο, έμφαση στον αριθμό και υπότιτλο «ζώνες × ξενοδοχεία», με μικρό «αναπήδημα» σε κάθε αλλαγή.']},
     {'v': '12.356', 'b': '637', 'date': '30/06/2026', 'time': '13:30', 'title': 'Δομή δικτύου — ένας κόμβος μετριέται σε πολλές ζώνες δειγματοληψίας',
      'items': ['Στη «Δομή δικτύου», ο κόμβος ανατίθεται πλέον σε **πολλές κοινές ζώνες** (Μηχανοστάσιο/Δωμάτιο/Πισίνα…) — το ίδιο κύκλωμα μετριέται **χωριστά** σε καθεμία.',
                'Νέο μπλοκ «Ζώνες δειγματοληψίας» (checklist) στον editor κόμβου + ζωντανός μετρητής «θα δημιουργηθούν N σημεία (ζώνες × ξενοδοχεία)».',
@@ -1850,17 +1856,30 @@ FREQ_LABEL   = {'twice': '2×/ημέρα (πρωί/απόγευμα)', 'daily': 
 def periods_for(freq):
     return FREQ_PERIODS.get(freq, ['day'])
 
+def _reading_params(r):
+    """Παράμετροι μιας καταγραφής = οι μετρήσεις ΤΟΥ σημείου (AreaParam→MonitorParam),
+    ΟΧΙ του template. Fix v12.358: generic σημεία με δικά τους pkeys (π.χ. clo2_ro) έπαιρναν
+    τα 4 fixed του template → μηδέν εμφάνιση/έλεγχος ορίων. Fallback: template.params."""
+    try:
+        from measurements import point_params
+        if getattr(r, 'area', None):
+            ps = point_params(r.area)
+            if ps:
+                return ps
+    except Exception:
+        pass
+    tpl = MonitorTemplate.query.get(r.template_key) if r.template_key else None
+    return list(tpl.params) if tpl else []
+
+
 def area_actions(reading):
-    """Generic έλεγχος ορίων -> ενέργειες, με βάση τις παραμέτρους του template."""
+    """Generic έλεγχος ορίων -> ενέργειες, με βάση τις μετρήσεις ΤΟΥ σημείου (v12.358)."""
     out = []
     try:
         vals = json.loads(reading.values or '{}')
     except Exception:
         vals = {}
-    tpl = MonitorTemplate.query.get(reading.template_key)
-    if not tpl:
-        return out
-    for p in tpl.params:
+    for p in _reading_params(reading):
         v = vals.get(p.pkey)
         if v is None:
             continue
@@ -3094,18 +3113,19 @@ def _reading_values(r):
     except Exception:
         vals = {}
     out = []
-    tpl = MonitorTemplate.query.get(r.template_key) if r.template_key else None
-    if tpl:
-        for p in tpl.params:
-            v = vals.get(p.pkey)
-            if v in (None, ''):
-                continue
-            out.append({'label': p.label, 'value': v, 'unit': p.unit or ''})
-    else:
-        for k, v in vals.items():
-            if v in (None, ''):
-                continue
-            out.append({'label': k, 'value': v, 'unit': ''})
+    params = _reading_params(r)   # v12.358: μετρήσεις ΤΟΥ σημείου (όχι template)
+    seen = set()
+    for p in params:
+        v = vals.get(p.pkey)
+        if v in (None, ''):
+            continue
+        seen.add(p.pkey)
+        out.append({'label': p.label, 'value': v, 'unit': p.unit or ''})
+    # fallback: ό,τι κλειδί έμεινε αδιάβαστο (raw JSON) — μηδέν απώλεια εμφάνισης
+    for k, v in vals.items():
+        if k in seen or v in (None, ''):
+            continue
+        out.append({'label': k, 'value': v, 'unit': ''})
     return out
 
 
