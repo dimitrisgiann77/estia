@@ -2986,20 +2986,21 @@ STAFF_STATUS_MONTHS = [1, 2, 3, 4, 5, 6]   # Ιαν→Ιουν
 # src = κλειδί μέσα στο dict του μηνιαίου cell (βλ. _staff_status_rows).
 # grp: 'mgmt'=Management (αχνό κόκκινο) · 'acct'=Λογιστήριο (αχνό πράσινο έως Μάιο) · 'bal'=Υπόλοιπο
 PAYROLL_GRID_COLS = [
-    {'k': 'hotel', 'label': 'HOTEL CODE',     'src': 'hotel_code', 'kind': 'text',  'grp': ''},
-    {'k': 'agree', 'label': 'ΠΟΣΟ ΣΥΜΦΩΝΙΑΣ',  'src': 'agreement',  'kind': 'money', 'grp': 'mgmt'},
-    {'k': 'day',   'label': 'ΗΜΕΡΟΜΙΣΘΙΟ',     'src': 'day_wage',   'kind': 'money', 'grp': 'mgmt'},
-    {'k': 'hour',  'label': 'ΩΡΟΜΙΣΘΙΟ',       'src': 'hour_wage',  'kind': 'money', 'grp': 'mgmt'},
-    {'k': 'extra', 'label': 'ΕΞΤΡΑ ΩΡΕΣ',      'src': 'extra',      'kind': 'num',   'grp': ''},
-    {'k': 'work',  'label': 'ΕΡΓΑΣΙΜΕΣ',       'src': 'work',       'kind': 'int',   'grp': ''},
-    {'k': 'repo',  'label': 'ΡΕΠΟ',            'src': 'repo',       'kind': 'int',   'grp': ''},
-    {'k': 'net',   'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ ΛΟΓΙΣΤΗΡΙΟ', 'src': 'net', 'kind': 'money', 'grp': 'acct'},
-    {'k': 'dx',    'label': 'ΔΧ',              'src': 'gift_xmas',   'kind': 'money', 'grp': 'acct'},
-    {'k': 'aa',    'label': 'ΑΑ',              'src': 'comp_leave',  'kind': 'money', 'grp': 'acct'},
-    {'k': 'dp',    'label': 'ΔΠ',              'src': 'gift_easter', 'kind': 'money', 'grp': 'acct'},
-    {'k': 'ea',    'label': 'ΕΑ',              'src': 'leave_allow', 'kind': 'money', 'grp': 'acct'},
-    {'k': 'apol',  'label': 'Αποζ. Απολ.',     'src': 'comp_dismiss','kind': 'money', 'grp': 'acct'},
-    {'k': 'bal',   'label': 'ΥΠΟΛΟΙΠΟ',        'src': 'balance',    'kind': 'money', 'grp': 'bal'},
+    {'k': 'hotel',  'label': 'HOTEL CODE',      'src': 'hotel_code', 'kind': 'text',  'grp': ''},
+    {'k': 'agree',  'label': 'ΠΟΣΟ ΣΥΜΦΩΝΙΑΣ',   'src': 'agreement',  'kind': 'money', 'grp': 'mgmt', 'cap': 'MANAGEMENT'},
+    {'k': 'day',    'label': 'ΗΜΕΡΟΜΙΣΘΙΟ',      'src': 'day_wage',   'kind': 'money', 'grp': 'mgmt', 'cap': 'MANAGEMENT'},
+    {'k': 'hour',   'label': 'ΩΡΟΜΙΣΘΙΟ',        'src': 'hour_wage',  'kind': 'money', 'grp': 'mgmt', 'cap': 'MANAGEMENT'},
+    {'k': 'paymgmt','label': 'ΠΛΗΡΩΤΕΟ MANAGEMENT','src': 'pay_mgmt', 'kind': 'money', 'grp': ''},
+    {'k': 'extra',  'label': 'ΕΞΤΡΑ ΩΡΕΣ',       'src': 'extra',      'kind': 'num',   'grp': ''},
+    {'k': 'work',   'label': 'ΕΡΓΑΣΙΜΕΣ',        'src': 'work',       'kind': 'int',   'grp': ''},
+    {'k': 'repo',   'label': 'ΡΕΠΟ',             'src': 'repo',       'kind': 'int',   'grp': ''},
+    {'k': 'net',    'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ',   'src': 'net',        'kind': 'money', 'grp': 'acct', 'cap': 'ΛΟΓΙΣΤΗΡΙΟ'},
+    {'k': 'dx',     'label': 'ΔΧ',               'src': 'gift_xmas',   'kind': 'money', 'grp': 'acct'},
+    {'k': 'aa',     'label': 'ΑΑ',               'src': 'comp_leave',  'kind': 'money', 'grp': 'acct'},
+    {'k': 'dp',     'label': 'ΔΠ',               'src': 'gift_easter', 'kind': 'money', 'grp': 'acct'},
+    {'k': 'ea',     'label': 'ΕΑ',               'src': 'leave_allow', 'kind': 'money', 'grp': 'acct'},
+    {'k': 'apol',   'label': 'Αποζ. Απολ.',      'src': 'comp_dismiss','kind': 'money', 'grp': 'acct'},
+    {'k': 'bal',    'label': 'ΥΠΟΛΟΙΠΟ',         'src': 'balance',    'kind': 'money', 'grp': 'bal'},
 ]
 
 def _staff_status_rows(year=None, months=None):
@@ -3089,14 +3090,17 @@ def _staff_status_rows(year=None, months=None):
                 sp = {k: (pay.get(k) if is_home else None) for k in
                       ('gift_xmas', 'comp_leave', 'gift_easter', 'leave_allow', 'comp_dismiss')}
                 active = bool(alist) or (net is not None) or any(v for v in sp.values())
-                _agree_v = agreement if active else None
-                _bal = round(_agree_v - net, 2) if (_agree_v is not None and net is not None) else None
+                _dw = day_wage if active else None
+                _work = agg['work_days'] or 0
+                _paymgmt = round((_dw or 0) * _work, 2) if (active and _dw and _work) else None
+                _bal = round(_paymgmt - net, 2) if (_paymgmt is not None and net is not None) else None
                 mcells[mo] = {
                     'active': active,
                     'hotel_code': (_hotel_short(hotel_name.get(hk, '')) if hk else '') if active else '',
-                    'agreement': _agree_v,
-                    'day_wage': day_wage if active else None,
+                    'agreement': agreement if active else None,
+                    'day_wage': _dw,
                     'hour_wage': hour_wage if active else None,
+                    'pay_mgmt': _paymgmt,
                     'extra': (round(agg['extra_hours'], 2) or None) if active else None,
                     'work': (agg['work_days'] or None) if active else None,
                     'repo': (agg['repo'] or None) if active else None,
@@ -3185,7 +3189,7 @@ def schedule_staff_status_xlsx():
         mc = ws.cell(row=1, column=c, value=MONTHS_EL[mo].upper())
         mc.font = Font(bold=True, color='FFFFFF', size=12); mc.fill = (navy if mi % 2 == 0 else navy2); mc.alignment = center
         for j, col in enumerate(cols):
-            lbl = col['label'] + ('\nMANAGEMENT' if col.get('grp') == 'mgmt' else '')
+            lbl = col['label'] + (('\n' + col['cap']) if col.get('cap') else '')
             hc = ws.cell(row=2, column=c + j, value=lbl)
             gf, fcolor = hdr_style(col.get('grp'))
             # ΛΟΓΙΣΤΗΡΙΟ πράσινο μόνο έως Μάιο· αλλιώς γκρι

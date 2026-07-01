@@ -2,6 +2,7 @@
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Κατάσταση Προσωπικού ανά Ξενοδοχείο', theme.primary) }}
 <style>
   :root{--navy:#153847;--navy2:#0f2a36;--gold:#caa64a;--gold2:#e7cd85;}
+  .container{max-width:none!important;width:100%;padding-left:12px;padding-right:12px;}
   .ssbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 2px 10px;}
   .sskpis{display:flex;gap:10px;flex-wrap:wrap;}
   .sskpi{background:linear-gradient(135deg,#fff,#f7f9fb);border:1px solid #e6ecf2;border-left:3px solid var(--gold);
@@ -68,7 +69,7 @@
       <tr class="crow">
         {% for mo in months %}{% for c in cols %}
           {%- set gc = 'gmgmt' if c.grp=='mgmt' else ('gacct' if (c.grp=='acct' and mo<=5) else ('gbal' if c.grp=='bal' else '')) -%}
-          <th class="{{ 'mstart ' if loop.first else '' }}{{ gc }}">{{ c.label }}{% if c.grp=='mgmt' %}<div class="mgmt-tag">MANAGEMENT</div>{% endif %}</th>
+          <th class="{{ 'mstart ' if loop.first else '' }}{{ gc }}">{{ c.label }}{% if c.cap %}<div class="mgmt-tag">{{ c.cap }}</div>{% endif %}</th>
         {% endfor %}{% endfor %}
       </tr>
     </thead>
