@@ -2263,13 +2263,11 @@ def payroll_grid():
         for uid in ids:
             u = User.query.get(uid)
             if not u: continue
-            pii = EmployeePII.query.filter_by(user_id=uid).first()
             ch = False
-            ph = g('f_phone', uid); em = g('f_email', uid); cc = g('f_cc', uid)
+            ph = g('f_phone', uid); em = g('f_email', uid)
             act = g('f_active', uid)
             if ph is not None and (u.phone or '') != ph: u.phone = ph or None; ch = True
             if em is not None and (u.email or '') != em: u.email = em or None; ch = True
-            if cc is not None and pii and (pii.cost_center or '') != cc: pii.cost_center = cc or None; ch = True
             if act in ('1', '0'):
                 want = (act == '1')
                 if u.employment_active != want: u.employment_active = want; ch = True
@@ -2280,7 +2278,7 @@ def payroll_grid():
                 if ag == '':
                     agv = None
                 else:
-                    try: agv = round(float(ag), 2)
+                    try: agv = round(float(ag.replace(' ', '').replace('€', '').replace(',', '.')), 2)
                     except Exception: ok = False
                 if ok:
                     prof = EmploymentProfile.query.filter_by(user_id=uid).first()

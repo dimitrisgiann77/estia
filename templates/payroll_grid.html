@@ -10,7 +10,12 @@
  table.emp thead th{ position:sticky; top:0; z-index:2; background:#f7fbff; color:#5b6b72; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; font-weight:700; padding:11px 12px; text-align:left; border-bottom:1px solid #e0f0ff; }
  table.emp tbody td{ padding:9px 12px; border-bottom:1px solid #f0f6fb; vertical-align:middle; }
  table.emp tbody tr{ transition:background .1s; }
- table.emp tbody tr:hover{ background:#f7fbff; }
+ table.emp tbody tr:nth-child(even){ background:#fbfdff; }
+ table.emp tbody tr:hover{ background:#eef6ff; }
+ .search{ position:relative; }
+ .search i{ position:absolute; left:11px; top:50%; transform:translateY(-50%); color:#9aa7ad; font-size:15px; }
+ .search input{ padding:8px 12px 8px 32px; border:1px solid #dde7ef; border-radius:9px; font-size:13px; min-width:230px; }
+ .search input:focus{ outline:none; border-color:var(--mp-brand); box-shadow:0 0 0 3px rgba(24,95,165,.12); }
  .av{ width:34px; height:34px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; background:var(--mp-brand); letter-spacing:.5px; flex:0 0 auto; }
  .who{ display:flex; align-items:center; gap:10px; }
  .who .nm{ font-weight:600; color:#1e293b; line-height:1.2; }
@@ -42,14 +47,15 @@
     <div class="toolbar">
       <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση όλων</button>
       <button type="button" class="del-btn" onclick="delSelected()"><i class="ti ti-trash"></i> Διαγραφή επιλεγμένων (<span id="delcount">0</span>)</button>
-      <span class="muted" style="margin-left:auto; font-size:12.5px;">{{ rows|length }} γραμμές</span>
+      <span class="search" style="margin-left:auto;"><i class="ti ti-search"></i><input type="text" id="empSearch" placeholder="Αναζήτηση ονόματος / ΑΦΜ…" autocomplete="off" oninput="filterRows()"></span>
+      <span class="muted" style="font-size:12.5px;"><span id="visCount">{{ rows|length }}</span> / {{ rows|length }} γραμμές</span>
     </div>
     <div class="card emp-card" data-nocopy>
       <table class="emp">
         <thead><tr>
           <th style="width:34px;"></th><th>Εργαζόμενος</th>
           <th class="col-agr">Συμφωνία €</th><th class="col-phone">Τηλέφωνο</th>
-          <th>Email</th><th class="col-cc">Κ.κόστους</th><th class="col-active">Κατάσταση</th>
+          <th>Email</th><th class="col-active">Κατάσταση</th>
         </tr></thead>
         <tbody>
         {% for r in rows %}
@@ -71,11 +77,10 @@
           </td>
           <td><input name="f_phone_{{ uid }}" value="{{ r.user.phone or '' }}" placeholder="—"></td>
           <td><input name="f_email_{{ uid }}" value="{{ r.user.email or '' }}" placeholder="—"></td>
-          <td><input name="f_cc_{{ uid }}" value="{{ r.cost_center or '' }}" placeholder="—"></td>
           <td><select name="f_active_{{ uid }}"><option value="1" {{ 'selected' if r.user.employment_active is not false }}>✅ Ενεργός</option><option value="0" {{ 'selected' if r.user.employment_active is false }}>⛔ Ανενεργός</option></select></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="empty"><i class="ti ti-users-off" style="font-size:22px;display:block;margin-bottom:6px;"></i>Κανένας εργαζόμενος σε αυτή την προβολή.</td></tr>
+        <tr><td colspan="6" class="empty"><i class="ti ti-users-off" style="font-size:22px;display:block;margin-bottom:6px;"></i>Κανένας εργαζόμενος σε αυτή την προβολή.</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -86,6 +91,16 @@
     </div>
   </form>
 <script>
+function filterRows(){
+  var q=(document.getElementById('empSearch').value||'').trim().toLowerCase();
+  var rows=document.querySelectorAll('table.emp tbody tr'),n=0;
+  rows.forEach(function(tr){
+    if(tr.querySelector('.empty')){return;}
+    var t=(tr.querySelector('.who')?tr.querySelector('.who').innerText:'').toLowerCase();
+    var show=!q||t.indexOf(q)>=0; tr.style.display=show?'':'none'; if(show)n++;
+  });
+  var vc=document.getElementById('visCount'); if(vc)vc.textContent=n;
+}
 function _selIds(){return Array.from(document.querySelectorAll('.delsel:checked')).map(function(c){return c.value;});}
 document.addEventListener('change',function(e){if(e.target&&e.target.classList&&e.target.classList.contains('delsel')){document.getElementById('delcount').textContent=_selIds().length;}});
 function delSelected(){
