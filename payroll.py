@@ -2248,10 +2248,7 @@ def payroll_grid():
                 want = (act == '1')
                 if u.employment_active != want: u.employment_active = want; ch = True
             if a:
-                un = g('f_unit', uid); dp = g('f_dept', uid); ps = g('f_pos', uid); ag = g('f_agr', uid)
-                if un is not None and (a.unit or '') != un: a.unit = un or None; ch = True
-                if dp is not None and (a.department or '') != dp: a.department = dp or None; ch = True
-                if ps is not None and (a.position or '') != ps: a.position = ps or None; ch = True
+                ag = g('f_agr', uid)
                 if ag is not None:
                     try: agv = float(ag) if ag != '' else None
                     except Exception: agv = a.agreement_amount

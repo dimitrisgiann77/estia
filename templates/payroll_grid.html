@@ -31,16 +31,13 @@
     {% if request.args.get('deleted') %}<div style="background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;margin-bottom:10px;">✓ Διαγράφηκαν {{ request.args.get('deleted') }} προφίλ{% if request.args.get('skipped') and request.args.get('skipped')!='0' %} · {{ request.args.get('skipped') }} προστατευμένα/απέτυχαν{% endif %}.</div>{% endif %}
     <div class="card" data-nocopy>
       <table>
-        <tr><th style="width:24px;"></th><th>Επώνυμο</th><th>Όνομα</th><th>ΑΦΜ</th><th>Μονάδα</th><th>Τμήμα</th><th>Θέση</th><th>Συμφωνία €</th><th>Τηλέφωνο</th><th>Email</th><th>Κ.κόστους</th><th>Κατάσταση</th></tr>
+        <tr><th style="width:24px;"></th><th>Επώνυμο</th><th>Όνομα</th><th>ΑΦΜ</th><th>Συμφωνία €</th><th>Τηλέφωνο</th><th>Email</th><th>Κ.κόστους</th><th>Κατάσταση</th></tr>
         {% for r in rows %}
         {% set uid = r.user.id %}
         <tr>
           <td style="text-align:center;">{% if not emp_locked(r.user) %}<input type="checkbox" class="delsel" value="{{ r.user.id }}" style="width:auto;">{% endif %}</td><td class="ro">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ lock_badge(r.user) }}</td>
           <td class="ro">{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
           <td class="ro muted">{{ r.pii.afm if r.pii and r.pii.afm else '—' }}</td>
-          <td><input name="f_unit_{{ uid }}" value="{{ r.mgmt.unit if r.mgmt and r.mgmt.unit else '' }}"></td>
-          <td><input name="f_dept_{{ uid }}" value="{{ r.mgmt.department if r.mgmt and r.mgmt.department else '' }}"></td>
-          <td><input name="f_pos_{{ uid }}" value="{{ r.mgmt.position if r.mgmt and r.mgmt.position else '' }}"></td>
           <td><input name="f_agr_{{ uid }}" value="{{ '%.0f'|format(r.mgmt.agreement_amount) if r.mgmt and r.mgmt.agreement_amount else '' }}" style="text-align:right;"></td>
           <td><input name="f_phone_{{ uid }}" value="{{ r.user.phone or '' }}"></td>
           <td><input name="f_email_{{ uid }}" value="{{ r.user.email or '' }}"></td>
@@ -48,7 +45,7 @@
           <td><select name="f_active_{{ uid }}"><option value="1" {{ 'selected' if r.user.employment_active is not false }}>Ενεργός</option><option value="0" {{ 'selected' if r.user.employment_active is false }}>Ανενεργός</option></select></td>
         </tr>
         {% else %}
-        <tr><td colspan="12" class="muted">Κανένας.</td></tr>
+        <tr><td colspan="9" class="muted">Κανένας.</td></tr>
         {% endfor %}
       </table>
     </div>
@@ -66,5 +63,5 @@ function delSelected(){
   document.body.appendChild(f);f.submit();
 }
 </script>
-  <p class="muted" style="margin-top:8px;">Σημ.: επεξεργάζεσαι την <b>τρέχουσα ανάθεση</b> (μονάδα/τμήμα/θέση/συμφωνία). Για ιστορικό/πολλαπλές αναθέσεις & merge → καρτέλα εργαζομένου.</p>
+  <p class="muted" style="margin-top:8px;">Σημ.: επεξεργάζεσαι τη <b>συμφωνία</b> της τρέχουσας ανάθεσης. Τμήμα/θέση/ξενοδοχείο → Οργανόγραμμα. Για ιστορικό/πολλαπλές αναθέσεις & merge → καρτέλα εργαζομένου.</p>
 </div></body></html>
