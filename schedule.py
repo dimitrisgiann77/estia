@@ -2993,6 +2993,11 @@ PAYROLL_GRID_COLS = [
     {'k': 'work',  'label': 'ΕΡΓΑΣΙΜΕΣ',       'src': 'work',       'kind': 'int'},
     {'k': 'repo',  'label': 'ΡΕΠΟ',            'src': 'repo',       'kind': 'int'},
     {'k': 'net',   'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ',  'src': 'net',        'kind': 'money'},
+    {'k': 'dx',    'label': 'ΔΧ',              'src': 'gift_xmas',   'kind': 'money'},
+    {'k': 'aa',    'label': 'ΑΑ',              'src': 'comp_leave',  'kind': 'money'},
+    {'k': 'dp',    'label': 'ΔΠ',              'src': 'gift_easter', 'kind': 'money'},
+    {'k': 'ea',    'label': 'ΕΑ',              'src': 'leave_allow', 'kind': 'money'},
+    {'k': 'apol',  'label': 'Αποζ. Απολ.',     'src': 'comp_dismiss','kind': 'money'},
 ]
 
 def _staff_status_rows(year=None, months=None):
@@ -3026,16 +3031,30 @@ def _staff_status_rows(year=None, months=None):
     by_uhm = {}
     for a in shifts:
         by_uhm.setdefault((a.user_id, a.work_hotel_id, a.work_date.month), []).append(a)
-    # (uid, μήνας) -> καθαρό λογιστηρίου (άθροισμα αν πολλές εγγραφές)
-    net_by_um = {}
+    # (uid, μήνας) -> {net, gift_xmas, comp_leave, gift_easter, leave_allow, comp_dismiss}
+    # Καθαρά Λογιστηρίου (LegalNetImport.net_legal) ανά κατηγορία period_kind.
+    SPECIAL_MATCH = [
+        ('gift_xmas',    lambda n: 'δωρο' in n and 'χριστ' in n and 'προηγ' not in n),
+        ('gift_easter',  lambda n: 'δωρο' in n and 'πασχα' in n and 'προηγ' not in n),
+        ('leave_allow',  lambda n: 'επιδομα' in n and 'αδει' in n and 'προηγ' not in n),
+        ('comp_leave',   lambda n: 'αποζημιωσ' in n and 'αδει' in n and 'προηγ' not in n),
+        ('comp_dismiss', lambda n: 'αποζημιωσ' in n and 'απολυσ' in n),
+    ]
+    pay_by_um = {}   # (uid, μήνας) -> dict κατηγοριών
     if LegalNetImport and uids:
         for li in (LegalNetImport.query
                    .filter(LegalNetImport.year == year,
                            LegalNetImport.month.in_(months),
-                           LegalNetImport.period_kind == 'monthly',
                            LegalNetImport.user_id.in_(uids)).all()):
-            k = (li.user_id, li.month)
-            net_by_um[k] = round(net_by_um.get(k, 0.0) + (li.net_legal or 0.0), 2)
+            k = (li.user_id, li.month); d = pay_by_um.setdefault(k, {})
+            pk = (li.period_kind or 'monthly'); val = li.net_legal or 0.0
+            if pk == 'monthly':
+                d['net'] = round(d.get('net', 0.0) + val, 2)
+            else:
+                nn = _norm(pk)
+                for key, match in SPECIAL_MATCH:
+                    if match(nn):
+                        d[key] = round(d.get(key, 0.0) + val, 2); break
     rows = []
     for er in emp_rows:
         u = er['user']; prof = er.get('profile')
@@ -3063,8 +3082,11 @@ def _staff_status_rows(year=None, months=None):
                     if uid == u.id and m2 == mo and ((whid or home) == hk):
                         alist += lst
                 agg = aggregate(alist, home) if alist else {'work_days': 0, 'repo': 0, 'extra_hours': 0.0}
-                net = net_by_um.get((u.id, mo)) if is_home else None
-                active = bool(alist) or (net is not None)
+                pay = pay_by_um.get((u.id, mo), {}) if is_home else {}
+                net = pay.get('net') if is_home else None
+                sp = {k: (pay.get(k) if is_home else None) for k in
+                      ('gift_xmas', 'comp_leave', 'gift_easter', 'leave_allow', 'comp_dismiss')}
+                active = bool(alist) or (net is not None) or any(v for v in sp.values())
                 mcells[mo] = {
                     'active': active,
                     'hotel_code': (_hotel_short(hotel_name.get(hk, '')) if hk else '') if active else '',
@@ -3075,6 +3097,9 @@ def _staff_status_rows(year=None, months=None):
                     'work': (agg['work_days'] or None) if active else None,
                     'repo': (agg['repo'] or None) if active else None,
                     'net': net,
+                    'gift_xmas': sp['gift_xmas'], 'comp_leave': sp['comp_leave'],
+                    'gift_easter': sp['gift_easter'], 'leave_allow': sp['leave_allow'],
+                    'comp_dismiss': sp['comp_dismiss'],
                 }
                 if active:
                     any_data = True
@@ -3093,9 +3118,22 @@ def schedule_staff_status():
     if not is_admin():
         return redirect(url_for('schedule_board'))
     rows = _staff_status_rows()
+    # σύνολα ανά (μήνας, στήλη) για το footer
+    totals = {}
+    for mo in STAFF_STATUS_MONTHS:
+        tt = {}
+        for col in PAYROLL_GRID_COLS:
+            if col['kind'] in ('money', 'num', 'int'):
+                tot = 0.0
+                for r in rows:
+                    v = r['months'][mo].get(col['src'])
+                    if isinstance(v, (int, float)):
+                        tot += v
+                tt[col['src']] = round(tot, 2) if tot else None
+        totals[mo] = tt
     return render_template('schedule_staff_status.html',
-        rows=rows, cols=PAYROLL_GRID_COLS, months=STAFF_STATUS_MONTHS,
-        month_el=MONTHS_EL, year=STAFF_STATUS_YEAR, is_admin=is_admin())
+        rows=rows, cols=PAYROLL_GRID_COLS, months=STAFF_STATUS_MONTHS, totals=totals,
+        month_el=MONTHS_EL, year=STAFF_STATUS_YEAR, is_admin=is_admin(), n_emp=len(rows))
 
 
 @app.route('/dashboard/schedule/staff_status.xlsx')
@@ -3104,38 +3142,92 @@ def schedule_staff_status_xlsx():
         return redirect(url_for('login'))
     rows = _staff_status_rows()
     import openpyxl, io
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
     cols = PAYROLL_GRID_COLS; ncol = len(cols)
+    nmonths = len(STAFF_STATUS_MONTHS)
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Προσωπικό'
-    navy = PatternFill('solid', fgColor='193847'); grey = PatternFill('solid', fgColor='334155')
+    navy = PatternFill('solid', fgColor='153847'); navy2 = PatternFill('solid', fgColor='0F2A36')
+    grey = PatternFill('solid', fgColor='334155'); grey2 = PatternFill('solid', fgColor='3E4C5E')
+    gold = PatternFill('solid', fgColor='CAA64A'); totfill = PatternFill('solid', fgColor='FBF3DE')
+    zebra = PatternFill('solid', fgColor='F7F9FB')
     center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    thin = Side(style='thin', color='E3E9EF'); border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    gside = Side(style='medium', color='CAA64A')
+    money_fmt = '#,##0.00'; num_fmt = '0.00'; int_fmt = '0'
+    def fmt_of(kind):
+        return money_fmt if kind == 'money' else (num_fmt if kind == 'num' else (int_fmt if kind == 'int' else None))
+    # Row1: name (merged) + month headers ; Row2: column labels
     ws.cell(row=1, column=1, value='Ονοματεπώνυμο')
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
-    a1 = ws.cell(row=1, column=1); a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy; a1.alignment = center
+    a1 = ws.cell(row=1, column=1); a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy2; a1.alignment = center
     c = 2
-    for mo in STAFF_STATUS_MONTHS:
+    for mi, mo in enumerate(STAFF_STATUS_MONTHS):
         ws.merge_cells(start_row=1, start_column=c, end_row=1, end_column=c + ncol - 1)
         mc = ws.cell(row=1, column=c, value=MONTHS_EL[mo].upper())
-        mc.font = Font(bold=True, color='FFFFFF'); mc.fill = navy; mc.alignment = center
+        mc.font = Font(bold=True, color='FFFFFF', size=12); mc.fill = (navy if mi % 2 == 0 else navy2); mc.alignment = center
         for j, col in enumerate(cols):
             hc = ws.cell(row=2, column=c + j, value=col['label'])
-            hc.font = Font(bold=True, color='FFFFFF'); hc.fill = grey; hc.alignment = center
+            hc.font = Font(bold=True, color='FFFFFF', size=9); hc.fill = (grey if mi % 2 == 0 else grey2)
+            hc.alignment = center; hc.border = border
         c += ncol
+    # Data rows
     r = 3
-    for row in rows:
-        ws.cell(row=r, column=1, value=row['name'])
+    for ri, row in enumerate(rows):
+        nc = ws.cell(row=r, column=1, value=row['name'])
+        nc.font = Font(bold=True, color='153847'); nc.alignment = Alignment(vertical='center')
+        if ri % 2 == 1:
+            nc.fill = zebra
+        nc.border = Border(left=thin, right=gside, top=thin, bottom=thin)
+        if not row['is_home'] and row.get('hotel_code'):
+            nc.value = '%s  · %s' % (row['name'], row['hotel_code'])
         c = 2
-        for mo in STAFF_STATUS_MONTHS:
+        for mi, mo in enumerate(STAFF_STATUS_MONTHS):
             cell = row['months'][mo]
             for j, col in enumerate(cols):
-                ws.cell(row=r, column=c + j, value=cell.get(col['src']))
+                v = cell.get(col['src'])
+                x = ws.cell(row=r, column=c + j, value=v)
+                x.border = Border(left=(gside if j == 0 else thin), right=thin, top=thin, bottom=thin)
+                f = fmt_of(col['kind'])
+                if f and v is not None:
+                    x.number_format = f
+                if col['kind'] in ('money', 'num', 'int'):
+                    x.alignment = Alignment(horizontal='right')
+                if ri % 2 == 1:
+                    x.fill = zebra
             c += ncol
         r += 1
+    # Totals row
+    tr = r
+    tc = ws.cell(row=tr, column=1, value='ΣΥΝΟΛΑ')
+    tc.font = Font(bold=True, color='153847'); tc.fill = gold; tc.alignment = Alignment(vertical='center')
+    tc.border = Border(left=thin, right=gside, top=Side(style='medium', color='CAA64A'), bottom=thin)
+    c = 2
+    for mi, mo in enumerate(STAFF_STATUS_MONTHS):
+        for j, col in enumerate(cols):
+            if col['kind'] in ('money', 'num', 'int'):
+                tot = 0.0
+                for row in rows:
+                    v = row['months'][mo].get(col['src'])
+                    if isinstance(v, (int, float)):
+                        tot += v
+                x = ws.cell(row=tr, column=c + j, value=round(tot, 2) if tot else None)
+                if col['kind'] != 'int':
+                    x.number_format = money_fmt
+                else:
+                    x.number_format = int_fmt
+                x.font = Font(bold=True, color='153847'); x.alignment = Alignment(horizontal='right')
+            else:
+                x = ws.cell(row=tr, column=c + j, value=None)
+            x.fill = totfill
+            x.border = Border(left=(gside if j == 0 else thin), right=thin,
+                              top=Side(style='medium', color='CAA64A'), bottom=thin)
+        c += ncol
     ws.freeze_panes = 'B3'
-    ws.column_dimensions['A'].width = 26
-    for i in range(2, 2 + ncol * len(STAFF_STATUS_MONTHS)):
-        ws.column_dimensions[get_column_letter(i)].width = 12
+    ws.row_dimensions[1].height = 22; ws.row_dimensions[2].height = 30
+    ws.column_dimensions['A'].width = 30
+    for i in range(2, 2 + ncol * nmonths):
+        ws.column_dimensions[get_column_letter(i)].width = 11
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     return Response(bio.read(),
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
