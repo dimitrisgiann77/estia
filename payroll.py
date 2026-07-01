@@ -2305,6 +2305,64 @@ def payroll_grid():
                            ids=','.join(str(r['user'].id) for r in rows), is_admin=is_admin())
 
 
+# ── v12.368 (P-050) — Έλεγχος: λογαριασμοί πλατφόρμας vs προσωπικό + πιθανά διπλότυπα (READ-ONLY) ──
+_GR2LAT = {'Α':'A','Β':'V','Γ':'G','Δ':'D','Ε':'E','Ζ':'Z','Η':'I','Θ':'T','Ι':'I','Κ':'K',
+           'Λ':'L','Μ':'M','Ν':'N','Ξ':'X','Ο':'O','Π':'P','Ρ':'R','Σ':'S','Τ':'T','Υ':'Y',
+           'Φ':'F','Χ':'X','Ψ':'P','Ω':'O','Ϊ':'I','Ϋ':'Y','ς':'S'}
+def _translit(s):
+    import unicodedata
+    s = unicodedata.normalize('NFD', s or '')
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')   # αφαίρεση τόνων
+    return ''.join(_GR2LAT.get(c, _GR2LAT.get(c.upper(), c)) for c in s).upper()
+def _name_key(name):
+    """Κλειδί ονόματος ανθεκτικό σε ελληνικά/λατινικά: σύμφωνα ανά λέξη, ταξινομημένα."""
+    words = []
+    for w in _translit(name).split():
+        cons = ''.join(c for c in w if c.isalpha() and c not in 'AEIOUYH')
+        if cons: words.append(cons)
+    return ' '.join(sorted(words))
+
+@app.route('/dashboard/payroll/account_audit')
+def payroll_account_audit():
+    if not _padmin():
+        return redirect(url_for('login'))
+    from collections import defaultdict
+    users = User.query.all()
+    pii_by = {p.user_id: p for p in EmployeePII.query.all()}
+    prof_by = {p.user_id: p for p in EmploymentProfile.query.all()} if EmploymentProfile else {}
+    legal_uids = {uid for (uid,) in db.session.query(LegalNetImport.user_id).distinct() if uid}
+    mgmt_uids = {uid for (uid,) in db.session.query(MgmtAssignment.user_id).distinct() if uid}
+    recs = []
+    for u in users:
+        pii = pii_by.get(u.id); prof = prof_by.get(u.id)
+        afm = (pii.afm if pii else None) or None
+        login_off = (getattr(u, 'login_enabled', None) is False)
+        has_hr = bool(prof or pii or getattr(u, 'home_hotel_id', None) or getattr(u, 'department_id', None))
+        payroll_sub = bool(login_off or afm or (prof and prof.agreement_amount) or u.id in legal_uids or u.id in mgmt_uids)
+        recs.append({'u': u, 'afm': afm, 'login_off': login_off, 'has_hr': has_hr, 'payroll': payroll_sub})
+    clean_accounts = [r for r in recs if r['has_hr'] and not r['payroll']]
+    n_real = sum(1 for r in recs if r['has_hr'] and r['payroll'])
+    by_afm = defaultdict(list); by_name = defaultdict(list)
+    for r in recs:
+        if r['afm']: by_afm[r['afm']].append(r)
+        nk = _name_key(r['u'].full_name or r['u'].username)
+        if nk: by_name[nk].append(r)
+    dup_groups = []; seen = set()
+    def add_group(ms, reason):
+        ids = tuple(sorted(m['u'].id for m in ms))
+        if len(ids) < 2 or ids in seen: return
+        seen.add(ids); dup_groups.append({'reason': reason, 'members': ms})
+    for afm, ms in by_afm.items():
+        if len(ms) > 1: add_group(ms, 'ΑΦΜ %s' % afm)
+    for nk, ms in by_name.items():
+        if len(ms) > 1 and any(m['login_off'] for m in ms) and any(not m['login_off'] for m in ms):
+            add_group(ms, 'ίδιο όνομα (λογαριασμός ↔ προσωπικό)')
+    dup_groups.sort(key=lambda g: (not g['reason'].startswith('ΑΦΜ'), -len(g['members'])))
+    log_activity('payroll_account_audit', '%d clean / %d dup' % (len(clean_accounts), len(dup_groups)))
+    return render_template('payroll_account_audit.html', n_users=len(users),
+        n_hr=len(clean_accounts) + n_real, clean_accounts=clean_accounts,
+        n_real=n_real, dup_groups=dup_groups)
+
 
 # ── v12.80 — Export 2 μητρώων ΑΠΟ ΤΗ ΒΑΣΗ (καθρέφτης live) ────────────────────
 def _xlsx_response(wb, fname):

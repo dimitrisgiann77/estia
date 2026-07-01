@@ -1,0 +1,73 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Έλεγχος λογαριασμών & διπλότυπων', theme.primary) }}
+<style>
+ .container{ max-width:1120px; }
+ .note{ background:#f7fbff; border:1px solid #e0f0ff; border-radius:10px; padding:12px 14px; font-size:13px; color:#475569; margin-bottom:16px; }
+ .sec-h{ font-size:15px; font-weight:700; color:#1e293b; margin:22px 0 10px; display:flex; align-items:center; gap:8px; }
+ table.aud{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+ table.aud th{ text-align:left; padding:9px 12px; color:#5b6b72; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; font-weight:700; border-bottom:1px solid #e0f0ff; background:#f7fbff; }
+ table.aud td{ padding:9px 12px; border-bottom:1px solid #f0f6fb; vertical-align:middle; }
+ table.aud tr:hover td{ background:#f7fbff; }
+ .av{ width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff; background:var(--mp-brand); flex:0 0 auto; }
+ .who{ display:flex; align-items:center; gap:9px; }
+ .nm{ font-weight:600; color:#1e293b; }
+ .tag{ display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; padding:1px 8px; border-radius:20px; white-space:nowrap; }
+ .tag.acct{ background:#f1f5f9; color:#64748b; } .tag.staff{ background:#dbeafe; color:#1d4ed8; }
+ .open{ color:var(--mp-brand); text-decoration:none; font-weight:600; font-size:12px; white-space:nowrap; }
+ .dupcard{ border:1px solid #fde2e2; background:#fff; border-radius:11px; padding:12px 14px; margin-bottom:10px; }
+ .dupcard .rsn{ font-size:11px; font-weight:700; color:#b91c1c; background:#fef2f2; border-radius:20px; padding:2px 10px; display:inline-block; margin-bottom:9px; }
+ .mrow{ display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px dashed #f0e0e0; flex-wrap:wrap; }
+ .mrow:first-of-type{ border-top:none; }
+ .muted{ color:#9aa7ad; } .afm{ font-family:ui-monospace,monospace; font-size:12px; color:#64748b; }
+ .empty{ padding:26px; text-align:center; color:#9aa7ad; }
+</style></head><body>
+{{ mp.topbar('user-search', 'Έλεγχος λογαριασμών & διπλότυπων', 'Ποιοι είναι πραγματικό προσωπικό και ποιοι απλοί λογαριασμοί') }}
+<div class="container">
+  {{ mp.kpis([
+     {'n':n_users,'label':'Σύνολο χρηστών'},
+     {'n':n_hr,'label':'Εμφανίζονται στα προφίλ','color':'#185FA5'},
+     {'n':clean_accounts|length,'label':'Καθαροί λογαριασμοί (θόρυβος)','color':'#d97706'},
+     {'n':dup_groups|length,'label':'Πιθανά διπλότυπα','color':'#dc2626'}
+  ]) }}
+
+  <div class="note"><b>Καθαρός λογαριασμός</b> = χρήστης που κάνει login αλλά ΔΕΝ έχει μισθοδοτική υπόσταση (χωρίς ΑΦΜ / συμφωνία / μισθοδοσία Λογιστηρίου / ανάθεση). Εμφανίζεται στα προφίλ μόνο επειδή του δόθηκε τμήμα/ξενοδοχείο. <b>Πραγματικό προσωπικό: {{ n_real }}.</b></div>
+
+  <div class="sec-h"><i class="ti ti-user-off"></i> Καθαροί λογαριασμοί στα προφίλ ({{ clean_accounts|length }})</div>
+  <div class="card" style="padding:0;overflow-x:auto;" data-nocopy>
+    <table class="aud">
+      <tr><th>Χρήστης</th><th>Username</th><th>Ρόλος</th><th>Email</th><th></th></tr>
+      {% for r in clean_accounts %}
+      <tr>
+        <td><div class="who"><span class="av">{{ (r.u.full_name or r.u.username or '?')[0]|upper }}</span><span class="nm">{{ r.u.full_name or r.u.username }}</span></div></td>
+        <td class="muted">{{ r.u.username }}</td>
+        <td class="muted">{{ r.u.role }}</td>
+        <td class="muted">{{ r.u.email or '—' }}</td>
+        <td><a class="open" href="/dashboard/payroll/employee/{{ r.u.id }}?embed=1">Καρτέλα →</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">Κανένας — καθαρή λίστα προσωπικού. 👌</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="sec-h"><i class="ti ti-copy"></i> Πιθανά διπλότυπα ({{ dup_groups|length }})</div>
+  {% for g in dup_groups %}
+  <div class="dupcard">
+    <span class="rsn">{{ g.reason }}</span>
+    {% for m in g.members %}
+    <div class="mrow">
+      <span class="av">{{ (m.u.full_name or m.u.username or '?')[0]|upper }}</span>
+      <span class="nm">{{ m.u.full_name or m.u.username }}</span>
+      {% if m.login_off %}<span class="tag staff"><i class="ti ti-lock"></i> Προσωπικό</span>{% else %}<span class="tag acct"><i class="ti ti-user"></i> Λογαριασμός</span>{% endif %}
+      <span class="afm">ΑΦΜ {{ m.afm or '—' }}</span>
+      <span class="muted" style="font-size:12px;">· {{ m.u.username }}</span>
+      <a class="open" style="margin-left:auto;" href="/dashboard/payroll/employee/{{ m.u.id }}?embed=1">Καρτέλα →</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card"><div class="empty">Κανένα πιθανό διπλότυπο βρέθηκε (κατά ΑΦΜ ή όνομα). 👌</div></div>
+  {% endfor %}
+
+  <p class="muted" style="margin-top:14px; font-size:12px;">Read-only έλεγχος — καμία αλλαγή. Το merge γίνεται από την καρτέλα του εργαζομένου (Καρτέλα → Συγχώνευση).</p>
+</div></body></html>
