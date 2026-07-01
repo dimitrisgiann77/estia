@@ -2984,20 +2984,22 @@ STAFF_STATUS_MONTHS = [1, 2, 3, 4, 5, 6]   # Ιαν→Ιουν
 
 # Ενιαίο μητρώο στηλών — άλλαξε label/src ΕΔΩ και ενημερώνονται grid + excel μαζί.
 # src = κλειδί μέσα στο dict του μηνιαίου cell (βλ. _staff_status_rows).
+# grp: 'mgmt'=Management (αχνό κόκκινο) · 'acct'=Λογιστήριο (αχνό πράσινο έως Μάιο) · 'bal'=Υπόλοιπο
 PAYROLL_GRID_COLS = [
-    {'k': 'hotel', 'label': 'HOTEL CODE',     'src': 'hotel_code', 'kind': 'text'},
-    {'k': 'agree', 'label': 'ΠΟΣΟ ΣΥΜΦΩΝΙΑΣ',  'src': 'agreement',  'kind': 'money'},
-    {'k': 'day',   'label': 'ΗΜΕΡΟΜΙΣΘΙΟ',     'src': 'day_wage',   'kind': 'money'},
-    {'k': 'hour',  'label': 'ΩΡΟΜΙΣΘΙΟ',       'src': 'hour_wage',  'kind': 'money'},
-    {'k': 'extra', 'label': 'ΕΞΤΡΑ ΩΡΕΣ',      'src': 'extra',      'kind': 'num'},
-    {'k': 'work',  'label': 'ΕΡΓΑΣΙΜΕΣ',       'src': 'work',       'kind': 'int'},
-    {'k': 'repo',  'label': 'ΡΕΠΟ',            'src': 'repo',       'kind': 'int'},
-    {'k': 'net',   'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ',  'src': 'net',        'kind': 'money'},
-    {'k': 'dx',    'label': 'ΔΧ',              'src': 'gift_xmas',   'kind': 'money'},
-    {'k': 'aa',    'label': 'ΑΑ',              'src': 'comp_leave',  'kind': 'money'},
-    {'k': 'dp',    'label': 'ΔΠ',              'src': 'gift_easter', 'kind': 'money'},
-    {'k': 'ea',    'label': 'ΕΑ',              'src': 'leave_allow', 'kind': 'money'},
-    {'k': 'apol',  'label': 'Αποζ. Απολ.',     'src': 'comp_dismiss','kind': 'money'},
+    {'k': 'hotel', 'label': 'HOTEL CODE',     'src': 'hotel_code', 'kind': 'text',  'grp': ''},
+    {'k': 'agree', 'label': 'ΠΟΣΟ ΣΥΜΦΩΝΙΑΣ',  'src': 'agreement',  'kind': 'money', 'grp': 'mgmt'},
+    {'k': 'day',   'label': 'ΗΜΕΡΟΜΙΣΘΙΟ',     'src': 'day_wage',   'kind': 'money', 'grp': 'mgmt'},
+    {'k': 'hour',  'label': 'ΩΡΟΜΙΣΘΙΟ',       'src': 'hour_wage',  'kind': 'money', 'grp': 'mgmt'},
+    {'k': 'extra', 'label': 'ΕΞΤΡΑ ΩΡΕΣ',      'src': 'extra',      'kind': 'num',   'grp': ''},
+    {'k': 'work',  'label': 'ΕΡΓΑΣΙΜΕΣ',       'src': 'work',       'kind': 'int',   'grp': ''},
+    {'k': 'repo',  'label': 'ΡΕΠΟ',            'src': 'repo',       'kind': 'int',   'grp': ''},
+    {'k': 'net',   'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ ΛΟΓΙΣΤΗΡΙΟ', 'src': 'net', 'kind': 'money', 'grp': 'acct'},
+    {'k': 'dx',    'label': 'ΔΧ',              'src': 'gift_xmas',   'kind': 'money', 'grp': 'acct'},
+    {'k': 'aa',    'label': 'ΑΑ',              'src': 'comp_leave',  'kind': 'money', 'grp': 'acct'},
+    {'k': 'dp',    'label': 'ΔΠ',              'src': 'gift_easter', 'kind': 'money', 'grp': 'acct'},
+    {'k': 'ea',    'label': 'ΕΑ',              'src': 'leave_allow', 'kind': 'money', 'grp': 'acct'},
+    {'k': 'apol',  'label': 'Αποζ. Απολ.',     'src': 'comp_dismiss','kind': 'money', 'grp': 'acct'},
+    {'k': 'bal',   'label': 'ΥΠΟΛΟΙΠΟ',        'src': 'balance',    'kind': 'money', 'grp': 'bal'},
 ]
 
 def _staff_status_rows(year=None, months=None):
@@ -3087,10 +3089,12 @@ def _staff_status_rows(year=None, months=None):
                 sp = {k: (pay.get(k) if is_home else None) for k in
                       ('gift_xmas', 'comp_leave', 'gift_easter', 'leave_allow', 'comp_dismiss')}
                 active = bool(alist) or (net is not None) or any(v for v in sp.values())
+                _agree_v = agreement if active else None
+                _bal = round(_agree_v - net, 2) if (_agree_v is not None and net is not None) else None
                 mcells[mo] = {
                     'active': active,
                     'hotel_code': (_hotel_short(hotel_name.get(hk, '')) if hk else '') if active else '',
-                    'agreement': agreement if active else None,
+                    'agreement': _agree_v,
                     'day_wage': day_wage if active else None,
                     'hour_wage': hour_wage if active else None,
                     'extra': (round(agg['extra_hours'], 2) or None) if active else None,
@@ -3100,6 +3104,7 @@ def _staff_status_rows(year=None, months=None):
                     'gift_xmas': sp['gift_xmas'], 'comp_leave': sp['comp_leave'],
                     'gift_easter': sp['gift_easter'], 'leave_allow': sp['leave_allow'],
                     'comp_dismiss': sp['comp_dismiss'],
+                    'balance': _bal,
                 }
                 if active:
                     any_data = True
@@ -3151,13 +3156,26 @@ def schedule_staff_status_xlsx():
     grey = PatternFill('solid', fgColor='334155'); grey2 = PatternFill('solid', fgColor='3E4C5E')
     gold = PatternFill('solid', fgColor='CAA64A'); totfill = PatternFill('solid', fgColor='FBF3DE')
     zebra = PatternFill('solid', fgColor='F7F9FB')
+    # group fills
+    mgmt_hdr = PatternFill('solid', fgColor='7A2F2F'); mgmt_cell = PatternFill('solid', fgColor='FCE6E6')
+    acct_hdr = PatternFill('solid', fgColor='2F6B3A'); acct_cell = PatternFill('solid', fgColor='E4F4E6')
+    bal_hdr  = PatternFill('solid', fgColor='8A6D1C'); bal_cell  = PatternFill('solid', fgColor='FFF4D6')
     center = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    thin = Side(style='thin', color='E3E9EF'); border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    gside = Side(style='medium', color='CAA64A')
+    thin = Side(style='thin', color='E3E9EF'); gside = Side(style='medium', color='CAA64A')
     money_fmt = '#,##0.00'; num_fmt = '0.00'; int_fmt = '0'
     def fmt_of(kind):
         return money_fmt if kind == 'money' else (num_fmt if kind == 'num' else (int_fmt if kind == 'int' else None))
-    # Row1: name (merged) + month headers ; Row2: column labels
+    def hdr_style(grp):
+        if grp == 'mgmt': return mgmt_hdr, 'F7DEDE'
+        if grp == 'acct': return acct_hdr, 'DFF2E3'
+        if grp == 'bal':  return bal_hdr, 'FBEEC4'
+        return None, 'FFFFFF'
+    def cell_fill(grp, mo, even):
+        if grp == 'mgmt': return mgmt_cell
+        if grp == 'acct' and mo <= 5: return acct_cell
+        if grp == 'bal': return bal_cell
+        return zebra if even else None
+    # Row1 name + month headers
     ws.cell(row=1, column=1, value='Ονοματεπώνυμο')
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
     a1 = ws.cell(row=1, column=1); a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy2; a1.alignment = center
@@ -3167,20 +3185,24 @@ def schedule_staff_status_xlsx():
         mc = ws.cell(row=1, column=c, value=MONTHS_EL[mo].upper())
         mc.font = Font(bold=True, color='FFFFFF', size=12); mc.fill = (navy if mi % 2 == 0 else navy2); mc.alignment = center
         for j, col in enumerate(cols):
-            hc = ws.cell(row=2, column=c + j, value=col['label'])
-            hc.font = Font(bold=True, color='FFFFFF', size=9); hc.fill = (grey if mi % 2 == 0 else grey2)
-            hc.alignment = center; hc.border = border
+            lbl = col['label'] + ('\nMANAGEMENT' if col.get('grp') == 'mgmt' else '')
+            hc = ws.cell(row=2, column=c + j, value=lbl)
+            gf, fcolor = hdr_style(col.get('grp'))
+            # ΛΟΓΙΣΤΗΡΙΟ πράσινο μόνο έως Μάιο· αλλιώς γκρι
+            if col.get('grp') == 'acct' and mo > 5:
+                gf, fcolor = None, 'FFFFFF'
+            hc.fill = gf if gf else (grey if mi % 2 == 0 else grey2)
+            hc.font = Font(bold=True, color=fcolor, size=9); hc.alignment = center
+            hc.border = Border(left=(gside if j == 0 else thin), right=thin, top=thin, bottom=thin)
         c += ncol
-    # Data rows
+    # Data
     r = 3
     for ri, row in enumerate(rows):
-        nc = ws.cell(row=r, column=1, value=row['name'])
+        even = (ri % 2 == 1)
+        nc = ws.cell(row=r, column=1, value=(row['name'] if row['is_home'] else '%s  · %s' % (row['name'], row.get('hotel_code') or '')))
         nc.font = Font(bold=True, color='153847'); nc.alignment = Alignment(vertical='center')
-        if ri % 2 == 1:
-            nc.fill = zebra
+        if even: nc.fill = zebra
         nc.border = Border(left=thin, right=gside, top=thin, bottom=thin)
-        if not row['is_home'] and row.get('hotel_code'):
-            nc.value = '%s  · %s' % (row['name'], row['hotel_code'])
         c = 2
         for mi, mo in enumerate(STAFF_STATUS_MONTHS):
             cell = row['months'][mo]
@@ -3189,15 +3211,13 @@ def schedule_staff_status_xlsx():
                 x = ws.cell(row=r, column=c + j, value=v)
                 x.border = Border(left=(gside if j == 0 else thin), right=thin, top=thin, bottom=thin)
                 f = fmt_of(col['kind'])
-                if f and v is not None:
-                    x.number_format = f
-                if col['kind'] in ('money', 'num', 'int'):
-                    x.alignment = Alignment(horizontal='right')
-                if ri % 2 == 1:
-                    x.fill = zebra
+                if f and v is not None: x.number_format = f
+                if col['kind'] in ('money', 'num', 'int'): x.alignment = Alignment(horizontal='right')
+                fill = cell_fill(col.get('grp'), mo, even)
+                if fill: x.fill = fill
             c += ncol
         r += 1
-    # Totals row
+    # Totals
     tr = r
     tc = ws.cell(row=tr, column=1, value='ΣΥΝΟΛΑ')
     tc.font = Font(bold=True, color='153847'); tc.fill = gold; tc.alignment = Alignment(vertical='center')
@@ -3209,22 +3229,17 @@ def schedule_staff_status_xlsx():
                 tot = 0.0
                 for row in rows:
                     v = row['months'][mo].get(col['src'])
-                    if isinstance(v, (int, float)):
-                        tot += v
+                    if isinstance(v, (int, float)): tot += v
                 x = ws.cell(row=tr, column=c + j, value=round(tot, 2) if tot else None)
-                if col['kind'] != 'int':
-                    x.number_format = money_fmt
-                else:
-                    x.number_format = int_fmt
+                x.number_format = int_fmt if col['kind'] == 'int' else money_fmt
                 x.font = Font(bold=True, color='153847'); x.alignment = Alignment(horizontal='right')
             else:
                 x = ws.cell(row=tr, column=c + j, value=None)
             x.fill = totfill
-            x.border = Border(left=(gside if j == 0 else thin), right=thin,
-                              top=Side(style='medium', color='CAA64A'), bottom=thin)
+            x.border = Border(left=(gside if j == 0 else thin), right=thin, top=Side(style='medium', color='CAA64A'), bottom=thin)
         c += ncol
     ws.freeze_panes = 'B3'
-    ws.row_dimensions[1].height = 22; ws.row_dimensions[2].height = 30
+    ws.row_dimensions[1].height = 22; ws.row_dimensions[2].height = 34
     ws.column_dimensions['A'].width = 30
     for i in range(2, 2 + ncol * nmonths):
         ws.column_dimensions[get_column_letter(i)].width = 11
