@@ -105,7 +105,12 @@ def render(b):
         L.append('\U0001f517 Συνέχεια: v%s — %s' % (r0['v'], r0['title']))
         L.append('✅ Πρόσφατα: ' + ' · '.join('v%s' % r['v'] for r in b['recent']))
     if b['mine']:
-        ids = ' · '.join('%s' % m['id'] for m in b['mine'])
+        CAP = 8  # P-045: shortlist αντί για dump ΟΛΩΝ — καθαρή κάρτα boot
+        head = b['mine'][:CAP]
+        ids = ' · '.join('%s' % m['id'] for m in head)
+        extra = len(b['mine']) - len(head)
+        if extra > 0:
+            ids += ' · …+%d ακόμη' % extra
         L.append('\U0001f4e5 Για σένα (Owner=%s): %s' % (b['recipient'], ids))
     else:
         L.append('\U0001f4e5 Για σένα (Owner=%s): καθαρό' % b['recipient'])
