@@ -2299,9 +2299,11 @@ def payroll_grid():
     rows = _employees(status)
     saved = request.args.get('saved', type=int)
     n_active = len(_employees('active')); n_inactive = len(_employees('inactive'))
+    with_agr = sum(1 for r in rows if r.get('profile') and r['profile'].agreement_amount)
     log_activity('payroll_grid_view', status)
     return render_template('payroll_grid.html', rows=rows, status=status, saved=saved,
                            n_active=n_active, n_inactive=n_inactive, n_all=n_active + n_inactive,
+                           with_agr=with_agr,
                            ids=','.join(str(r['user'].id) for r in rows), is_admin=is_admin())
 
 

@@ -1,55 +1,89 @@
 {% import '_monitoring.html' as mp %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Μαζική επεξεργασία προσωπικού', theme.primary) }}
 <style>
- .card h3{margin:0 0 8px;font-size:15px;}
- table{width:100%;border-collapse:collapse;font-size:12px;}
- td,th{padding:4px 6px;border-bottom:1px solid #eef2f6;text-align:left;}
- th{font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:#64748b;position:sticky;top:0;background:#fff;}
- input,select{width:100%;padding:4px 6px;border:1px solid #dbe3ea;border-radius:6px;font-size:12px;box-sizing:border-box;}
- .ro{color:#1e293b;} .muted{color:#94a3b8;}
- .seg{padding:6px 12px;border:1px solid #dbe3ea;background:#fff;color:#475569;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;text-decoration:none;}
- .seg.on{background:var(--accent,#185FA5);color:#fff;border-color:var(--accent,#185FA5);}
- .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 12px;}
- .save{background:var(--accent,#185FA5);color:#fff;border:none;padding:9px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;}
- .ok{background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;font-size:13px;}
+ .container{ max-width:1180px; }
+ .flash{ padding:11px 14px; border-radius:10px; font-size:13px; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+ .flash.ok{ background:#dcfce7; color:#166534; }
+ .toolbar{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:2px 0 14px; }
+ .emp-card{ padding:0; overflow-x:auto; }
+ table.emp{ width:100%; border-collapse:separate; border-spacing:0; font-size:13px; }
+ table.emp thead th{ position:sticky; top:0; z-index:2; background:#f7fbff; color:#5b6b72; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; font-weight:700; padding:11px 12px; text-align:left; border-bottom:1px solid #e0f0ff; }
+ table.emp tbody td{ padding:9px 12px; border-bottom:1px solid #f0f6fb; vertical-align:middle; }
+ table.emp tbody tr{ transition:background .1s; }
+ table.emp tbody tr:hover{ background:#f7fbff; }
+ .av{ width:34px; height:34px; border-radius:9px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:#fff; background:var(--mp-brand); letter-spacing:.5px; flex:0 0 auto; }
+ .who{ display:flex; align-items:center; gap:10px; }
+ .who .nm{ font-weight:600; color:#1e293b; line-height:1.2; }
+ .who .afm{ font-size:11px; color:#9aa7ad; font-family:ui-monospace,monospace; margin-top:2px; }
+ table.emp input, table.emp select{ width:100%; padding:6px 9px; border:1px solid #dde7ef; border-radius:8px; font-size:13px; box-sizing:border-box; background:#fff; transition:border-color .1s, box-shadow .1s; }
+ table.emp input:focus, table.emp select:focus{ outline:none; border-color:var(--mp-brand); box-shadow:0 0 0 3px rgba(24,95,165,.12); }
+ .agr-cell input{ text-align:right; font-weight:600; }
+ .agr-hint{ font-size:10.5px; color:#9aa7ad; text-align:right; margin-top:3px; }
+ .col-agr{ width:150px; } .col-phone{ width:150px; } .col-cc{ width:110px; } .col-active{ width:140px; }
+ .savebar{ position:sticky; bottom:0; margin-top:14px; padding:12px; background:rgba(255,255,255,.88); backdrop-filter:blur(6px); border:1px solid #e0f0ff; border-radius:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; box-shadow:0 -2px 12px rgba(25,56,71,.05); }
+ .del-btn{ background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:8px 14px; border-radius:9px; cursor:pointer; font-weight:600; font-size:13px; }
+ .del-btn:hover{ background:#fee2e2; }
+ .empty{ padding:34px; text-align:center; color:#9aa7ad; }
 </style></head><body>
-{{ mp.topbar('table', 'ΕΣΤΙΑ — Μαζική επεξεργασία προσωπικού') }}
+{{ mp.topbar('users-group', 'Μαζική επεξεργασία προσωπικού', 'Γρήγορη μαζική επεξεργασία — τρέχουσα κατάσταση') }}
 <div class="container">
-  {% if saved is not none %}<div class="ok">✓ Αποθηκεύτηκαν {{ saved }} αλλαγές.</div>{% endif %}
-  <div class="bar">
-    <a class="seg {{ 'on' if status=='active' }}" href="/dashboard/payroll/grid?status=active&embed=1">Ενεργοί ({{ n_active }})</a>
-    <a class="seg {{ 'on' if status=='inactive' }}" href="/dashboard/payroll/grid?status=inactive&embed=1">Ανενεργοί ({{ n_inactive }})</a>
-    <a class="seg {{ 'on' if status=='all' }}" href="/dashboard/payroll/grid?status=all&embed=1">Όλοι ({{ n_all }})</a>
-    <span class="muted" style="margin-left:auto;">{{ rows|length }} γραμμές · γρήγορη επεξεργασία (τρέχουσα ανάθεση)</span>
-  </div>
+  {% if saved is not none %}<div class="flash ok"><i class="ti ti-circle-check"></i> Αποθηκεύτηκαν {{ saved }} αλλαγές.</div>{% endif %}
+  {% if request.args.get('deleted') %}<div class="flash ok"><i class="ti ti-trash"></i> Διαγράφηκαν {{ request.args.get('deleted') }} προφίλ{% if request.args.get('skipped') and request.args.get('skipped')!='0' %} · {{ request.args.get('skipped') }} προστατευμένα/απέτυχαν{% endif %}.</div>{% endif %}
+
+  {{ mp.kpis([
+     {'n':n_active,'label':'Ενεργοί','color':'#16a34a','href':'/dashboard/payroll/grid?status=active&embed=1','active':status=='active'},
+     {'n':n_inactive,'label':'Ανενεργοί','color':'#dc2626','href':'/dashboard/payroll/grid?status=inactive&embed=1','active':status=='inactive'},
+     {'n':n_all,'label':'Όλοι','href':'/dashboard/payroll/grid?status=all&embed=1','active':status=='all'},
+     {'n':with_agr,'label':'Με συμφωνία (προβολή)','color':'#185FA5'}
+  ]) }}
+
   <form method="POST" action="/dashboard/payroll/grid?embed=1">
     <input type="hidden" name="ids" value="{{ ids }}"><input type="hidden" name="status" value="{{ status }}">
-    <div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <button class="save" type="submit">💾 Αποθήκευση όλων</button>
-      <button type="button" onclick="delSelected()" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;">🗑 Διαγραφή επιλεγμένων (<span id="delcount">0</span>)</button>
+    <div class="toolbar">
+      <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση όλων</button>
+      <button type="button" class="del-btn" onclick="delSelected()"><i class="ti ti-trash"></i> Διαγραφή επιλεγμένων (<span id="delcount">0</span>)</button>
+      <span class="muted" style="margin-left:auto; font-size:12.5px;">{{ rows|length }} γραμμές</span>
     </div>
-    {% if request.args.get('deleted') %}<div style="background:#dcfce7;color:#166534;padding:8px 12px;border-radius:8px;margin-bottom:10px;">✓ Διαγράφηκαν {{ request.args.get('deleted') }} προφίλ{% if request.args.get('skipped') and request.args.get('skipped')!='0' %} · {{ request.args.get('skipped') }} προστατευμένα/απέτυχαν{% endif %}.</div>{% endif %}
-    <div class="card" data-nocopy>
-      <table>
-        <tr><th style="width:24px;"></th><th>Επώνυμο</th><th>Όνομα</th><th>ΑΦΜ</th><th>Συμφωνία €</th><th>Τηλέφωνο</th><th>Email</th><th>Κ.κόστους</th><th>Κατάσταση</th></tr>
+    <div class="card emp-card" data-nocopy>
+      <table class="emp">
+        <thead><tr>
+          <th style="width:34px;"></th><th>Εργαζόμενος</th>
+          <th class="col-agr">Συμφωνία €</th><th class="col-phone">Τηλέφωνο</th>
+          <th>Email</th><th class="col-cc">Κ.κόστους</th><th class="col-active">Κατάσταση</th>
+        </tr></thead>
+        <tbody>
         {% for r in rows %}
         {% set uid = r.user.id %}
         <tr>
-          <td style="text-align:center;">{% if not emp_locked(r.user) %}<input type="checkbox" class="delsel" value="{{ r.user.id }}" style="width:auto;">{% endif %}</td><td class="ro">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ lock_badge(r.user) }}</td>
-          <td class="ro">{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
-          <td class="ro muted">{{ r.pii.afm if r.pii and r.pii.afm else '—' }}</td>
-          <td><input name="f_agr_{{ uid }}" value="{{ '%.0f'|format(r.profile.agreement_amount) if r.profile and r.profile.agreement_amount else '' }}" style="text-align:right;"></td>
-          <td><input name="f_phone_{{ uid }}" value="{{ r.user.phone or '' }}"></td>
-          <td><input name="f_email_{{ uid }}" value="{{ r.user.email or '' }}"></td>
-          <td><input name="f_cc_{{ uid }}" value="{{ r.cost_center or '' }}"></td>
-          <td><select name="f_active_{{ uid }}"><option value="1" {{ 'selected' if r.user.employment_active is not false }}>Ενεργός</option><option value="0" {{ 'selected' if r.user.employment_active is false }}>Ανενεργός</option></select></td>
+          <td style="text-align:center;">{% if not emp_locked(r.user) %}<input type="checkbox" class="delsel" value="{{ uid }}" style="width:auto;">{% endif %}</td>
+          <td>
+            <div class="who">
+              <span class="av">{{ (r.pii.last_name[0] if r.pii and r.pii.last_name else (r.user.username or '?')[0])|upper }}{{ (r.pii.first_name[0] if r.pii and r.pii.first_name else '')|upper }}</span>
+              <div>
+                <div class="nm">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ r.pii.first_name if r.pii and r.pii.first_name else '' }} {{ lock_badge(r.user) }}</div>
+                <div class="afm">ΑΦΜ {{ r.pii.afm if r.pii and r.pii.afm else '—' }}</div>
+              </div>
+            </div>
+          </td>
+          <td class="agr-cell">
+            <input name="f_agr_{{ uid }}" value="{{ '%.0f'|format(r.profile.agreement_amount) if r.profile and r.profile.agreement_amount else '' }}" placeholder="—" inputmode="numeric">
+            {% if r.profile and r.profile.agreement_amount %}<div class="agr-hint">≈ {{ '%.2f'|format(r.profile.day_wage) }} €/ημ</div>{% endif %}
+          </td>
+          <td><input name="f_phone_{{ uid }}" value="{{ r.user.phone or '' }}" placeholder="—"></td>
+          <td><input name="f_email_{{ uid }}" value="{{ r.user.email or '' }}" placeholder="—"></td>
+          <td><input name="f_cc_{{ uid }}" value="{{ r.cost_center or '' }}" placeholder="—"></td>
+          <td><select name="f_active_{{ uid }}"><option value="1" {{ 'selected' if r.user.employment_active is not false }}>✅ Ενεργός</option><option value="0" {{ 'selected' if r.user.employment_active is false }}>⛔ Ανενεργός</option></select></td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="muted">Κανένας.</td></tr>
+        <tr><td colspan="7" class="empty"><i class="ti ti-users-off" style="font-size:22px;display:block;margin-bottom:6px;"></i>Κανένας εργαζόμενος σε αυτή την προβολή.</td></tr>
         {% endfor %}
+        </tbody>
       </table>
     </div>
-    <div style="margin-top:10px;"><button class="save" type="submit">💾 Αποθήκευση όλων</button></div>
+    <div class="savebar">
+      <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση όλων</button>
+      <span class="muted" style="font-size:12px;">Επεξεργάζεσαι τη <b>Συμφωνία</b> (πηγή: προφίλ) · τμήμα/θέση/ξεν. → Οργανόγραμμα · ιστορικό/merge → καρτέλα εργαζομένου.</span>
+    </div>
   </form>
 <script>
 function _selIds(){return Array.from(document.querySelectorAll('.delsel:checked')).map(function(c){return c.value;});}
@@ -63,5 +97,4 @@ function delSelected(){
   document.body.appendChild(f);f.submit();
 }
 </script>
-  <p class="muted" style="margin-top:8px;">Σημ.: επεξεργάζεσαι τη <b>συμφωνία</b> της τρέχουσας ανάθεσης. Τμήμα/θέση/ξενοδοχείο → Οργανόγραμμα. Για ιστορικό/πολλαπλές αναθέσεις & merge → καρτέλα εργαζομένου.</p>
 </div></body></html>
