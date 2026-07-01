@@ -362,11 +362,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.364'
-APP_BUILD   = '645'
+APP_VERSION = '12.365'
+APP_BUILD   = '646'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.365', 'b': '646', 'date': '02/07/2026', 'time': '01:20', 'title': 'Συμφωνία μισθού — ΜΙΑ πηγή αλήθειας: EmploymentProfile (P-047)',
+     'items': ['Η «Μαζική επεξεργασία προσωπικού» (grid) γράφει πλέον τη Συμφωνία € στο EmploymentProfile (πηγή που διαβάζει η Κονσόλα Προσωπικού) — όχι στο legacy MgmtAssignment. Ό,τι βάζεις εμφανίζεται αμέσως στην κονσόλα.',
+               'Το ημερομίσθιο/ωρομίσθιο βγαίνει από EmploymentProfile (agreement ÷ days_per_month, default 26)· «άλλος τύπος πληρωμής» ορίζεται με τα υπάρχοντα πεδία days_per_month/agreement_type — κανένα νέο πεδίο.',
+               'One-time backfill (σφραγισμένο): όπου το EmploymentProfile.agreement_amount έλειπε, συμπληρώθηκε από την τρέχουσα MgmtAssignment (μόνο κενά, καμία επικάλυψη).',
+               'Τα legacy πεδία MgmtAssignment (συμφωνία/ημερομίσθιο/μονάδα/τμήμα/θέση) μένουν στη βάση — cleanup θα γίνει χωριστά με impact-first.']},
     {'v': '12.364', 'b': '645', 'date': '02/07/2026', 'time': '01:08', 'title': 'Μαζική επεξεργασία προσωπικού — αφαίρεση στηλών Μονάδα/Τμήμα/Θέση (P-048)',
      'items': ['Στην οθόνη «Μαζική επεξεργασία προσωπικού» (grid) αφαιρέθηκαν οι στήλες ΜΟΝΑΔΑ, ΤΜΗΜΑ, ΘΕΣΗ — πηγή αλήθειας για τμήμα/θέση/ξενοδοχείο είναι πλέον αποκλειστικά το Οργανόγραμμα.',
                'Παραμένουν: Επώνυμο/Όνομα/ΑΦΜ (read-only), Συμφωνία €, Κ.κόστους, Τηλέφωνο, Email, Κατάσταση.',
@@ -4776,6 +4781,7 @@ if schedule: schedule.ensure_schedule_columns()
 if schedule: schedule.seed_schedule()
 if payroll:  payroll.ensure_payroll_columns()
 if payroll:  payroll.seed_payroll()
+if payroll:  payroll.backfill_agreement_from_mgmt()   # v12.365 P-047: one-time backfill συμφωνίας → EmploymentProfile
 if measurements: measurements.seed_measurement_engine()   # Φ1: seed templates Πισίνα/ΖΝΧ + περίοδοι (idempotent)
 if measurements: measurements.seed_node_catalog()         # Φ-Α: κατάλογος-αναφορά δέντρου δικτύων (idempotent)
 if menu: menu.seed_menu_meta()   # v12.239: seed workspace+ρόλοι μενού (μόνο αν λείπει)

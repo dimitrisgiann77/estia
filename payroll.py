@@ -178,6 +178,33 @@ def ensure_payroll_columns():
             print('ensure_payroll_columns skipped:', e)
 
 
+def backfill_agreement_from_mgmt():
+    """v12.365 (P-047) — one-time: συμπλήρωσε EmploymentProfile.agreement_amount από την
+    ΤΡΕΧΟΥΣΑ MgmtAssignment ΜΟΝΟ όπου λείπει (backfill — ποτέ δεν ξαναγράφει υπάρχον ποσό).
+    Πηγή αλήθειας μισθού πλέον = EmploymentProfile. Flagged: τρέχει μία φορά, όχι auto-mutate."""
+    with app.app_context():
+        try:
+            from app import Setting
+            if EmploymentProfile is None or Setting.query.get('p047_agreement_backfill_done'):
+                return
+            filled = 0; seen = set()
+            for a in (MgmtAssignment.query.filter_by(valid_to=None)
+                      .order_by(MgmtAssignment.id.desc()).all()):
+                if a.user_id in seen or not a.agreement_amount:
+                    continue
+                seen.add(a.user_id)   # μόνο η τρέχουσα (τελευταία) ανάθεση ανά εργαζόμενο
+                prof = EmploymentProfile.query.filter_by(user_id=a.user_id).first()
+                if prof is None:
+                    prof = EmploymentProfile(user_id=a.user_id); db.session.add(prof)
+                if not prof.agreement_amount:   # ΜΟΝΟ αν λείπει — καμία επικάλυψη
+                    prof.agreement_amount = round(a.agreement_amount, 2); filled += 1
+            db.session.commit()
+            db.session.add(Setting(key='p047_agreement_backfill_done', value='1')); db.session.commit()
+            print('[payroll] P-047 backfill συμφωνίας: %d προφίλ συμπληρώθηκαν (μία φορά, σφραγίστηκε)' % filled)
+        except Exception as e:
+            db.session.rollback(); print('[payroll] P-047 backfill skipped:', e)
+
+
 # ── SEED (idempotent) ─────────────────────────────────────────────────────────
 def seed_payroll():
     with app.app_context():
@@ -2237,7 +2264,6 @@ def payroll_grid():
             u = User.query.get(uid)
             if not u: continue
             pii = EmployeePII.query.filter_by(user_id=uid).first()
-            a = current_assignment(uid)
             ch = False
             ph = g('f_phone', uid); em = g('f_email', uid); cc = g('f_cc', uid)
             act = g('f_active', uid)
@@ -2247,12 +2273,21 @@ def payroll_grid():
             if act in ('1', '0'):
                 want = (act == '1')
                 if u.employment_active != want: u.employment_active = want; ch = True
-            if a:
-                ag = g('f_agr', uid)
-                if ag is not None:
-                    try: agv = float(ag) if ag != '' else None
-                    except Exception: agv = a.agreement_amount
-                    if a.agreement_amount != agv: a.agreement_amount = agv; ch = True
+            # v12.365 (P-047) — «Συμφωνία €» = ΜΙΑ πηγή αλήθειας: EmploymentProfile (όχι MgmtAssignment)
+            ag = g('f_agr', uid)
+            if ag is not None and EmploymentProfile is not None:
+                ok = True
+                if ag == '':
+                    agv = None
+                else:
+                    try: agv = round(float(ag), 2)
+                    except Exception: ok = False
+                if ok:
+                    prof = EmploymentProfile.query.filter_by(user_id=uid).first()
+                    if agv is not None and prof is None:
+                        prof = EmploymentProfile(user_id=uid); db.session.add(prof)
+                    if prof is not None and (prof.agreement_amount or None) != agv:
+                        prof.agreement_amount = agv; ch = True
             if ch:
                 changed += 1
                 PPL.log_event(uid, 'edit', 'Μαζική επεξεργασία (grid)')

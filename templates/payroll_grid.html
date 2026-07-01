@@ -38,7 +38,7 @@
           <td style="text-align:center;">{% if not emp_locked(r.user) %}<input type="checkbox" class="delsel" value="{{ r.user.id }}" style="width:auto;">{% endif %}</td><td class="ro">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ lock_badge(r.user) }}</td>
           <td class="ro">{{ r.pii.first_name if r.pii and r.pii.first_name else '' }}</td>
           <td class="ro muted">{{ r.pii.afm if r.pii and r.pii.afm else '—' }}</td>
-          <td><input name="f_agr_{{ uid }}" value="{{ '%.0f'|format(r.mgmt.agreement_amount) if r.mgmt and r.mgmt.agreement_amount else '' }}" style="text-align:right;"></td>
+          <td><input name="f_agr_{{ uid }}" value="{{ '%.0f'|format(r.profile.agreement_amount) if r.profile and r.profile.agreement_amount else '' }}" style="text-align:right;"></td>
           <td><input name="f_phone_{{ uid }}" value="{{ r.user.phone or '' }}"></td>
           <td><input name="f_email_{{ uid }}" value="{{ r.user.email or '' }}"></td>
           <td><input name="f_cc_{{ uid }}" value="{{ r.cost_center or '' }}"></td>
