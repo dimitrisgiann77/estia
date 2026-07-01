@@ -27,6 +27,7 @@ MENU_REG = [
     {'k': 'meas_data',    'label': 'Κονσόλα Μετρήσεων',    'short': 'Κονσόλα',    'icon': 'ti-table',           'url': '/dashboard/measurements/console', 'ws': 'operations', 'group': 'Συντήρηση'},
     {'k': 'surveys',      'label': 'Ερωτηματολόγια',      'icon': 'ti-clipboard-check',  'url': '/dashboard/surveys','ws': 'operations admin',    'group': 'Υποδοχή'},
     {'k': 'schedule',     'label': 'Πρόγραμμα Εργασίας',  'icon': 'ti-calendar-week',    'url': '/dashboard/schedule','ws': 'operations admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
+    {'k': 'staff_status', 'label': 'Κατάσταση Προσωπικού (ανά ξεν.)', 'short': 'Κατάσταση Προσ.', 'icon': 'ti-table',      'url': '/dashboard/schedule/staff_status','ws': 'admin',   'group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'evals',        'label': 'Αξιολόγηση προσωπικού','icon': 'ti-star',            'url': '/dashboard/evaluations','ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'org',          'label': 'Οργανόγραμμα',       'icon': 'ti-sitemap',         'url': '/dashboard/org',        'ws': 'operations admin','group': 'HR — Ανθρώπινο Δυναμικό'},
     {'k': 'whatsnew',     'label': 'Τι νέο',              'icon': 'ti-sparkles',         'url': '/dashboard/whatsnew','ws': 'operations admin',   'group': 'Ενημέρωση'},

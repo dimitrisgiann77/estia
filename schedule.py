@@ -2972,3 +2972,171 @@ def import_any(source, filename='', only_year=None, created_by=None):
         out['schedule'] = import_schedule_workbook(source, only_year=only_year, created_by=created_by)
     kind = '+'.join([k for k in ('registry', 'schedule') if out[k] is not None]) or 'unknown'
     return kind, out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v12.359 — Κονσόλα «Κατάσταση Προσωπικού ανά Ξενοδοχείο» (read-only grid + Excel)
+# Δυναμικό: grid ΚΑΙ excel διαβάζουν από PAYROLL_GRID_COLS (single source of truth).
+# Πηγές (read-only): EmploymentProfile · schedule.aggregate() · payroll.LegalNetImport · _hotel_short.
+# ══════════════════════════════════════════════════════════════════════════════
+STAFF_STATUS_YEAR   = 2026
+STAFF_STATUS_MONTHS = [1, 2, 3, 4, 5, 6]   # Ιαν→Ιουν
+
+# Ενιαίο μητρώο στηλών — άλλαξε label/src ΕΔΩ και ενημερώνονται grid + excel μαζί.
+# src = κλειδί μέσα στο dict του μηνιαίου cell (βλ. _staff_status_rows).
+PAYROLL_GRID_COLS = [
+    {'k': 'hotel', 'label': 'HOTEL CODE',     'src': 'hotel_code', 'kind': 'text'},
+    {'k': 'agree', 'label': 'ΠΟΣΟ ΣΥΜΦΩΝΙΑΣ',  'src': 'agreement',  'kind': 'money'},
+    {'k': 'day',   'label': 'ΗΜΕΡΟΜΙΣΘΙΟ',     'src': 'day_wage',   'kind': 'money'},
+    {'k': 'hour',  'label': 'ΩΡΟΜΙΣΘΙΟ',       'src': 'hour_wage',  'kind': 'money'},
+    {'k': 'extra', 'label': 'ΕΞΤΡΑ ΩΡΕΣ',      'src': 'extra',      'kind': 'num'},
+    {'k': 'work',  'label': 'ΕΡΓΑΣΙΜΕΣ',       'src': 'work',       'kind': 'int'},
+    {'k': 'repo',  'label': 'ΡΕΠΟ',            'src': 'repo',       'kind': 'int'},
+    {'k': 'net',   'label': 'ΚΑΘΑΡΟ ΠΛΗΡΩΤΕΟ',  'src': 'net',        'kind': 'money'},
+]
+
+def _staff_status_rows(year=None, months=None):
+    """Read-only γραμμές ανά (εργαζόμενος × ξενοδοχείο). Home hotel = Οργανόγραμμα (User.home_hotel_id).
+    Κάθε μήνας cell: hotel_code/agreement/day_wage/hour_wage/extra/work/repo/net.
+    «Καθαρό πληρωτέο» (LegalNetImport.net_legal) μπαίνει ΜΟΝΟ στη γραμμή του home hotel (δεν διπλομετριέται)."""
+    year = year or STAFF_STATUS_YEAR
+    months = months or STAFF_STATUS_MONTHS
+    try:
+        from payroll import _employees, LegalNetImport
+    except Exception:
+        _employees, LegalNetImport = None, None
+    if _employees:
+        emp_rows = _employees('active')
+    else:
+        emp_rows = [{'user': u, 'profile': EmploymentProfile.query.filter_by(user_id=u.id).first(),
+                     'hotel_id': getattr(u, 'home_hotel_id', None)}
+                    for u in User.query.filter((User.employment_active == True) | (User.employment_active.is_(None))).all()]
+    hotel_name = {h.id: h.name for h in Hotel.query.all()}
+    start = date(year, months[0], 1)
+    endm = months[-1]
+    end = date(year + (endm // 12), (endm % 12) + 1, 1)
+    uids = [r['user'].id for r in emp_rows]
+    shifts = []
+    if uids:
+        shifts = (ShiftAssignment.query
+                  .filter(ShiftAssignment.user_id.in_(uids),
+                          ShiftAssignment.work_date >= start,
+                          ShiftAssignment.work_date < end).all())
+    # (uid, work_hotel_id|None, month) -> [assignments]
+    by_uhm = {}
+    for a in shifts:
+        by_uhm.setdefault((a.user_id, a.work_hotel_id, a.work_date.month), []).append(a)
+    # (uid, μήνας) -> καθαρό λογιστηρίου (άθροισμα αν πολλές εγγραφές)
+    net_by_um = {}
+    if LegalNetImport and uids:
+        for li in (LegalNetImport.query
+                   .filter(LegalNetImport.year == year,
+                           LegalNetImport.month.in_(months),
+                           LegalNetImport.period_kind == 'monthly',
+                           LegalNetImport.user_id.in_(uids)).all()):
+            k = (li.user_id, li.month)
+            net_by_um[k] = round(net_by_um.get(k, 0.0) + (li.net_legal or 0.0), 2)
+    rows = []
+    for er in emp_rows:
+        u = er['user']; prof = er.get('profile')
+        home = er.get('hotel_id') or getattr(u, 'home_hotel_id', None)
+        agreement = round(prof.agreement_amount, 2) if (prof and prof.agreement_amount) else None
+        day_wage  = round(prof.day_wage, 2) if prof else None
+        hour_wage = round(prof.hour_wage, 2) if prof else None
+        hotels_worked = set()
+        for (uid, whid, mo) in by_uhm.keys():
+            if uid == u.id:
+                hotels_worked.add(whid if whid else home)
+        if home:
+            hotels_worked.add(home)
+        if not hotels_worked:
+            hotels_worked = {home}
+        ordered = ([home] if home in hotels_worked else []) + \
+                  sorted([h for h in hotels_worked if h != home], key=lambda x: (x or 0))
+        for hk in ordered:
+            is_home = (hk == home)
+            mcells = {}
+            any_data = False
+            for mo in months:
+                alist = []
+                for (uid, whid, m2), lst in by_uhm.items():
+                    if uid == u.id and m2 == mo and ((whid or home) == hk):
+                        alist += lst
+                agg = aggregate(alist, home) if alist else {'work_days': 0, 'repo': 0, 'extra_hours': 0.0}
+                net = net_by_um.get((u.id, mo)) if is_home else None
+                active = bool(alist) or (net is not None)
+                mcells[mo] = {
+                    'active': active,
+                    'hotel_code': (_hotel_short(hotel_name.get(hk, '')) if hk else '') if active else '',
+                    'agreement': agreement if active else None,
+                    'day_wage': day_wage if active else None,
+                    'hour_wage': hour_wage if active else None,
+                    'extra': (round(agg['extra_hours'], 2) or None) if active else None,
+                    'work': (agg['work_days'] or None) if active else None,
+                    'repo': (agg['repo'] or None) if active else None,
+                    'net': net,
+                }
+                if active:
+                    any_data = True
+            if is_home or any_data:
+                rows.append({'user': u, 'hotel_id': hk, 'is_home': is_home,
+                             'hotel_code': _hotel_short(hotel_name.get(hk, '')) if hk else '',
+                             'name': u.full_name or u.username, 'months': mcells})
+    rows.sort(key=lambda r: (r['name'] or '', 0 if r['is_home'] else 1, r['hotel_code'] or ''))
+    return rows
+
+
+@app.route('/dashboard/schedule/staff_status')
+def schedule_staff_status():
+    if not _auth():
+        return redirect(url_for('login'))
+    if not is_admin():
+        return redirect(url_for('schedule_board'))
+    rows = _staff_status_rows()
+    return render_template('schedule_staff_status.html',
+        rows=rows, cols=PAYROLL_GRID_COLS, months=STAFF_STATUS_MONTHS,
+        month_el=MONTHS_EL, year=STAFF_STATUS_YEAR, is_admin=is_admin())
+
+
+@app.route('/dashboard/schedule/staff_status.xlsx')
+def schedule_staff_status_xlsx():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    rows = _staff_status_rows()
+    import openpyxl, io
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    cols = PAYROLL_GRID_COLS; ncol = len(cols)
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Προσωπικό'
+    navy = PatternFill('solid', fgColor='193847'); grey = PatternFill('solid', fgColor='334155')
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    ws.cell(row=1, column=1, value='Ονοματεπώνυμο')
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    a1 = ws.cell(row=1, column=1); a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy; a1.alignment = center
+    c = 2
+    for mo in STAFF_STATUS_MONTHS:
+        ws.merge_cells(start_row=1, start_column=c, end_row=1, end_column=c + ncol - 1)
+        mc = ws.cell(row=1, column=c, value=MONTHS_EL[mo].upper())
+        mc.font = Font(bold=True, color='FFFFFF'); mc.fill = navy; mc.alignment = center
+        for j, col in enumerate(cols):
+            hc = ws.cell(row=2, column=c + j, value=col['label'])
+            hc.font = Font(bold=True, color='FFFFFF'); hc.fill = grey; hc.alignment = center
+        c += ncol
+    r = 3
+    for row in rows:
+        ws.cell(row=r, column=1, value=row['name'])
+        c = 2
+        for mo in STAFF_STATUS_MONTHS:
+            cell = row['months'][mo]
+            for j, col in enumerate(cols):
+                ws.cell(row=r, column=c + j, value=cell.get(col['src']))
+            c += ncol
+        r += 1
+    ws.freeze_panes = 'B3'
+    ws.column_dimensions['A'].width = 26
+    for i in range(2, 2 + ncol * len(STAFF_STATUS_MONTHS)):
+        ws.column_dimensions[get_column_letter(i)].width = 12
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    return Response(bio.read(),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=staff_status_%d.xlsx' % STAFF_STATUS_YEAR})

@@ -1,0 +1,54 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Κατάσταση Προσωπικού ανά Ξενοδοχείο', theme.primary) }}
+<style>
+  .ssywrap{overflow:auto;max-height:calc(100vh - 190px);border:1px solid #e3e9ef;border-radius:12px;}
+  table.ssy{border-collapse:separate;border-spacing:0;font-size:12px;white-space:nowrap;}
+  table.ssy th,table.ssy td{border-right:1px solid #eef2f6;border-bottom:1px solid #eef2f6;padding:5px 8px;text-align:center;}
+  table.ssy thead th{position:sticky;top:0;z-index:3;background:#193847;color:#fff;font-weight:600;}
+  table.ssy thead tr.mrow th{background:#0f2a36;border-bottom:2px solid #caa64a;letter-spacing:.4px;}
+  table.ssy thead tr.crow th{top:31px;background:#334155;font-size:11px;}
+  table.ssy .nameh{position:sticky;left:0;z-index:5;background:#193847;text-align:left;min-width:210px;}
+  table.ssy td.name{position:sticky;left:0;z-index:2;background:#fff;text-align:left;font-weight:600;color:#193847;border-right:2px solid #caa64a;}
+  table.ssy tbody tr:nth-child(even) td.name{background:#f7f9fb;}
+  table.ssy tbody tr:hover td{background:#fff7e6;}
+  table.ssy td.money{text-align:right;font-variant-numeric:tabular-nums;}
+  table.ssy td.hotel{font-weight:700;color:#0f2a36;}
+  table.ssy .mstart{border-left:2px solid #caa64a;}
+  .ssnote{color:#64748b;font-size:12px;margin:6px 2px 12px;}
+</style></head><body>
+{{ mp.topbar('table', 'ΕΣΤΙΑ — Κατάσταση Προσωπικού ανά Ξενοδοχείο', rows|length ~ ' γραμμές · ' ~ year) }}
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+    <div class="ssnote">Καθαρό πληρωτέο = καθαρό Λογιστηρίου (Epsilon), στη γραμμή του ξενοδοχείου του Οργανογράμματος. Δεύτερη γραμμή = δανεικός σε άλλο ξενοδοχείο.</div>
+    <a class="btn" style="padding:8px 13px;border:1px solid #caa64a;border-radius:9px;text-decoration:none;color:#193847;background:#fff;font-weight:600;"
+       href="/dashboard/schedule/staff_status.xlsx"><i class="ti ti-file-spreadsheet"></i> Export Excel</a>
+  </div>
+  <div class="ssywrap"><table class="ssy">
+    {% set ncol = cols|length %}
+    <thead>
+      <tr class="mrow">
+        <th class="nameh" rowspan="2">Ονοματεπώνυμο</th>
+        {% for mo in months %}<th class="mstart" colspan="{{ ncol }}">{{ month_el[mo]|upper }}</th>{% endfor %}
+      </tr>
+      <tr class="crow">
+        {% for mo in months %}{% for c in cols %}<th class="{{ 'mstart' if loop.first else '' }}">{{ c.label }}</th>{% endfor %}{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="name">{{ r.name }}{% if not r.is_home %} <span style="color:#caa64a;font-weight:500;">· {{ r.hotel_code }}</span>{% endif %}</td>
+        {% for mo in months %}{% set m = r.months[mo] %}{% for c in cols %}
+          {%- set v = m[c.src] -%}
+          <td class="{{ 'mstart ' if loop.first else '' }}{{ 'money' if c.kind in ('money','num') else ('hotel' if c.kind=='text' else '') }}">
+            {%- if v is none or v == '' -%}{%- elif c.kind in ('money','num') -%}{{ '%.2f'|format(v) }}{%- else -%}{{ v }}{%- endif -%}
+          </td>
+        {% endfor %}{% endfor %}
+      </tr>
+    {% else %}
+      <tr><td class="name" colspan="{{ 1 + ncol*months|length }}" style="text-align:center;color:#94a3b8;padding:20px;">Καμία εγγραφή.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+</body></html>
