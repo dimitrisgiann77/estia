@@ -101,18 +101,18 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
     {% for g in data.groups %}
       <div class="hotelhead">🏨 {{ g.hotel.name if g.hotel else '— (χωρίς ξενοδοχείο)' }} <span style="font-size:13px;color:#64748b;font-weight:400;">· {{ g.subtotal.count }} άτομα</span></div>
       <div class="scroll"><table>
-        <thead><tr><th class="name" style="text-align:left;">Εργαζόμενος</th><th>Τμήμα</th><th>Ώρες</th><th>Έξτρα ώρες</th><th>Κυριακές</th><th>Εργάσιμες</th><th>Ρεπό</th><th>Πληρωτέο*</th></tr></thead>
+        <thead><tr><th class="name" style="text-align:left;">Εργαζόμενος</th><th>Τμήμα</th><th>Ώρες</th><th>Έξτρα ώρες</th><th>Κυριακές</th><th>Εργάσιμες</th><th>Ρεπό</th><th>Δουλ. ρεπό</th><th>Πληρωτέο*</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
           <tr><td class="name">{{ x.user.full_name }}{% if x.locked %}<span class="tag lock">🔒 {{ x.emp_code or 'Λογ.' }}</span>{% elif x.emp_code %}<span class="tag mgmt">{{ x.emp_code }}</span>{% else %}<span class="tag mgmt">Mgmt</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</td>
             <td>{{ deptmap.get(x.user.department_id,'') }}</td>
             <td>{{ x.hours }}</td><td>{{ x.extra }}</td><td>{{ x.sundays }}</td>
-            <td>{{ x.work_days }}</td><td>{{ x.repo }}</td>
+            <td>{{ x.work_days }}</td><td>{{ x.repo }}</td><td>{{ x.worked_repo or '—' }}</td>
             <td>{{ '%.2f'|format(x.payable) if x.payable else '—' }}</td></tr>
         {% endfor %}
           <tr class="sub"><td class="name">Σύνολο</td><td></td>
             <td>{{ g.subtotal.hours }}</td><td>{{ g.subtotal.extra }}</td><td>{{ g.subtotal.sundays }}</td>
-            <td>{{ g.subtotal.work_days }}</td><td>{{ g.subtotal.repo }}</td>
+            <td>{{ g.subtotal.work_days }}</td><td>{{ g.subtotal.repo }}</td><td>{{ g.subtotal.worked_repo or '—' }}</td>
             <td>{{ '%.2f'|format(g.subtotal.payable) if g.subtotal.payable else '—' }}</td></tr>
         </tbody>
       </table></div>
@@ -127,7 +127,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
       <div class="scroll"><table class="gtable">
         <thead><tr><th class="name" style="text-align:left;position:sticky;left:0;background:#f1f5f9;">Εργαζόμενος</th>
           {% for dh in day_hdr %}<th class="day {{ 'hol' if dh.hol else ('we' if dh.we) }}">{{ dh.d }}<br>{{ dh.wd }}</th>{% endfor %}
-          <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th></tr></thead>
+          <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th><th title="Δουλεμένο ρεπό">ΔΡ</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
           <tr><td class="name" style="position:sticky;left:0;background:var(--card,#fff);"><div class="nm">{{ x.user.full_name }}</div>{% if x.emp_code or x.afm %}<div class="nmeta">{% if x.emp_code %}<span class="tag {{ 'lock' if x.locked else 'mgmt' }}">#{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</div>{% endif %}</td>
@@ -140,7 +140,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
               </td>
             {% endfor %}
             <td class="tot">{{ x.hours }}</td><td class="tot">{{ x.extra }}</td><td class="tot">{{ x.sundays }}</td>
-            <td class="tot">{{ x.work_days }}</td><td class="tot">{{ x.repo }}</td></tr>
+            <td class="tot">{{ x.work_days }}</td><td class="tot">{{ x.repo }}</td><td class="tot">{{ x.worked_repo or '' }}</td></tr>
         {% endfor %}
         </tbody>
       </table></div>
@@ -156,6 +156,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
     <span>Κυριακές: {{ data.grand.sundays }}</span>
     <span>Εργάσιμες: {{ data.grand.work_days }}</span>
     <span>Ρεπό: {{ data.grand.repo }}</span>
+    <span>Δουλ. ρεπό: {{ data.grand.worked_repo }}</span>
     <span>Άτομα: {{ data.grand.count }}</span>
   </div>
   {% endif %}

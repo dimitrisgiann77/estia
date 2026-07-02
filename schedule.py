@@ -492,7 +492,7 @@ def _schedule_return_context(uid, wd, this_hotel_id):
 def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
     hol = {h.hol_date for h in Holiday.query.all()}
-    work = repo = sundays = hol_worked = elsewhere = 0
+    work = repo = sundays = hol_worked = elsewhere = worked_repo = 0
     extra = 0.0
     for a in assignments:
         code = a.shift_code
@@ -500,6 +500,8 @@ def aggregate(assignments, home_hotel_id=None):
             extra += worked_hours(a)
         elif is_work_code(code):
             work += 1
+            if code == 'ΔΡ':          # v12.376 — δηλωμένο ρεπό που εργάστηκε (μετρά εργάσιμη ΚΑΙ ως δουλ. ρεπό)
+                worked_repo += 1
             if a.work_date.weekday() == 6:
                 sundays += 1
             if a.work_date in hol:
@@ -510,7 +512,7 @@ def aggregate(assignments, home_hotel_id=None):
             repo += 1
     return {'work_days': work, 'repo': repo, 'sundays': sundays,
             'holidays_worked': hol_worked, 'extra_hours': round(extra, 2),
-            'elsewhere_days': elsewhere, 'total_days': work}
+            'elsewhere_days': elsewhere, 'total_days': work, 'worked_repo': worked_repo}
 
 def monthly_settlement(year, month, hotel_id=None):
     """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα."""
@@ -1694,12 +1696,12 @@ def schedule_export():
     data = monthly_settlement(year, month, hotel_id)
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ'
     ws.append(['Ονοματεπώνυμο', 'Μήνας', 'Καθημερινές εργάσιμες', 'Κυριακές', 'Αργίες',
-               'Έξτρα ώρες', 'Ρεπό', 'Μέρες αλλού', 'Σύνολο ημερών', 'Πληρωτέο συμφωνίας'])
+               'Έξτρα ώρες', 'Ρεπό', 'Δουλ. ρεπό', 'Μέρες αλλού', 'Σύνολο ημερών', 'Πληρωτέο συμφωνίας'])
     mname = MONTHS_EL[month]
     for r in data:
         a = r['agg']
         ws.append([r['user'].full_name, mname, a['work_days'], a['sundays'], a['holidays_worked'],
-                   a['extra_hours'], a['repo'], a['elsewhere_days'], a['total_days'], r['payable']])
+                   a['extra_hours'], a['repo'], a.get('worked_repo', 0), a['elsewhere_days'], a['total_days'], r['payable']])
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     fn = f'PROS_LOGISTIRIO_{year}_{month:02d}.xlsx'
     return Response(bio.read(),
@@ -1740,7 +1742,7 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
             continue
         days = {}
         hours = extra = 0.0
-        _wd = set(); _sun = set(); _hol = set(); _repo = set()
+        _wd = set(); _sun = set(); _hol = set(); _repo = set(); _wrepo = set()
         for a in alist:
             dd = days.setdefault(a.work_date.day, {'entries': [], 'code': '', 'wh': None, 'segs': '[]'})
             try:
@@ -1760,13 +1762,15 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
             elif is_work_code(a.shift_code):
                 hours += worked_hours(a)
                 _wd.add(a.work_date)
+                if a.shift_code == 'ΔΡ':      # v12.376 — δουλεμένο ρεπό
+                    _wrepo.add(a.work_date)
                 if a.work_date.weekday() == 6:
                     _sun.add(a.work_date)
                 if a.work_date in hol:
                     _hol.add(a.work_date)
             elif is_repo_code(a.shift_code):
                 _repo.add(a.work_date)
-        sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol)
+        sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol); worked_repo = len(_wrepo)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
         payable = 0.0
         if prof and getattr(prof, 'agreement_amount', None):
@@ -1781,7 +1785,7 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                      'locked': (bool(_pp.locked) if _pp else False),
                      'hours': round(hours, 1), 'extra': round(extra, 1),
                      'sundays': sundays, 'holidays': hol_worked,
-                     'work_days': work_days, 'repo': repo, 'payable': payable})
+                     'work_days': work_days, 'repo': repo, 'worked_repo': worked_repo, 'payable': payable})
     rows.sort(key=lambda r: (r['user'].full_name or ''))
     hotels_by_id = {h.id: h for h in Hotel.query.all()}
     groups = {}
@@ -1794,6 +1798,7 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                 'holidays': sum(x['holidays'] for x in rs),
                 'work_days': sum(x['work_days'] for x in rs),
                 'repo': sum(x['repo'] for x in rs),
+                'worked_repo': sum(x['worked_repo'] for x in rs),
                 'payable': round(sum(x['payable'] for x in rs), 2),
                 'count': len(rs)}
     out = []
@@ -1904,8 +1909,8 @@ def schedule_monthly_pdf():
     pdf.set_x(30); pdf.set_font('dv', '', 10); pdf.set_text_color(*GREY)
     pdf.cell(0, 6, '%s %d · Εκτύπωση: %s' % (MONTHS_EL[month], year, date.today().strftime('%d/%m/%Y')), ln=1)
     pdf.ln(5)
-    headers = ['Ονοματεπώνυμο', 'Τμήμα', 'Ώρες', 'Έξτρα', 'Κυρ.', 'Εργάσ.', 'Ρεπό', 'Πληρωτέο']
-    widths = [82, 55, 24, 24, 20, 24, 18, 30]
+    headers = ['Ονοματεπώνυμο', 'Τμήμα', 'Ώρες', 'Έξτρα', 'Κυρ.', 'Εργάσ.', 'Ρεπό', 'Δ.ρεπό', 'Πληρωτέο']
+    widths = [70, 48, 24, 24, 20, 24, 18, 19, 30]
     def hdr():
         pdf.set_font('dv', 'B', 9); pdf.set_text_color(255, 255, 255); pdf.set_fill_color(*NAVY)
         for h, w in zip(headers, widths):
@@ -1921,7 +1926,8 @@ def schedule_monthly_pdf():
             pdf.set_fill_color(243, 247, 250) if fill else pdf.set_fill_color(255, 255, 255)
             pdf.set_font('dv', '', 8.5); pdf.set_text_color(40, 40, 40)
             vals = [x['user'].full_name, deptmap.get(getattr(x['user'], 'department_id', None), ''),
-                    x['hours'], x['extra'], x['sundays'], x['work_days'], x['repo'], x['payable']]
+                    x['hours'], x['extra'], x['sundays'], x['work_days'], x['repo'],
+                    (x['worked_repo'] or ''), x['payable']]
             for val, w in zip(vals, widths):
                 s = str(val)
                 while s and pdf.get_string_width(s) > w - 2 and len(s) > 3:
@@ -1930,7 +1936,8 @@ def schedule_monthly_pdf():
             pdf.ln(7); fill = not fill
         s = g['subtotal']
         pdf.set_font('dv', 'B', 9); pdf.set_text_color(*NAVY); pdf.set_fill_color(225, 235, 245)
-        sub = ['Σύνολο · %s' % hn, '', s['hours'], s['extra'], s['sundays'], s['work_days'], s['repo'], s['payable']]
+        sub = ['Σύνολο · %s' % hn, '', s['hours'], s['extra'], s['sundays'], s['work_days'], s['repo'],
+               (s['worked_repo'] or ''), s['payable']]
         for val, w in zip(sub, widths):
             ss = str(val)
             while ss and pdf.get_string_width(ss) > w - 2 and len(ss) > 3:
@@ -1939,8 +1946,8 @@ def schedule_monthly_pdf():
         pdf.ln(10)
     gd = data['grand']
     pdf.set_font('dv', 'B', 11); pdf.set_text_color(*NAVY)
-    pdf.cell(0, 8, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ: %s ώρες · %s έξτρα · %s Κυρ. · %s εργάσιμες · %s ρεπό · %s €'
-             % (gd['hours'], gd['extra'], gd['sundays'], gd['work_days'], gd['repo'], gd['payable']), ln=1)
+    pdf.cell(0, 8, 'ΓΕΝΙΚΟ ΣΥΝΟΛΟ: %s ώρες · %s έξτρα · %s Κυρ. · %s εργάσιμες · %s ρεπό · %s δουλ. ρεπό · %s €'
+             % (gd['hours'], gd['extra'], gd['sundays'], gd['work_days'], gd['repo'], gd['worked_repo'], gd['payable']), ln=1)
     out = bytes(pdf.output())
     fn = 'estia_monthly_%d_%02d.pdf' % (year, month)
     return Response(out, mimetype='application/pdf',
