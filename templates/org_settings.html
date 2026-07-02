@@ -71,6 +71,7 @@
 <div class="container">
   <p style="margin:0 0 14px;"><a href="/dashboard/org?embed=1" class="sbtn"><i class="ti ti-arrow-left"></i> Πίσω στο οργανόγραμμα</a></p>
 
+  <div id="settingswrap"><!-- v12.384 P-058 Φ4: fragment swap αντικαθιστά ΜΟΝΟ αυτό -->
   <div class="scard">
     <h3><i class="ti ti-sitemap"></i> Δέντρο ομάδων</h3>
     <p class="sub">Φτιάξε ομάδες και υποομάδες (απεριόριστο βάθος). Π.χ. F&B → Κουζίνες, Εστιατόρια/Μπαρ. Τα τμήματα τα βάζεις σε ομάδα από το ✎ του τμήματος στο οργανόγραμμα.</p>
@@ -103,6 +104,7 @@
     </div>
     {% else %}<div style="color:#94a3b8;font-size:12.5px;">— καμία θέση ακόμη· πάτησε «Δημιουργία από προσωπικό» —</div>{% endfor %}
   </div>
+  </div><!-- /settingswrap -->
 </div>
 
 <div class="omodal2" id="gsupModal"><div class="box2">
@@ -112,9 +114,10 @@
   <div class="obtns2"><button onclick="closeGroupSup()">Άκυρο</button><button class="pri" onclick="saveGroupSup()">Αποθήκευση</button></div>
 </div></div>
 
+<script src="/static/estia_swap.js?v={{ app_build }}"></script>
 <script>
 function _post(url,body){ return fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
-function _ok(j){ if(j&&j.ok){ location.reload(); } else { alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); } }
+function _ok(j){ if(j&&j.ok){ estiaSwap('settingswrap','initSettings'); } else { alert((j&&j.msg)||'Δεν αποθηκεύτηκε'); } }
 function addTopGroup(){ var n=prompt('Όνομα νέας ομάδας:'); if(!n)return; var c=prompt('Χρώμα (hex, π.χ. #7c3aed):','#64748b')||'#64748b'; _post('/dashboard/org/group/save',{name:n,color:c}).then(_ok); }
 function addSubGroup(pid){ var n=prompt('Όνομα νέας υποομάδας:'); if(!n)return; var c=prompt('Χρώμα (hex):','#64748b')||'#64748b'; _post('/dashboard/org/group/save',{name:n,color:c,parent_id:pid}).then(_ok); }
 function renameGroup(id,name,color){ var n=prompt('Όνομα ομάδας:', name||''); if(n===null)return; var c=prompt('Χρώμα (hex):', color||'#64748b')||color||'#64748b'; _post('/dashboard/org/group/save',{group_id:id,name:n,color:c}).then(_ok); }
@@ -122,7 +125,7 @@ function delGroup(id){ if(!confirm('Διαγραφή ομάδας; Οι υποο
 function newPos(){ var n=prompt('Όνομα νέας θέσης:'); if(!n)return; var c=prompt('Χρώμα (hex):','#64748b')||'#64748b'; _post('/dashboard/org/position/save',{name:n,color:c}).then(_ok); }
 function renamePos(id,name,color){ var n=prompt('Όνομα θέσης:', name||''); if(n===null)return; var c=prompt('Χρώμα (hex):', color||'#64748b')||color||'#64748b'; _post('/dashboard/org/position/save',{position_id:id,name:n,color:c}).then(_ok); }
 function delPos(id){ if(!confirm('Διαγραφή θέσης;'))return; _post('/dashboard/org/position/delete',{position_id:id}).then(_ok); }
-function setPosGroup(id,gid){ _post('/dashboard/org/position/save',{position_id:id,group_id:gid}).then(function(j){ if(!(j&&j.ok)) alert('Δεν αποθηκεύτηκε'); else location.reload(); }); }
+function setPosGroup(id,gid){ _post('/dashboard/org/position/save',{position_id:id,group_id:gid}).then(function(j){ if(!(j&&j.ok)) alert('Δεν αποθηκεύτηκε'); else estiaSwap('settingswrap','initSettings'); }); }
 var CANDIDATES = {{ candidates|tojson }};
 var CURSUP = {{ cursup|tojson }};
 var gsupGid=null;
@@ -133,17 +136,22 @@ function setGroupSup(gid,name){ gsupGid=gid; document.getElementById('gsupTitle'
 function closeGroupSup(){ document.getElementById('gsupModal').style.display='none'; }
 function saveGroupSup(){ _post('/dashboard/org/group/supervisor',{group_id:gsupGid, user_id:document.getElementById('gsupSel').value}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); }); }
 document.getElementById('gsupModal').addEventListener('click', function(e){ if(e.target===this) closeGroupSup(); });
-function seedPos(){ if(!confirm('Δημιουργία θέσεων από τις θέσεις του προσωπικού;'))return; _post('/dashboard/org/positions/seed',{}).then(function(j){ if(j&&j.ok){ alert('Δημιουργήθηκαν '+j.created+' νέες θέσεις.'); location.reload(); } else alert('Δεν έγινε'); }); }
+function seedPos(){ if(!confirm('Δημιουργία θέσεων από τις θέσεις του προσωπικού;'))return; _post('/dashboard/org/positions/seed',{}).then(function(j){ if(j&&j.ok){ alert('Δημιουργήθηκαν '+j.created+' νέες θέσεις.'); estiaSwap('settingswrap','initSettings'); } else alert('Δεν έγινε'); }); }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>
-if(window.Sortable){ document.querySelectorAll('.gchildren').forEach(function(box){
-  Sortable.create(box, {group:'gtree', handle:'.ggrip', draggable:'.gwrap', animation:140, fallbackOnBody:true, swapThreshold:0.6,
-    onEnd:function(evt){
-      var gid=evt.item.getAttribute('data-id'); var box=evt.to; var parent=box.getAttribute('data-parent');
-      var order=[]; box.querySelectorAll(':scope > .gwrap').forEach(function(w){ order.push(w.getAttribute('data-id')); });
-      _post('/dashboard/org/group/move',{group_id:gid, parent_id:(parent==='0'?'':parent), order:order}).then(function(j){ if(!(j&&j.ok)){ alert((j&&j.msg)||'Δεν έγινε'); location.reload(); } });
-    }});
-}); }
+function initSettings(){   // v12.384 P-058 Φ4 — Sortable re-init στο load & μετά από κάθε fragment swap (idempotent)
+  if(!window.Sortable) return;
+  document.querySelectorAll('#settingswrap .gchildren').forEach(function(box){
+    if(box._sorted) return; box._sorted=true;
+    Sortable.create(box, {group:'gtree', handle:'.ggrip', draggable:'.gwrap', animation:140, fallbackOnBody:true, swapThreshold:0.6,
+      onEnd:function(evt){
+        var gid=evt.item.getAttribute('data-id'); var box=evt.to; var parent=box.getAttribute('data-parent');
+        var order=[]; box.querySelectorAll(':scope > .gwrap').forEach(function(w){ order.push(w.getAttribute('data-id')); });
+        _post('/dashboard/org/group/move',{group_id:gid, parent_id:(parent==='0'?'':parent), order:order}).then(function(j){ if(!(j&&j.ok)){ alert((j&&j.msg)||'Δεν έγινε'); location.reload(); } });
+      }});
+  });
+}
+initSettings();
 </script>
 </body></html>
