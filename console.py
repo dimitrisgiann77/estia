@@ -88,13 +88,19 @@ def _pending_items():
     items.sort(key=lambda x: (-x['count'], x['raw'] or ''))
     return items
 
-def _dup_rows():
+def _dup_rows(pairs=None):
     try:
-        from payroll import _dup_pairs, _net_summary
+        from payroll import _dup_pairs, _net_summary_map
+        if pairs is None:
+            pairs = _dup_pairs()
+        uids = set()
+        for a, pa, b, pb, reason in pairs:
+            uids.add(a.id); uids.add(b.id)
+        nmap = _net_summary_map(uids)          # v12.385 (P-060) — batch αντί _net_summary ανά ζεύγος
         out = []
-        for a, pa, b, pb, reason in _dup_pairs():
+        for a, pa, b, pb, reason in pairs:
             out.append({'a': a, 'b': b, 'reason': reason,
-                        'a_sum': _net_summary(a.id), 'b_sum': _net_summary(b.id)})
+                        'a_sum': nmap.get(a.id), 'b_sum': nmap.get(b.id)})
         return out
     except Exception:
         return []
@@ -138,11 +144,12 @@ def people_console():
         pend = 0
     try:
         from payroll import _dup_pairs
-        dups = len(_dup_pairs())
+        _pairs = _dup_pairs()          # v12.385 (P-060) — ΜΙΑ φορά (πριν: 2× ανά φόρτωση)
     except Exception:
-        dups = 0
+        _pairs = []
+    dups = len(_pairs)
     pending_items = _pending_items()
-    dup_rows = _dup_rows()
+    dup_rows = _dup_rows(_pairs)
     conflicts = _org_conflicts()
     return render_template('people_console.html', rows=rows, counts=counts,
                            pend=pend, dups=dups, pending_items=pending_items,

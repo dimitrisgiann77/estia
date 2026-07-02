@@ -2177,9 +2177,17 @@ def _dup_pairs():
     """Ζεύγη πιθανών διπλών: ίδιο επώνυμο (ή ίδιο ΑΦΜ), ενεργά, μη-απορριφθέντα."""
     import people as PPL
     from collections import defaultdict
+    # v12.385 (P-060) — batch: users σε dict (αντί User.query.get ανά PII) + dismissed set (αντί is_dismissed ανά ζεύγος)
+    umap = {u.id: u for u in User.query.all()}
+    dismissed = set()
+    try:
+        for nd in PPL.NotDuplicate.query.filter_by(entity_type='employee').all():
+            dismissed.add((nd.a_id, nd.b_id))
+    except Exception:
+        dismissed = set()
     by_last = defaultdict(list); by_afm = defaultdict(list)
     for pii in EmployeePII.query.all():
-        u = User.query.get(pii.user_id)
+        u = umap.get(pii.user_id)
         if not u or u.employment_active is False:
             continue
         if pii.last_name:
@@ -2191,7 +2199,7 @@ def _dup_pairs():
     def add(a, pa, b, pb, reason):
         k = (min(a.id, b.id), max(a.id, b.id))
         if k in seen: return
-        if PPL.is_dismissed(a.id, b.id): return
+        if k in dismissed: return          # v12.385 (P-060) — batch αντί is_dismissed query/ζεύγος
         seen.add(k); pairs.append((a, pa, b, pb, reason))
     for afm, lst in by_afm.items():
         for i in range(len(lst)):
@@ -2205,7 +2213,7 @@ def _dup_pairs():
     # v12.126 — ονοματικα διπλα: κοινα tokens (επιθετο ΚΑΙ ονομα, ανεξαρτητως σειρας)
     try:
         tokmap = defaultdict(list); utok = {}
-        for u in User.query.filter(User.is_active == True).all():
+        for u in [uu for uu in umap.values() if uu.is_active]:
             if getattr(u, 'employment_active', True) is False:
                 continue
             toks = _name_tokens(u.full_name)
@@ -2241,6 +2249,30 @@ def _net_summary(uid):
     na = MgmtAssignment.query.filter_by(user_id=uid).count()
     return {'afm': (afm or '—'), 'code': (pii.emp_code if pii else None) or '—',
             'years': yrs, 'assignments': na}
+
+def _net_summary_map(uids):
+    """v12.385 (P-060) — batch net-summary για ΠΟΛΛΟΥΣ uids με 3 queries συνολικά
+    (αντί ~3 queries + _legal_net_map ΑΝΑ uid). Ίδιο σχήμα με _net_summary."""
+    uids = set(u for u in uids if u)
+    if not uids:
+        return {}
+    from sqlalchemy import func
+    pii_map = {p.user_id: p for p in EmployeePII.query.filter(EmployeePII.user_id.in_(uids)).all()}
+    legal = _legal_net_map()   # ΜΙΑ φορά (πριν: ανά _net_summary)
+    mcount = {}
+    for uid, n in (db.session.query(MgmtAssignment.user_id, func.count(MgmtAssignment.id))
+                   .filter(MgmtAssignment.user_id.in_(uids))
+                   .group_by(MgmtAssignment.user_id).all()):
+        mcount[uid] = n
+    out = {}
+    for uid in uids:
+        pii = pii_map.get(uid)
+        afm = str(pii.afm) if (pii and pii.afm) else None
+        nm = legal.get(afm, {}) if afm else {}
+        yrs = ', '.join('%s:%.0f' % (y, nm[y]['tot']) for y in sorted(nm)) if nm else '—'
+        out[uid] = {'afm': (afm or '—'), 'code': (pii.emp_code if pii else None) or '—',
+                    'years': yrs, 'assignments': mcount.get(uid, 0)}
+    return out
 
 @app.route('/dashboard/payroll/duplicates')
 def payroll_duplicates():
