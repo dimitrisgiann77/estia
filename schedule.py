@@ -30,6 +30,7 @@ HOTEL_NORM   = {'ΗΡΩ': 'IRO'}
 SHIFT_CODES = [
     # code,  label,                 color,     counts_as_work, note, ergani
     ('ΕΡΓ',   'Εργασία',             '#16a34a', True,  'έξτρα = διάρκεια − 8,5', 'WORK'),
+    ('ΔΡ',    'Δουλεμένο Ρεπό',      '#0d9488', True,  'δηλωμένο ρεπό που εργάστηκε — μετρά εργάσιμη', 'WORK'),
     ('ΑΝ',    'Ρεπό',                '#185FA5', False, 'ρεπό/εβδομάδα',          'OFF'),
     ('ΑΔ',    'Κανονική άδεια',      '#64748b', False, 'το βγάζει το λογιστήριο','LEAVE'),
     ('ΑΣΘ',   'Αναρρωτική',          '#0e9f6e', False, 'το βγάζει το λογιστήριο','SICK'),
@@ -350,10 +351,11 @@ def entry_shift_types(role=None):
 
 def _validate_work_code(code, segs):
     """v12.120 — ΕΡΓ = ΑΚΡΙΒΩΣ 8ω + 30' (8,5 παρουσία)· διαφορετικά → ΕΩ (Έξτρα Ώρες)."""
-    if code == 'ΕΡΓ':
+    if code in ('ΕΡΓ', 'ΔΡ'):
         pres = segments_hours(segs)
         if abs(pres - NORMAL_HOURS) > 0.001:
-            return (False, 'Ο κωδικός ΕΡΓ είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες χρησιμοποίησε τον κωδικό ΕΩ.')
+            _lbl = 'ΔΡ' if code == 'ΔΡ' else 'ΕΡΓ'
+            return (False, 'Ο κωδικός ' + _lbl + ' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες χρησιμοποίησε τον κωδικό ΕΩ.')
     if code == 'ΕΩ' and not segs:
         return (False, 'Ο κωδικός ΕΩ χρειάζεται ώρες — όρισε βάρδια.')
     return (True, '')
@@ -636,8 +638,8 @@ def seed_schedule():
             for i, (code, label, color, cw, note, erg) in enumerate(SHIFT_CODES):
                 db.session.add(ShiftType(code=code, label=label, color=color, counts_as_work=cw,
                                          payroll_note=note, ergani_type=erg, sort=i,
-                                         default_start='07:00' if code == 'ΕΡΓ' else None,
-                                         default_end='15:30' if code == 'ΕΡΓ' else None))
+                                         default_start='07:00' if code in ('ΕΡΓ', 'ΔΡ') else None,
+                                         default_end='15:30' if code in ('ΕΡΓ', 'ΔΡ') else None))
         # v12.120 — εξασφάλισε κωδικό ΕΩ (Έξτρα Ώρες) και σε υπάρχουσες βάσεις
         if not ShiftType.query.filter_by(code='ΕΩ').first():
             _erg = ShiftType.query.filter_by(code='ΕΡΓ').first()
@@ -645,6 +647,14 @@ def seed_schedule():
                 counts_as_work=True, payroll_note='ώρες ≠ 8,5 (πάνω/κάτω από ΕΡΓ)',
                 ergani_type='WORK', sort=((_erg.sort if _erg else 0) + 1),
                 default_start='07:00', default_end='17:00', active=True))
+        # v12.375 — εξασφάλισε κωδικό ΔΡ (Δουλεμένο Ρεπό) και σε υπάρχουσες βάσεις
+        if not ShiftType.query.filter_by(code='ΔΡ').first():
+            _erg = ShiftType.query.filter_by(code='ΕΡΓ').first()
+            db.session.add(ShiftType(code='ΔΡ', label='Δουλεμένο Ρεπό', color='#0d9488',
+                counts_as_work=True, payroll_note='δηλωμένο ρεπό που εργάστηκε — μετρά εργάσιμη',
+                ergani_type='WORK', sort=((_erg.sort if _erg else 0) + 1),
+                count_as='work', break_deduct=True,
+                default_start='07:00', default_end='15:30', active=True))
         # Departments
         if not Department.query.first():
             for i, (name, en, color, aliases) in enumerate(DEPARTMENTS):
@@ -1226,11 +1236,11 @@ def schedule_cell():
             db.session.delete(a); db.session.commit()
         return jsonify(ok=True, deleted=True)
     # προεπιλεγμένες ώρες αν ΕΡΓ χωρίς segments
-    if code == 'ΕΡΓ' and not segs:
-        st = ShiftType.query.filter_by(code='ΕΡΓ').first()
+    if code in ('ΕΡΓ', 'ΔΡ') and not segs:
+        st = ShiftType.query.filter_by(code=code).first()
         if st and st.default_start and st.default_end:
             segs = [{'start': st.default_start, 'end': st.default_end}]
-    if code in ('ΕΡΓ', 'ΕΩ'):
+    if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ'):
         _ok, _msg = _validate_work_code(code, segs)
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
@@ -1288,11 +1298,11 @@ def schedule_cells_bulk():
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     _whid = d.get('work_hotel_id'); _whid = int(_whid) if _whid else None
-    if code == 'ΕΡΓ' and not segs:
-        st = ShiftType.query.filter_by(code='ΕΡΓ').first()
+    if code in ('ΕΡΓ', 'ΔΡ') and not segs:
+        st = ShiftType.query.filter_by(code=code).first()
         if st and st.default_start and st.default_end:
             segs = [{'start': st.default_start, 'end': st.default_end}]
-    if code in ('ΕΡΓ', 'ΕΩ'):
+    if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ'):
         _ok, _msg = _validate_work_code(code, segs)
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
@@ -1344,11 +1354,11 @@ def schedule_day():
             continue
         segs = e.get('segments') or []
         whid = e.get('work_hotel_id'); whid = int(whid) if whid else None
-        if code == 'ΕΡΓ' and not segs:
+        if code in ('ΕΡΓ', 'ΔΡ') and not segs:
             st = ShiftType.query.filter_by(code='ΕΡΓ').first()
             if st and st.default_start and st.default_end:
                 segs = [{'start': st.default_start, 'end': st.default_end}]
-        if code in ('ΕΡΓ', 'ΕΩ'):
+        if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ'):
             ok, msg = _validate_work_code(code, segs)
             if not ok:
                 return jsonify(ok=False, err='invalid', msg=msg), 400
@@ -1390,7 +1400,7 @@ def schedule_paste_cells():
             continue
         segs = e.get('segments') or e.get('segs') or []
         whid = e.get('work_hotel_id') or e.get('wh'); whid = int(whid) if whid else None
-        if code in ('ΕΡΓ', 'ΕΩ'):
+        if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ'):
             ok, msg = _validate_work_code(code, segs)
             if not ok:
                 return jsonify(ok=False, err='invalid', msg=msg), 400
