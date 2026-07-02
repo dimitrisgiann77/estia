@@ -299,18 +299,28 @@ def _employees(status='active'):
         _pname = {p.id: p.name for p in _JP.query.all()}
     except Exception:
         _dname, _pname = {}, {}
+    # v12.386 (P-060 δευτ.) — batch prefetch αντί για queries ΑΝΑ χρήστη (ωφελεί payroll grid + staff_status)
+    _profs = {p.user_id: p for p in EmploymentProfile.query.all()} if EmploymentProfile else {}
+    _piis  = {p.user_id: p for p in EmployeePII.query.all()}
+    _hotels = {h.id: h for h in Hotel.query.all()}
+    _comps = {c.id: c for c in Company.query.all()}
+    _ma_map = {}   # τρέχουσα MgmtAssignment ανά χρήστη (valid_to=None προτεραιότητα, μετά μεγαλύτερο id)
+    for _a in MgmtAssignment.query.order_by(MgmtAssignment.id.asc()).all():
+        _prev = _ma_map.get(_a.user_id)
+        if _prev is None or (0 if _a.valid_to else 1, _a.id) >= (0 if _prev.valid_to else 1, _prev.id):
+            _ma_map[_a.user_id] = _a
     out = []
     for u in users:
-        prof = EmploymentProfile.query.filter_by(user_id=u.id).first() if EmploymentProfile else None
-        pii = EmployeePII.query.filter_by(user_id=u.id).first()
+        prof = _profs.get(u.id)
+        pii = _piis.get(u.id)
         has_hr = bool(prof or pii or getattr(u, 'home_hotel_id', None) or getattr(u, 'department_id', None))
         if not has_hr:
             continue
         hid = getattr(u, 'home_hotel_id', None)
-        comp = _company_for_hotel(hid)
-        hotel = Hotel.query.get(hid) if hid else None
+        hotel = _hotels.get(hid) if hid else None
+        comp = _comps.get(hotel.company_id) if (hotel and getattr(hotel, 'company_id', None)) else None
         cc = pii.cost_center if (pii and pii.cost_center) else None
-        ma = current_assignment(u.id)
+        ma = _ma_map.get(u.id)
         out.append({'user': u, 'profile': prof, 'pii': pii, 'company': comp,
                     'hotel_name': (hotel.name if hotel else ''), 'hotel_id': hid,
                     'dept_id': getattr(u, 'department_id', None), 'mgmt': ma,

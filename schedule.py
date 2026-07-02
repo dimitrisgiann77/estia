@@ -318,11 +318,42 @@ BREAK_HOURS = 0.5
 BREAK_MIN_PRESENCE = 6.0
 def shift_break(presence):
     return BREAK_HOURS if (presence and presence >= BREAK_MIN_PRESENCE) else 0.0
+
+# v12.386 (P-060 δευτ.) — request-scoped cache: ShiftType-by-code + Holidays υπολογίζονται ΜΙΑ φορά
+# ανά request (αντί query ανά βάρδια/aggregate). Εκτός request context → fallback (ίδια συμπεριφορά).
+def _req_cache():
+    try:
+        from flask import g, has_request_context
+        if not has_request_context():
+            return None
+        c = getattr(g, '_estia_c', None)
+        if c is None:
+            c = {}; g._estia_c = c
+        return c
+    except Exception:
+        return None
+def _st_map():
+    c = _req_cache()
+    if c is not None:
+        m = c.get('stmap')
+        if m is None:
+            m = {s.code: s for s in ShiftType.query.all()}; c['stmap'] = m
+        return m
+    return {s.code: s for s in ShiftType.query.all()}
+def _holidays():
+    c = _req_cache()
+    if c is not None:
+        h = c.get('hol')
+        if h is None:
+            h = {x.hol_date for x in Holiday.query.all()}; c['hol'] = h
+        return h
+    return {x.hol_date for x in Holiday.query.all()}
+
 def worked_hours(a):
     """Πληρωτέες ώρες = παρουσία − διάλειμμα. Το διάλειμμα (30' αν ≥6ω) εφαρμόζεται
     ΑΝΑ ΚΩΔΙΚΟ (ShiftType.break_deduct, παραμετροποιήσιμο στις Ρυθμίσεις)."""
     p = assignment_hours(a)
-    _st = ShiftType.query.filter_by(code=a.shift_code).first()
+    _st = _st_map().get(a.shift_code)
     _bd = _st.break_deduct if (_st and _st.break_deduct is not None) else (a.shift_code in ('ΕΡΓ', 'ΕΩ'))
     brk = BREAK_HOURS if (_bd and p and p >= BREAK_MIN_PRESENCE) else 0.0
     return round(max(0.0, p - brk), 4)
@@ -399,7 +430,7 @@ def assignment_hours(a):
 def _shift_count_as(code):
     """v12.207 — Κατηγορία μέτρησης κωδικού (data-driven από ShiftType.count_as).
     work=εργάσιμη · extra=έξτρα ώρες · repo=ρεπό · absence=άδεια/απουσία."""
-    st = ShiftType.query.filter_by(code=code).first()
+    st = _st_map().get(code)
     if st and st.count_as:
         return st.count_as
     if code == 'ΕΡΓ': return 'work'
@@ -491,7 +522,7 @@ def _schedule_return_context(uid, wd, this_hotel_id):
 
 def aggregate(assignments, home_hotel_id=None):
     """Σύνολα από λίστα ShiftAssignment: work_days, repo, sundays, holidays_worked, extra, elsewhere."""
-    hol = {h.hol_date for h in Holiday.query.all()}
+    hol = _holidays()
     work = repo = sundays = hol_worked = elsewhere = worked_repo = 0
     extra = 0.0
     for a in assignments:
