@@ -2027,16 +2027,33 @@ def payroll_merge(uid):
     other = User.query.get(other_id) if other_id else None
     if not other or other.id == keep.id:
         return redirect(url_for('payroll_employee', uid=uid) + '?embed=1')
+    moved_mgmt = 0
     for a in MgmtAssignment.query.filter_by(user_id=other.id).all():
-        a.user_id = keep.id
+        a.user_id = keep.id; moved_mgmt += 1
+    moved_legal = 0
     for li in LegalNetImport.query.filter_by(user_id=other.id).all():
-        li.user_id = keep.id
+        li.user_id = keep.id; moved_legal += 1
     pk = EmployeePII.query.filter_by(user_id=keep.id).first()
     po = EmployeePII.query.filter_by(user_id=other.id).first()
     if pk and po:
         for fld in ('afm','amka','ika_am','father_name','bank_name','bank_iban','emp_code'):
             if not getattr(pk, fld, None) and getattr(po, fld, None):
                 setattr(pk, fld, getattr(po, fld))
+    # v12.370 (P-050 β3) — ΜΕΤΑΦΟΡΑ/ΣΥΓΧΩΝΕΥΣΗ EmploymentProfile (πηγή μισθού — έλειπε από το merge!)
+    ep_other_agr = None
+    if EmploymentProfile is not None:
+        epk = EmploymentProfile.query.filter_by(user_id=keep.id).first()
+        epo = EmploymentProfile.query.filter_by(user_id=other.id).first()
+        if epo:
+            ep_other_agr = epo.agreement_amount
+            if epk is None:
+                epo.user_id = keep.id     # μετακίνηση (keep δεν έχει — user_id unique)
+            else:
+                if not epk.agreement_amount and epo.agreement_amount:
+                    epk.agreement_amount = epo.agreement_amount
+                for fld in ('days_per_month', 'hours_per_day', 'agreement_type', 'position', 'hired_at', 'left_at'):
+                    if not getattr(epk, fld, None) and getattr(epo, fld, None):
+                        setattr(epk, fld, getattr(epo, fld))
     # v12.106 — μετάφερε ΚΑΙ τις βάρδιες στον keep (διπλή μέρα: κρατάμε του keep)
     moved_sh = 0
     try:
@@ -2049,13 +2066,25 @@ def payroll_merge(uid):
                 a.user_id = keep.id; _kd.add(a.work_date); moved_sh += 1
     except Exception:
         pass
+    # v12.370 (P-050 β3) — RE-PARENT ιστορικού other -> keep (η καρτέλα keep κρατά ΟΛΗ την ιστορία ενεργειών)
+    try:
+        PPL.ProfileEvent.query.filter_by(entity_type='employee', entity_id=other.id)\
+            .update({'entity_id': keep.id}, synchronize_session=False)
+    except Exception:
+        pass
     other.employment_active = False; other.login_enabled = False
     PPL.clear_flags(other.id)
     PPL.clear_flags(keep.id, 'possible_dup')
-    PPL.log_event(keep.id,'merge','Συγχώνευση: «%s» (#%d) -> σε αυτό το προφίλ' % (other.full_name or other.username, other.id))
-    PPL.log_event(other.id,'merge','Συγχωνεύτηκε στο «%s» (#%d) - αρχειοθετήθηκε' % (keep.full_name or keep.username, keep.id))
+    # v12.370 — SNAPSHOT της συγχωνευμένης καρτέλας (audit — μηδέν σιωπηλή απώλεια)
+    snap = ('Συγχωνεύτηκε καρτέλα «%s» (#%d): ΑΦΜ %s · συμφωνία %s · βάρδιες +%d · μισθ.Λογιστ. %d · αναθέσεις %d'
+            % (other.full_name or other.username, other.id,
+               (po.afm if po and po.afm else '—'),
+               (('%.0f€' % ep_other_agr) if ep_other_agr else '—'),
+               moved_sh, moved_legal, moved_mgmt))
+    PPL.log_event(keep.id, 'merge', snap)
+    PPL.log_event(other.id, 'merge', 'Συγχωνεύτηκε στο «%s» (#%d) — αρχειοθετήθηκε' % (keep.full_name or keep.username, keep.id))
     db.session.commit()
-    log_activity('payroll_merge', '%s -> %s (βάρδιες %d)' % (other.id, keep.id, moved_sh))
+    log_activity('payroll_merge', '%s -> %s (βάρδιες %d, ιστορικό re-parented)' % (other.id, keep.id, moved_sh))
     back = request.form.get('back')
     if back:
         return redirect(back + ('&embed=1' if '?' in back else '?embed=1'))
@@ -2358,6 +2387,15 @@ def payroll_account_audit():
         if len(ms) > 1 and any(m['login_off'] for m in ms) and any(not m['login_off'] for m in ms):
             add_group(ms, 'ίδιο όνομα (λογαριασμός ↔ προσωπικό)')
     dup_groups.sort(key=lambda g: (not g['reason'].startswith('ΑΦΜ'), -len(g['members'])))
+    # v12.370 (Φ2) — για ζεύγη (2 μέλη): προτεινόμενο keep = προσωπικό/κλειδωμένο ή με ΑΦΜ (inline merge)
+    for g in dup_groups:
+        ms = g['members']
+        if len(ms) == 2:
+            keep = next((m for m in ms if m['login_off']), None) or next((m for m in ms if m['afm']), None) or ms[0]
+            other = ms[1] if ms[0] is keep else ms[0]
+            g['keep_id'] = keep['u'].id; g['other_id'] = other['u'].id
+            g['keep_name'] = keep['u'].full_name or keep['u'].username
+            g['other_name'] = other['u'].full_name or other['u'].username
     log_activity('payroll_account_audit', '%d clean / %d dup' % (len(clean_accounts), len(dup_groups)))
     return render_template('payroll_account_audit.html', n_users=len(users),
         n_hr=len(clean_accounts) + n_real, clean_accounts=clean_accounts,

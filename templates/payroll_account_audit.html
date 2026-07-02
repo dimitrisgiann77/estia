@@ -1,5 +1,5 @@
 {% import '_monitoring.html' as mp %}
-<!DOCTYPE html><html lang="el"><head>{{ mp.head('Έλεγχος λογαριασμών & διπλότυπων', theme.primary) }}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Έλεγχος & καθαρισμός προσωπικού', theme.primary) }}
 <style>
  .container{ max-width:1120px; }
  .note{ background:#f7fbff; border:1px solid #e0f0ff; border-radius:10px; padding:12px 14px; font-size:13px; color:#475569; margin-bottom:16px; }
@@ -18,10 +18,16 @@
  .dupcard .rsn{ font-size:11px; font-weight:700; color:#b91c1c; background:#fef2f2; border-radius:20px; padding:2px 10px; display:inline-block; margin-bottom:9px; }
  .mrow{ display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px dashed #f0e0e0; flex-wrap:wrap; }
  .mrow:first-of-type{ border-top:none; }
+ .mergebar{ display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid #f0e0e0; }
+ .mergebar form{ margin:0; }
+ .mbtn{ background:var(--mp-brand); color:#fff; border:none; padding:7px 13px; border-radius:8px; cursor:pointer; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:5px; }
+ .mbtn:hover{ filter:brightness(1.08); }
+ .mbtn-alt{ background:#fff; color:#64748b; border:1px solid #dde7ef; padding:7px 11px; border-radius:8px; cursor:pointer; font-size:12px; }
+ .mbtn-alt:hover{ background:#f1f5f9; }
  .muted{ color:#9aa7ad; } .afm{ font-family:ui-monospace,monospace; font-size:12px; color:#64748b; }
  .empty{ padding:26px; text-align:center; color:#9aa7ad; }
 </style></head><body>
-{{ mp.topbar('user-search', 'Έλεγχος λογαριασμών & διπλότυπων', 'Ποιοι είναι πραγματικό προσωπικό και ποιοι απλοί λογαριασμοί') }}
+{{ mp.topbar('user-search', 'Έλεγχος & καθαρισμός προσωπικού', 'Λογαριασμοί vs προσωπικό · εντοπισμός & συγχώνευση διπλών') }}
 <div class="container">
   {{ mp.kpis([
      {'n':n_users,'label':'Σύνολο χρηστών'},
@@ -64,10 +70,24 @@
       <a class="open" style="margin-left:auto;" href="/dashboard/payroll/employee/{{ m.u.id }}?embed=1">Καρτέλα →</a>
     </div>
     {% endfor %}
+    {% if g.keep_id %}
+    <div class="mergebar">
+      <form method="POST" action="/dashboard/payroll/employee/{{ g.keep_id }}/merge" onsubmit="return confirm('Συγχώνευση: κράτα «{{ g.keep_name }}», αρχειοθέτησε «{{ g.other_name }}». Ιστορικό + δεδομένα (ΑΦΜ/συμφωνία/βάρδιες) μεταφέρονται. Δεν διαγράφεται τίποτα — αναστρέψιμο.');">
+        <input type="hidden" name="other_id" value="{{ g.other_id }}">
+        <input type="hidden" name="back" value="/dashboard/payroll/account_audit">
+        <button type="submit" class="mbtn"><i class="ti ti-arrows-join-2"></i> Συγχώνευση — κράτα «{{ g.keep_name }}»</button>
+      </form>
+      <form method="POST" action="/dashboard/payroll/employee/{{ g.other_id }}/merge" onsubmit="return confirm('Αντίστροφη συγχώνευση: κράτα «{{ g.other_name }}», αρχειοθέτησε «{{ g.keep_name }}»;');">
+        <input type="hidden" name="other_id" value="{{ g.keep_id }}">
+        <input type="hidden" name="back" value="/dashboard/payroll/account_audit">
+        <button type="submit" class="mbtn-alt" title="Αντίστροφη κατεύθυνση">αντίστροφα</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
   {% else %}
   <div class="card"><div class="empty">Κανένα πιθανό διπλότυπο βρέθηκε (κατά ΑΦΜ ή όνομα). 👌</div></div>
   {% endfor %}
 
-  <p class="muted" style="margin-top:14px; font-size:12px;">Read-only έλεγχος — καμία αλλαγή. Το merge γίνεται από την καρτέλα του εργαζομένου (Καρτέλα → Συγχώνευση).</p>
+  <p class="muted" style="margin-top:14px; font-size:12px;">Η συγχώνευση μεταφέρει στο «keep»: ΑΦΜ/συμφωνία, μισθοδοσία, βάρδιες, αναθέσεις <b>και όλο το ιστορικό ενεργειών</b>· η άλλη καρτέλα αρχειοθετείται (δεν διαγράφεται — αναστρέψιμο). Ενοποιεί: διπλά κατά ΑΦΜ + κατά όνομα + λογαριασμούς-θόρυβο.</p>
 </div></body></html>
