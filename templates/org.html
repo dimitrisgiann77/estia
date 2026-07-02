@@ -127,6 +127,7 @@
 
   <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"><a href="/dashboard/org/settings?embed=1" class="otab"><i class="ti ti-settings"></i> Ρυθμίσεις (ομάδες / υποομάδες / θέσεις)</a><a href="/dashboard/org/chart?hotel_id={{ sel }}&embed=1" class="otab"><i class="ti ti-sitemap"></i> Κλασική όψη (οργανόγραμμα)</a></div>
 
+  <div id="orgwrap"><!-- v12.383 P-058 Φ3: fragment swap αντικαθιστά ΜΟΝΟ αυτό (drop/toggle) -->
   <div style="margin-bottom:12px;"><button type="button" class="otab" id="unbtn" onclick="toggleUnassigned()" style="cursor:pointer;{% if unassigned %}border-color:#f59e0b;color:#b45309;background:#fffbeb;{% endif %}"><i class="ti ti-alert-triangle"></i> Χωρίς τμήμα / θέση / ξενοδοχείο ({{ unassigned|length }})</button></div>
   <div id="unpanel" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;margin-bottom:14px;">
     <div style="font-size:12.5px;color:#92400e;margin-bottom:8px;"><i class="ti ti-info-circle"></i> Εργαζόμενοι <b>χωρίς τμήμα ΚΑΙ χωρίς θέση</b> (όλα τα ξενοδοχεία). Πάτησε «+ θέση» για θέση· για τμήμα, διάλεξε το ξενοδοχείο του και σύρ' τον από τη ζώνη «Χωρίς τμήμα».</div>
@@ -197,6 +198,7 @@
     {% for d in ungrouped %}{{ deptcol(d, bydept, supmap, sel) }}{% endfor %}
   </div>
   {% endif %}
+  </div><!-- /orgwrap -->
 </div>
 
 <div class="omodal" id="supModal">
@@ -272,6 +274,7 @@
   </div>
 </div>
 
+<script src="/static/estia_swap.js?v={{ app_build }}"></script>
 <script>
 function drag(e){ e.dataTransfer.setData('uid', e.target.closest('.ocard').dataset.uid); }
 function allowDrop(e){ e.preventDefault(); e.currentTarget.classList.add('over'); }
@@ -282,7 +285,7 @@ function drop(e, hotel, dept){
   fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({user_id:uid, hotel_id:(hotel||''), department_id:(dept||'')})})
     .then(function(r){return r.json();})
-    .then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'+(j&&j.msg?': '+j.msg:'')); })
+    .then(function(j){ if(j&&j.ok) estiaSwap('orgwrap','initOrg'); else alert('Δεν αποθηκεύτηκε'+(j&&j.msg?': '+j.msg:'')); })
     .catch(function(){ alert('Σφάλμα.'); });
 }
 function filt(){
@@ -296,7 +299,7 @@ function toggleDept(did, el){
   var on=!el.classList.contains('on');
   fetch('/dashboard/org/dept/toggle',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({hotel_id:SELHOTEL, department_id:did, on:on})})
-    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); });
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) estiaSwap('orgwrap','initOrg'); else alert('Δεν αποθηκεύτηκε'); });
 }
 function newDept(){
   var name=prompt('Όνομα νέου τμήματος:'); if(!name)return;
@@ -308,7 +311,7 @@ function newDept(){
 function toggleLead(did, on){
   fetch('/dashboard/org/dept/leadership',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({department_id:did, on:on})})
-    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) location.reload(); else alert('Δεν αποθηκεύτηκε'); });
+    .then(function(r){return r.json();}).then(function(j){ if(j&&j.ok) estiaSwap('orgwrap','initOrg'); else alert('Δεν αποθηκεύτηκε'); });
 }
 var SUPCAND={{ sup_candidates|tojson }};
 var CURSUP={{ cursup|tojson }};
@@ -402,9 +405,19 @@ function toggleUnassigned(){ var p=document.getElementById('unpanel'); if(!p) re
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script>
-(function(){
+function initOrg(){   // v12.383 P-058 Φ3 — Sortable re-init στο load & μετά από κάθε fragment swap (idempotent)
   if(!window.Sortable) return;
-  document.querySelectorAll('.oboard').forEach(function(board){
+  document.querySelectorAll('#orgwrap .oboard').forEach(function(board){
+    if(board._sorted) return; board._sorted=true;
     Sortable.create(board, {handle:'.ogrip', draggable:'.ocol', filter:'[data-dept=""]', preventOnFilter:false, animation:140,
       onEnd:function(){
-        var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); })
+        var ids=[]; board.querySelectorAll('.ocol[data-dept]').forEach(function(c){ var v=c.getAttribute('data-dept'); if(v) ids.push(v); });
+        fetch('/dashboard/org/dept/reorder',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order:ids})})
+          .then(function(r){return r.json();}).then(function(j){ if(!j||!j.ok) alert('Η αναδιάταξη στηλών δεν αποθηκεύτηκε'); });
+      }
+    });
+  });
+}
+initOrg();
+</script>
+</body></html>
