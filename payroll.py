@@ -548,6 +548,11 @@ def payroll_employee(uid):
     except Exception:
         pass
     all_hotels = Hotel.query.filter_by(is_active=True).order_by(Hotel.name).all()
+    try:  # v12.377 — «εκ περιτροπής» (ξεχωριστό module rotation.py· read-only εδώ)
+        import rotation as _ROT
+        rot_shares = _ROT.rotation_shares(uid)
+    except Exception:
+        rot_shares = []
     try:
         from schedule import Department as _Dep2, JobPosition as _JP2
         all_depts = _Dep2.query.filter_by(active=True).order_by(_Dep2.sort, _Dep2.name).all()
@@ -561,7 +566,8 @@ def payroll_employee(uid):
         ev_labels=ev_labels, flag_labels=flag_labels, merge_cands=merge_cands,
         is_admin=is_admin(), org_dept=org_dept, org_pos=org_pos,
         sched_first=sched_first, sched_last=sched_last, sched_periods=sched_periods,
-        all_hotels=all_hotels, all_depts=all_depts, all_positions=all_positions)
+        all_hotels=all_hotels, all_depts=all_depts, all_positions=all_positions,
+        rot_shares=rot_shares)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

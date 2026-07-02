@@ -43,6 +43,42 @@
       </form>
     </div>
 
+    <div class="card" id="rotation"><h3>Εκ περιτροπής εργασία
+      {% if rot_shares %}<span class="pill ok">ενεργό</span>{% else %}<span class="pill no">ανενεργό</span>{% endif %}
+      <a href="/dashboard/rotation" style="float:right;font-size:12px;font-weight:400;">Συνολική εικόνα ▸</a></h3>
+      <p class="muted" style="font-size:12px;margin:0 0 8px;">Εργαζόμενος που μοιράζεται σε <b>πολλά ξενοδοχεία</b> (π.χ. Butch: SRG 3 + CNT 2 μέρες/βδ). Παραμένει <b>μία καρτέλα</b>· ανήκει στην έδρα του (τα ρεπό εκεί). Οι εργάσιμες &amp; το κόστος θα επιμερίζονται ανά ξενοδοχείο. Πρόσθεσε ≥1 ξενοδοχείο για να ενεργοποιηθεί.</p>
+      {% if rot_shares %}
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px;">
+        <thead><tr style="text-align:left;color:#64748b;"><th>Ξενοδοχείο</th><th>Μέρες/βδ</th><th></th></tr></thead>
+        <tbody>
+        {% for s in rot_shares %}
+          <tr style="border-top:1px solid #eef2f7;">
+            <td style="padding:4px 0;">{{ s.hotel_name }}</td>
+            <td>{{ s.days_week }}</td>
+            <td style="text-align:right;">
+              <form method="POST" action="/dashboard/rotation/save" style="display:inline;" onsubmit="return confirm('Αφαίρεση «{{ s.hotel_name }}» από τα εκ περιτροπής;');">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <input type="hidden" name="op" value="remove">
+                <input type="hidden" name="hotel_id" value="{{ s.hotel_id }}">
+                <button type="submit" style="border:none;background:#fee2e2;color:#b91c1c;border-radius:6px;cursor:pointer;padding:2px 8px;">×</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      <form method="POST" action="/dashboard/rotation/save" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <input type="hidden" name="user_id" value="{{ u.id }}">
+        <input type="hidden" name="op" value="add">
+        <div class="row" style="min-width:160px;"><label>Ξενοδοχείο</label>
+          <select name="hotel_id"><option value="">— διάλεξε —</option>{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
+        <div class="row" style="min-width:110px;"><label>Μέρες/βδομάδα</label>
+          <input name="days_week" type="number" min="0" max="7" value="0" style="width:80px;"></div>
+        <button class="b" type="submit">Προσθήκη</button>
+      </form>
+    </div>
+
     <div class="card"><h3>Συμφωνία (Management)</h3>
       {% if prof %}
       <form method="POST"><input type="hidden" name="action" value="agreement">
