@@ -514,8 +514,12 @@ def aggregate(assignments, home_hotel_id=None):
             'holidays_worked': hol_worked, 'extra_hours': round(extra, 2),
             'elsewhere_days': elsewhere, 'total_days': work, 'worked_repo': worked_repo}
 
-def monthly_settlement(year, month, hotel_id=None):
-    """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα."""
+def monthly_settlement(year, month, hotel_id=None, split=False):
+    """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα.
+    v12.381 Φ3 — split=True: ΕΚ-ΠΕΡΙΤΡΟΠΗΣ βγαίνει σε μία γραμμή ΑΝΑ ξενοδοχείο-χρέωσης
+    (μέρες/έξτρα/Κυρ./αργίες → ξεν. της ημέρας· ρεπό → έδρα· payable = μέρες×ημερομίσθιο).
+    split=False (default) = ΠΑΛΙΑ συμπεριφορά ακριβώς (μία γραμμή/εργαζόμενο, όλα υπό home)
+    — κρίσιμο για build_run που κάνει dedupe ανά user."""
     start = date(year, month, 1)
     end = date(year + (month // 12), (month % 12) + 1, 1)
     q = (db.session.query(ShiftAssignment)
@@ -524,23 +528,42 @@ def monthly_settlement(year, month, hotel_id=None):
     by_user = {}
     for a in rows:
         by_user.setdefault(a.user_id, []).append(a)
+    try:
+        import rotation as _ROT
+        rot_ids = _ROT.rotational_user_ids()
+    except Exception:
+        rot_ids = set()
+    _hotels = {h.id: h.name for h in Hotel.query.all()}
     out = []
     for uid, alist in by_user.items():
         u = User.query.get(uid)
         if not u:
             continue
-        if hotel_id and getattr(u, 'home_hotel_id', None) != hotel_id:
-            continue
-        agg = aggregate(alist, getattr(u, 'home_hotel_id', None))
+        home = getattr(u, 'home_hotel_id', None)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
-        payable = 0.0
-        if prof and prof.agreement_amount:
-            if prof.agreement_type == 'Management':
-                payable = round(prof.agreement_amount, 2)
-            else:
-                payable = round(prof.day_wage * agg['total_days'] + extra_wage(prof, agg['extra_hours']), 2)
-        out.append({'user': u, 'agg': agg, 'payable': payable, 'profile': prof})
-    out.sort(key=lambda r: r['user'].full_name or '')
+        # Ομαδοποίηση ανά ξεν.-χρέωσης: work→work_hotel (ή home), ρεπό/άδεια→home. Split ΜΟΝΟ αν ζητηθεί + εκ-περιτροπής.
+        if split and uid in rot_ids:
+            groups = {}
+            for a in alist:
+                ch = a.work_hotel_id if (is_work_code(a.shift_code) and a.work_hotel_id) else home
+                groups.setdefault(ch, []).append(a)
+        else:
+            groups = {home: alist}
+        is_split = (split and uid in rot_ids and len(groups) > 1)
+        for ch, sub in groups.items():
+            if hotel_id and ch != hotel_id:
+                continue
+            agg = aggregate(sub, ch)
+            payable = 0.0
+            if prof and prof.agreement_amount:
+                if prof.agreement_type == 'Management':
+                    # fixed μηνιαίος: πλήρες ΜΟΝΟ στη γραμμή έδρας (αποφυγή πολλαπλασιασμού μισθού)
+                    payable = round(prof.agreement_amount, 2) if ch == home else 0.0
+                else:
+                    payable = round(prof.day_wage * agg['total_days'] + extra_wage(prof, agg['extra_hours']), 2)
+            out.append({'user': u, 'agg': agg, 'payable': payable, 'profile': prof,
+                        'hotel_id': ch, 'hotel': _hotels.get(ch), 'split': is_split})
+    out.sort(key=lambda r: (r['user'].full_name or '', r.get('hotel') or ''))
     return out
 
 def extra_wage(prof, hours):
@@ -1854,14 +1877,15 @@ def schedule_export():
     year = request.args.get('year', type=int) or date.today().year
     month = request.args.get('month', type=int) or date.today().month
     hotel_id = request.args.get('hotel_id', type=int) or active_hotel_id()
-    data = monthly_settlement(year, month, hotel_id)
+    data = monthly_settlement(year, month, hotel_id, split=True)
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ'
-    ws.append(['Ονοματεπώνυμο', 'Μήνας', 'Καθημερινές εργάσιμες', 'Κυριακές', 'Αργίες',
+    ws.append(['Ονοματεπώνυμο', 'Ξενοδοχείο', 'Μήνας', 'Καθημερινές εργάσιμες', 'Κυριακές', 'Αργίες',
                'Έξτρα ώρες', 'Ρεπό', 'Δουλ. ρεπό', 'Μέρες αλλού', 'Σύνολο ημερών', 'Πληρωτέο συμφωνίας'])
     mname = MONTHS_EL[month]
     for r in data:
         a = r['agg']
-        ws.append([r['user'].full_name, mname, a['work_days'], a['sundays'], a['holidays_worked'],
+        _nm = r['user'].full_name + (' (εκ περιτροπής)' if r.get('split') else '')
+        ws.append([_nm, r.get('hotel') or '', mname, a['work_days'], a['sundays'], a['holidays_worked'],
                    a['extra_hours'], a['repo'], a.get('worked_repo', 0), a['elsewhere_days'], a['total_days'], r['payable']])
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     fn = f'PROS_LOGISTIRIO_{year}_{month:02d}.xlsx'
