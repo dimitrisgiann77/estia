@@ -160,6 +160,7 @@
   </div>
   {% endif %}
 
+  <div id="boardwrap"><!-- v12.382 P-058: fragment swap αντικαθιστά ΜΟΝΟ αυτό (όχι full reload) -->
   {% if view_mode=='month' and month_block %}
   <div class="card wkcard">
     <div class="wkhead"><h3><i class="ti ti-calendar-month"></i> {{ month_block.label }} — όλο το προσωπικό ({{ month_block.rows|length }})</h3>
@@ -235,8 +236,10 @@
   {% endfor %}
 
   <div class="legend">{% for st in shift_types %}<span><span class="dot" style="background:{{ st.color }}"></span>{{ st.code }} — {{ st.label }}</span>{% endfor %}<span><span class="x">⇄</span> άλλο ξενοδοχείο</span></div>
+  </div><!-- /boardwrap -->
 </div>
 
+<script src="/static/estia_swap.js?v={{ app_build }}"></script>
 <div class="editor" id="editor">
   <h5 id="ed-title">Βάρδια</h5>
   <div id="ed-paint">
@@ -273,7 +276,6 @@ function toggleDept(id){ var s=deptSelArr(); var i=s.indexOf(id); if(i>=0)s.spli
   var all=document.querySelectorAll('.dchip[data-dept]:not([data-dept="all"])').length;
   localStorage.setItem(HKEY, (s.length>=all)?'null':JSON.stringify(s)); applyDeptFilter(); }
 function toggleAll(){ localStorage.removeItem(HKEY); applyDeptFilter(); }
-applyDeptFilter();
 function monthDeptAll(cb){ if(cb&&cb.checked){ document.querySelectorAll('.mdcb').forEach(function(c){c.checked=false;}); } try{localStorage.removeItem(HKEY);}catch(_){}; monthDeptSync(); }
 function monthDeptApply(){
   var sel=Array.prototype.map.call(document.querySelectorAll('.mdcb:checked'),function(c){return c.value;});
@@ -288,10 +290,8 @@ function monthDeptSync(){
   else { document.querySelectorAll('.mdcb').forEach(function(c){c.checked=false;}); if(allcb)allcb.checked=true; if(sum)sum.textContent='Όλα τα τμήματα'; }
   applyDeptFilter();
 }
-try{ monthDeptSync(); }catch(_){}
 function toggleDense(){ var t=document.getElementById('monthtable'); if(!t)return; t.classList.toggle('dense'); try{localStorage.setItem('estia_dense', t.classList.contains('dense')?'1':'0');}catch(_){} }
-(function(){ var t=document.getElementById('monthtable'); if(t){ try{ if(localStorage.getItem('estia_dense')==='1') t.classList.add('dense'); }catch(_){} }
-  var md=document.getElementById('monthDept'); if(md){ try{ var sel=JSON.parse(localStorage.getItem(HKEY)||'null'); md.value=(sel&&sel.length===1)?sel[0]:''; }catch(_){} } })();
+// (monthDeptSync + dense/month-dept restore μεταφέρθηκαν στο initBoard — τρέχουν στο load & μετά το swap)
 // ── Cell editor (drag-select εύρους ημερών ανά γραμμή) ──
 var curSel=[], selecting=false, anchor=null, ctrlPending=false;
 function _pos(el){var td=el.parentNode,tr=td.parentNode,tb=tr.parentNode;return {tb:tb,r:Array.prototype.indexOf.call(tb.children,tr),c:Array.prototype.indexOf.call(tr.children,td)};}
@@ -299,13 +299,23 @@ function clearSel(){ curSel.forEach(function(c){c.classList.remove('sel');}); cu
 function markRect(a,b){ clearSel(); var r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r),c0=Math.min(a.c,b.c),c1=Math.max(a.c,b.c);
   a.tb.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){var p=_pos(el);if(p.r>=r0&&p.r<=r1&&p.c>=c0&&p.c<=c1){el.classList.add('sel');curSel.push(el);}}); }
 function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);} _updSelBtn(); }
-document.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){
-  el.addEventListener('mousedown',function(e){
-    if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
-    e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
+function _cellDown(e){ var el=this;
+  if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
+  e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
+}
+function _cellEnter(){ var el=this; if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el)); }
+// v12.382 P-058 — τρέχει στο load ΚΑΙ μετά από κάθε fragment swap (refreshBoard) → re-bind χωρίς reload
+function initBoard(){
+  curSel=[]; if(typeof _selBtn!=='undefined' && _selBtn) _selBtn.style.display='none';
+  try{ applyDeptFilter(); }catch(_){}
+  try{ monthDeptSync(); }catch(_){}
+  var t=document.getElementById('monthtable'); if(t){ try{ if(localStorage.getItem('estia_dense')==='1') t.classList.add('dense'); }catch(_){} }
+  var md=document.getElementById('monthDept'); if(md){ try{ var sel=JSON.parse(localStorage.getItem(HKEY)||'null'); md.value=(sel&&sel.length===1)?sel[0]:''; }catch(_){} }
+  document.querySelectorAll('#boardwrap .cell[data-edit="1"]').forEach(function(el){
+    el.addEventListener('mousedown', _cellDown);
+    el.addEventListener('mouseenter', _cellEnter);
   });
-  el.addEventListener('mouseenter',function(){if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el));});
-});
+}
 var _selBtn=null;
 function _updSelBtn(){
   if(!_selBtn){
@@ -414,11 +424,11 @@ function saveDay(){
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var entries=dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok){if(j.return_prompt){showReturnPrompt(j.return_prompt);}else{location.reload();}}});
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok){if(j.return_prompt){showReturnPrompt(j.return_prompt);}else{refreshBoard();}}});
 }
 function _rfmt(iso){var a=(iso||'').split('-');return a.length===3?(a[2]+'/'+a[1]+'/'+a[0]):iso;}
 function markReturn(p,kind){
-  fetch('/dashboard/schedule/period_mark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:p.user_id,date:p.date,kind:kind,hotel_id:p.hotel_id})}).then(function(r){return r.json();}).then(function(){location.reload();});
+  fetch('/dashboard/schedule/period_mark',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:p.user_id,date:p.date,kind:kind,hotel_id:p.hotel_id})}).then(function(r){return r.json();}).then(function(){refreshBoard();});
 }
 function showReturnPrompt(p){
   var reasonTxt = (p.reason==='hotel') ? ('αλλαγή ξενοδοχείου ('+p.last_hotel+' → '+p.this_hotel+')')
@@ -438,7 +448,7 @@ function showReturnPrompt(p){
   row.appendChild(mk('Νέα περίοδος','new',true));
   row.appendChild(mk('Συνέχεια','continue',false));
   box.appendChild(row);
-  var skip=document.createElement('div');skip.textContent='Αργότερα';skip.style.cssText='text-align:center;margin-top:10px;color:#94a3b8;font-size:12px;cursor:pointer;';skip.onclick=function(){location.reload();};
+  var skip=document.createElement('div');skip.textContent='Αργότερα';skip.style.cssText='text-align:center;margin-top:10px;color:#94a3b8;font-size:12px;cursor:pointer;';skip.onclick=function(){refreshBoard();};
   box.appendChild(skip);
   ov.appendChild(box);document.body.appendChild(ov);
 }
@@ -463,7 +473,7 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)refreshBoard();});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -495,7 +505,7 @@ function _toClipboard(txt){
 function _selSorted(){ return curSel.slice().sort(function(a,b){var pa=_pos(a),pb=_pos(b);return (pa.r-pb.r)||(pa.c-pb.c);}); }
 function _readClipboard(){ try{ if(navigator.clipboard&&navigator.clipboard.readText) return navigator.clipboard.readText().catch(function(){return null;}); }catch(_){} return Promise.resolve(null); }
 function _pasteInternal(cells){
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
 }
 function _pasteExcel(txt){
   var grid=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(function(l){return l.split('\t');});
@@ -515,7 +525,7 @@ function _pasteExcel(txt){
         items.push({user_id:cell.getAttribute('data-uid'),date:cell.getAttribute('data-date'),text:val}); } }
   }
   if(!items.length){ _toast('Τίποτα για επικόλληση'); return; }
-  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
+  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
 }
 document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
@@ -543,5 +553,6 @@ document.addEventListener('keydown',function(e){
   window.addEventListener('mousemove',function(e){if(!drag)return;var L=Math.max(0,Math.min(e.clientX-dx,window.innerWidth-ed.offsetWidth));var T=Math.max(0,Math.min(e.clientY-dy,window.innerHeight-ed.offsetHeight));ed.style.left=L+'px';ed.style.top=T+'px';});
   window.addEventListener('mouseup',function(){drag=false;});
 })();
+initBoard();   // v12.382 P-058 — αρχικό bind (τρέχει και μετά από κάθε fragment swap)
 </script>
 </body></html>
