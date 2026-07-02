@@ -28,6 +28,9 @@
  .savebar{ position:sticky; bottom:0; margin-top:14px; padding:12px; background:rgba(255,255,255,.88); backdrop-filter:blur(6px); border:1px solid #e0f0ff; border-radius:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; box-shadow:0 -2px 12px rgba(25,56,71,.05); }
  .del-btn{ background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:8px 14px; border-radius:9px; cursor:pointer; font-weight:600; font-size:13px; }
  .del-btn:hover{ background:#fee2e2; }
+ .acc-btn{ background:#fff; color:#475569; border:1px solid #dde7ef; padding:8px 13px; border-radius:9px; cursor:pointer; font-weight:600; font-size:12.5px; display:inline-flex; align-items:center; gap:5px; }
+ .acc-btn:hover{ background:#f1f5f9; } .acc-btn.on{ background:#eef2f7; border-color:#cbd5e1; color:#334155; }
+ .acc-tag{ font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:20px; background:#f1f5f9; color:#64748b; white-space:nowrap; vertical-align:middle; }
  .empty{ padding:34px; text-align:center; color:#9aa7ad; }
 </style></head><body>
 {{ mp.topbar('users-group', 'Μαζική επεξεργασία προσωπικού', 'Γρήγορη μαζική επεξεργασία — τρέχουσα κατάσταση') }}
@@ -47,6 +50,7 @@
     <div class="toolbar">
       <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση όλων</button>
       <button type="button" class="del-btn" onclick="delSelected()"><i class="ti ti-trash"></i> Διαγραφή επιλεγμένων (<span id="delcount">0</span>)</button>
+      {% if n_accounts %}<button type="button" id="accToggle" class="acc-btn" onclick="toggleAccounts()"><i class="ti ti-user-off"></i> Απόκρυψη λογαριασμών ({{ n_accounts }})</button>{% endif %}
       <span class="search" style="margin-left:auto;"><i class="ti ti-search"></i><input type="text" id="empSearch" placeholder="Αναζήτηση ονόματος / ΑΦΜ…" autocomplete="off" oninput="filterRows()"></span>
       <span class="muted" style="font-size:12.5px;"><span id="visCount">{{ rows|length }}</span> / {{ rows|length }} γραμμές</span>
     </div>
@@ -60,13 +64,13 @@
         <tbody>
         {% for r in rows %}
         {% set uid = r.user.id %}
-        <tr>
+        <tr{% if r.is_account %} data-account="1"{% endif %}>
           <td style="text-align:center;">{% if not emp_locked(r.user) %}<input type="checkbox" class="delsel" value="{{ uid }}" style="width:auto;">{% endif %}</td>
           <td>
             <div class="who">
               <span class="av">{{ (r.pii.last_name[0] if r.pii and r.pii.last_name else (r.user.username or '?')[0])|upper }}{{ (r.pii.first_name[0] if r.pii and r.pii.first_name else '')|upper }}</span>
               <div>
-                <div class="nm">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ r.pii.first_name if r.pii and r.pii.first_name else '' }} {{ lock_badge(r.user) }}</div>
+                <div class="nm">{{ r.pii.last_name if r.pii and r.pii.last_name else (r.user.full_name or r.user.username) }} {{ r.pii.first_name if r.pii and r.pii.first_name else '' }} {{ lock_badge(r.user) }}{% if r.is_account %} <span class="acc-tag" title="Λογαριασμός πλατφόρμας — χωρίς μισθοδοτική υπόσταση">λογαριασμός</span>{% endif %}</div>
                 <div class="afm">ΑΦΜ {{ r.pii.afm if r.pii and r.pii.afm else '—' }}</div>
               </div>
             </div>
@@ -91,15 +95,26 @@
     </div>
   </form>
 <script>
-function filterRows(){
-  var q=(document.getElementById('empSearch').value||'').trim().toLowerCase();
+var _hideAcc=false;
+function applyFilters(){
+  var el=document.getElementById('empSearch'); var q=(el?el.value:'').trim().toLowerCase();
   var rows=document.querySelectorAll('table.emp tbody tr'),n=0;
   rows.forEach(function(tr){
     if(tr.querySelector('.empty')){return;}
     var t=(tr.querySelector('.who')?tr.querySelector('.who').innerText:'').toLowerCase();
-    var show=!q||t.indexOf(q)>=0; tr.style.display=show?'':'none'; if(show)n++;
+    var isAcc=tr.dataset.account==='1';
+    var show=(!q||t.indexOf(q)>=0) && !(_hideAcc&&isAcc);
+    tr.style.display=show?'':'none'; if(show)n++;
   });
   var vc=document.getElementById('visCount'); if(vc)vc.textContent=n;
+}
+function filterRows(){ applyFilters(); }
+function toggleAccounts(){
+  _hideAcc=!_hideAcc;
+  var b=document.getElementById('accToggle');
+  if(b){ b.classList.toggle('on',_hideAcc);
+    b.innerHTML='<i class="ti ti-'+(_hideAcc?'user':'user-off')+'"></i> '+(_hideAcc?'Εμφάνιση λογαριασμών':'Απόκρυψη λογαριασμών')+' ('+document.querySelectorAll('table.emp tbody tr[data-account]').length+')'; }
+  applyFilters();
 }
 function _selIds(){return Array.from(document.querySelectorAll('.delsel:checked')).map(function(c){return c.value;});}
 document.addEventListener('change',function(e){if(e.target&&e.target.classList&&e.target.classList.contains('delsel')){document.getElementById('delcount').textContent=_selIds().length;}});

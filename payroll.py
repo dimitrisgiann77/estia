@@ -2327,10 +2327,19 @@ def payroll_grid():
     saved = request.args.get('saved', type=int)
     n_active = len(_employees('active')); n_inactive = len(_employees('inactive'))
     with_agr = sum(1 for r in rows if r.get('profile') and r['profile'].agreement_amount)
+    # v12.371 (P-050 β2) — σημείωσε «καθαρούς λογαριασμούς» (login χωρίς μισθοδοτική υπόσταση)
+    legal_uids = {x for (x,) in db.session.query(LegalNetImport.user_id).distinct() if x}
+    mgmt_uids = {x for (x,) in db.session.query(MgmtAssignment.user_id).distinct() if x}
+    for r in rows:
+        u = r['user']; prof = r.get('profile'); pii = r.get('pii')
+        payroll_sub = bool((u.login_enabled is False) or (pii and pii.afm)
+                           or (prof and prof.agreement_amount) or u.id in legal_uids or u.id in mgmt_uids)
+        r['is_account'] = not payroll_sub
+    n_accounts = sum(1 for r in rows if r['is_account'])
     log_activity('payroll_grid_view', status)
     return render_template('payroll_grid.html', rows=rows, status=status, saved=saved,
                            n_active=n_active, n_inactive=n_inactive, n_all=n_active + n_inactive,
-                           with_agr=with_agr,
+                           with_agr=with_agr, n_accounts=n_accounts,
                            ids=','.join(str(r['user'].id) for r in rows), is_admin=is_admin())
 
 
