@@ -898,8 +898,27 @@ def week_grid(hotel_id, dept_id, week_start):
 def _grid_for_days(hotel_id, dept_id, days, users=None):
     """v12.201 — Γενικό grid για ΟΠΟΙΕΣΔΗΠΟΤΕ μέρες (εβδομάδα ή μήνας). Ίδια δομή κελιών/totals.
     users=None → προσωπικό τμήματος· αλλιώς δοθείσα λίστα (π.χ. όλο το ξεν., ungrouped)."""
+    borrowed_ids = set(); rot_ids = set()
     if users is None:
         users = _dept_users(hotel_id, dept_id)
+        # v12.378 Φ2a — εκ-περιτροπής που μοιράζονται σε ΑΥΤΟ το ξεν. (έδρα αλλού) → read-only ορατότητα
+        try:
+            import rotation as _ROT
+            rot_ids = _ROT.rotational_user_ids()
+            if hotel_id:
+                share_uids = _ROT.share_user_ids_for_hotel(hotel_id)
+                have = {u.id for u in users}
+                extra = [uu for uu in share_uids if uu not in have]
+                if extra:
+                    bq = User.query.filter(User.is_active == True, User.id.in_(extra),
+                                           User.home_hotel_id != hotel_id)
+                    if dept_id:
+                        bq = bq.filter(User.department_id == dept_id)
+                    for bu in bq.all():
+                        users.append(bu); borrowed_ids.add(bu.id)
+                    users = sorted(users, key=lambda x: x.full_name or '')
+        except Exception:
+            borrowed_ids = set(); rot_ids = set()
     uids = [u.id for u in users]
     amap = {}
     if uids:
@@ -968,8 +987,13 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
                               'elsewhere': False, 'wh': None, 'note': '', 'n': 0, 'entries': []})
         _m = _meta.get(u.id) or {}
+        _borrowed = u.id in borrowed_ids
+        _rotational = (u.id in rot_ids) or _borrowed
         rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days,
-                     'emp_code': _m.get('emp_code'), 'afm': _m.get('afm'), 'locked': _m.get('locked', False)})
+                     'emp_code': _m.get('emp_code'), 'afm': _m.get('afm'), 'locked': _m.get('locked', False),
+                     'rotational': _rotational, 'borrowed': _borrowed,  # v12.378 Φ2a
+                     'home_hotel': (_hotels.get(getattr(u, 'home_hotel_id', None)) if _borrowed else None),
+                     'readonly': _borrowed})
     return days, rows
 
 def validate_hotel_week(hotel_id, week_start):

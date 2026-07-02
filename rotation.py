@@ -44,6 +44,19 @@ def is_rotational(uid):
     """True αν ο εργαζόμενος είναι εκ περιτροπής (έχει ≥1 μοίρασμα)."""
     return RotationShare.query.filter_by(user_id=uid).first() is not None
 
+def rotational_user_ids():
+    """Σύνολο user_id όλων των εκ-περιτροπής (batch — για boards)."""
+    return {r.user_id for r in RotationShare.query.all()}
+
+def share_user_ids_for_hotel(hotel_id):
+    """user_id όσων μοιράζονται σε ΑΥΤΟ το ξενοδοχείο (batch)."""
+    return {r.user_id for r in RotationShare.query.filter_by(hotel_id=hotel_id).all()}
+
+def days_quota(uid, hotel_id):
+    """Μέρες/βδομάδα (μερίδιο) του εργαζομένου σε ξενοδοχείο· None αν δεν μοιράζεται εκεί."""
+    r = RotationShare.query.filter_by(user_id=uid, hotel_id=hotel_id).first()
+    return (r.days_week or 0) if r else None
+
 def _audit(uid, event, detail):
     try:
         import people as _PPL
