@@ -8,7 +8,7 @@ function estiaSwap(containerId, initFnName){
   var wrap = document.getElementById(containerId);
   if(!wrap){ location.reload(); return; }
   // αποθήκευση scroll (οριζόντιο/κάθετο) των εσωτερικών scrollers + παραθύρου
-  var scrollers = wrap.querySelectorAll('.gridwrap');
+  var scrollers = wrap.querySelectorAll('.gridwrap, .scroll');
   var saved = [];
   for(var i=0;i<scrollers.length;i++){ saved.push([scrollers[i].scrollLeft, scrollers[i].scrollTop]); }
   var winY = window.scrollY, winX = window.scrollX;
@@ -22,7 +22,7 @@ function estiaSwap(containerId, initFnName){
       var fn = initFnName && window[initFnName];
       if(typeof fn === 'function'){ try{ fn(); }catch(e){} }
       // επαναφορά scroll
-      var s2 = wrap.querySelectorAll('.gridwrap');
+      var s2 = wrap.querySelectorAll('.gridwrap, .scroll');
       for(var j=0;j<s2.length;j++){ if(saved[j]){ s2[j].scrollLeft = saved[j][0]; s2[j].scrollTop = saved[j][1]; } }
       window.scrollTo(winX, winY);
     })

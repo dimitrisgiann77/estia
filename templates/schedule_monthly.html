@@ -92,6 +92,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
     </div>
   </form>
 
+  <div id="monthwrap"><!-- v12.382 P-058 Φ2: fragment swap αντικαθιστά ΜΟΝΟ αυτό -->
   {% if not data.groups %}
     <div class="card empty-st"><i class="ti ti-calendar-off" style="font-size:34px;display:block;margin-bottom:8px;"></i>
       Καμία βάρδια για {{ months[month] }} {{ year }} με αυτά τα φίλτρα.</div>
@@ -163,18 +164,25 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
 
   <div class="legend">{% for st in shift_types %}<span><span class="dot" style="background:{{ st.color }}"></span>{{ st.code }} — {{ st.label }}</span>{% endfor %}</div>
   <p style="font-size:11px;color:#94a3b8;margin-top:8px;">* Πληρωτέο = εκτίμηση βάσει συμφωνίας/ημερομισθίου από το μητρώο (όπου υπάρχει).</p>
+  </div><!-- /monthwrap -->
 </div>
 
+<script src="/static/estia_swap.js?v={{ app_build }}"></script>
 <script>
-document.querySelectorAll('.scroll').forEach(function(sc){
-  var down=false,sx,sl;
-  sc.addEventListener('mousedown',function(e){
-    if(e.target.closest('td.edit')||e.target.closest('a')||e.target.closest('button')||e.target.closest('select'))return;
-    down=true;sc.classList.add('drag');sx=e.pageX;sl=sc.scrollLeft;
+// v12.382 P-058 Φ2 — idempotent (guard _sbound) ώστε να ξανακαλείται μετά το fragment swap
+function _bindScrolls(){
+  document.querySelectorAll('.scroll').forEach(function(sc){
+    if(sc._sbound) return; sc._sbound=true;
+    var down=false,sx,sl;
+    sc.addEventListener('mousedown',function(e){
+      if(e.target.closest('td.edit')||e.target.closest('a')||e.target.closest('button')||e.target.closest('select'))return;
+      down=true;sc.classList.add('drag');sx=e.pageX;sl=sc.scrollLeft;
+    });
+    window.addEventListener('mouseup',function(){down=false;sc.classList.remove('drag');});
+    sc.addEventListener('mousemove',function(e){if(!down)return;e.preventDefault();sc.scrollLeft=sl-(e.pageX-sx);});
   });
-  window.addEventListener('mouseup',function(){down=false;sc.classList.remove('drag');});
-  sc.addEventListener('mousemove',function(e){if(!down)return;e.preventDefault();sc.scrollLeft=sl-(e.pageX-sx);});
-});
+}
+_bindScrolls();
 </script>
 {% if view=='grid' and can_edit %}
 <div class="editor" id="editor">
@@ -190,7 +198,7 @@ document.querySelectorAll('.scroll').forEach(function(sc){
 var SHIFTS={{ shift_types_json|safe }}, COLORS={}; SHIFTS.forEach(function(s){COLORS[s.code]=s.color;});
 /* χρωματισμός πλέον ανά τσιπ (mchip) */
 var pickedCode='ΕΡΓ', curSel=[];
-var cells=Array.prototype.slice.call(document.querySelectorAll('td.edit'));
+var cells=[];
 var selecting=false, selUid=null, anchorDi=null, ctrlPending=false;
 function rowCells(uid){return cells.filter(function(c){return c.getAttribute('data-uid')===uid;});}
 function clearSel(){curSel.forEach(function(c){c.classList.remove('sel');});curSel=[];}
@@ -198,13 +206,19 @@ function markRange(uid,a,b){clearSel();var lo=Math.min(a,b),hi=Math.max(a,b);
   rowCells(uid).forEach(function(c){var di=parseInt(c.getAttribute('data-di'));if(di>=lo&&di<=hi){c.classList.add('sel');curSel.push(c);}});
   curSel.sort(function(p,q){return parseInt(p.getAttribute('data-di'))-parseInt(q.getAttribute('data-di'));});}
 function toggleCell(td){var i=curSel.indexOf(td);if(i>=0){td.classList.remove('sel');curSel.splice(i,1);}else{td.classList.add('sel');curSel.push(td);}}
-cells.forEach(function(td){
-  td.addEventListener('mousedown',function(e){
-    if(e.ctrlKey||e.metaKey){e.preventDefault();toggleCell(td);ctrlPending=true;return;}
-    e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);
-  });
-  td.addEventListener('mouseenter',function(){if(selecting&&td.getAttribute('data-uid')===selUid)markRange(selUid,anchorDi,parseInt(td.getAttribute('data-di')));});
-});
+function _mCellDown(e){ var td=this;
+  if(e.ctrlKey||e.metaKey){e.preventDefault();toggleCell(td);ctrlPending=true;return;}
+  e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);
+}
+function _mCellEnter(){ var td=this; if(selecting&&td.getAttribute('data-uid')===selUid)markRange(selUid,anchorDi,parseInt(td.getAttribute('data-di'))); }
+// v12.382 P-058 Φ2 — τρέχει στο load ΚΑΙ μετά από κάθε fragment swap (re-bind cells + scroll)
+function initMonthly(){
+  cells=Array.prototype.slice.call(document.querySelectorAll('td.edit'));
+  curSel=[];
+  cells.forEach(function(td){ td.addEventListener('mousedown',_mCellDown); td.addEventListener('mouseenter',_mCellEnter); });
+  if(typeof _bindScrolls==='function') _bindScrolls();
+}
+initMonthly();
 window.addEventListener('mouseup',function(){
   if(ctrlPending){ctrlPending=false;if(curSel.length)openEd();return;}
   if(!selecting)return;selecting=false;if(curSel.length)openEd();
@@ -280,7 +294,7 @@ function saveDay(){
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var entries=dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)location.reload();});
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)estiaSwap('monthwrap','initMonthly');});
 }
 function openEd(){
   var last=curSel[curSel.length-1]; var ed=document.getElementById('editor');
@@ -303,7 +317,7 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)location.reload();});
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -319,7 +333,7 @@ document.addEventListener('keydown',function(e){
   } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&clip&&curSel.length){
     e.preventDefault();
     var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));location.reload();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));estiaSwap('monthwrap','initMonthly');}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
   }
 });
 (function(){var ed=document.getElementById('editor'),t=document.getElementById('ed-title'),dx=0,dy=0,drag=false;
