@@ -2118,33 +2118,8 @@ def _inject_pending_identify():
 def schedule_identify():
     if not _auth() or not is_admin():
         return redirect(url_for('login'))
-    groups = {}
-    for ps in PendingShift.query.order_by(PendingShift.work_date).all():
-        g = groups.get(ps.norm_name)
-        if not g:
-            g = {'norm': ps.norm_name, 'raw': ps.raw_name, 'count': 0,
-                 'hotel_tag': ps.hotel_tag, 'dept': ps.dept_raw, 'employer': ps.employer,
-                 'dmin': ps.work_date, 'dmax': ps.work_date}
-            groups[ps.norm_name] = g
-        g['count'] += 1
-        if ps.work_date:
-            if not g['dmin'] or ps.work_date < g['dmin']: g['dmin'] = ps.work_date
-            if not g['dmax'] or ps.work_date > g['dmax']: g['dmax'] = ps.work_date
-    piimap = _pending_pii_map()
-    locked = _locked_uids()
-    items = []
-    for g in groups.values():
-        sugg = []
-        for u, sc in _suggest_masters(g['raw'] or g['norm'], limit=5):
-            pp = piimap.get(u.id)
-            sugg.append({'id': u.id, 'name': u.full_name,
-                         'emp_code': (pp.emp_code if pp else None),
-                         'afm': (pp.afm if pp else None),
-                         'locked': u.id in locked, 'score': sc})
-        g['suggestions'] = sugg
-        items.append(g)
-    items.sort(key=lambda x: (-x['count'], x['raw'] or ''))
-    return render_template('schedule_identify.html', items=items, total=len(items))
+    # v12.374 (P-051 cleanup) — αποσύρθηκε· ανακατεύθυνση στην ενοποιημένη «Ταυτοποίηση εισαγωγών»
+    return redirect(url_for('schedule_import_hub') + ('?embed=1' if request.args.get('embed') else ''))
 
 @app.route('/dashboard/schedule/identify/link', methods=['POST'])
 def schedule_identify_link():
@@ -2280,26 +2255,8 @@ def schedule_imported():
     # + κουμπια «Συγχωνευση με Master» / «Διαγραφη». Ξεχωριζει «αληθινος→merge» απο «σκουπιδι→delete».
     if not _auth() or not is_admin():
         return redirect(url_for('login'))
-    locked = _locked_uids()
-    piimap = _pending_pii_map()
-    rows = []
-    for u in imported_staff_query().filter(User.is_active == True).all():
-        if u.id in locked:
-            continue
-        sugg = None
-        for cand, sc in _suggest_masters(u.full_name or '', limit=8):
-            if cand.id == u.id or cand.id not in locked:
-                continue
-            pp = piimap.get(cand.id)
-            sugg = {'id': cand.id, 'name': cand.full_name,
-                    'emp_code': (pp.emp_code if pp else None),
-                    'afm': (pp.afm if pp else None), 'score': sc}
-            break
-        rows.append({'id': u.id, 'name': u.full_name,
-                     'shifts': ShiftAssignment.query.filter_by(user_id=u.id).count(),
-                     'suggestion': sugg})
-    rows.sort(key=lambda r: (0 if r['suggestion'] else 1, -r['shifts'], r['name'] or ''))
-    return render_template('schedule_imported.html', rows=rows, total=len(rows))
+    # v12.374 (P-051 cleanup) — αποσύρθηκε· ανακατεύθυνση στην ενοποιημένη «Ταυτοποίηση εισαγωγών»
+    return redirect(url_for('schedule_import_hub') + ('?embed=1' if request.args.get('embed') else ''))
 
 
 @app.route('/dashboard/schedule/imported/merge', methods=['POST'])

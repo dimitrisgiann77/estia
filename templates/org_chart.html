@@ -140,6 +140,11 @@
 {{ mp.topbar('chart', 'ΕΣΤΙΑ — Κλασικό οργανόγραμμα', 'Ξενοδοχείο → Ομάδες → Τμήματα → Θέσεις → Άτομα') }}
 {% set emb = '&embed=1' if request.args.get('embed') else '' %}
 <div class="container">
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;">
+    <span style="font-size:12px;color:#64748b;margin-right:2px;">Όψη:</span>
+    <a href="/dashboard/org?hotel_id={{ sel }}&embed={{ 1 if request.args.get('embed') else 0 }}" style="padding:6px 13px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;background:#fff;color:#475569;border:1px solid #dbe3ea;"><i class="ti ti-layout-grid"></i> Πλέγμα (επεξεργασία)</a>
+    <a href="/dashboard/org/chart?hotel_id={{ sel }}&embed={{ 1 if request.args.get('embed') else 0 }}" style="padding:6px 13px;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;background:var(--accent,#185FA5);color:#fff;"><i class="ti ti-binary-tree"></i> Δέντρο</a>
+  </div>
   <div class="toolbar">
     <a href="/dashboard/org?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-arrow-left"></i> Πίσω στη διαχείριση</a>
     <a href="/dashboard/org/settings?embed={{ 1 if request.args.get('embed') else 0 }}" class="sbtn"><i class="ti ti-settings"></i> Ρυθμίσεις δομής</a>
