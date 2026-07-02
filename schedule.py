@@ -938,6 +938,8 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
             _meta = {}
     rows = []
     for u in users:
+        _is_rot = (u.id in rot_ids) or (u.id in borrowed_ids)   # v12.379 Φ2β
+        _uhome = getattr(u, 'home_hotel_id', None)
         cells = []
         wk_hours = 0.0; wk_extra = 0.0; repo = 0; work_days = 0
         for d in days:
@@ -982,10 +984,13 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                               'label': '\n'.join(labels), 'hours': round(day_hours, 1),
                               'elsewhere': bool(first.work_hotel_id and first.work_hotel_id != hotel_id),
                               'wh': first.work_hotel_id, 'note': first.note or '',
-                              'n': len(alist), 'entries': _entries})
+                              'n': len(alist), 'entries': _entries,
+                              # v12.379 Φ2β — κλείδωμα ανά μέρα: εκ-περιτροπής μέρα που ανήκει σε άλλο ξεν.
+                              'locked': bool(_is_rot and ((first.work_hotel_id or _uhome) != hotel_id))})
             else:
                 cells.append({'date': d.isoformat(), 'code': '', 'segs': [], 'label': '', 'hours': 0,
-                              'elsewhere': False, 'wh': None, 'note': '', 'n': 0, 'entries': []})
+                              'elsewhere': False, 'wh': None, 'note': '', 'n': 0, 'entries': [],
+                              'locked': False})
         _m = _meta.get(u.id) or {}
         _borrowed = u.id in borrowed_ids
         _rotational = (u.id in rot_ids) or _borrowed
@@ -1237,6 +1242,76 @@ def schedule_month_export():
 
 
 # ── API: autosave κελιού ──────────────────────────────────────────────────────
+# ── v12.379 Φ2β — Guard καταχώρησης εκ-περιτροπής (κλείδωμα ανά μέρα + σκληρό όριο) ──
+def _rotation_guard(uid, wd, code, board_hotel_id, pending=None):
+    """Έλεγχος καταχώρησης βάρδιας για ΕΚ-ΠΕΡΙΤΡΟΠΗΣ εργαζόμενο.
+    Επιστρέφει (ok, msg, work_hotel_override, is_rotational, acting_hotel_id).
+    Για ΜΗ εκ-περιτροπής → (True,'',None,False,None): καμία επίδραση (ξεχωριστό κύκλωμα).
+    pending: {(uid, acting): set(dates)} ήδη αποδεκτές σε ΑΥΤΟ το request (cumulative όριο)."""
+    try:
+        import rotation as _ROT
+        if not _ROT.is_rotational(uid):
+            return (True, '', None, False, None)
+    except Exception:
+        return (True, '', None, False, None)
+    u = User.query.get(uid)
+    home = getattr(u, 'home_hotel_id', None)
+    acting = board_hotel_id or active_hotel_id() or home   # v12.380 F5 — fallback αν λείπει board_hotel_id
+    nm = (u.full_name if u else '') or 'ο εργαζόμενος'
+    wh = acting if (acting and acting != home) else None
+    # 1) Ρεπό/άδειες ορίζονται ΜΟΝΟ από την έδρα
+    if not is_work_code(code):
+        if acting != home:
+            return (False, '%s: τα ρεπό/άδειες ορίζονται από την έδρα του.' % nm, None, True, acting)
+        return (True, '', None, True, acting)
+    # 2) Αποκλειστικότητα/κλείδωμα ημέρας: υπάρχει ήδη βάρδια που ανήκει σε ΑΛΛΟ ξενοδοχείο
+    for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all():
+        if (a.work_hotel_id or home) != acting:
+            if is_work_code(a.shift_code):
+                return (False, '%s έχει ήδη βάρδια εκείνη τη μέρα σε άλλο ξενοδοχείο.' % nm, None, True, acting)
+            return (False, '%s: αυτή η μέρα ανήκει σε άλλο ξενοδοχείο (έδρα).' % nm, None, True, acting)
+    # 3) Σκληρό όριο μεριδίου (μόνο όπου υπάρχει ορισμένο μερίδιο)
+    quota = _ROT.days_quota(uid, acting)
+    if quota is not None:
+        wk = monday_of(wd)
+        wdays = set()
+        for a in ShiftAssignment.query.filter(
+                ShiftAssignment.user_id == uid,
+                ShiftAssignment.work_date >= wk,
+                ShiftAssignment.work_date <= wk + timedelta(days=6)).all():
+            if a.work_date == wd:
+                continue   # η τρέχουσα μέρα (ξανα)γράφεται — δεν μετρά διπλά
+            if is_work_code(a.shift_code) and (a.work_hotel_id or home) == acting:
+                wdays.add(a.work_date)
+        for pdate in (pending or {}).get((uid, acting), ()):
+            if pdate != wd:
+                wdays.add(pdate)
+        if len(wdays) >= quota:
+            return (False, 'Όριο εκ περιτροπής: %s δικαιούται %d μέρες/βδ σε αυτό το ξενοδοχείο.' % (nm, quota), None, True, acting)
+    return (True, '', wh, True, acting)
+
+
+def _rotation_can_modify(uid, a, board_hotel_id):
+    """v12.379 Φ2β — Μπορεί το ξεν.-υποδοχής να ΔΙΑΓΡΑΨΕΙ/αντικαταστήσει υπάρχουσα βάρδια;
+    Μπλοκάρει αν ο εκ-περιτροπής έχει βάρδια που ανήκει σε ΑΛΛΟ ξενοδοχείο (κλείδωμα ανά μέρα)."""
+    try:
+        import rotation as _ROT
+        if not _ROT.is_rotational(uid):
+            return (True, '')
+    except Exception:
+        return (True, '')
+    u = User.query.get(uid)
+    home = getattr(u, 'home_hotel_id', None)
+    acting = board_hotel_id or active_hotel_id() or home   # v12.380 F5
+    # F2 — έλεγξε ΟΛΕΣ τις βάρδιες της μέρας (όχι μόνο την πρώτη): μπλοκ αν ΚΑΠΟΙΑ ανήκει αλλού
+    for _a in ShiftAssignment.query.filter_by(user_id=uid, work_date=a.work_date).all():
+        if is_work_code(_a.shift_code) and (_a.work_hotel_id or home) != acting:
+            return (False, 'Αυτή η μέρα ανήκει σε άλλο ξενοδοχείο (εκ περιτροπής).')
+        if (not is_work_code(_a.shift_code)) and acting != home:
+            return (False, 'Τα ρεπό/άδειες του εκ περιτροπής ορίζονται από την έδρα.')
+    return (True, '')
+
+
 @app.route('/dashboard/schedule/cell', methods=['POST'])
 def schedule_cell():
     if not _auth():
@@ -1256,9 +1331,13 @@ def schedule_cell():
     segs = d.get('segments') or []
     note = (d.get('note') or '')[:200]
     whid = d.get('work_hotel_id'); whid = int(whid) if whid else None
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
     if not code:
         if a:
+            _dok, _dmsg = _rotation_can_modify(uid, a, board_hid)
+            if not _dok:
+                return jsonify(ok=False, err='rotation', msg=_dmsg), 400
             db.session.delete(a); db.session.commit()
         return jsonify(ok=True, deleted=True)
     # προεπιλεγμένες ώρες αν ΕΡΓ χωρίς segments
@@ -1270,6 +1349,12 @@ def schedule_cell():
         _ok, _msg = _validate_work_code(code, segs)
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
+    # v12.379 Φ2β — έλεγχος εκ-περιτροπής (κλείδωμα ημέρας + όριο) + auto work_hotel
+    _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid)
+    if not _gok:
+        return jsonify(ok=False, err='rotation', msg=_gmsg), 400
+    if _grot:
+        whid = _gwh
     if not a:
         a = ShiftAssignment(user_id=uid, work_date=wd, created_by=user.id)
         db.session.add(a)
@@ -1324,6 +1409,7 @@ def schedule_cells_bulk():
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     _whid = d.get('work_hotel_id'); _whid = int(_whid) if _whid else None
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     if code in ('ΕΡΓ', 'ΔΡ') and not segs:
         st = ShiftType.query.filter_by(code=code).first()
         if st and st.default_start and st.default_end:
@@ -1332,15 +1418,30 @@ def schedule_cells_bulk():
         _ok, _msg = _validate_work_code(code, segs)
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
-    done = 0; locked = 0
-    touched = set()
+    done = 0; locked = 0; blocked = 0; _last_msg = ''
+    touched = set(); _pending = {}
     for uid, wd in pairs:
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
+        _wh_use = _whid
+        if code:
+            _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
+            if _grot:
+                if not _gok:
+                    blocked += 1; _last_msg = _gmsg; continue
+                _wh_use = _gwh
+                if is_work_code(code):
+                    _pending.setdefault((uid, _gact), set()).add(wd)
+        else:
+            _ex = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
+            if _ex:
+                _dok, _dmsg = _rotation_can_modify(uid, _ex, board_hid)
+                if not _dok:
+                    blocked += 1; _last_msg = _dmsg; continue
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         if code:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
-                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_whid, created_by=user.id))
+                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_wh_use, created_by=user.id))
         touched.add((uid, monday_of(wd)))
         done += 1
     for uid, ws in touched:
@@ -1354,7 +1455,9 @@ def schedule_cells_bulk():
                 wp.status = 'draft'
             wp.updated_by = user.id
     db.session.commit()
-    return jsonify(ok=True, done=done, locked=locked)
+    if done == 0 and blocked:
+        return jsonify(ok=False, err='rotation', msg=_last_msg or 'Δεν επιτρέπεται (εκ περιτροπής).'), 400
+    return jsonify(ok=True, done=done, locked=locked, blocked=blocked)
 
 @app.route('/dashboard/schedule/day', methods=['POST'])
 def schedule_day():
@@ -1373,6 +1476,7 @@ def schedule_day():
         return jsonify(ok=False, err='bad'), 400
     if not week_editable(monday_of(wd), user):
         return jsonify(ok=False, err='locked', msg='Κλειδωμένη εβδομάδα.'), 423
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     norm = []
     for e in (d.get('entries') or []):
         code = (e.get('code') or '').strip()
@@ -1390,6 +1494,12 @@ def schedule_day():
                 return jsonify(ok=False, err='invalid', msg=msg), 400
         else:
             segs = []; whid = None
+        # v12.379 Φ2β — εκ-περιτροπής: κλείδωμα/όριο + auto work_hotel
+        _gok, _gmsg, _gwh, _grot, _ = _rotation_guard(uid, wd, code, board_hid)
+        if not _gok:
+            return jsonify(ok=False, err='rotation', msg=_gmsg), 400
+        if _grot:
+            whid = _gwh
         norm.append((code, segs, whid))
     ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
     for code, segs, whid in norm:
@@ -1419,6 +1529,7 @@ def schedule_paste_cells():
         return jsonify(ok=False, err='forbidden'), 403
     user = current_user()
     d = request.json or {}
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     norm = []
     for e in (d.get('entries') or []):
         code = (e.get('code') or '').strip()
@@ -1433,8 +1544,8 @@ def schedule_paste_cells():
         else:
             segs = []; whid = None
         norm.append((code, segs, whid))
-    done = 0; locked = 0
-    touched_wp = set()
+    done = 0; locked = 0; blocked = 0; _last_msg = ''
+    touched_wp = set(); _pending = {}
     for c in (d.get('cells') or []):
         try:
             uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
@@ -1442,8 +1553,21 @@ def schedule_paste_cells():
             continue
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
-        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        # v12.379 Φ2β — εκ-περιτροπής: guard ανά κελί (κλείδωμα/όριο + auto work_hotel)
+        _entries_use = []; _blk = False
         for code, segs, whid in norm:
+            _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
+            if _grot:
+                if not _gok:
+                    _blk = True; _last_msg = _gmsg; break
+                whid = _gwh
+                if is_work_code(code):
+                    _pending.setdefault((uid, _gact), set()).add(wd)
+            _entries_use.append((code, segs, whid))
+        if _blk:
+            blocked += 1; continue
+        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        for code, segs, whid in _entries_use:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
                 segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
         u = User.query.get(uid)
@@ -1473,7 +1597,9 @@ def schedule_paste_cells():
                 prompt = ctx
         except Exception:
             prompt = None
-    return jsonify(ok=True, done=done, locked=locked, return_prompt=prompt)
+    if done == 0 and blocked:
+        return jsonify(ok=False, err='rotation', msg=_last_msg or 'Δεν επιτρέπεται (εκ περιτροπής).'), 400
+    return jsonify(ok=True, done=done, locked=locked, blocked=blocked, return_prompt=prompt)
 
 
 @app.route('/dashboard/schedule/period_mark', methods=['POST'])
@@ -1513,12 +1639,13 @@ def schedule_paste_excel():
     user = current_user()
     d = request.json or {}
     items = d.get('items') or []
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     short2id = {}
     for h in Hotel.query.all():
         sh = _hotel_short(h.name)
         if sh:
             short2id[sh.upper()] = h.id
-    done = 0; locked = 0; skipped = 0; touched = set()
+    done = 0; locked = 0; skipped = 0; blocked = 0; touched = set(); _pending = {}
     for it in items:
         try:
             uid = int(it['user_id']); wd = datetime.strptime(it['date'], '%Y-%m-%d').date()
@@ -1530,6 +1657,14 @@ def schedule_paste_excel():
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
         whid = short2id.get((tag or '').upper()) if tag else None
+        # v12.380 F1 — εκ-περιτροπής guard ΚΑΙ στο Excel-paste (κλείδωμα/όριο + auto work_hotel)
+        _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
+        if _grot:
+            if not _gok:
+                blocked += 1; continue
+            whid = _gwh
+            if is_work_code(code):
+                _pending.setdefault((uid, _gact), set()).add(wd)
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
             segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
@@ -1546,9 +1681,11 @@ def schedule_paste_excel():
                 wp.status = 'draft'
             wp.updated_by = user.id
     db.session.commit()
+    if not done and blocked:
+        return jsonify(ok=False, err='rotation', msg='Δεν επιτρέπεται (εκ περιτροπής — όριο/κλείδωμα ημέρας).')
     if not done and not locked:
         return jsonify(ok=False, msg='Δεν αναγνωρίστηκε βάρδια στο κείμενο του Excel.')
-    return jsonify(ok=True, done=done, locked=locked)
+    return jsonify(ok=True, done=done, locked=locked, blocked=blocked)
 
 
 
