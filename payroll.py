@@ -2364,6 +2364,21 @@ def payroll_account_audit():
         n_real=n_real, dup_groups=dup_groups)
 
 
+# ── v12.369 (P-051 Φ1) — Hub Προσωπικού: μία είσοδος για όλες τις σελίδες προφίλ ──
+@app.route('/dashboard/hr')
+def hr_hub():
+    if not _padmin():
+        return redirect(url_for('login'))
+    from collections import Counter
+    active = _employees('active'); allr = _employees('all')
+    n_active = len(active); n_all = len(allr); n_inactive = n_all - n_active
+    afms = [(p.afm or '').strip() for p in EmployeePII.query.filter(EmployeePII.afm.isnot(None)).all()]
+    afm_dups = sum(1 for c in Counter([a for a in afms if a]).values() if c > 1)
+    log_activity('hr_hub_view', '')
+    return render_template('hr_hub.html', n_all=n_all, n_active=n_active,
+                           n_inactive=n_inactive, afm_dups=afm_dups)
+
+
 # ── v12.80 — Export 2 μητρώων ΑΠΟ ΤΗ ΒΑΣΗ (καθρέφτης live) ────────────────────
 def _xlsx_response(wb, fname):
     from flask import send_file

@@ -1,0 +1,64 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Προσωπικό — Κέντρο διαχείρισης', theme.primary) }}
+<style>
+ .container{ max-width:1120px; }
+ .sec-h{ display:flex; align-items:center; gap:9px; margin:20px 0 10px; }
+ .sec-h .t{ font-size:14px; font-weight:700; color:#1e293b; }
+ .sec-h i{ color:var(--mp-brand); font-size:18px; }
+ .pill{ font-size:10px; font-weight:700; padding:2px 9px; border-radius:20px; background:#ede9fe; color:#6d28d9; }
+ .tiles{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
+ .tile{ background:#fff; border:1px solid #e0f0ff; border-radius:11px; padding:12px 14px; display:flex; gap:11px; align-items:flex-start; text-decoration:none; color:inherit; transition:transform .08s, box-shadow .08s, border-color .08s; }
+ .tile:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(25,56,71,.08); border-color:#bcdcff; }
+ .tile.warn{ border-color:#fde2e2; } .tile.warn i.ic{ color:#dc2626; }
+ .tile i.ic{ font-size:20px; color:var(--mp-brand); margin-top:1px; flex:0 0 auto; }
+ .tile .tt{ font-weight:600; font-size:13px; color:#1e293b; }
+ .tile .ds{ font-size:11.5px; color:#64748b; margin-top:2px; }
+ .bd{ font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:20px; white-space:nowrap; margin-left:auto; align-self:flex-start; }
+ .bd.hub{ background:#dbeafe; color:#1d4ed8; } .bd.read{ background:#f1f5f9; color:#64748b; }
+ .bd.owner{ background:#fff7ed; color:#9a3412; } .bd.new{ background:#dcfce7; color:#166534; }
+</style></head><body>
+{{ mp.topbar('users-group', 'Προσωπικό — Κέντρο διαχείρισης', 'Μία είσοδος για όλες τις σελίδες προφίλ') }}
+<div class="container">
+  {{ mp.kpis([
+     {'n':n_all,'label':'Σύνολο προφίλ'},
+     {'n':n_active,'label':'Ενεργοί','color':'#16a34a'},
+     {'n':n_inactive,'label':'Ανενεργοί','color':'#dc2626'},
+     {'n':afm_dups,'label':'Πιθανά διπλά ΑΦΜ','color':'#d97706','href':'/dashboard/payroll/account_audit?embed=1'}
+  ]) }}
+
+  <div class="sec-h"><i class="ti ti-list-details"></i><span class="t">Λίστες και καρτέλες</span></div>
+  <div class="tiles">
+    <a class="tile" href="/dashboard/people?embed=1"><i class="ic ti ti-users"></i><div><div class="tt">Διαχείριση προσωπικού</div><div class="ds">αναζήτηση, κατάσταση, διαφωνίες</div></div><span class="bd hub">hub</span></a>
+    <a class="tile" href="/dashboard/payroll?embed=1"><i class="ic ti ti-cash"></i><div><div class="tt">Μητρώο εργαζομένων</div><div class="ds">ΑΦΜ, συμφωνία, καθαρά Epsilon</div></div><span class="bd read">read</span></a>
+    <a class="tile" href="/dashboard/payroll/grid?embed=1"><i class="ic ti ti-table"></i><div><div class="tt">Μαζική επεξεργασία</div><div class="ds">συμφωνία, τηλέφωνο, email</div></div><span class="bd owner">owner</span></a>
+    <a class="tile" href="/dashboard/evaluations?embed=1"><i class="ic ti ti-star"></i><div><div class="tt">Αξιολόγηση προσωπικού</div><div class="ds">κριτήρια, βαθμολογίες</div></div><span class="bd owner">owner</span></a>
+  </div>
+
+  <div class="sec-h"><i class="ti ti-sitemap"></i><span class="t">Οργάνωση</span></div>
+  <div class="tiles">
+    <a class="tile" href="/dashboard/org?embed=1"><i class="ic ti ti-layout-grid"></i><div><div class="tt">Οργανόγραμμα</div><div class="ds">τμήμα, ξενοδοχείο (drag-drop)</div></div><span class="bd owner">owner</span></a>
+    <a class="tile" href="/dashboard/org/chart?embed=1"><i class="ic ti ti-binary-tree"></i><div><div class="tt">Δεντρική όψη</div><div class="ds">ιεραρχία, υπεύθυνοι</div></div><span class="bd read">read</span></a>
+  </div>
+
+  <div class="sec-h"><i class="ti ti-file-import"></i><span class="t">Εισαγωγές και ταυτοποίηση</span><span class="pill">ενοποιεί 2 → μελλοντικά</span></div>
+  <div class="tiles">
+    <a class="tile" href="/dashboard/schedule/identify?embed=1"><i class="ic ti ti-user-search"></i><div><div class="tt">Ταυτοποίηση εισαγωγών</div><div class="ds">εκκρεμείς βάρδιες → προφίλ</div></div></a>
+    <a class="tile" href="/dashboard/schedule/imported?embed=1"><i class="ic ti ti-user-plus"></i><div><div class="tt">Εισηγμένα προφίλ</div><div class="ds">merge με master καρτέλα</div></div></a>
+  </div>
+
+  <div class="sec-h"><i class="ti ti-shield-check" style="color:#dc2626;"></i><span class="t">Έλεγχος και καθαρισμός</span><span class="pill">ενοποιεί 3 → μελλοντικά</span></div>
+  <div class="tiles">
+    <a class="tile warn" href="/dashboard/payroll/duplicates?embed=1"><i class="ic ti ti-users"></i><div><div class="tt">Πιθανές διπλοεγγραφές</div><div class="ds">κατά ΑΦΜ</div></div></a>
+    <a class="tile warn" href="/dashboard/payroll/account_audit?embed=1"><i class="ic ti ti-user-search"></i><div><div class="tt">Έλεγχος λογαριασμών</div><div class="ds">λογαριασμοί vs προσωπικό</div></div><span class="bd new">νέο</span></a>
+    <a class="tile warn" href="/dashboard/attention?embed=1"><i class="ic ti ti-alert-triangle"></i><div><div class="tt">Χρειάζονται προσοχή</div><div class="ds">κενά, σημαίες</div></div></a>
+  </div>
+
+  <div class="sec-h"><i class="ti ti-calendar-week"></i><span class="t">Πρόγραμμα και λογαριασμοί</span></div>
+  <div class="tiles">
+    <a class="tile" href="/dashboard/schedule/staff?embed=1"><i class="ic ti ti-users-plus"></i><div><div class="tt">Πρόγραμμα · Προσωπικό</div><div class="ds">τμήμα/ξεν. + διπλά (όνομα)</div></div><span class="bd owner">owner</span></a>
+    <a class="tile" href="/dashboard/schedule/staff_status?embed=1"><i class="ic ti ti-report-money"></i><div><div class="tt">Κατάσταση ανά ξενοδοχείο</div><div class="ds">μηνιαία, μισθοδοτικά</div></div><span class="bd read">read</span></a>
+    <a class="tile" href="/dashboard/users?embed=1"><i class="ic ti ti-user-cog"></i><div><div class="tt">Χρήστες</div><div class="ds">λογαριασμοί πλατφόρμας</div></div><span class="bd read">read</span></a>
+  </div>
+
+  <p class="muted" style="margin-top:16px; font-size:12px; color:#9aa7ad;">Τα badges: <b>hub</b> = είσοδος · <b>read</b> = μόνο προβολή · <b>owner</b> = εδώ γράφεται το δεδομένο. Τα μωβ pill δείχνουν πού θα ενοποιηθούν σκόρπια εργαλεία σε επόμενο βήμα.</p>
+</div></body></html>
