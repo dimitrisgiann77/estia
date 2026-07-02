@@ -2268,6 +2268,9 @@ def schedule_identify_clear_all():
     n = PendingShift.query.delete()
     db.session.commit()
     log_activity('schedule_identify_clear_all', '%d βαρδιες προθαλαμου' % (n or 0))
+    _bk = request.form.get('back')
+    if _bk:
+        return redirect(_bk + ('&embed=1' if '?' in _bk else '?embed=1'))
     return redirect(url_for('schedule_identify') + ('?embed=1' if request.args.get('embed') else ''))
 
 
@@ -2332,6 +2335,9 @@ def schedule_imported_merge():
         except Exception:
             db.session.rollback()
         log_activity('schedule_imported_merge', '%d -> %d' % (drop_id, master_id))
+    _bk = request.form.get('back')
+    if _bk:
+        return redirect(_bk + ('&embed=1' if '?' in _bk else '?embed=1'))
     return redirect(url_for('schedule_imported') + ('?embed=1' if request.args.get('embed') else ''))
 
 
@@ -2346,7 +2352,58 @@ def schedule_imported_delete():
         log_activity('schedule_imported_delete', '%d (%s)' % (uid, 'ok' if ok else _r))
     except Exception:
         db.session.rollback()
+    _bk = request.form.get('back')
+    if _bk:
+        return redirect(_bk + ('&embed=1' if '?' in _bk else '?embed=1'))
     return redirect(url_for('schedule_imported') + ('?embed=1' if request.args.get('embed') else ''))
+
+
+# ── v12.372 (P-051 Φ3) — ΕΝΙΑΙΑ «Ταυτοποίηση εισαγωγών»: προθάλαμος + εισηγμένα σε 2 tabs ──
+@app.route('/dashboard/schedule/import_hub')
+def schedule_import_hub():
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    piimap = _pending_pii_map(); locked = _locked_uids()
+    # Tab 1 — εκκρεμείς βάρδιες (PendingShift), ίδια λογική με schedule_identify
+    groups = {}
+    for ps in PendingShift.query.order_by(PendingShift.work_date).all():
+        g = groups.get(ps.norm_name)
+        if not g:
+            g = {'norm': ps.norm_name, 'raw': ps.raw_name, 'count': 0, 'hotel_tag': ps.hotel_tag,
+                 'dept': ps.dept_raw, 'employer': ps.employer, 'dmin': ps.work_date, 'dmax': ps.work_date}
+            groups[ps.norm_name] = g
+        g['count'] += 1
+        if ps.work_date:
+            if not g['dmin'] or ps.work_date < g['dmin']: g['dmin'] = ps.work_date
+            if not g['dmax'] or ps.work_date > g['dmax']: g['dmax'] = ps.work_date
+    pending = []
+    for g in groups.values():
+        g['suggestions'] = [{'id': u.id, 'name': u.full_name,
+                             'emp_code': (piimap.get(u.id).emp_code if piimap.get(u.id) else None),
+                             'afm': (piimap.get(u.id).afm if piimap.get(u.id) else None),
+                             'locked': u.id in locked, 'score': sc}
+                            for u, sc in _suggest_masters(g['raw'] or g['norm'], limit=5)]
+        pending.append(g)
+    pending.sort(key=lambda x: (-x['count'], x['raw'] or ''))
+    # Tab 2 — εισηγμένα προφίλ (keyless), ίδια λογική με schedule_imported
+    imp = []
+    for u in imported_staff_query().filter(User.is_active == True).all():
+        if u.id in locked:
+            continue
+        sugg = None
+        for cand, sc in _suggest_masters(u.full_name or '', limit=8):
+            if cand.id == u.id or cand.id not in locked:
+                continue
+            pp = piimap.get(cand.id)
+            sugg = {'id': cand.id, 'name': cand.full_name,
+                    'emp_code': (pp.emp_code if pp else None), 'afm': (pp.afm if pp else None), 'score': sc}
+            break
+        imp.append({'id': u.id, 'name': u.full_name,
+                    'shifts': ShiftAssignment.query.filter_by(user_id=u.id).count(), 'suggestion': sugg})
+    imp.sort(key=lambda r: (0 if r['suggestion'] else 1, -r['shifts'], r['name'] or ''))
+    log_activity('schedule_import_hub', '%d pending / %d imported' % (len(pending), len(imp)))
+    return render_template('schedule_import_hub.html', pending=pending, n_pending=len(pending),
+                           imported=imp, n_imported=len(imp))
 
 
 # ── PASTE: μαζική επικόλληση προγράμματος από Excel (όνομα + Δ–Κ) ──────────────

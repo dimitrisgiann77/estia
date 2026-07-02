@@ -1,0 +1,157 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Ταυτοποίηση εισαγωγών', theme.primary) }}
+<style>
+.b{background:var(--accent,#185FA5);color:#fff;border:none;padding:8px 14px;border-radius:9px;cursor:pointer;font:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.b.g{background:#16a34a;} .b.x{background:#fff;color:#b91c1c;border:1px solid #f0c4c4;}
+.tabs{display:flex;gap:8px;margin:2px 0 16px;border-bottom:2px solid #eef2f6;}
+.tab{background:none;border:none;padding:11px 16px;font:inherit;font-weight:600;color:#64748b;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;display:inline-flex;align-items:center;gap:7px;}
+.tab.on{color:var(--accent,#185FA5);border-bottom-color:var(--accent,#185FA5);}
+.tab .cnt{background:#eef2f6;color:#475569;border-radius:20px;padding:0 8px;font-size:11.5px;font-weight:700;}
+.tab.on .cnt{background:#e7f0fb;color:#185FA5;}
+.pcard{border:1px solid #e6ecf2;border-radius:14px;padding:14px 16px;margin-bottom:14px;background:#fff;}
+.pname{font-size:16px;font-weight:700;}
+.chip{display:inline-block;padding:2px 9px;border-radius:11px;font-size:11.5px;background:#f1f5f9;color:#475569;margin:2px 4px 2px 0;}
+.sg{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid #eef2f6;border-radius:10px;margin:5px 0;flex-wrap:wrap;}
+.sg .nm{font-weight:600;}
+.k{padding:2px 8px;border-radius:10px;font-size:11px;} .k.lock{background:#e7f0fb;color:#185FA5;} .k.mgmt{background:#eef2f6;color:#64748b;}
+.meta{font-size:12px;color:#64748b;} .sc{margin-left:auto;font-size:11px;color:#94a3b8;}
+.srch{width:100%;padding:8px 10px;border:1px solid #dbe3ea;border-radius:9px;font:inherit;margin-top:4px;}
+details summary{cursor:pointer;color:var(--accent,#185FA5);font-size:13px;font-weight:600;}
+.row-actions{margin-top:10px;border-top:1px dashed #e6ecf2;padding-top:8px;display:flex;gap:8px;flex-wrap:wrap;}
+.empty{text-align:center;color:#64748b;padding:40px 10px;}
+.qbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+</style></head><body>
+{{ mp.topbar('user-search', 'Ταυτοποίηση εισαγωγών', 'Προθάλαμος βαρδιών + εισηγμένα προφίλ — σε μία οθόνη') }}
+<div class="container">
+  <div class="card" style="border-left:4px solid var(--accent,#185FA5);">
+    <b>Εδώ ταυτοποιείς ό,τι ήρθε από εισαγωγές:</b> στην καρτέλα «Εκκρεμείς βάρδιες» συνδέεις ονόματα προγράμματος με το σωστό 🔒 προφίλ· στην «Εισηγμένα προφίλ» συγχωνεύεις ή διαγράφεις παλιά προφίλ χωρίς κλειδιά. Τίποτα δεν ενώνεται μόνο του.
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tabbtn-pending" onclick="showTab('pending')"><i class="ti ti-clock-pause"></i> Εκκρεμείς βάρδιες <span class="cnt">{{ n_pending }}</span></button>
+    <button class="tab" id="tabbtn-imported" onclick="showTab('imported')"><i class="ti ti-user-cog"></i> Εισηγμένα προφίλ <span class="cnt">{{ n_imported }}</span></button>
+  </div>
+
+  <div id="tab-pending">
+    {% if n_pending %}
+    <div class="card qbar">
+      <div style="flex:1;min-width:200px;font-size:13px;color:#475569;"><b>Γρήγορες κινήσεις:</b> ταυτοποίησε κλειδωμένα στο όνομά τους, μετά επιβεβαίωσε τα 100%. Δεν είναι merge.</div>
+      <form method="POST" action="/dashboard/schedule/identify/seed_locked?embed=1" style="margin:0;" onsubmit="return confirm('Σύνδεση κάθε κλειδωμένου προφίλ στο ίδιο του το όνομα;');">
+        <input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+        <button class="b" type="submit"><i class="ti ti-lock-check"></i> Ταυτοποίηση κλειδωμένων</button>
+      </form>
+      <form method="POST" action="/dashboard/schedule/identify/auto?embed=1" style="margin:0;" onsubmit="return confirm('Σύνδεση όλων των ονομάτων που ταιριάζουν ΑΚΡΙΒΩΣ (100%);');">
+        <input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+        <button class="b g" type="submit"><i class="ti ti-checks"></i> Επιβεβαίωση ακριβών</button>
+      </form>
+      <form method="POST" action="/dashboard/schedule/identify/clear_all?embed=1" style="margin:0;" onsubmit="return confirm('ΚΑΘΑΡΙΣΜΟΣ ΟΛΟΥ του προθαλάμου ({{ n_pending }} ονόματα); Δεν αναιρείται.');">
+        <input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+        <button class="b x" type="submit"><i class="ti ti-trash-x"></i> Καθαρισμός προθαλάμου</button>
+      </form>
+    </div>
+    {% for it in pending %}
+    <div class="pcard">
+      <div class="pname">{{ it.raw or it.norm }}</div>
+      <div style="margin:6px 0;">
+        <span class="chip">📅 {{ it.count }} βάρδιες</span>
+        {% if it.dmin %}<span class="chip">{{ it.dmin.strftime('%d/%m/%Y') }} – {{ it.dmax.strftime('%d/%m/%Y') }}</span>{% endif %}
+        {% if it.hotel_tag %}<span class="chip">🏨 {{ it.hotel_tag }}</span>{% endif %}
+        {% if it.dept %}<span class="chip">{{ it.dept }}</span>{% endif %}
+      </div>
+      {% if it.suggestions %}
+      <div class="meta" style="margin-top:8px;">Προτεινόμενα προφίλ (εσύ επιβεβαιώνεις):</div>
+      {% for s in it.suggestions %}
+      <div class="sg">
+        {% if s.locked %}<span class="k lock">🔒 Οριστικοποιημένο</span>{% else %}<span class="k mgmt">Management</span>{% endif %}
+        <span class="nm">{{ s.name }}</span>
+        <span class="meta">{% if s.emp_code %}Κωδ: <b>{{ s.emp_code }}</b>{% endif %}{% if s.afm %} · ΑΦΜ: <b>{{ s.afm }}</b>{% endif %}</span>
+        <span class="sc">{{ s.score }}%</span>
+        <form method="POST" action="/dashboard/schedule/identify/link?embed=1" style="margin:0;">
+          <input type="hidden" name="norm_name" value="{{ it.norm }}"><input type="hidden" name="master_id" value="{{ s.id }}">
+          <input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+          <button class="b g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button>
+        </form>
+      </div>
+      {% endfor %}
+      {% endif %}
+      <details style="margin-top:8px;">
+        <summary>Χειροκίνητη αναζήτηση (όνομα / ΑΦΜ / κωδικός)</summary>
+        <input class="srch" type="text" placeholder="Πληκτρολόγησε όνομα, ΑΦΜ ή κωδικό…" oninput="schSearch(this, '{{ it.norm }}')">
+        <div class="srres"></div>
+      </details>
+      <div class="row-actions">
+        <form method="POST" action="/dashboard/schedule/identify/dismiss?embed=1" style="margin:0;" onsubmit="return confirm('Διαγραφή βαρδιών αυτού του ονόματος από τον προθάλαμο;');">
+          <input type="hidden" name="norm_name" value="{{ it.norm }}"><input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+          <button class="b x" type="submit"><i class="ti ti-trash"></i> Αγνόησε / σκουπίδι</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card empty"><i class="ti ti-checks" style="font-size:34px;color:#16a34a;display:block;margin-bottom:8px;"></i>Κανένα όνομα σε αναμονή ταυτοποίησης. 🎉</div>
+    {% endif %}
+  </div>
+
+  <div id="tab-imported" style="display:none;">
+    {% if n_imported %}
+    {% for r in imported %}
+    <div class="pcard">
+      <div class="pname">{{ r.name }} <span class="k mgmt">Management</span></div>
+      <div style="margin:6px 0;"><span class="chip">📅 {{ r.shifts }} βάρδιες</span><span class="chip"><i>χωρίς κλειδιά</i></span></div>
+      {% if r.suggestion %}
+      <div class="meta" style="margin-top:8px;">Προτεινόμενο 🔒 επίσημο προφίλ:</div>
+      <div class="sg">
+        <span class="k lock">🔒 Οριστικοποιημένο</span><span class="nm">{{ r.suggestion.name }}</span>
+        <span class="meta">{% if r.suggestion.emp_code %}Κωδ: <b>{{ r.suggestion.emp_code }}</b>{% endif %}{% if r.suggestion.afm %} · ΑΦΜ: <b>{{ r.suggestion.afm }}</b>{% endif %}</span>
+        <span class="sc">{{ r.suggestion.score }}%</span>
+        <form method="POST" action="/dashboard/schedule/imported/merge?embed=1" style="margin:0 0 0 auto;" onsubmit="return confirm('Συγχώνευση «{{ r.name }}» με «{{ r.suggestion.name }}»; Οι {{ r.shifts }} βάρδιες περνούν στο επίσημο, το διπλό διαγράφεται.');">
+          <input type="hidden" name="drop_id" value="{{ r.id }}"><input type="hidden" name="master_id" value="{{ r.suggestion.id }}">
+          <input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+          <button class="b g" type="submit"><i class="ti ti-arrow-merge"></i> Συγχώνευση με Master</button>
+        </form>
+      </div>
+      {% else %}
+      <div class="meta" style="margin-top:8px;">Δεν βρέθηκε αντίστοιχο 🔒 επίσημο προφίλ — αν είναι αληθινός πρόσθεσέ τον στο μητρώο, αλλιώς διέγραψέ τον.</div>
+      {% endif %}
+      <div class="row-actions">
+        <form method="POST" action="/dashboard/schedule/imported/delete?embed=1" style="margin:0;" onsubmit="return confirm('Οριστική διαγραφή «{{ r.name }}» + {{ r.shifts }} βαρδιών; Δεν αναιρείται.');">
+          <input type="hidden" name="uid" value="{{ r.id }}"><input type="hidden" name="back" value="/dashboard/schedule/import_hub">
+          <button class="b x" type="submit"><i class="ti ti-trash"></i> Διαγραφή</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card empty"><i class="ti ti-checks" style="font-size:34px;color:#16a34a;display:block;margin-bottom:8px;"></i>Κανένα εισηγμένο προφίλ χωρίς κλειδιά. 🎉</div>
+    {% endif %}
+  </div>
+</div>
+<script>
+function showTab(t){
+  document.getElementById('tab-pending').style.display = (t==='pending')?'':'none';
+  document.getElementById('tab-imported').style.display = (t==='imported')?'':'none';
+  document.getElementById('tabbtn-pending').classList.toggle('on', t==='pending');
+  document.getElementById('tabbtn-imported').classList.toggle('on', t==='imported');
+}
+function schSearch(inp, norm){
+  var box = inp.parentNode.querySelector('.srres'); var q = inp.value.trim();
+  if(q.length < 2){ box.innerHTML=''; return; }
+  fetch('/dashboard/schedule/identify/search?q='+encodeURIComponent(q))
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!rows.length){ box.innerHTML='<div class="meta" style="padding:6px;">Καμία αντιστοιχία.</div>'; return; }
+      var h='';
+      rows.forEach(function(s){
+        h+='<div class="sg">'+(s.locked?'<span class="k lock">🔒 Οριστικοποιημένο</span>':'<span class="k mgmt">Management</span>')+
+           '<span class="nm">'+(s.name||'')+'</span>'+
+           '<span class="meta">'+(s.emp_code?('Κωδ: <b>'+s.emp_code+'</b>'):'')+(s.afm?(' · ΑΦΜ: <b>'+s.afm+'</b>'):'')+'</span>'+
+           '<form method="POST" action="/dashboard/schedule/identify/link?embed=1" style="margin:0 0 0 auto;">'+
+           '<input type="hidden" name="norm_name" value="'+norm+'"><input type="hidden" name="master_id" value="'+s.id+'">'+
+           '<input type="hidden" name="back" value="/dashboard/schedule/import_hub">'+
+           '<button class="b g" type="submit"><i class="ti ti-link"></i> Σύνδεσε</button></form></div>';
+      });
+      box.innerHTML=h;
+    });
+}
+</script>
+</body></html>
