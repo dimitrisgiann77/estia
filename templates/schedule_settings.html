@@ -16,10 +16,26 @@
       Ώρα: <input type="time" name="cutoff_time" value="{{ policy.cutoff_time }}">
       Lead (μέρες πριν τη Δευτέρα): <input type="number" name="lead_days" value="{{ policy.lead_days }}" style="width:70px;">
     </div>
-    <div class="row">Admin override: <select name="allow_admin_override"><option value="1" {{ 'selected' if policy.allow_admin_override|int==1 }}>Ναι</option><option value="0" {{ 'selected' if policy.allow_admin_override|int==0 }}>Όχι</option></select></div>
+    <div class="row">Admin επεξεργάζεται ΠΑΝΤΑ το παρελθόν (owner): <select name="allow_admin_override"><option value="1" {{ 'selected' if policy.allow_admin_override|int==1 }}>Ναι</option><option value="0" {{ 'selected' if policy.allow_admin_override|int==0 }}>Όχι — κι ο admin περνά από ξεκλείδωμα</option></select></div>
     <div class="row">Managers επεξεργάζονται κλειδωμένες/ληγμένες εβδομάδες: <select name="manager_edit_locked"><option value="0" {{ 'selected' if policy.manager_edit_locked|int==0 }}>Όχι</option><option value="1" {{ 'selected' if policy.manager_edit_locked|int==1 }}>Ναι</option></select></div>
+    <div class="row">Παράθυρο διόρθωσης — μέρες μετά τη λήξη εβδομάδας που μένει ανοιχτή: <input type="number" name="past_correction_days" value="{{ policy.past_correction_days }}" min="0" style="width:70px;"> <span style="color:#94a3b8;font-size:12px;">(0 = κλειδώνει στην προθεσμία)</span></div>
+    <div class="row">Πάγωμα μετά την υποβολή στο λογιστήριο: <select name="freeze_on_submit"><option value="0" {{ 'selected' if policy.freeze_on_submit|int==0 }}>Όχι</option><option value="1" {{ 'selected' if policy.freeze_on_submit|int==1 }}>Ναι</option></select></div>
     <button class="b" type="submit">Αποθήκευση πολιτικής</button>
   </form></div>
+
+  <div class="card"><h3>🔓 Ενεργά ξεκλειδώματα παρελθόντος</h3>
+    {% if reopens %}<table>
+      <tr><th>Διάστημα</th><th>Ξενοδοχείο</th><th>Λήγει</th><th>Σημείωση</th></tr>
+      {% for r in reopens %}<tr><td>{{ r.from_date.strftime('%d/%m/%Y') }} → {{ r.to_date.strftime('%d/%m/%Y') }}</td><td>{{ r.hotel_id or 'όλα' }}</td><td>{{ r.expires_at.strftime('%d/%m %H:%M') }}</td><td>{{ r.note or '' }}</td></tr>{% endfor %}
+    </table>{% else %}<div style="color:#94a3b8;">Κανένα ενεργό ξεκλείδωμα. (Το κάνεις από το πρόγραμμα → «Ξεκλείδωσε για διόρθωση».)</div>{% endif %}
+  </div>
+
+  <div class="card"><h3>📝 Ιστορικό αλλαγών παρελθόντος (audit)</h3>
+    {% if audit_rows %}<table>
+      <tr><th>Πότε</th><th>Ποιος</th><th>Εργαζόμενος</th><th>Μέρα</th><th>Από → Σε</th><th>Πηγή</th></tr>
+      {% for a in audit_rows %}<tr><td>{{ a.ts.strftime('%d/%m %H:%M') }}</td><td>{{ a.actor_name }}</td><td>{{ a.target_name }}</td><td>{{ a.work_date.strftime('%d/%m') if a.work_date }}</td><td>{{ a.old_val or '—' }} → <b>{{ a.new_val or '—' }}</b></td><td style="color:#94a3b8;">{{ a.source }}</td></tr>{% endfor %}
+    </table>{% else %}<div style="color:#94a3b8;">Καμία καταγεγραμμένη αλλαγή παρελθόντος.</div>{% endif %}
+  </div>
 
   <div class="card"><h3>Κανόνες υποβολής</h3><table>
     <tr><th>Κωδικός</th><th>Περιγραφή</th><th>Σοβαρότητα</th><th>Ενεργός</th><th></th></tr>

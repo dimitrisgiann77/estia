@@ -247,6 +247,30 @@ class ScheduleSubmission(db.Model):
     submitted_at  = db.Column(db.DateTime, default=datetime.now)
     submitted_by  = db.Column(db.Integer, db.ForeignKey('user.id'))
 
+# v12.389 — Ρητό ΞΕΚΛΕΙΔΩΜΑ παρελθόντος: ο admin ανοίγει συγκεκριμένο διάστημα για διόρθωση (managers μπαίνουν προσωρινά)
+class ScheduleReopen(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    hotel_id   = db.Column(db.Integer, index=True)     # null = όλα τα ξενοδοχεία
+    from_date  = db.Column(db.Date, nullable=False, index=True)
+    to_date    = db.Column(db.Date, nullable=False, index=True)
+    opened_by  = db.Column(db.Integer)
+    opened_at  = db.Column(db.DateTime, default=datetime.now)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    note       = db.Column(db.String(200))
+
+# v12.389 — Audit παρελθοντικών αλλαγών: ποιος/πότε/κελί/παλιό→νέο
+class ScheduleAudit(db.Model):
+    id         = db.Column(db.Integer, primary_key=True)
+    ts         = db.Column(db.DateTime, default=datetime.now, index=True)
+    actor_id   = db.Column(db.Integer, index=True)
+    actor_name = db.Column(db.String(120))
+    target_uid = db.Column(db.Integer, index=True)
+    target_name= db.Column(db.String(120))
+    work_date  = db.Column(db.Date, index=True)
+    old_val    = db.Column(db.String(300))
+    new_val    = db.Column(db.String(300))
+    source     = db.Column(db.String(20))          # cell | bulk | excel
+
 
 # ── MIGRATION (στήλες User) ───────────────────────────────────────────────────
 def ensure_schedule_columns():
@@ -610,8 +634,10 @@ POLICY_DEFAULTS = {
     'cutoff_dow': 3,          # 0=Δευτ ... 3=Πέμπτη
     'cutoff_time': '18:00',
     'lead_days': 4,           # προθεσμία = lead_days πριν τη Δευτέρα της W (4 = Πέμπτη προηγ.)
-    'allow_admin_override': 1,
+    'allow_admin_override': 1, # v12.389: αν 1, ο admin επεξεργάζεται ΠΑΝΤΑ (owner)· αν 0, κλειδώνεται κι αυτός στο παρελθόν (χρειάζεται re-open)
     'manager_edit_locked': 0, # v12.230: αν 1, οι managers επεξεργάζονται και ΚΛΕΙΔΩΜΕΝΕΣ/ληγμένες εβδομάδες
+    'past_correction_days': 0, # v12.389: παράθυρο διόρθωσης — επεξεργάσιμο N μέρες ΜΕΤΑ τη λήξη της εβδομάδας (0=όχι)
+    'freeze_on_submit': 0,     # v12.389: αν 1, εβδομάδα υποβεβλημένη στο λογιστήριο παγώνει (χρειάζεται re-open) — Φ3
 }
 
 def get_policy():
@@ -644,18 +670,49 @@ def week_deadline(week_start):
     d = week_start - timedelta(days=int(pol['lead_days']))
     return datetime.combine(d, dtime(hh, mm))
 
-def week_editable(week_start, user=None):
-    """True αν η εβδομάδα είναι ακόμη επεξεργάσιμη. v12.121: ο admin ΠΑΝΤΑ μπορεί
-    (ιδιοκτήτης)· οι managers δεσμεύονται από την προθεσμία."""
+def _week_in_reopen(week_start, hotel_id=None):
+    """v12.389 — True αν η εβδομάδα καλύπτεται από ΕΝΕΡΓΟ ρητό ξεκλείδωμα (admin re-open)."""
+    now = datetime.now()
+    wk_end = week_start + timedelta(days=6)
+    try:
+        q = ScheduleReopen.query.filter(ScheduleReopen.expires_at > now,
+                                        ScheduleReopen.from_date <= wk_end,
+                                        ScheduleReopen.to_date >= week_start).all()
+    except Exception:
+        return False
+    for r in q:
+        if r.hotel_id is None or hotel_id is None or r.hotel_id == hotel_id:
+            return True
+    return False
+
+def week_editable(week_start, user=None, hotel_id=None):
+    """v12.389 — Πότε επεξεργάζεται μια εβδομάδα. Κλιμάκωση:
+    admin owner-override (ρυθμιζόμενο) · πριν την προθεσμία · παράθυρο διόρθωσης (N μέρες μετά) ·
+    ενεργό re-open (admin το άνοιξε για managers) · legacy manager_edit_locked. Αλλιώς κλειδωμένο."""
     if user is None:
         user = current_user()
-    if user is not None and role_rank(user.role) >= ROLE_RANK['admin']:
+    if user is None:
+        return False
+    pol = get_policy()
+    # 1) admin owner-override — αν είναι ενεργό, ο admin επεξεργάζεται πάντα
+    if role_rank(user.role) >= ROLE_RANK['admin'] and int(pol.get('allow_admin_override', 1) or 0):
         return True
-    if datetime.now() < week_deadline(week_start):
+    # staff (κάτω από manager) δεν επεξεργάζεται ποτέ
+    if role_rank(user.role) < ROLE_RANK['manager']:
+        return False
+    now = datetime.now()
+    # 2) πριν την προθεσμία οριστικοποίησης
+    if now < week_deadline(week_start):
         return True
-    # v12.230: ρυθμιζόμενη εξαίρεση — managers επεξεργάζονται κλειδωμένες/ληγμένες εβδομάδες
-    if (user is not None and role_rank(user.role) >= ROLE_RANK['manager']
-            and int(get_policy().get('manager_edit_locked', 0) or 0)):
+    # 3) παράθυρο διόρθωσης: μέχρι Κυριακή + N μέρες (τέλος ημέρας)
+    grace = int(pol.get('past_correction_days', 0) or 0)
+    if grace > 0 and now <= datetime.combine(week_start + timedelta(days=6 + grace), dtime(23, 59, 59)):
+        return True
+    # 4) ρητό ξεκλείδωμα (admin το άνοιξε για διόρθωση)
+    if _week_in_reopen(week_start, hotel_id):
+        return True
+    # 5) legacy: managers παντού
+    if int(pol.get('manager_edit_locked', 0) or 0):
         return True
     return False
 
@@ -667,6 +724,23 @@ def is_accountant():
 
 def can_edit_schedule():
     return is_admin() or (current_user() and role_rank(current_user().role) >= ROLE_RANK['manager'])
+
+def _audit_past(actor, uid, wd, old_val, new_val, source):
+    """v12.389 — Καταγραφή αλλαγής σε ΠΑΡΕΛΘΟΝ (μετά την προθεσμία της εβδομάδας). Idempotent-safe."""
+    try:
+        if datetime.now() <= week_deadline(monday_of(wd)):
+            return
+        ov = (old_val or '').strip(); nv = (new_val or '').strip()
+        if ov == nv:
+            return
+        tu = User.query.get(uid)
+        db.session.add(ScheduleAudit(
+            actor_id=(actor.id if actor else None),
+            actor_name=((actor.full_name or actor.username) if actor else '')[:120],
+            target_uid=uid, target_name=((tu.full_name if tu else '') or '')[:120],
+            work_date=wd, old_val=ov[:300], new_val=nv[:300], source=source))
+    except Exception:
+        pass
 
 def resolve_department(name):
     """Ταίριασμα ονόματος τμήματος -> Department (exact -> alias normalized)."""
@@ -1115,7 +1189,7 @@ def _build_block(hotel_id, dept_list, week_start, user):
                .order_by(ScheduleSubmission.version.desc()).first())
     return {
         'week_start': week_start, 'days': days, 'deptgrids': deptgrids,
-        'editable': week_editable(week_start, user) and can_edit_schedule(),
+        'editable': week_editable(week_start, user, hotel_id) and can_edit_schedule(),
         'issues': validate_hotel_week(hotel_id, week_start) if hotel_id else [],
         'deadline': week_deadline(week_start), 'sub': sub, 'iso': week_start.isoformat(),
         'label': f"{week_start.strftime('%d/%m')} – {(week_start + timedelta(days=6)).strftime('%d/%m/%Y')}",
@@ -1136,7 +1210,7 @@ def _build_span_block(hotel_id, dept_list, days, user, label):
     def _ed(d):
         ws = monday_of(d)
         if ws not in _wk:
-            _wk[ws] = bool(week_editable(ws, user) and can_edit_schedule())
+            _wk[ws] = bool(week_editable(ws, user, hotel_id) and can_edit_schedule())
         return _wk[ws]
     _, rows = _grid_for_days(hotel_id, None, days, users=users)
     for r in rows:
@@ -1213,6 +1287,23 @@ def schedule_board():
     shift_lookup = {st.code: st for st in shift_types}
     shift_types_json = json.dumps([{'code': st.code, 'color': st.color} for st in entry_shift_types()], ensure_ascii=False)
     cur_hotel = Hotel.query.get(hotel_id) if hotel_id else None
+    # v12.389 — εύρος προβολής + ενεργό re-open (για banner/κουμπί ξεκλειδώματος)
+    if view_mode == 'year':
+        view_from, view_to = date(sel_year, 1, 1), date(sel_year, 12, 31)
+    elif view_mode == 'month':
+        view_from = date(sel_year, sel_month, 1)
+        view_to = date(sel_year, sel_month, _cal.monthrange(sel_year, sel_month)[1])
+    else:
+        view_from, view_to = week_start, week_start + timedelta(days=7 * weeks - 1)
+    reopen_active = None
+    try:
+        reopen_active = (ScheduleReopen.query
+            .filter(ScheduleReopen.expires_at > datetime.now(),
+                    ScheduleReopen.from_date <= view_to, ScheduleReopen.to_date >= view_from,
+                    db.or_(ScheduleReopen.hotel_id == hotel_id, ScheduleReopen.hotel_id.is_(None)))
+            .order_by(ScheduleReopen.expires_at.desc()).first())
+    except Exception:
+        reopen_active = None
     return render_template('schedule_board.html',
         shift_lookup=shift_lookup, shift_types_json=shift_types_json,
         hotels=hotels, hotel_id=hotel_id, cur_hotel=cur_hotel, dept_list=dept_list,
@@ -1221,6 +1312,7 @@ def schedule_board():
         prev_week=(week_start - timedelta(days=7)).isoformat(),
         next_week=(week_start + timedelta(days=7)).isoformat(),
         month_el=MONTHS_EL, is_admin=is_admin(),
+        view_from=view_from.isoformat(), view_to=view_to.isoformat(), reopen_active=reopen_active,
         sel_month=sel_month, sel_year=sel_year, view_mode=view_mode, month_block=month_block, year_block=year_block,
         prev_month=prev_m.month, prev_year=prev_m.year, next_month=nxt.month, next_year=nxt.year)
 
@@ -1522,10 +1614,12 @@ def schedule_cells_bulk():
                 _dok, _dmsg = _rotation_can_modify(uid, _ex, board_hid)
                 if not _dok:
                     blocked += 1; _last_msg = _dmsg; continue
+        _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         if code:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
                 segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_wh_use, created_by=user.id))
+        _audit_past(user, uid, wd, _old, code or '', 'bulk')
         touched.add((uid, monday_of(wd)))
         done += 1
     for uid, ws in touched:
@@ -1585,10 +1679,12 @@ def schedule_day():
         if _grot:
             whid = _gwh
         norm.append((code, segs, whid))
+    _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
     ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
     for code, segs, whid in norm:
         db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
             segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+    _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _ in norm), 'cell')
     u = User.query.get(uid)
     if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
         ws = monday_of(wd)
@@ -1650,10 +1746,12 @@ def schedule_paste_cells():
             _entries_use.append((code, segs, whid))
         if _blk:
             blocked += 1; continue
+        _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         for code, segs, whid in _entries_use:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
                 segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+        _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _ in _entries_use), 'excel')
         u = User.query.get(uid)
         if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
             ws = monday_of(wd)
@@ -2767,6 +2865,39 @@ def schedule_paste():
 
 
 # ── ADMIN settings (κωδικοί / τμήματα / αργίες / πολιτική / κανόνες) ───────────
+@app.route('/dashboard/schedule/reopen', methods=['POST'])
+def schedule_reopen():
+    """v12.389 — Ρητό ξεκλείδωμα παρελθόντος από admin: ανοίγει διάστημα [from,to] για συγκεκριμένο
+    χρόνο ώστε να μπουν οι managers να διορθώσουν. action=close → κλείνει τα ενεργά του διαστήματος."""
+    if not _auth() or not is_admin():
+        return redirect(url_for('login'))
+    u = current_user()
+    hotel_id = request.form.get('hotel_id', type=int)
+    back = request.form.get('back') or '/dashboard/schedule?embed=1'
+    act = request.form.get('action') or 'open'
+    try:
+        frm = datetime.strptime(request.form['from'], '%Y-%m-%d').date()
+        to = datetime.strptime(request.form['to'], '%Y-%m-%d').date()
+    except Exception:
+        return redirect(back)
+    if act == 'close':
+        now = datetime.now()
+        for r in ScheduleReopen.query.filter(ScheduleReopen.expires_at > now,
+                                             ScheduleReopen.from_date <= to,
+                                             ScheduleReopen.to_date >= frm).all():
+            if r.hotel_id is None or hotel_id is None or r.hotel_id == hotel_id:
+                r.expires_at = now
+        db.session.commit()
+        return redirect(back)
+    hours = request.form.get('hours', type=int) or 24
+    hours = max(1, min(hours, 24 * 30))
+    exp = datetime.now() + timedelta(hours=hours)
+    db.session.add(ScheduleReopen(hotel_id=hotel_id, from_date=frm, to_date=to,
+        opened_by=u.id, expires_at=exp, note=(request.form.get('note') or '')[:200]))
+    db.session.commit()
+    return redirect(back)
+
+
 @app.route('/dashboard/schedule/settings', methods=['GET', 'POST'])
 def schedule_settings():
     if not _auth() or not is_admin():
@@ -2820,13 +2951,22 @@ def schedule_settings():
             db.session.commit()
         return redirect('/dashboard/schedule/settings?embed=1&ok=1')
     _allow = _entry_codes_setting('admin'); _allow_m = _entry_codes_setting('manager')
+    try:
+        audit_rows = ScheduleAudit.query.order_by(ScheduleAudit.ts.desc()).limit(40).all()
+    except Exception:
+        audit_rows = []
+    try:
+        reopens = ScheduleReopen.query.filter(ScheduleReopen.expires_at > datetime.now()).order_by(ScheduleReopen.expires_at.desc()).all()
+    except Exception:
+        reopens = []
     return render_template('schedule_settings.html',
         policy=get_policy(), shift_types=ShiftType.query.order_by(ShiftType.sort).all(),
         entry_codes=_allow, entry_all=(_allow is None),
         entry_codes_mgr=_allow_m, entry_all_mgr=(_allow_m is None),
         depts=Department.query.order_by(Department.sort).all(),
         holidays=Holiday.query.order_by(Holiday.hol_date).all(),
-        rules=ScheduleRule.query.all(), dow_el=DOW_EL)
+        rules=ScheduleRule.query.all(), dow_el=DOW_EL,
+        audit_rows=audit_rows, reopens=reopens)
 
 
 # ── ROUTE: Διαχείριση Προσωπικού (οργανόγραμμα: τμήμα/ξενοδοχείο/login) ────────
