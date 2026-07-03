@@ -56,8 +56,8 @@
   .legend{padding:8px 10px;background:var(--card,#fff);border:1px solid var(--bd,#e2e8f0);border-radius:10px;}
 
   .editor{position:fixed;z-index:90;background:var(--card,#fff);border:1px solid var(--bd,#cbd5e1);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:12px;width:300px;display:none;max-height:calc(100vh - 20px);overflow:auto;}
-  .editor h5{margin:-4px -4px 8px;font-size:12px;color:#475569;cursor:move;user-select:none;display:flex;align-items:center;gap:6px;padding:4px 4px 7px;border-bottom:1px solid var(--bd,#eef2f6);}
-  .editor h5::before{content:"\2630";font-size:12px;opacity:.45;} .codes{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;} .codes button{border:none;border-radius:7px;padding:5px 8px;color:#fff;cursor:pointer;font-size:11px;}
+  .editor h5{margin:-4px -4px 8px;font-size:12px;color:#475569;user-select:none;display:flex;align-items:center;gap:6px;padding:4px 4px 7px;border-bottom:1px solid var(--bd,#eef2f6);}
+  .codes{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;} .codes button{border:none;border-radius:7px;padding:5px 8px;color:#fff;cursor:pointer;font-size:11px;}
   .times{display:flex;gap:5px;align-items:center;margin-bottom:8px;} .times input{width:70px;padding:5px;border:1px solid var(--bd,#cbd5e1);border-radius:7px;} .ed-actions{display:flex;justify-content:space-between;}
   .issues .it{font-size:12px;padding:4px 8px;border-radius:7px;background:#fef2f2;color:#b91c1c;margin-bottom:3px;} .issues .it.warn{background:#fffbeb;color:#92400e;}
     table.grid td.name .nm{font-weight:600;}
@@ -116,8 +116,6 @@
   </div>
   {% endif %}
 
-  <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 8px;"><i class="ti ti-pointer"></i> Σύρε για εύρος · <b>Ctrl+κλικ</b> για πολλά κουτιά (ημέρες/άτομα) · <b>Ctrl+C</b>/<b>Ctrl+V</b> αντιγραφή & επικόλληση βάρδιας σε άλλα κελιά. Το <b>Ctrl+C</b> αντιγράφει και για <b>Excel</b>, και το <b>Ctrl+V</b> επικολλά και <b>από</b> Excel — διάλεξε ένα κελί-αφετηρία και κολλάει ολόκληρο το μπλοκ. Η αντιγραφή μένει ενεργή μέχρι να αντιγράψεις κάτι άλλο.</p>
-
   {% set qs=request.args %}
   {% if qs.get('ok')=='submitted' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκε στο λογιστήριο.</div>{% endif %}
   {% if qs.get('ok')=='copied' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-copy"></i> Αντιγράφηκε η προηγούμενη εβδομάδα.</div>{% endif %}
@@ -126,23 +124,25 @@
 
   {% if view_mode=='month' %}
   <div class="sched-toolbar" style="margin-bottom:10px;">
+    <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar-month"></i> {{ month_block.label if month_block }} — όλο το προσωπικό ({{ month_block.rows|length if month_block }})</h3>
     <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&embed=1"><i class="ti ti-arrow-left"></i> Εβδομαδιαία</a>
     <div class="fsep"></div>
     <div class="fgrp"><span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
       <select onchange="location.href='/dashboard/schedule?view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1&hotel_id='+this.value">
         {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}</select></div>
     <div class="fgrp"><span class="flab"><i class="ti ti-calendar-month"></i> Μήνας</span>
-      <span class="wk-nav">
-        <a title="Προηγ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ prev_month }}&year={{ prev_year }}&embed=1"><i class="ti ti-chevron-left"></i></a>
-        <b style="min-width:120px;text-align:center;display:inline-block;">{{ month_block.label if month_block }}</b>
-        <a title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+      <span style="display:flex;gap:6px;">
+        <select onchange="location.href='/dashboard/schedule?view=month&hotel_id={{ hotel_id }}&year={{ sel_year }}&embed=1&month='+this.value">
+          {% for mi in range(1,13) %}<option value="{{ mi }}" {{ 'selected' if mi==sel_month }}>{{ month_el[mi] }}</option>{% endfor %}</select>
+        <select onchange="location.href='/dashboard/schedule?view=month&hotel_id={{ hotel_id }}&month={{ sel_month }}&embed=1&year='+this.value">
+          {% for yy in [sel_year-1, sel_year, sel_year+1] %}<option value="{{ yy }}" {{ 'selected' if yy==sel_year }}>{{ yy }}</option>{% endfor %}</select>
       </span></div>
     <div class="fgrp" style="position:relative;"><span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
       <details class="mdept">
         <summary id="mdeptSum" style="cursor:pointer;padding:7px 10px;border:1px solid #d6eef3;border-radius:7px;background:#fff;font-size:13px;list-style:none;white-space:nowrap;">Όλα τα τμήματα</summary>
-        <div style="position:absolute;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow:auto;min-width:210px;">
-          <label style="display:block;padding:4px 6px;font-size:13px;"><input type="checkbox" id="mdAll" checked onchange="monthDeptAll(this)"> Όλα</label>
-          {% for d in dept_list %}<label style="display:block;padding:4px 6px;font-size:13px;"><input type="checkbox" class="mdcb" value="{{ d.id }}" onchange="monthDeptApply()"> {{ d.name }}</label>{% endfor %}
+        <div style="position:absolute;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow:auto;width:max-content;min-width:210px;max-width:420px;">
+          <label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" id="mdAll" checked onchange="monthDeptAll(this)"> Όλα</label>
+          {% for d in dept_list %}<label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" class="mdcb" value="{{ d.id }}" onchange="monthDeptApply()"> {{ d.name }}</label>{% endfor %}
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
@@ -163,8 +163,6 @@
   <div id="boardwrap"><!-- v12.382 P-058: fragment swap αντικαθιστά ΜΟΝΟ αυτό (όχι full reload) -->
   {% if view_mode=='month' and month_block %}
   <div class="card wkcard">
-    <div class="wkhead"><h3><i class="ti ti-calendar-month"></i> {{ month_block.label }} — όλο το προσωπικό ({{ month_block.rows|length }})</h3>
-      <span class="banner open" style="font-size:12px;"><i class="ti ti-pencil"></i> Μηνιαίο πλάνο· ίδια επεξεργασία με την εβδομαδιαία· υποβολή από εβδομαδιαία</span></div>
     <div class="gridwrap monthwrap">
       <table class="grid" id="monthtable">
         <thead><tr><th class="name">Εργαζόμενος</th>
@@ -334,16 +332,27 @@ document.addEventListener('keydown',function(e){
   e.preventDefault(); if(_selBtn)_selBtn.style.display='none'; openEd();
 });
 var _activeWrap=null,_autoRAF=null,_mx=0,_my=0;
-window.addEventListener('mousemove',function(e){_mx=e.clientX;_my=e.clientY;});
+window.addEventListener('mousemove',function(e){
+  _mx=e.clientX;_my=e.clientY;
+  // v12.388 — επιλογή εύρους σε ΟΠΟΙΑΔΗΠΟΤΕ κατεύθυνση (οριζόντια & κάθετα) όσο σέρνεις
+  if(!selecting||!anchor)return;
+  var t=document.elementFromPoint(_mx,_my), cell=(t&&t.closest)?t.closest('.cell[data-edit="1"]'):null;
+  if(cell&&_pos(cell).tb===anchor.tb) markRect(anchor,_pos(cell));
+});
 function _startEdgeScroll(){ if(!_autoRAF) _autoRAF=requestAnimationFrame(_edgeTick); }
 function _edgeTick(){
   if(!selecting||!_activeWrap){_autoRAF=null;return;}
-  var r=_activeWrap.getBoundingClientRect(),pad=55,sp=0;
+  var r=_activeWrap.getBoundingClientRect(),pad=55,vpad=64,sp=0,vp=0;
   if(_mx>r.right-pad) sp=Math.min(32,(_mx-(r.right-pad))/1.4);
   else if(_mx<r.left+pad) sp=-Math.min(32,((r.left+pad)-_mx)/1.4);
-  if(sp){ _activeWrap.scrollLeft+=sp;
+  if(_my>window.innerHeight-vpad) vp=Math.min(28,(_my-(window.innerHeight-vpad))/1.6);   // κοντά στο κάτω άκρο → scroll κάτω
+  else if(_my<vpad) vp=-Math.min(28,(vpad-_my)/1.6);                                       // κοντά στο πάνω άκρο → scroll πάνω
+  if(sp) _activeWrap.scrollLeft+=sp;
+  if(vp) window.scrollBy(0,vp);
+  if(sp||vp){
     var cx=Math.max(r.left+3,Math.min(r.right-3,_mx));
-    var t=document.elementFromPoint(cx,_my), cell=(t&&t.closest)?t.closest('.cell[data-edit="1"]'):null;
+    var cy=Math.max(3,Math.min(window.innerHeight-3,_my));
+    var t=document.elementFromPoint(cx,cy), cell=(t&&t.closest)?t.closest('.cell[data-edit="1"]'):null;
     if(cell&&anchor&&_pos(cell).tb===anchor.tb) markRect(anchor,_pos(cell));
   }
   _autoRAF=requestAnimationFrame(_edgeTick);
@@ -546,13 +555,7 @@ document.addEventListener('keydown',function(e){
     });
   }
 });
-// ── Draggable editor (σύρε από τον τίτλο) ──
-(function(){var ed=document.getElementById('editor'),t=document.getElementById('ed-title'),dx=0,dy=0,drag=false;
-  if(!t)return;
-  t.addEventListener('mousedown',function(e){drag=true;var r=ed.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;e.preventDefault();e.stopPropagation();});
-  window.addEventListener('mousemove',function(e){if(!drag)return;var L=Math.max(0,Math.min(e.clientX-dx,window.innerWidth-ed.offsetWidth));var T=Math.max(0,Math.min(e.clientY-dy,window.innerHeight-ed.offsetHeight));ed.style.left=L+'px';ed.style.top=T+'px';});
-  window.addEventListener('mouseup',function(){drag=false;});
-})();
+// v12.388 — ο editor δεν σέρνεται πλέον (σταθερή θέση, κανονική συμπεριφορά κλικ)
 initBoard();   // v12.382 P-058 — αρχικό bind (τρέχει και μετά από κάθε fragment swap)
 </script>
 </body></html>
