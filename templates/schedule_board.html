@@ -635,7 +635,8 @@ function _matchPerson(lead, people){ var best=null,bs=0,tie=false,bex=false;
   return (best&&!tie)?{p:best,exact:bex}:null; }   // exact=true αν ΟΛΑ τα tokens ταίριαξαν ακριβώς (όχι fuzzy)
 function _shiftLike(s){ s=(s||'').trim(); if(!s)return false;
   if(/\d{1,2}\s*[:\.]\s*\d{2}/.test(s)) return true;                 // έχει ώρα → βάρδια
-  return /^(ΑΝ|ΑΡΓ|ΑΣΘ|ΑΝΕΥ|ΑΔ|ΑΠ|ΑΑ|ΕΡΓ|ΕΩ|ΔΡ|ΡΕΠΟ|ΡΕΠ|ΡΠ|SRG|CNT|AST|PSV|PLM|IRO|CND)/.test(_normName(s)); }
+  // κωδικός = ΟΛΟΚΛΗΡΟ κύτταρο (όχι πρόθεμα ονόματος: «ΑΔΑΜΟΝΑΚΗ»≠ΑΔ, «ΑΠΟΣΤΟΛΟΣ»≠ΑΠ)
+  return /^(ΑΝ|ΑΡΓ|ΑΣΘ|ΑΝΕΥ|ΑΔ|ΑΠ|ΑΑ|ΕΡΓ|ΕΩ|ΔΡ|ΡΕΠΟ|ΡΕΠ|ΡΠ|SRG|CNT|AST|PSV|PLM|IRO|CND)(\s|$)/.test(_normName(s)); }
 function _pasteSmart(grid){
   if(!grid.length) return false;
   var hdr=grid[0], colDate={}, dateCols=[];
