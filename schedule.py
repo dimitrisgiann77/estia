@@ -1271,23 +1271,32 @@ def schedule_month_export():
     from openpyxl.styles import Font, PatternFill, Alignment
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = 'Μηνιαίο'
     navy = PatternFill('solid', fgColor='193847'); we = PatternFill('solid', fgColor='fde2e2')
-    hdr = ['Εργαζόμενος'] + ['%s %d' % (d['wd'], d['d']) for d in mb['day_hdr']] + ['Ώρες', 'Έξτρα', 'Ρεπό', 'Εργ.']
+    # v12.388 — στήλες HOTEL CODE + ΤΜΗΜΑ (home hotel / τμήμα ανά εργαζόμενο)
+    _hnames = {h.id: h.name for h in Hotel.query.all()}
+    _dnames = {d.id: d.name for d in Department.query.all()}
+    NPRE = 3   # πλήθος στηλών πριν τις μέρες (Εργαζόμενος, HOTEL CODE, ΤΜΗΜΑ)
+    hdr = ['Εργαζόμενος', 'HOTEL CODE', 'ΤΜΗΜΑ'] + ['%s %d' % (d['wd'], d['d']) for d in mb['day_hdr']] + ['Ώρες', 'Έξτρα', 'Ρεπό', 'Εργ.']
     ws.append(hdr)
     for cell in ws[1]:
         cell.font = Font(bold=True, color='FFFFFF'); cell.fill = navy; cell.alignment = Alignment(horizontal='center')
     for r in mb['rows']:
-        row = [r['user'].full_name or r['user'].username]
+        u = r['user']
+        _hc = _hotel_short(_hnames.get(getattr(u, 'home_hotel_id', None), ''))
+        _dep = _dnames.get(getattr(u, 'department_id', None), '')
+        row = [u.full_name or u.username, _hc, _dep]
         for c in r['cells']:
             row.append(' / '.join((e['code'] + ((' ' + e['times']) if e.get('times') else '')) for e in c['entries']) if c['entries'] else '')
         row += [r['wk_hours'], r['wk_extra'], r['repo'], r['work_days']]
         ws.append(row)
-    ws.freeze_panes = 'B2'
+    ws.freeze_panes = 'D2'
     ws.column_dimensions['A'].width = 26
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 18
     for i, d in enumerate(mb['day_hdr']):
-        col = openpyxl.utils.get_column_letter(2 + i); ws.column_dimensions[col].width = 13
+        col = openpyxl.utils.get_column_letter(NPRE + 1 + i); ws.column_dimensions[col].width = 13
         if d['we']:
             for rr in range(1, ws.max_row + 1):
-                ws.cell(row=rr, column=2 + i).fill = we
+                ws.cell(row=rr, column=NPRE + 1 + i).fill = we
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     fn = 'monthly_%d_%02d.xlsx' % (year, month)
     return Response(bio.read(),
