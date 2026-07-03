@@ -1730,6 +1730,7 @@ def schedule_paste_excel():
         if sh:
             short2id[sh.upper()] = h.id
     done = 0; locked = 0; skipped = 0; blocked = 0; touched = set(); _pending = {}
+    unread = []   # v12.388 — δείγματα κειμένων που δεν αναγνωρίστηκαν (για ειδοποίηση)
     for it in items:
         try:
             uid = int(it['user_id']); wd = datetime.strptime(it['date'], '%Y-%m-%d').date()
@@ -1737,7 +1738,11 @@ def schedule_paste_excel():
             continue
         code, segs, tag = parse_cell(it.get('text') or '')
         if not code:
-            skipped += 1; continue
+            skipped += 1
+            _t = (it.get('text') or '').strip()
+            if _t and _t not in unread and len(unread) < 15:
+                unread.append(_t)
+            continue
         if not week_editable(monday_of(wd), user):
             locked += 1; continue
         whid = short2id.get((tag or '').upper()) if tag else None
@@ -1768,8 +1773,8 @@ def schedule_paste_excel():
     if not done and blocked:
         return jsonify(ok=False, err='rotation', msg='Δεν επιτρέπεται (εκ περιτροπής — όριο/κλείδωμα ημέρας).')
     if not done and not locked:
-        return jsonify(ok=False, msg='Δεν αναγνωρίστηκε βάρδια στο κείμενο του Excel.')
-    return jsonify(ok=True, done=done, locked=locked, blocked=blocked)
+        return jsonify(ok=False, msg='Δεν αναγνωρίστηκε βάρδια στο κείμενο του Excel.', skipped=skipped, unread=unread)
+    return jsonify(ok=True, done=done, locked=locked, blocked=blocked, skipped=skipped, unread=unread)
 
 
 

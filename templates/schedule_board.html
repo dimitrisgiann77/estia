@@ -589,6 +589,7 @@ function _pasteInternal(cells){
 }
 function _pasteExcel(txt){
   var grid=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(function(l){return l.split('\t');});
+  if(_pasteSmart(grid)) return;   // v12.388 — έξυπνο ταίριασμα κατά όνομα + ημερομηνία (αν το block έχει γραμμή ημερομηνιών)
   var nonEmpty=[]; grid.forEach(function(r){r.forEach(function(v){if((v||'').trim())nonEmpty.push(v.trim());});});
   if(!nonEmpty.length){ _toast('Κενό περιεχόμενο'); return; }
   var items=[];
@@ -607,6 +608,110 @@ function _pasteExcel(txt){
   if(!items.length){ _toast('Τίποτα για επικόλληση'); return; }
   var _pend=_histCapture(items.map(function(it){return {user_id:it.user_id,date:it.date};}));
   fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard(function(){_histCommit(_pend);});}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
+}
+// ── v12.388 — ΕΞΥΠΝΟ Excel-paste: ταίριασμα κατά ΟΝΟΜΑ + ΗΜΕΡΟΜΗΝΙΑ (ανεξ. σειράς) ──
+function _normName(s){ return (s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-ZΑ-Ω0-9]+/g,' ').trim(); }
+function _nameTokens(s){ return _normName(s).split(' ').filter(function(t){return t.length>1;}); }
+function _lev1(a,b){ if(a===b)return true; if(Math.abs(a.length-b.length)>1)return false;
+  var i=0,j=0,e=0; while(i<a.length&&j<b.length){ if(a[i]===b[j]){i++;j++;continue;} if(++e>1)return false;
+    if(a.length>b.length)i++; else if(b.length>a.length)j++; else {i++;j++;} } e+=(a.length-i)+(b.length-j); return e<=1; }
+function _tokEq(a,b){ if(a===b)return true; if(a.length>=4&&b.length>=4&&(a.indexOf(b)===0||b.indexOf(a)===0))return true; return _lev1(a,b); }
+function _boardPeople(){ var arr=[];
+  document.querySelectorAll('#boardwrap tr').forEach(function(tr){
+    var nmEl=tr.querySelector('td.name .nm'); if(!nmEl)return;
+    var cell=tr.querySelector('.cell[data-uid]'); if(!cell)return;
+    arr.push({uid:cell.getAttribute('data-uid'), name:nmEl.textContent.trim(), tokens:_nameTokens(nmEl.textContent)});
+  }); return arr; }
+function _boardDates(){ var s={}; document.querySelectorAll('#boardwrap .cell[data-date]').forEach(function(c){s[c.getAttribute('data-date')]=1;}); return s; }
+function _parseDateCell(s){ s=(s||'').trim(); var m=s.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})$/); if(!m)return null;
+  var d=+m[1],mo=+m[2],y=+m[3]; if(y<100)y+=2000; if(mo<1||mo>12||d<1||d>31)return null;
+  return y+'-'+('0'+mo).slice(-2)+'-'+('0'+d).slice(-2); }
+function _matchPerson(lead, people){ var best=null,bs=0,tie=false,bex=false;
+  people.forEach(function(p){ if(!p.tokens.length)return; var sc=0,ex=0;
+    p.tokens.forEach(function(t){ if(lead.indexOf(t)>=0){sc++;ex++;} else if(lead.some(function(x){return _tokEq(t,x);})) sc++; });
+    var need=Math.min(2,p.tokens.length);
+    if(sc>=need){ if(sc>bs){bs=sc;best=p;tie=false;bex=(ex===p.tokens.length);} else if(sc===bs){tie=true;} }
+  });
+  return (best&&!tie)?{p:best,exact:bex}:null; }   // exact=true αν ΟΛΑ τα tokens ταίριαξαν ακριβώς (όχι fuzzy)
+function _pasteSmart(grid){
+  if(grid.length<2) return false;
+  var hdr=grid[0], colDate={}, dateCols=[];
+  for(var c=0;c<hdr.length;c++){ var iso=_parseDateCell(hdr[c]); if(iso){colDate[c]=iso;dateCols.push(c);} }
+  if(dateCols.length<2) return false;                 // δεν βρέθηκε γραμμή ημερομηνιών → όχι smart (fallback positional)
+  var firstDateCol=dateCols[0];
+  // Στήλες ονόματος από τις ΕΤΙΚΕΤΕΣ (ΕΠΩΝΥΜΟ/ΟΝΟΜΑ) → ΑΓΝΟΕΙ ΤΜΗΜΑ/ΕΤΑΙΡΕΙΑ/ΥΠΟΚ (καμία μόλυνση από ονόματα εταιρειών)
+  var nameCols=[];
+  for(var cn=0;cn<firstDateCol;cn++){ var lab=_normName(hdr[cn]); if(lab.indexOf('ΕΠΩΝΥΜ')>=0||lab.indexOf('ΟΝΟΜΑ')>=0) nameCols.push(cn); }
+  if(!nameCols.length){ for(var cf=0;cf<firstDateCol;cf++) nameCols.push(cf); }   // fallback: όλες οι μπροστινές
+  var people=_boardPeople(), bdates=_boardDates();
+  var matches=[], unmatched=[], datesOut={}, items=[];
+  for(var r=1;r<grid.length;r++){ var row=grid[r]||[];
+    var nm=''; nameCols.forEach(function(k){ nm+=' '+(row[k]||''); }); nm=nm.trim().replace(/\s+/g,' ');
+    if(!nm) continue;
+    var mr=_matchPerson(_nameTokens(nm), people);
+    if(!mr){ unmatched.push(nm); continue; }
+    var cnt=0;
+    for(var di=0;di<dateCols.length;di++){ var cc=dateCols[di], iso=colDate[cc], val=(row[cc]||'').trim();
+      if(!val) continue;
+      if(!bdates[iso]){ datesOut[iso]=1; continue; }   // ημερομηνία εκτός τρέχουσας προβολής
+      items.push({user_id:mr.p.uid, date:iso, text:val}); cnt++;
+    }
+    matches.push({excel:nm, board:mr.p.name, exact:mr.exact, count:cnt});
+  }
+  var dOut=Object.keys(datesOut).sort();
+  if(!matches.length && !unmatched.length && !dOut.length) return false;   // τίποτα smart → άσε το positional
+  _pastePreview({matches:matches, unmatched:unmatched, datesOut:dOut, items:items});   // ΠΡΟΕΠΙΣΚΟΠΗΣΗ πριν γραφτεί οτιδήποτε
+  return true;
+}
+function _pastePreview(plan){
+  var old=document.getElementById('pastePrev'); if(old)old.remove();
+  var ov=document.createElement('div'); ov.id='pastePrev';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;max-width:580px;width:94%;max-height:86vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-size:13px;color:#0f172a;';
+  var nfz=plan.matches.filter(function(m){return !m.exact;}).length;
+  var h='<div style="font-weight:700;font-size:16px;margin-bottom:4px;"><i class="ti ti-file-spreadsheet"></i> Προεπισκόπηση επικόλλησης</div>';
+  h+='<div style="color:#475569;margin-bottom:10px;">Έλεγξε τις αντιστοιχίσεις — τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (μη-ακριβή) ταιριάσματα — δες τα κίτρινα.</b>'):'')+'</div>';
+  if(plan.matches.length){
+    h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;"><th style="padding:4px;">Excel</th><th></th><th style="padding:4px;">Εργαζόμενος στο πρόγραμμα</th><th style="padding:4px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
+    plan.matches.forEach(function(m){
+      var bg=m.exact?'':'background:#fef9c3;';
+      h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:4px;">'+_esc(m.excel)+'</td><td style="padding:0 4px;color:#94a3b8;">→</td><td style="padding:4px;font-weight:600;">'+_esc(m.board)+' '+(m.exact?'<span style="color:#16a34a;">✓</span>':'<span title="πιθανό ταίριασμα — έλεγξέ το" style="color:#b45309;font-weight:700;">~ πιθανό</span>')+'</td><td style="padding:4px;text-align:center;">'+m.count+'</td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  if(plan.unmatched.length){ h+='<div style="color:#b45309;font-weight:600;margin-top:6px;">Δεν βρέθηκαν ('+plan.unmatched.length+') — θα αγνοηθούν:</div><div style="color:#64748b;max-height:92px;overflow:auto;margin-bottom:6px;">'+plan.unmatched.slice(0,40).map(_esc).join('<br>')+(plan.unmatched.length>40?'<br>…':'')+'</div>'; }
+  if(plan.datesOut.length){ h+='<div style="color:#b45309;margin-top:4px;">'+plan.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής (θα αγνοηθούν).</div>'; }
+  h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση &amp; επικόλληση ('+plan.items.length+')</button></div>';
+  box.innerHTML=h; ov.appendChild(box); document.body.appendChild(ov);
+  document.getElementById('ppCancel').onclick=function(){ov.remove();};
+  document.getElementById('ppOk').onclick=function(){ ov.remove(); _commitSmart(plan); };
+}
+function _commitSmart(plan){
+  var items=plan.items;
+  if(!items.length){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:plan.unmatched,datesOut:plan.datesOut}); return; }
+  var _pend=_histCapture(items.map(function(it){return {user_id:it.user_id,date:it.date};}));
+  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})})
+    .then(function(r){return r.json();}).then(function(j){
+      if(j&&j.ok){ refreshBoard(function(){_histCommit(_pend);}); }
+      _pasteReport({done:(j&&j.done)||0, locked:(j&&j.locked)||0, blocked:(j&&j.blocked)||0,
+                    skipped:(j&&j.skipped)||0, unread:(j&&j.unread)||[], unmatched:plan.unmatched, datesOut:plan.datesOut});
+    }).catch(function(){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:plan.unmatched,datesOut:plan.datesOut,err:true}); });
+}
+function _esc(s){ return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+function _pasteReport(o){
+  var old=document.getElementById('pasteReport'); if(old)old.remove();
+  var box=document.createElement('div'); box.id='pasteReport';
+  box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:9999;max-width:370px;background:#fff;border:1px solid #dbe3ea;border-left:5px solid #185FA5;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.24);padding:12px 14px;font-size:13px;color:#0f172a;';
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;"><b><i class="ti ti-file-spreadsheet"></i> Επικόλληση από Excel</b><span id="prX" style="cursor:pointer;color:#94a3b8;font-size:15px;">✕</span></div>';
+  h+='<div style="color:#16a34a;">✓ '+(o.done||0)+' βάρδιες φορτώθηκαν'+(o.locked?(' · '+o.locked+' σε κλειδωμένες'):'')+(o.blocked?(' · '+o.blocked+' μπλοκ (εκ περιτροπής)'):'')+'</div>';
+  if(o.unmatched&&o.unmatched.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.unmatched.length+' άτομα δεν βρέθηκαν</div><div style="color:#64748b;max-height:88px;overflow:auto;">'+o.unmatched.slice(0,20).map(_esc).join('<br>')+(o.unmatched.length>20?'<br>…':'')+'</div>'; }
+  if(o.datesOut&&o.datesOut.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής</div>'; }
+  if(o.unread&&o.unread.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+(o.skipped||o.unread.length)+' κελιά δεν αναγνωρίστηκαν</div><div style="color:#64748b;max-height:88px;overflow:auto;">'+o.unread.slice(0,15).map(_esc).join('<br>')+'</div>'; }
+  else if(o.skipped){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.skipped+' κελιά δεν αναγνωρίστηκαν</div>'; }
+  box.innerHTML=h; document.body.appendChild(box);
+  document.getElementById('prX').onclick=function(){box.remove();};
+  setTimeout(function(){ if(box&&box.parentNode&&!(o.unmatched&&o.unmatched.length)&&!(o.unread&&o.unread.length)) box.remove(); }, 12000);
 }
 // ── v12.388 — Undo/Redo (Ctrl+Z / Ctrl+Y) πάνω στον πίνακα ────────────────────────
 var undoStack=[], redoStack=[], UNDO_MAX=40;   // κρατά έως 40 βήματα
