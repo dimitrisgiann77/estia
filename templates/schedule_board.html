@@ -23,6 +23,7 @@
   .sched-toolbar .btn.pri:hover{filter:brightness(1.06);}
   .wk-nav{display:flex;align-items:center;gap:6px;}
   .wk-nav a,.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:9px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);color:inherit;text-decoration:none;cursor:pointer;font-size:13px;}
+  .btn:disabled{opacity:.38;cursor:default;}
   .btn.pri{background:var(--accent,#185FA5);color:#fff;border-color:transparent;}
   .deptchips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px;}
   .dchip{padding:5px 12px;border-radius:20px;border:1px solid var(--bd,#dbe3ea);background:var(--card,#fff);cursor:pointer;font-size:12.5px;user-select:none;}
@@ -113,6 +114,8 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <button type="button" class="btn" id="undoBtn" onclick="doUndo()" title="Αναίρεση (Ctrl+Z)" disabled><i class="ti ti-arrow-back-up"></i></button>
+      <button type="button" class="btn" id="redoBtn" onclick="doRedo()" title="Επανάληψη (Ctrl+Y)" disabled><i class="ti ti-arrow-forward-up"></i></button>
       <a class="btn pri" href="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Προσωπικό</a>
       <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1" title="Μετάβαση στο μηνιαίο">Μηνιαίο <i class="ti ti-chevron-right"></i></a>
     </span>
@@ -149,6 +152,8 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <button type="button" class="btn" id="undoBtn" onclick="doUndo()" title="Αναίρεση (Ctrl+Z)" disabled><i class="ti ti-arrow-back-up"></i></button>
+      <button type="button" class="btn" id="redoBtn" onclick="doRedo()" title="Επανάληψη (Ctrl+Y)" disabled><i class="ti ti-arrow-forward-up"></i></button>
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
       <a class="btn" href="/dashboard/schedule/month_export.xlsx?hotel_id={{ hotel_id }}&month={{ sel_month }}&year={{ sel_year }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
       <form method="POST" action="/dashboard/schedule/submit_month" onsubmit="return confirm('Υποβολή ΟΛΟΥ του μήνα {{ month_block.label if month_block }} στο λογιστήριο;');" style="margin:0;">
@@ -178,6 +183,8 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <button type="button" class="btn" id="undoBtn" onclick="doUndo()" title="Αναίρεση (Ctrl+Z)" disabled><i class="ti ti-arrow-back-up"></i></button>
+      <button type="button" class="btn" id="redoBtn" onclick="doRedo()" title="Επανάληψη (Ctrl+Y)" disabled><i class="ti ti-arrow-forward-up"></i></button>
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
     </span>
   </div>
@@ -351,16 +358,20 @@ function markRect(a,b){ clearSel(); var r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r
 function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);} _updSelBtn(); }
 function _cellDown(e){ var el=this;
   if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
+  if(curSel.length>1 && curSel.indexOf(el)>=0){ e.preventDefault(); selecting=false; return; }   // v12.388 — κλικ ΜΕΣΑ σε υπάρχουσα multi-επιλογή → κράτα την (για διπλό κλικ)
   e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
 }
 function _cellEnter(){ var el=this; if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el)); }
 // v12.388 — διπλό κλικ ανοίγει τον editor (μονό κλικ = μόνο επιλογή)
 function _cellDbl(e){ e.preventDefault(); var el=this; if(el.getAttribute('data-edit')!=='1')return;
-  clearSel(); anchor=_pos(el); selecting=false; markRect(anchor,anchor);
+  selecting=false;
+  if(!(curSel.length && curSel.indexOf(el)>=0)){ clearSel(); anchor=_pos(el); markRect(anchor,anchor); }   // v12.388 — αν το κελί είναι ΜΕΣΑ στην multi-επιλογή, κράτα ΟΛΗ την επιλογή
   if(_selBtn)_selBtn.style.display='none'; openEd(); }
 // v12.382 P-058 — τρέχει στο load ΚΑΙ μετά από κάθε fragment swap (refreshBoard) → re-bind χωρίς reload
 function initBoard(){
   curSel=[]; if(typeof _selBtn!=='undefined' && _selBtn) _selBtn.style.display='none';
+  try{ _updHistBtns(); }catch(_){}
+
   try{ applyDeptFilter(); }catch(_){}
   try{ monthDeptSync(); }catch(_){}
   var t=document.getElementById('monthtable'); if(t){ try{ if(localStorage.getItem('estia_dense')==='1') t.classList.add('dense'); }catch(_){} }
@@ -490,7 +501,8 @@ function saveDay(){
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var entries=dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok){if(j.return_prompt){showReturnPrompt(j.return_prompt);}else{refreshBoard();}}});
+  var _pend=_histCapture(cells);
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok){if(j.return_prompt){showReturnPrompt(j.return_prompt);}else{refreshBoard(function(){_histCommit(_pend);});}}});
 }
 function _rfmt(iso){var a=(iso||'').split('-');return a.length===3?(a[2]+'/'+a[1]+'/'+a[0]):iso;}
 function markReturn(p,kind){
@@ -539,7 +551,8 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)refreshBoard();});
+  var _pend=_histCapture(cells);
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)refreshBoard(function(){_histCommit(_pend);});});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -571,7 +584,8 @@ function _toClipboard(txt){
 function _selSorted(){ return curSel.slice().sort(function(a,b){var pa=_pos(a),pb=_pos(b);return (pa.r-pb.r)||(pa.c-pb.c);}); }
 function _readClipboard(){ try{ if(navigator.clipboard&&navigator.clipboard.readText) return navigator.clipboard.readText().catch(function(){return null;}); }catch(_){} return Promise.resolve(null); }
 function _pasteInternal(cells){
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard();}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+  var _pend=_histCapture(cells);
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard(function(){_histCommit(_pend);});}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
 }
 function _pasteExcel(txt){
   var grid=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(function(l){return l.split('\t');});
@@ -591,10 +605,58 @@ function _pasteExcel(txt){
         items.push({user_id:cell.getAttribute('data-uid'),date:cell.getAttribute('data-date'),text:val}); } }
   }
   if(!items.length){ _toast('Τίποτα για επικόλληση'); return; }
-  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard();}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
+  var _pend=_histCapture(items.map(function(it){return {user_id:it.user_id,date:it.date};}));
+  fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Από Excel: '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));refreshBoard(function(){_histCommit(_pend);});}else{alert((j&&j.msg)||'Δεν αναγνωρίστηκε βάρδια από το Excel.');}});
 }
+// ── v12.388 — Undo/Redo (Ctrl+Z / Ctrl+Y) πάνω στον πίνακα ────────────────────────
+var undoStack=[], redoStack=[], UNDO_MAX=40;   // κρατά έως 40 βήματα
+function _cellEntriesPaste(cell){
+  var es=[]; try{es=JSON.parse(cell.getAttribute('data-entries')||'[]');}catch(_){}
+  return es.map(function(e){return {code:e.code, work_hotel_id:(e.wh||null),
+    segments:((e.segs&&e.segs.length)?e.segs.map(function(s){return {start:s.start,end:s.end};}):[])};});
+}
+function _snapCells(keys){
+  return keys.map(function(k){
+    var el=document.querySelector('.cell[data-uid="'+k.user_id+'"][data-date="'+k.date+'"]');
+    return {user_id:k.user_id, date:k.date, entries: el?_cellEntriesPaste(el):[]};
+  });
+}
+function _histCapture(keys){ return {keys:keys, before:_snapCells(keys)}; }   // πριν την αλλαγή
+function _histCommit(pend){                                                    // μετά το swap
+  if(!pend) return;
+  var after=_snapCells(pend.keys);
+  if(JSON.stringify(pend.before)===JSON.stringify(after)) return;   // καμία πραγματική αλλαγή → μη γράφεις βήμα
+  undoStack.push({before:pend.before, after:after});
+  if(undoStack.length>UNDO_MAX) undoStack.shift();
+  redoStack=[]; _updHistBtns();
+}
+function _updHistBtns(){
+  var u=document.getElementById('undoBtn'), r=document.getElementById('redoBtn');
+  if(u){ u.disabled=!undoStack.length; u.title='Αναίρεση (Ctrl+Z)'+(undoStack.length?(' — '+undoStack.length+' βήμ.'):''); }
+  if(r){ r.disabled=!redoStack.length; r.title='Επανάληψη (Ctrl+Y)'+(redoStack.length?(' — '+redoStack.length+' βήμ.'):''); }
+}
+function _restoreCells(list, done){   // ποστάρει τα entries ανά ομάδα ίδιου περιεχομένου
+  var groups={};
+  list.forEach(function(it){ var sig=JSON.stringify(it.entries);
+    (groups[sig]=groups[sig]||{entries:it.entries,cells:[]}).cells.push({user_id:it.user_id,date:it.date}); });
+  var sigs=Object.keys(groups), i=0;
+  (function next(){ if(i>=sigs.length){ if(done)done(); return; }
+    var g=groups[sigs[i++]];
+    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cells:g.cells,entries:g.entries,board_hotel_id:BOARD_HOTEL_ID})})
+      .then(function(){next();}).catch(function(){next();});
+  })();
+}
+function doUndo(){ if(!undoStack.length){ _toast('Καμία αναίρεση'); return; }
+  var rec=undoStack.pop(); redoStack.push(rec); _updHistBtns();
+  _restoreCells(rec.before, function(){ refreshBoard(); }); _toast('Αναίρεση (Ctrl+Z)'); }
+function doRedo(){ if(!redoStack.length){ _toast('Καμία επανάληψη'); return; }
+  var rec=redoStack.pop(); undoStack.push(rec); _updHistBtns();
+  _restoreCells(rec.after, function(){ refreshBoard(); }); _toast('Επανάληψη (Ctrl+Y)'); }
 document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
+  if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'&&!e.shiftKey){ e.preventDefault(); doUndo(); return; }
+  if((e.ctrlKey||e.metaKey)&&(e.code==='KeyY'||(e.code==='KeyZ'&&e.shiftKey))){ e.preventDefault(); doRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&curSel.length){
     var src=curSel[curSel.length-1]; var es=[];try{es=JSON.parse(src.getAttribute('data-entries')||'[]');}catch(_){}
     clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),work_hotel_id:(x.wh||null)};});

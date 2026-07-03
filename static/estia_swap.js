@@ -4,7 +4,7 @@
  * Κρατά scroll θέση. Fallback σε location.reload() αν κάτι αποτύχει.
  * Απαιτεί: container με id, και (προαιρετικά) global initFn που ξανα-δένει listeners μετά το swap.
  */
-function estiaSwap(containerId, initFnName){
+function estiaSwap(containerId, initFnName, cb){
   var wrap = document.getElementById(containerId);
   if(!wrap){ location.reload(); return; }
   // αποθήκευση scroll (οριζόντιο/κάθετο) των εσωτερικών scrollers + παραθύρου
@@ -25,8 +25,9 @@ function estiaSwap(containerId, initFnName){
       var s2 = wrap.querySelectorAll('.gridwrap, .scroll');
       for(var j=0;j<s2.length;j++){ if(saved[j]){ s2[j].scrollLeft = saved[j][0]; s2[j].scrollTop = saved[j][1]; } }
       window.scrollTo(winX, winY);
+      if(typeof cb === 'function'){ try{ cb(); }catch(e){} }
     })
     .catch(function(){ location.reload(); });
 }
 /* Βολικός wrapper για το Πρόγραμμα (schedule_board) */
-function refreshBoard(){ estiaSwap('boardwrap', 'initBoard'); }
+function refreshBoard(cb){ estiaSwap('boardwrap', 'initBoard', cb); }
