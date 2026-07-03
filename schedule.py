@@ -1712,6 +1712,24 @@ def schedule_period_mark():
     return jsonify(ok=True)
 
 
+@app.route('/dashboard/schedule/parse_preview', methods=['POST'])
+def schedule_parse_preview():
+    """v12.388 — DRY-RUN parse κειμένων κελιών (ΔΕΝ γράφει τίποτα). Για την οθόνη ελέγχου
+    πριν την επικόλληση: επιστρέφει ανά μοναδικό κείμενο αν αναγνωρίστηκε + τον κωδικό."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    d = request.json or {}
+    out = {}
+    for t in (d.get('texts') or []):
+        if t in out:
+            continue
+        code, segs, tag = parse_cell(t or '')
+        out[t] = {'ok': bool(code), 'code': code or '', 'tag': tag or ''}
+    return jsonify(ok=True, results=out)
+
+
 @app.route('/dashboard/schedule/paste_excel', methods=['POST'])
 def schedule_paste_excel():
     """v12.209/210 — Επικόλληση ΑΠΟ Excel: δέχεται items=[{user_id,date,text}] (block/grid),

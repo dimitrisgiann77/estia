@@ -664,7 +664,7 @@ function _smartHeader(grid, dateCols, colDate, people, bdates){
     rows.push({excel:nm, uid:(mr?mr.p.uid:null), board:(mr?mr.p.name:null), exact:(mr?mr.exact:false), cells:cells}); any=true;
   }
   if(!any && !Object.keys(datesOut).length) return false;
-  _pastePreview({rows:rows, people:people, datesOut:Object.keys(datesOut).sort(),
+  _showSmartPreview({rows:rows, people:people, datesOut:Object.keys(datesOut).sort(),
                  note:'Ημερομηνίες: από τη γραμμή-κεφαλίδα του Excel (ταίριασμα κατά ημερομηνία — δεν γράφει σε λάθος μήνα).'});
   return true;
 }
@@ -693,31 +693,70 @@ function _smartNoHeader(grid, people, bdates){
   if(!tested) return false;
   var lastIso=ordered[baseIdx+maxJ-1];
   var note='Χωρίς γραμμή ημερομηνιών → οι μέρες μπαίνουν <b>κατά σειρά</b> από <b>'+_rfmt(startDate||'')+'</b>'+(lastIso?(' έως <b>'+_rfmt(lastIso)+'</b>'):'')+' (αρχή = το κελί που διάλεξες).'+(beyond?(' · '+beyond+' στήλες πέρα από την προβολή αγνοήθηκαν.'):'');
-  _pastePreview({rows:rows, people:people, datesOut:[], note:note});
+  _showSmartPreview({rows:rows, people:people, datesOut:[], note:note});
   return true;
+}
+// v12.388 — DRY-RUN: ρωτά τον server ποια κελιά αναγνωρίζονται (parse_cell) ΠΡΙΝ την οθόνη ελέγχου
+function _showSmartPreview(plan){
+  var texts={}; plan.rows.forEach(function(r){ r.cells.forEach(function(c){ texts[c.text]=1; }); });
+  var arr=Object.keys(texts);
+  function annotate(rec){
+    var unknown={};
+    plan.rows.forEach(function(r){ r.recCount=0; r.codes={};
+      r.cells.forEach(function(c){ var info=rec[c.text]; if(info&&info.ok){ c.code=info.code; r.recCount++; if(info.code)r.codes[info.code]=1; }
+        else { c.bad=true; unknown[c.text]=(unknown[c.text]||0)+1; } });
+    });
+    plan.unknownTexts=Object.keys(unknown).map(function(t){return {text:t,n:unknown[t]};});
+    var allc={}; plan.rows.forEach(function(r){ Object.keys(r.codes||{}).forEach(function(k){allc[k]=1;}); });
+    plan.recCodes=Object.keys(allc).sort();
+    _pastePreview(plan);
+  }
+  if(!arr.length){ annotate({}); return; }
+  fetch('/dashboard/schedule/parse_preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:arr})})
+    .then(function(r){return r.json();}).then(function(j){ annotate((j&&j.results)||{}); })
+    .catch(function(){ annotate({}); });   // fallback: χωρίς recognition, δείξε ό,τι έχεις
 }
 function _pastePreview(plan){
   var old=document.getElementById('pastePrev'); if(old)old.remove();
   var ppl=plan.people||_boardPeople();
   var optsBase='<option value="">— (να μη μπει) —</option>'+ppl.map(function(p){return '<option value="'+p.uid+'">'+_esc(p.name)+'</option>';}).join('');
   var ov=document.createElement('div'); ov.id='pastePrev';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;';
   var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:14px;max-width:700px;width:95%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-size:13px;color:#0f172a;';
+  box.style.cssText='background:#fff;border-radius:14px;max-width:860px;width:96%;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);font-size:13px;color:#0f172a;';
+  var nrec=plan.rows.filter(function(x){return x.uid;}).length;
   var nfz=plan.rows.filter(function(x){return x.uid && !x.exact;}).length;
   var nun=plan.rows.filter(function(x){return !x.uid;}).length;
-  var h='<div style="font-weight:700;font-size:16px;margin-bottom:4px;"><i class="ti ti-file-spreadsheet"></i> Προεπισκόπηση επικόλλησης</div>';
-  h+='<div style="color:#475569;margin-bottom:8px;">Έλεγξε/διόρθωσε τις αντιστοιχίσεις από τα μενού. Τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (κίτρινα).</b>'):'')+(nun?(' <b style="color:#b91c1c;">'+nun+' χωρίς αντιστοίχιση (ροζ) — διάλεξε ή άσ\' τα.</b>'):'')+'</div>';
-  if(plan.note){ h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:10px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
-  h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;"><th style="padding:4px;">Excel</th><th style="padding:4px;">→ Εργαζόμενος (μενού)</th><th style="padding:4px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
+  var totRec=plan.rows.reduce(function(a,x){return a+(x.recCount!=null?x.recCount:x.cells.length);},0);
+  var unknown=plan.unknownTexts||[]; var recCodes=plan.recCodes||[];
+  var h='<div style="position:sticky;top:0;background:#193847;color:#fff;padding:14px 20px;z-index:2;"><div style="font-weight:700;font-size:16px;"><i class="ti ti-clipboard-check"></i> Έλεγχος πριν την καταχώρηση</div><div style="font-size:12px;opacity:.9;margin-top:3px;">Τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση». Διόρθωσε τις αντιστοιχίσεις από τα μενού.</div></div>';
+  h+='<div style="padding:16px 20px;">';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    +'<span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;">✓ '+totRec+' βάρδιες θα μπουν</span>'
+    +'<span style="background:#e0e7ff;color:#3730a3;padding:4px 10px;border-radius:999px;">'+nrec+' εργαζόμενοι</span>'
+    +(nfz?'<span style="background:#fef9c3;color:#854d0e;padding:4px 10px;border-radius:999px;">~ '+nfz+' πιθανά</span>':'')
+    +(nun?'<span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:999px;">'+nun+' χωρίς αντιστοίχιση</span>':'')+'</div>';
+  if(plan.note){ h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:12px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
+  if(recCodes.length){ h+='<div style="margin-bottom:10px;font-size:12px;color:#475569;"><b>Κωδικοί εργασίας που αναγνωρίστηκαν:</b> '+recCodes.map(_esc).join(' · ')+'</div>'; }
+  h+='<div style="font-weight:700;margin:6px 0;">① Αντιστοιχίσεις εργαζομένων &amp; ματσαρίσματα</div>';
+  h+='<table style="width:100%;border-collapse:collapse;margin-bottom:14px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;background:#f8fafc;"><th style="padding:5px;">Excel (ΕΠΩΝΥΜΟ ΟΝΟΜΑ)</th><th style="padding:5px;">→ Εργαζόμενος (άλλαξέ τον)</th><th style="padding:5px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
   plan.rows.forEach(function(x,i){
-    var bg = !x.uid ? 'background:#fee2e2;' : (x.exact?'':'background:#fef9c3;');
-    var badge = !x.uid ? '' : (x.exact?' <span style="color:#16a34a;">✓</span>':' <span title="πιθανό — έλεγξέ το" style="color:#b45309;font-weight:700;">~</span>');
-    h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:4px;">'+_esc(x.excel)+badge+'</td><td style="padding:4px;"><select class="ppSel" data-idx="'+i+'" style="max-width:240px;padding:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">'+optsBase+'</select></td><td style="padding:4px;text-align:center;">'+x.cells.length+'</td></tr>';
+    var bg = !x.uid ? 'background:#fef2f2;' : (x.exact?'':'background:#fefce8;');
+    var badge = !x.uid ? '<span style="color:#b91c1c;font-weight:700;"> ✗</span>' : (x.exact?' <span style="color:#16a34a;">✓</span>':' <span title="πιθανό — έλεγξέ το" style="color:#b45309;font-weight:700;">~</span>');
+    var cnt = (x.recCount!=null?x.recCount:x.cells.length);
+    var badCnt = x.cells.length - cnt;
+    h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:5px;">'+_esc(x.excel)+badge+'</td>'
+      +'<td style="padding:5px;"><select class="ppSel" data-idx="'+i+'" style="max-width:260px;padding:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">'+optsBase+'</select></td>'
+      +'<td style="padding:5px;text-align:center;">'+cnt+(badCnt>0?(' <span style="color:#b45309;" title="'+badCnt+' κελιά δεν αναγνωρίστηκαν">(+'+badCnt+'?)</span>'):'')+'</td></tr>';
   });
   h+='</tbody></table>';
-  if(plan.datesOut&&plan.datesOut.length){ h+='<div style="color:#b45309;margin:4px 0;">'+plan.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής (αγνοούνται).</div>'; }
-  h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;position:sticky;bottom:-18px;background:#fff;padding:8px 0;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση & επικόλληση</button></div>';
+  var hasProblems = unknown.length || nun || (plan.datesOut&&plan.datesOut.length);
+  h+='<div style="font-weight:700;margin:6px 0;color:'+(hasProblems?'#b45309':'#16a34a')+';">② Τι ΔΕΝ αναγνωρίστηκε'+(hasProblems?'':' — τίποτα ✓')+'</div>';
+  if(nun){ h+='<div style="margin:5px 0;"><b style="color:#b91c1c;">Ονόματα χωρίς αντιστοίχιση ('+nun+'):</b> <span style="color:#64748b;">'+plan.rows.filter(function(x){return !x.uid;}).map(function(x){return _esc(x.excel);}).join(' · ')+'</span> <span style="color:#94a3b8;">— διάλεξέ τους από το μενού, αλλιώς αγνοούνται.</span></div>'; }
+  if(unknown.length){ h+='<div style="margin:5px 0;"><b style="color:#b45309;">Κελιά/κωδικοί που δεν διαβάστηκαν ('+unknown.length+'):</b><div style="color:#64748b;max-height:120px;overflow:auto;margin-top:2px;">'+unknown.map(function(u){return _esc(u.text)+(u.n>1?(' ×'+u.n):'');}).join(' · ')+'</div></div>'; }
+  if(plan.datesOut&&plan.datesOut.length){ h+='<div style="margin:5px 0;"><b style="color:#b45309;">Ημερομηνίες εκτός τρέχουσας προβολής ('+plan.datesOut.length+'):</b> <span style="color:#64748b;">'+plan.datesOut.map(function(d){return _rfmt(d);}).join(' · ')+'</span></div>'; }
+  h+='</div>';
+  h+='<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;z-index:2;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση &amp; καταχώρηση</button></div>';
   box.innerHTML=h; ov.appendChild(box); document.body.appendChild(ov);
   var sels=box.querySelectorAll('.ppSel');
   plan.rows.forEach(function(x,i){ if(sels[i]) sels[i].value=(x.uid||''); });   // προεπιλογή = auto-match
@@ -730,7 +769,7 @@ function _pastePreview(plan){
 function _commitSmart(plan, chosen){
   var items=[];
   plan.rows.forEach(function(x,i){ var uid=chosen[i]; if(!uid) return;
-    x.cells.forEach(function(c){ items.push({user_id:uid, date:c.date, text:c.text}); });
+    x.cells.forEach(function(c){ if(c.bad) return; items.push({user_id:uid, date:c.date, text:c.text}); });   // μόνο αναγνωρισμένα κελιά
   });
   var unmatchedNames=plan.rows.filter(function(x,i){return !chosen[i] && x.cells.length;}).map(function(x){return x.excel;});
   if(!items.length){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:unmatchedNames,datesOut:plan.datesOut||[]}); return; }
