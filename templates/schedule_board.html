@@ -639,33 +639,47 @@ function _shiftLike(s){ s=(s||'').trim(); if(!s)return false;
   return /^(ΑΝ|ΑΡΓ|ΑΣΘ|ΑΝΕΥ|ΑΔ|ΑΠ|ΑΑ|ΕΡΓ|ΕΩ|ΔΡ|ΡΕΠΟ|ΡΕΠ|ΡΠ|SRG|CNT|AST|PSV|PLM|IRO|CND)(\s|$)/.test(_normName(s)); }
 function _pasteSmart(grid){
   if(!grid.length) return false;
-  var hdr=grid[0], colDate={}, dateCols=[];
-  for(var c=0;c<hdr.length;c++){ var iso=_parseDateCell(hdr[c]); if(iso){colDate[c]=iso;dateCols.push(c);} }
   var people=_boardPeople(), bdates=_boardDates();
-  if(dateCols.length>=2) return _smartHeader(grid, dateCols, colDate, people, bdates);  // Α: με γραμμή ημερομηνιών
-  return _smartNoHeader(grid, people, bdates);                                          // Β: χωρίς — κατά θέση από το κλικ
-}
-function _smartHeader(grid, dateCols, colDate, people, bdates){
-  if(grid.length<2) return false;
-  var hdr=grid[0], firstDateCol=dateCols[0], nameCols=[];
-  for(var cn=0;cn<firstDateCol;cn++){ var lab=_normName(hdr[cn]); if(lab.indexOf('ΕΠΩΝΥΜ')>=0||lab.indexOf('ΟΝΟΜΑ')>=0) nameCols.push(cn); }
-  if(!nameCols.length){ for(var cf=0;cf<firstDateCol;cf++) nameCols.push(cf); }   // fallback: όλες οι μπροστινές
-  var rows=[], datesOut={}, any=false;
-  for(var r=1;r<grid.length;r++){ var row=grid[r]||[];
-    var nm=''; nameCols.forEach(function(k){ nm+=' '+(row[k]||''); }); nm=nm.trim().replace(/\s+/g,' ');
-    if(!nm) continue;
-    var mr=_matchPerson(_nameTokens(nm), people);
-    var cells=[];
-    for(var di=0;di<dateCols.length;di++){ var cc=dateCols[di], iso=colDate[cc], val=(row[cc]||'').trim();
-      if(!val) continue;
-      if(!bdates[iso]){ datesOut[iso]=1; continue; }
-      cells.push({date:iso, text:val});
-    }
-    rows.push({excel:nm, uid:(mr?mr.p.uid:null), board:(mr?mr.p.name:null), exact:(mr?mr.exact:false), cells:cells}); any=true;
+  // Υπάρχει ΟΠΟΙΑΔΗΠΟΤΕ γραμμή-κεφαλίδα (≥2 ημερομηνίες); → header mode (καλύπτει και πολλά εβδομαδιαία μπλοκ)
+  for(var r=0;r<grid.length;r++){ var row=grid[r]||[], dc=0;
+    for(var c=0;c<row.length;c++){ if(_parseDateCell(row[c])){ if(++dc>=2)break; } }
+    if(dc>=2) return _smartHeader(grid, people, bdates);
   }
-  if(!any && !Object.keys(datesOut).length) return false;
+  return _smartNoHeader(grid, people, bdates);   // χωρίς κεφαλίδα → κατά θέση από το κλικ
+}
+function _smartHeader(grid, people, bdates){
+  // Εντόπισε ΟΛΕΣ τις γραμμές-κεφαλίδες (κάθε εβδομαδιαίο μπλοκ έχει δική του)
+  var headers=[];
+  for(var r=0;r<grid.length;r++){ var row=grid[r]||[], dc=[], cd={};
+    for(var c=0;c<row.length;c++){ var iso=_parseDateCell(row[c]); if(iso){dc.push(c);cd[c]=iso;} }
+    if(dc.length>=2){
+      var firstDate=dc[0], ncols=[];
+      for(var cn=0;cn<firstDate;cn++){ var lab=_normName(row[cn]); if(lab.indexOf('ΕΠΩΝΥΜ')>=0||lab.indexOf('ΟΝΟΜΑ')>=0) ncols.push(cn); }
+      if(!ncols.length){ for(var cf=0;cf<firstDate;cf++) ncols.push(cf); }
+      headers.push({idx:r, dateCols:dc, colDate:cd, nameCols:ncols});
+    }
+  }
+  if(!headers.length) return false;
+  var byName={}, order=[], datesOut={};   // συγχώνευση ανά άτομο (ίδιος εργαζόμενος σε πολλά μπλοκ)
+  for(var hi=0;hi<headers.length;hi++){ var H=headers[hi], endIdx=(hi+1<headers.length)?headers[hi+1].idx:grid.length;
+    for(var rr=H.idx+1;rr<endIdx;rr++){ var row=grid[rr]||[];
+      var nm=''; H.nameCols.forEach(function(k){ nm+=' '+(row[k]||''); }); nm=nm.trim().replace(/\s+/g,' ');
+      if(!nm) continue;
+      var key=_normName(nm);
+      if(!byName[key]){ var mr=_matchPerson(_nameTokens(nm), people);
+        byName[key]={excel:nm, uid:(mr?mr.p.uid:null), board:(mr?mr.p.name:null), exact:(mr?mr.exact:false), cells:[]}; order.push(key); }
+      var ent=byName[key];
+      for(var di=0;di<H.dateCols.length;di++){ var cc=H.dateCols[di], iso=H.colDate[cc], val=(row[cc]||'').trim();
+        if(!val) continue;
+        if(!bdates[iso]){ datesOut[iso]=1; continue; }
+        ent.cells.push({date:iso, text:val});
+      }
+    }
+  }
+  var rows=order.map(function(k){return byName[k];});
+  if(!rows.length && !Object.keys(datesOut).length) return false;
   _showSmartPreview({rows:rows, people:people, datesOut:Object.keys(datesOut).sort(),
-                 note:'Ημερομηνίες: από τη γραμμή-κεφαλίδα του Excel (ταίριασμα κατά ημερομηνία — δεν γράφει σε λάθος μήνα).'});
+                 note:'Ημερομηνίες: από '+headers.length+(headers.length>1?' εβδομαδιαία μπλοκ':' γραμμή-κεφαλίδα')+' του Excel (ταίριασμα κατά ημερομηνία — δεν γράφει σε λάθος μήνα).'});
   return true;
 }
 function _smartNoHeader(grid, people, bdates){
