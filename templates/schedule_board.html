@@ -720,51 +720,87 @@ function _pastePreview(plan){
   var old=document.getElementById('pastePrev'); if(old)old.remove();
   var ppl=plan.people||_boardPeople();
   var optsBase='<option value="">— (να μη μπει) —</option>'+ppl.map(function(p){return '<option value="'+p.uid+'">'+_esc(p.name)+'</option>';}).join('');
-  var ov=document.createElement('div'); ov.id='pastePrev';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;';
-  var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:14px;max-width:860px;width:96%;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);font-size:13px;color:#0f172a;';
   var nrec=plan.rows.filter(function(x){return x.uid;}).length;
   var nfz=plan.rows.filter(function(x){return x.uid && !x.exact;}).length;
   var nun=plan.rows.filter(function(x){return !x.uid;}).length;
   var totRec=plan.rows.reduce(function(a,x){return a+(x.recCount!=null?x.recCount:x.cells.length);},0);
-  var unknown=plan.unknownTexts||[]; var recCodes=plan.recCodes||[];
-  var h='<div style="position:sticky;top:0;background:#193847;color:#fff;padding:14px 20px;z-index:2;"><div style="font-weight:700;font-size:16px;"><i class="ti ti-clipboard-check"></i> Έλεγχος πριν την καταχώρηση</div><div style="font-size:12px;opacity:.9;margin-top:3px;">Τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση». Διόρθωσε τις αντιστοιχίσεις από τα μενού.</div></div>';
-  h+='<div style="padding:16px 20px;">';
-  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
-    +'<span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;">✓ '+totRec+' βάρδιες θα μπουν</span>'
+  var unknown=plan.unknownTexts||[]; var recCodes=plan.recCodes||[]; var dOut=plan.datesOut||[];
+  var hasProblems = unknown.length || nun || dOut.length;
+  var ov=document.createElement('div'); ov.id='pastePrev';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  var box=document.createElement('div');
+  box.style.cssText='background:#fff;border-radius:14px;max-width:860px;width:96%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4);font-size:13px;color:#0f172a;';
+  var STEPS=[{t:'Αντιστοιχίσεις'},{t:'Έλεγχος'},{t:'Επιβεβαίωση'}];
+  var cur=1, maxSeen=1;
+  // ── ΒΗΜΑ 1: αντιστοιχίσεις ──
+  var s1='<div class="ppC" data-s="1">';
+  s1+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'
+    +'<span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;">✓ '+totRec+' βάρδιες</span>'
     +'<span style="background:#e0e7ff;color:#3730a3;padding:4px 10px;border-radius:999px;">'+nrec+' εργαζόμενοι</span>'
     +(nfz?'<span style="background:#fef9c3;color:#854d0e;padding:4px 10px;border-radius:999px;">~ '+nfz+' πιθανά</span>':'')
     +(nun?'<span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:999px;">'+nun+' χωρίς αντιστοίχιση</span>':'')+'</div>';
-  if(plan.note){ h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:12px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
-  if(recCodes.length){ h+='<div style="margin-bottom:10px;font-size:12px;color:#475569;"><b>Κωδικοί εργασίας που αναγνωρίστηκαν:</b> '+recCodes.map(_esc).join(' · ')+'</div>'; }
-  h+='<div style="font-weight:700;margin:6px 0;">① Αντιστοιχίσεις εργαζομένων &amp; ματσαρίσματα</div>';
-  h+='<table style="width:100%;border-collapse:collapse;margin-bottom:14px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;background:#f8fafc;"><th style="padding:5px;">Excel (ΕΠΩΝΥΜΟ ΟΝΟΜΑ)</th><th style="padding:5px;">→ Εργαζόμενος (άλλαξέ τον)</th><th style="padding:5px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
+  if(plan.note){ s1+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:12px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
+  if(recCodes.length){ s1+='<div style="margin-bottom:10px;font-size:12px;color:#475569;"><b>Κωδικοί που αναγνωρίστηκαν:</b> '+recCodes.map(_esc).join(' · ')+'</div>'; }
+  s1+='<div style="color:#475569;margin-bottom:6px;">Έλεγξε/διόρθωσε τους εργαζόμενους από τα μενού, μετά «Επόμενο».</div>';
+  s1+='<table style="width:100%;border-collapse:collapse;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;background:#f8fafc;"><th style="padding:5px;">Excel (ΕΠΩΝΥΜΟ ΟΝΟΜΑ)</th><th style="padding:5px;">→ Εργαζόμενος (άλλαξέ τον)</th><th style="padding:5px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
   plan.rows.forEach(function(x,i){
     var bg = !x.uid ? 'background:#fef2f2;' : (x.exact?'':'background:#fefce8;');
     var badge = !x.uid ? '<span style="color:#b91c1c;font-weight:700;"> ✗</span>' : (x.exact?' <span style="color:#16a34a;">✓</span>':' <span title="πιθανό — έλεγξέ το" style="color:#b45309;font-weight:700;">~</span>');
-    var cnt = (x.recCount!=null?x.recCount:x.cells.length);
-    var badCnt = x.cells.length - cnt;
-    h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:5px;">'+_esc(x.excel)+badge+'</td>'
+    var cnt = (x.recCount!=null?x.recCount:x.cells.length); var badCnt = x.cells.length - cnt;
+    s1+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:5px;">'+_esc(x.excel)+badge+'</td>'
       +'<td style="padding:5px;"><select class="ppSel" data-idx="'+i+'" style="max-width:260px;padding:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">'+optsBase+'</select></td>'
       +'<td style="padding:5px;text-align:center;">'+cnt+(badCnt>0?(' <span style="color:#b45309;" title="'+badCnt+' κελιά δεν αναγνωρίστηκαν">(+'+badCnt+'?)</span>'):'')+'</td></tr>';
   });
-  h+='</tbody></table>';
-  var hasProblems = unknown.length || nun || (plan.datesOut&&plan.datesOut.length);
-  h+='<div style="font-weight:700;margin:6px 0;color:'+(hasProblems?'#b45309':'#16a34a')+';">② Τι ΔΕΝ αναγνωρίστηκε'+(hasProblems?'':' — τίποτα ✓')+'</div>';
-  if(nun){ h+='<div style="margin:5px 0;"><b style="color:#b91c1c;">Ονόματα χωρίς αντιστοίχιση ('+nun+'):</b> <span style="color:#64748b;">'+plan.rows.filter(function(x){return !x.uid;}).map(function(x){return _esc(x.excel);}).join(' · ')+'</span> <span style="color:#94a3b8;">— διάλεξέ τους από το μενού, αλλιώς αγνοούνται.</span></div>'; }
-  if(unknown.length){ h+='<div style="margin:5px 0;"><b style="color:#b45309;">Κελιά/κωδικοί που δεν διαβάστηκαν ('+unknown.length+'):</b><div style="color:#64748b;max-height:120px;overflow:auto;margin-top:2px;">'+unknown.map(function(u){return _esc(u.text)+(u.n>1?(' ×'+u.n):'');}).join(' · ')+'</div></div>'; }
-  if(plan.datesOut&&plan.datesOut.length){ h+='<div style="margin:5px 0;"><b style="color:#b45309;">Ημερομηνίες εκτός τρέχουσας προβολής ('+plan.datesOut.length+'):</b> <span style="color:#64748b;">'+plan.datesOut.map(function(d){return _rfmt(d);}).join(' · ')+'</span></div>'; }
-  h+='</div>';
-  h+='<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #e2e8f0;padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;z-index:2;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση &amp; καταχώρηση</button></div>';
-  box.innerHTML=h; ov.appendChild(box); document.body.appendChild(ov);
+  s1+='</tbody></table></div>';
+  // ── ΒΗΜΑ 2: τι δεν αναγνωρίστηκε ──
+  var s2='<div class="ppC" data-s="2" style="display:none;">';
+  s2+='<div style="font-weight:700;margin:2px 0 10px;color:'+(hasProblems?'#b45309':'#16a34a')+';">'+(hasProblems?'Δες τι ΔΕΝ αναγνωρίστηκε — θα αγνοηθεί':'Όλα αναγνωρίστηκαν ✓')+'</div>';
+  if(nun){ s2+='<div style="margin:6px 0;"><b style="color:#b91c1c;">Ονόματα χωρίς αντιστοίχιση ('+nun+'):</b> <span style="color:#64748b;">'+plan.rows.filter(function(x){return !x.uid;}).map(function(x){return _esc(x.excel);}).join(' · ')+'</span><div style="color:#94a3b8;font-size:12px;">Γύρνα στο βήμα 1 για να τους αναθέσεις, αλλιώς αγνοούνται.</div></div>'; }
+  if(unknown.length){ s2+='<div style="margin:6px 0;"><b style="color:#b45309;">Κελιά/κωδικοί που δεν διαβάστηκαν ('+unknown.length+'):</b><div style="color:#64748b;max-height:140px;overflow:auto;margin-top:2px;">'+unknown.map(function(u){return _esc(u.text)+(u.n>1?(' ×'+u.n):'');}).join(' · ')+'</div></div>'; }
+  if(dOut.length){ s2+='<div style="margin:6px 0;"><b style="color:#b45309;">Ημερομηνίες εκτός τρέχουσας προβολής ('+dOut.length+'):</b> <span style="color:#64748b;">'+dOut.map(function(d){return _rfmt(d);}).join(' · ')+'</span></div>'; }
+  if(!hasProblems){ s2+='<div style="color:#64748b;">Δεν υπάρχουν προβλήματα — προχώρα στην επιβεβαίωση.</div>'; }
+  s2+='</div>';
+  // ── ΒΗΜΑ 3: επιβεβαίωση ──
+  var s3='<div class="ppC" data-s="3" style="display:none;"><div style="text-align:center;padding:14px 0;">'
+    +'<div style="font-size:42px;line-height:1;">✅</div>'
+    +'<div style="font-weight:700;font-size:15px;margin-top:8px;">Έτοιμο για καταχώρηση</div>'
+    +'<div style="color:#475569;margin-top:8px;">Θα καταχωρηθούν <b>'+totRec+' βάρδιες</b> σε <b>'+nrec+'</b> εργαζόμενους.'+(hasProblems?' Τα μη-αναγνωρισμένα αγνοούνται.':'')+'</div>'
+    +'<div style="color:#94a3b8;margin-top:8px;font-size:12px;">Πάτα «Επιβεβαίωση & καταχώρηση» για ολοκλήρωση. (Μπορείς να αναιρέσεις με Ctrl+Z.)</div></div></div>';
+  box.innerHTML='<div style="background:#193847;color:#fff;padding:14px 20px;flex:0 0 auto;"><div style="font-weight:700;font-size:16px;"><i class="ti ti-clipboard-check"></i> Έλεγχος πριν την καταχώρηση</div><div style="font-size:12px;opacity:.9;margin-top:3px;">Ακολούθησε τα 3 βήματα με τη σειρά — η τελική επιβεβαίωση ενεργοποιείται στο τέλος.</div></div>'
+    +'<div id="ppSteps" style="padding:14px 20px 4px;flex:0 0 auto;"></div>'
+    +'<div id="ppBody" style="padding:8px 20px 14px;overflow:auto;flex:1 1 auto;">'+s1+s2+s3+'</div>'
+    +'<div id="ppFoot" style="border-top:1px solid #e2e8f0;padding:12px 20px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex:0 0 auto;"></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
   var sels=box.querySelectorAll('.ppSel');
-  plan.rows.forEach(function(x,i){ if(sels[i]) sels[i].value=(x.uid||''); });   // προεπιλογή = auto-match
-  document.getElementById('ppCancel').onclick=function(){ov.remove();};
-  document.getElementById('ppOk').onclick=function(){
-    var chosen=[]; box.querySelectorAll('.ppSel').forEach(function(s){ chosen[+s.getAttribute('data-idx')]=s.value||''; });
-    ov.remove(); _commitSmart(plan, chosen);
-  };
+  plan.rows.forEach(function(x,i){ if(sels[i]) sels[i].value=(x.uid||''); });
+  function renderSteps(){
+    var el=box.querySelector('#ppSteps'); var html='<div style="display:flex;align-items:center;">';
+    STEPS.forEach(function(s,idx){ var n=idx+1, done=n<cur, active=n===cur, reachable=n<=maxSeen;
+      var cbg=done?'#16a34a':(active?'#193847':'#e2e8f0'), ccol=(done||active)?'#fff':'#94a3b8', lab=(done||active)?'#0f172a':'#94a3b8';
+      html+='<div class="ppBub" data-n="'+n+'" style="display:flex;align-items:center;gap:7px;cursor:'+(reachable?'pointer':'default')+';">'
+        +'<span style="width:26px;height:26px;border-radius:999px;background:'+cbg+';color:'+ccol+';display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">'+(done?'✓':n)+'</span>'
+        +'<span style="font-size:12px;font-weight:600;color:'+lab+';">'+s.t+'</span></div>';
+      if(idx<STEPS.length-1) html+='<div style="flex:1;height:2px;background:'+(n<cur?'#16a34a':'#e2e8f0')+';margin:0 10px;"></div>';
+    });
+    html+='</div>'; el.innerHTML=html;
+    el.querySelectorAll('.ppBub').forEach(function(b){ b.onclick=function(){ var n=+b.getAttribute('data-n'); if(n<=maxSeen) goto(n); }; });
+  }
+  function renderFoot(){
+    var el=box.querySelector('#ppFoot');
+    var left = cur>1 ? '<button id="ppBack" class="btn"><i class="ti ti-chevron-left"></i> Πίσω</button>' : '<button id="ppCancel" class="btn">Άκυρο</button>';
+    var right = cur<3 ? '<button id="ppNext" class="btn pri">Το είδα — Επόμενο <i class="ti ti-chevron-right"></i></button>'
+                      : '<button id="ppOk" class="btn pri"><i class="ti ti-check"></i> Επιβεβαίωση & καταχώρηση</button>';
+    el.innerHTML=left+'<span style="flex:1;"></span>'+right;
+    var c=box.querySelector('#ppCancel'); if(c) c.onclick=function(){ov.remove();};
+    var bk=box.querySelector('#ppBack'); if(bk) bk.onclick=function(){goto(cur-1);};
+    var nx=box.querySelector('#ppNext'); if(nx) nx.onclick=function(){goto(cur+1);};
+    var ok=box.querySelector('#ppOk'); if(ok) ok.onclick=function(){ var chosen=[]; box.querySelectorAll('.ppSel').forEach(function(s){ chosen[+s.getAttribute('data-idx')]=s.value||''; }); ov.remove(); _commitSmart(plan, chosen); };
+  }
+  function goto(n){ if(n<1)n=1; if(n>3)n=3; cur=n; if(n>maxSeen)maxSeen=n;
+    box.querySelectorAll('.ppC').forEach(function(d){ d.style.display=(+d.getAttribute('data-s')===cur)?'':'none'; });
+    box.querySelector('#ppBody').scrollTop=0; renderSteps(); renderFoot();
+  }
+  renderSteps(); renderFoot();
 }
 function _commitSmart(plan, chosen){
   var items=[];
