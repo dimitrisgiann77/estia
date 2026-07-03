@@ -806,16 +806,17 @@ document.addEventListener('keydown',function(e){
     clipTSV=_selToTSV(); _toClipboard(clipTSV);
     try{ sessionStorage.setItem('estia_clip',JSON.stringify(clip)); sessionStorage.setItem('estia_clipTSV',clipTSV); }catch(_){}
     e.preventDefault(); _toast((curSel.length>1?('Αντιγράφηκαν '+curSel.length+' κελιά'):(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε'))+' — μένει ενεργό για πολλά paste');
-  } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&curSel.length){
-    e.preventDefault();
-    var cells=_selSorted().map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-    _readClipboard().then(function(txt){
-      if(txt && clipTSV && txt===clipTSV && clip){ _pasteInternal(cells); }     // δικό μας copy → πλήρης βάρδια
-      else if(txt && txt.trim()){ _pasteExcel(txt); }                    // από Excel → parse
-      else if(clip){ _pasteInternal(cells); }                                   // fallback
-      else { _toast('Δεν υπάρχει κάτι για επικόλληση'); }
-    });
   }
+});
+// v12.388 — Επικόλληση μέσω native paste event (e.clipboardData) — δουλεύει ΚΑΙ μέσα σε iframe, ΧΩΡΙΣ άδεια clipboard-read
+document.addEventListener('paste',function(e){
+  var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
+  var txt=''; try{ txt=((e.clipboardData||window.clipboardData).getData('text'))||''; }catch(_){}
+  if(!txt.trim()) return;
+  e.preventDefault();
+  var cells=(typeof curSel!=='undefined'&&curSel.length)?_selSorted().map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};}):[];
+  if(clipTSV && txt===clipTSV && clip){ if(cells.length){ _pasteInternal(cells); } else { _toast('Διάλεξε κελιά για επικόλληση'); } }  // δικό μας copy → πλήρης βάρδια
+  else { _pasteExcel(txt); }                                                       // από Excel → smart (κατά όνομα) ή positional (δεν χρειάζεται επιλογή για smart)
 });
 // v12.388 — ο editor δεν σέρνεται πλέον (σταθερή θέση, κανονική συμπεριφορά κλικ)
 initBoard();   // v12.382 P-058 — αρχικό bind (τρέχει και μετά από κάθε fragment swap)
