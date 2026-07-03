@@ -71,9 +71,10 @@
 {{ mp.topbar('calendar-week', 'ΕΣΤΙΑ — Πρόγραμμα Εργασίας', cur_hotel.name if cur_hotel else '', 'Επικόλληση Excel', '/dashboard/schedule/paste?embed=1') }}
 <div class="container">
 
-  {% if view_mode!='month' %}
+  {% if view_mode!='month' and view_mode!='year' %}
   <form class="sched-toolbar" method="GET" action="/dashboard/schedule">
     <input type="hidden" name="embed" value="1">
+    <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar-week"></i> Εβδομαδιαίο πρόγραμμα{% if cur_hotel %} — {{ cur_hotel.name }}{% endif %}</h3>
     <div class="fgrp">
       <span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
       <select name="hotel_id" onchange="this.form.submit()">
@@ -92,7 +93,6 @@
       <span class="flab">Πλήθος εβδ.</span>
       <select name="weeks" onchange="this.form.submit()">{% for n in [1,2,3,4,6,8,12] %}{% if n<=horizon %}<option value="{{ n }}" {{ 'selected' if n==weeks }}>{{ n }}</option>{% endif %}{% endfor %}</select>
     </div>
-    <div class="fsep"></div>
     <div class="fgrp">
       <span class="flab"><i class="ti ti-calendar-month"></i> Μετάβαση σε μήνα</span>
       <span class="wk-nav">
@@ -104,16 +104,19 @@
         <a title="Επόμ. μήνας" href="/dashboard/schedule?hotel_id={{ hotel_id }}&month={{ next_month }}&year={{ next_year }}&embed=1"><i class="ti ti-chevron-right"></i></a>
       </span>
     </div>
-    <a class="btn pri" href="/dashboard/schedule/staff?embed=1" style="margin-left:auto;align-self:flex-end;"><i class="ti ti-users-plus"></i> Προσωπικό</a>
+    <div class="fgrp" style="position:relative;"><span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
+      <details class="mdept">
+        <summary id="mdeptSum" style="cursor:pointer;padding:7px 10px;border:1px solid #d6eef3;border-radius:7px;background:#fff;font-size:13px;list-style:none;white-space:nowrap;">Όλα τα τμήματα</summary>
+        <div style="position:absolute;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow:auto;width:max-content;min-width:210px;max-width:420px;">
+          <label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" id="mdAll" checked onchange="monthDeptAll(this)"> Όλα</label>
+          {% for d in dept_list %}<label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" class="mdcb" value="{{ d.id }}" onchange="monthDeptApply()"> {{ d.name }}</label>{% endfor %}
+        </div>
+      </details></div>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=year&year={{ sel_year }}&embed=1"><i class="ti ti-calendar"></i> Ετήσιο</a>
+      <a class="btn pri" href="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Προσωπικό</a>
+    </span>
   </form>
-
-  <div class="deptbar">
-    <span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
-    <div class="deptchips" id="deptchips" style="margin:0;">
-      <span class="dchip on" data-dept="all" onclick="toggleAll()">Όλα</span>
-      {% for d in dept_list %}<span class="dchip on" data-dept="{{ d.id }}" onclick="toggleDept('{{ d.id }}')" style="border-left:4px solid {{ d.color }};">{{ d.name }}</span>{% endfor %}
-    </div>
-  </div>
   {% endif %}
 
   {% set qs=request.args %}
@@ -146,12 +149,37 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=year&year={{ sel_year }}&embed=1"><i class="ti ti-calendar"></i> Ετήσιο</a>
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
       <a class="btn" href="/dashboard/schedule/month_export.xlsx?hotel_id={{ hotel_id }}&month={{ sel_month }}&year={{ sel_year }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
       <form method="POST" action="/dashboard/schedule/submit_month" onsubmit="return confirm('Υποβολή ΟΛΟΥ του μήνα {{ month_block.label if month_block }} στο λογιστήριο;');" style="margin:0;">
         <input type="hidden" name="hotel_id" value="{{ hotel_id }}"><input type="hidden" name="month" value="{{ sel_month }}"><input type="hidden" name="year" value="{{ sel_year }}">
         <button class="btn pri" type="submit"><i class="ti ti-send"></i> Υποβολή μήνα</button>
       </form>
+    </span>
+  </div>
+  {% elif view_mode=='year' %}
+  <div class="sched-toolbar" style="margin-bottom:10px;">
+    <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar"></i> Ετήσιο πρόγραμμα {{ year_block.label if year_block }} — όλο το προσωπικό ({{ year_block.rows|length if year_block }})</h3>
+    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&embed=1"><i class="ti ti-arrow-left"></i> Εβδομαδιαία</a>
+    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1"><i class="ti ti-calendar-month"></i> Μηνιαίο</a>
+    <div class="fsep"></div>
+    <div class="fgrp"><span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
+      <select onchange="location.href='/dashboard/schedule?view=year&year={{ sel_year }}&embed=1&hotel_id='+this.value">
+        {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}</select></div>
+    <div class="fgrp"><span class="flab"><i class="ti ti-calendar"></i> Έτος</span>
+      <select onchange="location.href='/dashboard/schedule?view=year&hotel_id={{ hotel_id }}&embed=1&year='+this.value">
+        {% for yy in [sel_year-1, sel_year, sel_year+1] %}<option value="{{ yy }}" {{ 'selected' if yy==sel_year }}>{{ yy }}</option>{% endfor %}</select></div>
+    <div class="fgrp" style="position:relative;"><span class="flab"><i class="ti ti-category"></i> Τμήματα</span>
+      <details class="mdept">
+        <summary id="mdeptSum" style="cursor:pointer;padding:7px 10px;border:1px solid #d6eef3;border-radius:7px;background:#fff;font-size:13px;list-style:none;white-space:nowrap;">Όλα τα τμήματα</summary>
+        <div style="position:absolute;background:#fff;border:1px solid #d6eef3;border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:60;max-height:280px;overflow:auto;width:max-content;min-width:210px;max-width:420px;">
+          <label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" id="mdAll" checked onchange="monthDeptAll(this)"> Όλα</label>
+          {% for d in dept_list %}<label style="display:block;padding:4px 6px;font-size:13px;white-space:nowrap;"><input type="checkbox" class="mdcb" value="{{ d.id }}" onchange="monthDeptApply()"> {{ d.name }}</label>{% endfor %}
+        </div>
+      </details></div>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
+      <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
     </span>
   </div>
   {% else %}
@@ -185,6 +213,33 @@
       </table>
     </div>
     <p style="font-size:12px;color:#64748b;margin-top:8px;">Κλικ/σύρσιμο σε κελιά (όπως στην εβδομαδιαία). Κλειδωμένες εβδομάδες δεν επεξεργάζονται. Σύνολα = μηνιαία (Ώρες/Έξτρα/Ρεπό/Εργάσιμες).</p>
+  </div>
+  {% endif %}
+
+  {% if view_mode=='year' and year_block %}
+  <div class="card wkcard">
+    <div class="gridwrap monthwrap">
+      <table class="grid" id="monthtable">
+        <thead><tr><th class="name">Εργαζόμενος</th>
+          {% for dh in year_block.day_hdr %}<th class="{{ 'sun' if dh.we }}{{ ' today' if dh.today }}" style="{{ 'border-left:2px solid #185FA5;' if dh.mstart }}{{ 'background:#fff7ed;' if dh.hol }}">{% if dh.mstart %}<div style="font-size:10px;font-weight:700;color:#185FA5;">{{ dh.mlabel }}</div>{% endif %}{{ dh.wd }}<br><small>{{ dh.d }}</small></th>{% endfor %}
+          <th>Ώρες</th><th>Έξτρα</th><th>Ρεπό</th><th>Εργ.</th></tr></thead>
+        <tbody>
+        {% for r in year_block.rows %}
+          <tr data-dept="{{ r.user.department_id or '' }}">
+            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
+            {% for c in r.cells %}
+              <td class="{{ 'sun' if year_block.day_hdr[loop.index0].we }}{{ ' today' if year_block.day_hdr[loop.index0].today }}" style="{{ 'border-left:2px solid #185FA5;' if year_block.day_hdr[loop.index0].mstart }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if (c.edit and not c.locked) else '0' }}">{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span><span class="tm">{% if en.segs and en.segs|length %}{% for sg in en.segs %}{% if not loop.first %}<br><span class="segc">{% endif %}{{ sg.start }} - {{ sg.end }}{% if not loop.last %} &{% else %}{% if not loop.first %}</span>{% endif %}{% endif %}{% endfor %}{% elif en.times %}{{ en.times }}{% endif %}</span></span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
+            {% endfor %}
+            <td class="tot">{{ r.wk_hours }}</td><td class="tot">{{ r.wk_extra }}</td><td class="tot {{ 'warn' if r.repo<1 }}">{{ r.repo }}</td><td class="tot">{{ r.work_days }}</td>
+          </tr>
+        {% else %}<tr><td colspan="{{ year_block.ndays + 5 }}" style="padding:12px;color:#94a3b8;">— καμία εγγραφή —</td></tr>{% endfor %}
+        </tbody>
+        <tfoot><tr style="background:var(--soft,#f8fafc);"><td class="name" style="font-weight:700;">Δουλεύουν / μέρα</td>
+          {% for dh in year_block.day_hdr %}<td class="{{ 'sun' if dh.we }}{{ ' today' if dh.today }}" style="font-weight:700;font-size:11px;{{ 'border-left:2px solid #185FA5;' if dh.mstart }}">{{ dh.work }}{% if dh.repo %}<br><span style="color:#94a3b8;font-weight:400;font-size:10px;">ρ{{ dh.repo }}</span>{% endif %}</td>{% endfor %}
+          <td></td><td></td><td></td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <p style="font-size:12px;color:#64748b;margin-top:8px;">Ετήσια προβολή — κλικ/σύρσιμο & διπλό κλικ όπως στο μηνιαίο. Οι μπλε γραμμές χωρίζουν τους μήνες. Σύνολα = ετήσια.</p>
   </div>
   {% endif %}
 
@@ -302,6 +357,10 @@ function _cellDown(e){ var el=this;
   e.preventDefault();anchor=_pos(el);selecting=true;_activeWrap=el.closest('.gridwrap');_startEdgeScroll();markRect(anchor,anchor);
 }
 function _cellEnter(){ var el=this; if(selecting&&anchor&&_pos(el).tb===anchor.tb)markRect(anchor,_pos(el)); }
+// v12.388 — διπλό κλικ ανοίγει τον editor (μονό κλικ = μόνο επιλογή)
+function _cellDbl(e){ e.preventDefault(); var el=this; if(el.getAttribute('data-edit')!=='1')return;
+  clearSel(); anchor=_pos(el); selecting=false; markRect(anchor,anchor);
+  if(_selBtn)_selBtn.style.display='none'; openEd(); }
 // v12.382 P-058 — τρέχει στο load ΚΑΙ μετά από κάθε fragment swap (refreshBoard) → re-bind χωρίς reload
 function initBoard(){
   curSel=[]; if(typeof _selBtn!=='undefined' && _selBtn) _selBtn.style.display='none';
@@ -312,6 +371,7 @@ function initBoard(){
   document.querySelectorAll('#boardwrap .cell[data-edit="1"]').forEach(function(el){
     el.addEventListener('mousedown', _cellDown);
     el.addEventListener('mouseenter', _cellEnter);
+    el.addEventListener('dblclick', _cellDbl);
   });
 }
 var _selBtn=null;
@@ -342,16 +402,16 @@ window.addEventListener('mousemove',function(e){
 function _startEdgeScroll(){ if(!_autoRAF) _autoRAF=requestAnimationFrame(_edgeTick); }
 function _edgeTick(){
   if(!selecting||!_activeWrap){_autoRAF=null;return;}
-  var r=_activeWrap.getBoundingClientRect(),pad=55,vpad=64,sp=0,vp=0;
+  var r=_activeWrap.getBoundingClientRect(),pad=55,vpad=55,sp=0,vp=0;
   if(_mx>r.right-pad) sp=Math.min(32,(_mx-(r.right-pad))/1.4);
   else if(_mx<r.left+pad) sp=-Math.min(32,((r.left+pad)-_mx)/1.4);
-  if(_my>window.innerHeight-vpad) vp=Math.min(28,(_my-(window.innerHeight-vpad))/1.6);   // κοντά στο κάτω άκρο → scroll κάτω
-  else if(_my<vpad) vp=-Math.min(28,(vpad-_my)/1.6);                                       // κοντά στο πάνω άκρο → scroll πάνω
+  if(_my>r.bottom-vpad) vp=Math.min(28,(_my-(r.bottom-vpad))/1.6);   // κοντά στο κάτω άκρο ΤΟΥ ΠΙΝΑΚΑ → scroll κάτω
+  else if(_my<r.top+vpad) vp=-Math.min(28,((r.top+vpad)-_my)/1.6);   // κοντά στο πάνω άκρο ΤΟΥ ΠΙΝΑΚΑ → scroll πάνω
   if(sp) _activeWrap.scrollLeft+=sp;
-  if(vp) window.scrollBy(0,vp);
+  if(vp) _activeWrap.scrollTop+=vp;   // v12.388 — scroll ΜΕΣΑ στο εύρος του πίνακα (όχι στην οθόνη)
   if(sp||vp){
     var cx=Math.max(r.left+3,Math.min(r.right-3,_mx));
-    var cy=Math.max(3,Math.min(window.innerHeight-3,_my));
+    var cy=Math.max(r.top+3,Math.min(r.bottom-3,_my));
     var t=document.elementFromPoint(cx,cy), cell=(t&&t.closest)?t.closest('.cell[data-edit="1"]'):null;
     if(cell&&anchor&&_pos(cell).tb===anchor.tb) markRect(anchor,_pos(cell));
   }
@@ -360,7 +420,7 @@ function _edgeTick(){
 window.addEventListener('mouseup',function(){
   _activeWrap=null;
   if(ctrlPending){ctrlPending=false;_updSelBtn();return;}  // Ctrl-block: χτίσε επιλογή, ΟΧΙ άμεσο άνοιγμα
-  if(!selecting)return;selecting=false;if(curSel.length)openEd();
+  if(!selecting)return;selecting=false;_updSelBtn();   // v12.388 — άνοιγμα με διπλό κλικ ή με το πλωτό κουμπί (όχι σε μονό κλικ)
 });
 var HOTELS_LIST=[{% for h in hotels %}{id:{{h.id}},name:{{ h.name|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
 var segState=[], dayMode=false, dayEntries=[], dayHome='';

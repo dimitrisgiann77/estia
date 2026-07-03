@@ -1121,12 +1121,10 @@ def _build_block(hotel_id, dept_list, week_start, user):
         'label': f"{week_start.strftime('%d/%m')} – {(week_start + timedelta(days=6)).strftime('%d/%m/%Y')}",
     }
 
-def _build_month_block(hotel_id, dept_list, year, month, user):
-    """v12.204 — Μηνιαίο πλάνο: ΟΛΟ το προσωπικό σε ΜΙΑ λίστα (ΟΧΙ ανά τμήμα), όλες οι μέρες
-    του μήνα ως στήλες, ίδια κελιά/editor. Row totals (hours/extra/repo/work_days) = ΜΗΝΙΑΙΑ."""
-    import calendar as _cal
-    ndays = _cal.monthrange(year, month)[1]
-    days = [date(year, month, dd) for dd in range(1, ndays + 1)]
+def _build_span_block(hotel_id, dept_list, days, user, label):
+    """v12.388 — Πλάνο για ΟΠΟΙΟΔΗΠΟΤΕ εύρος ημερών (μήνας ή έτος): ΟΛΟ το προσωπικό σε ΜΙΑ λίστα,
+    όλες οι μέρες ως στήλες, ίδια κελιά/editor. Row totals = για ΟΛΟ το εύρος. day_hdr με σήμανση μήνα."""
+    ndays = len(days)
     hol = {h.hol_date for h in Holiday.query.all()}
     seen = set(); users = []
     for dep in dept_list:
@@ -1156,8 +1154,25 @@ def _build_month_block(hotel_id, dept_list, year, month, user):
                 day_repo[idx] += 1
     day_hdr = [{'iso': d.isoformat(), 'd': d.day, 'wd': WD[d.weekday()],
                 'we': d.weekday() >= 5, 'hol': d in hol, 'today': (d == today),
+                'm': d.month, 'mstart': (d.day == 1), 'mlabel': MONTHS_EL[d.month][:3],
                 'work': day_work[i], 'repo': day_repo[i]} for i, d in enumerate(days)]
-    return {'rows': rows, 'day_hdr': day_hdr, 'ndays': ndays, 'label': f'{MONTHS_EL[month]} {year}'}
+    return {'rows': rows, 'day_hdr': day_hdr, 'ndays': ndays, 'label': label}
+
+def _build_month_block(hotel_id, dept_list, year, month, user):
+    """v12.204 — Μηνιαίο πλάνο (wrapper του _build_span_block για έναν μήνα)."""
+    import calendar as _cal
+    ndays = _cal.monthrange(year, month)[1]
+    days = [date(year, month, dd) for dd in range(1, ndays + 1)]
+    return _build_span_block(hotel_id, dept_list, days, user, '%s %d' % (MONTHS_EL[month], year))
+
+def _build_year_block(hotel_id, dept_list, year, user):
+    """v12.388 — Ετήσιο πλάνο: όλες οι μέρες του έτους ως στήλες (ίδιο grid/editor με το μηνιαίο)."""
+    import calendar as _cal
+    days = []
+    for mo in range(1, 13):
+        nd = _cal.monthrange(year, mo)[1]
+        days += [date(year, mo, dd) for dd in range(1, nd + 1)]
+    return _build_span_block(hotel_id, dept_list, days, user, str(year))
 
 @app.route('/dashboard/schedule')
 def schedule_board():
@@ -1185,9 +1200,12 @@ def schedule_board():
     prev_m = (date(sel_year, sel_month, 1) - timedelta(days=1))
     nxt = date(sel_year, sel_month, 28) + timedelta(days=10)
     view_mode = request.args.get('view') or 'week'
-    month_block = None
+    month_block = None; year_block = None
     if view_mode == 'month':
         month_block = _build_month_block(hotel_id, dept_list, sel_year, sel_month, user)
+        blocks = []
+    elif view_mode == 'year':
+        year_block = _build_year_block(hotel_id, dept_list, sel_year, user)
         blocks = []
     else:
         blocks = [_build_block(hotel_id, dept_list, week_start + timedelta(days=7 * i), user) for i in range(weeks)]
@@ -1203,7 +1221,7 @@ def schedule_board():
         prev_week=(week_start - timedelta(days=7)).isoformat(),
         next_week=(week_start + timedelta(days=7)).isoformat(),
         month_el=MONTHS_EL, is_admin=is_admin(),
-        sel_month=sel_month, sel_year=sel_year, view_mode=view_mode, month_block=month_block,
+        sel_month=sel_month, sel_year=sel_year, view_mode=view_mode, month_block=month_block, year_block=year_block,
         prev_month=prev_m.month, prev_year=prev_m.year, next_month=nxt.month, next_year=nxt.year)
 
 
