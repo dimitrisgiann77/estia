@@ -1292,11 +1292,14 @@ def schedule_month_export():
     ws.column_dimensions['A'].width = 26
     ws.column_dimensions['B'].width = 12
     ws.column_dimensions['C'].width = 18
+    _ctr = Alignment(horizontal='center', vertical='center')
     for i, d in enumerate(mb['day_hdr']):
         col = openpyxl.utils.get_column_letter(NPRE + 1 + i); ws.column_dimensions[col].width = 13
-        if d['we']:
-            for rr in range(1, ws.max_row + 1):
-                ws.cell(row=rr, column=NPRE + 1 + i).fill = we
+        for rr in range(1, ws.max_row + 1):
+            cell = ws.cell(row=rr, column=NPRE + 1 + i)
+            cell.alignment = _ctr           # v12.388 — μέρες + περιεχόμενο κεντραρισμένα
+            if d['we']:
+                cell.fill = we
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     fn = 'monthly_%d_%02d.xlsx' % (year, month)
     return Response(bio.read(),
