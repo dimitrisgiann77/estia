@@ -633,17 +633,22 @@ function _matchPerson(lead, people){ var best=null,bs=0,tie=false,bex=false;
     if(sc>=need){ if(sc>bs){bs=sc;best=p;tie=false;bex=(ex===p.tokens.length);} else if(sc===bs){tie=true;} }
   });
   return (best&&!tie)?{p:best,exact:bex}:null; }   // exact=true αν ΟΛΑ τα tokens ταίριαξαν ακριβώς (όχι fuzzy)
+function _shiftLike(s){ s=(s||'').trim(); if(!s)return false;
+  if(/\d{1,2}\s*[:\.]\s*\d{2}/.test(s)) return true;                 // έχει ώρα → βάρδια
+  return /^(ΑΝ|ΑΡΓ|ΑΣΘ|ΑΝΕΥ|ΑΔ|ΑΠ|ΑΑ|ΕΡΓ|ΕΩ|ΔΡ|ΡΕΠΟ|ΡΕΠ|ΡΠ|SRG|CNT|AST|PSV|PLM|IRO|CND)/.test(_normName(s)); }
 function _pasteSmart(grid){
-  if(grid.length<2) return false;
+  if(!grid.length) return false;
   var hdr=grid[0], colDate={}, dateCols=[];
   for(var c=0;c<hdr.length;c++){ var iso=_parseDateCell(hdr[c]); if(iso){colDate[c]=iso;dateCols.push(c);} }
-  if(dateCols.length<2) return false;                 // δεν βρέθηκε γραμμή ημερομηνιών → όχι smart (fallback positional)
-  var firstDateCol=dateCols[0];
-  // Στήλες ονόματος από τις ΕΤΙΚΕΤΕΣ (ΕΠΩΝΥΜΟ/ΟΝΟΜΑ) → ΑΓΝΟΕΙ ΤΜΗΜΑ/ΕΤΑΙΡΕΙΑ/ΥΠΟΚ (καμία μόλυνση από ονόματα εταιρειών)
-  var nameCols=[];
+  var people=_boardPeople(), bdates=_boardDates();
+  if(dateCols.length>=2) return _smartHeader(grid, dateCols, colDate, people, bdates);  // Α: με γραμμή ημερομηνιών
+  return _smartNoHeader(grid, people, bdates);                                          // Β: χωρίς — κατά θέση από το κλικ
+}
+function _smartHeader(grid, dateCols, colDate, people, bdates){
+  if(grid.length<2) return false;
+  var hdr=grid[0], firstDateCol=dateCols[0], nameCols=[];
   for(var cn=0;cn<firstDateCol;cn++){ var lab=_normName(hdr[cn]); if(lab.indexOf('ΕΠΩΝΥΜ')>=0||lab.indexOf('ΟΝΟΜΑ')>=0) nameCols.push(cn); }
   if(!nameCols.length){ for(var cf=0;cf<firstDateCol;cf++) nameCols.push(cf); }   // fallback: όλες οι μπροστινές
-  var people=_boardPeople(), bdates=_boardDates();
   var matches=[], unmatched=[], datesOut={}, items=[];
   for(var r=1;r<grid.length;r++){ var row=grid[r]||[];
     var nm=''; nameCols.forEach(function(k){ nm+=' '+(row[k]||''); }); nm=nm.trim().replace(/\s+/g,' ');
@@ -653,14 +658,46 @@ function _pasteSmart(grid){
     var cnt=0;
     for(var di=0;di<dateCols.length;di++){ var cc=dateCols[di], iso=colDate[cc], val=(row[cc]||'').trim();
       if(!val) continue;
-      if(!bdates[iso]){ datesOut[iso]=1; continue; }   // ημερομηνία εκτός τρέχουσας προβολής
+      if(!bdates[iso]){ datesOut[iso]=1; continue; }
       items.push({user_id:mr.p.uid, date:iso, text:val}); cnt++;
     }
     matches.push({excel:nm, board:mr.p.name, exact:mr.exact, count:cnt});
   }
   var dOut=Object.keys(datesOut).sort();
-  if(!matches.length && !unmatched.length && !dOut.length) return false;   // τίποτα smart → άσε το positional
-  _pastePreview({matches:matches, unmatched:unmatched, datesOut:dOut, items:items});   // ΠΡΟΕΠΙΣΚΟΠΗΣΗ πριν γραφτεί οτιδήποτε
+  if(!matches.length && !unmatched.length && !dOut.length) return false;
+  _pastePreview({matches:matches, unmatched:unmatched, datesOut:dOut, items:items,
+                 note:'Ημερομηνίες: από τη γραμμή-κεφαλίδα του Excel (ασφαλές — ταίριασμα κατά ημερομηνία).'});
+  return true;
+}
+function _smartNoHeader(grid, people, bdates){
+  // πόσες μπροστινές στήλες είναι ΟΝΟΜΑ (μέχρι την 1η στήλη με βάρδια)
+  var L=Infinity;
+  grid.forEach(function(row){ for(var c=0;c<row.length;c++){ if(_shiftLike(row[c])){ if(c<L)L=c; break; } } });
+  if(!isFinite(L) || L<1) return false;   // δεν ξεχωρίζει όνομα/περιεχόμενο → άσε το positional
+  var ordered=Object.keys(bdates).sort();
+  var anchor=(typeof curSel!=='undefined' && curSel.length)?_selSorted()[0]:null;
+  var startDate=anchor?anchor.getAttribute('data-date'):(ordered[0]||null);
+  var baseIdx=startDate?ordered.indexOf(startDate):0; if(baseIdx<0) baseIdx=0;
+  var matches=[], unmatched=[], items=[], beyond=0, tested=0, ok=0, maxJ=0;
+  grid.forEach(function(row){
+    var nm=''; for(var k=0;k<L;k++) nm+=' '+(row[k]||''); nm=nm.trim().replace(/\s+/g,' ');
+    if(!nm) return;
+    tested++;
+    var mr=_matchPerson(_nameTokens(nm), people);
+    if(!mr){ unmatched.push(nm); return; }
+    ok++; var cnt=0;
+    for(var j=0;(L+j)<row.length;j++){ var val=(row[L+j]||'').trim(); if(!val) continue;
+      if((j+1)>maxJ) maxJ=j+1;
+      var iso=ordered[baseIdx+j]; if(!iso){ beyond++; continue; }
+      items.push({user_id:mr.p.uid, date:iso, text:val}); cnt++;
+    }
+    matches.push({excel:nm, board:mr.p.name, exact:mr.exact, count:cnt});
+  });
+  if(!tested) return false;   // καμία γραμμή με όνομα → δεν είναι μπλοκ ονομάτων → positional fallback
+  // (αν tested>0 αλλά ok=0 → δείχνουμε προεπισκόπηση με «0 βρέθηκαν», ΔΕΝ πέφτουμε σε positional για ασφάλεια)
+  var lastIso=ordered[baseIdx+maxJ-1];
+  var note='Το Excel ΔΕΝ είχε γραμμή ημερομηνιών → οι μέρες μπαίνουν <b>κατά σειρά</b> ξεκινώντας από <b>'+_rfmt(startDate||'')+'</b>'+(lastIso?(' έως <b>'+_rfmt(lastIso)+'</b>'):'')+'. Αν η αφετηρία είναι λάθος: Άκυρο → κλικ στο κελί της 1ης μέρας → ξανα-Ctrl+V.'+(beyond?(' · '+beyond+' στήλες πέρα από την προβολή αγνοήθηκαν.'):'');
+  _pastePreview({matches:matches, unmatched:unmatched, datesOut:[], items:items, note:note});
   return true;
 }
 function _pastePreview(plan){
@@ -671,7 +708,8 @@ function _pastePreview(plan){
   box.style.cssText='background:#fff;border-radius:14px;max-width:580px;width:94%;max-height:86vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-size:13px;color:#0f172a;';
   var nfz=plan.matches.filter(function(m){return !m.exact;}).length;
   var h='<div style="font-weight:700;font-size:16px;margin-bottom:4px;"><i class="ti ti-file-spreadsheet"></i> Προεπισκόπηση επικόλλησης</div>';
-  h+='<div style="color:#475569;margin-bottom:10px;">Έλεγξε τις αντιστοιχίσεις — τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (μη-ακριβή) ταιριάσματα — δες τα κίτρινα.</b>'):'')+'</div>';
+  h+='<div style="color:#475569;margin-bottom:8px;">Έλεγξε τις αντιστοιχίσεις — τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (μη-ακριβή) ταιριάσματα — δες τα κίτρινα.</b>'):'')+'</div>';
+  if(plan.note){ h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:10px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
   if(plan.matches.length){
     h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;"><th style="padding:4px;">Excel</th><th></th><th style="padding:4px;">Εργαζόμενος στο πρόγραμμα</th><th style="padding:4px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
     plan.matches.forEach(function(m){
