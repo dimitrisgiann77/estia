@@ -650,103 +650,108 @@ function _smartHeader(grid, dateCols, colDate, people, bdates){
   var hdr=grid[0], firstDateCol=dateCols[0], nameCols=[];
   for(var cn=0;cn<firstDateCol;cn++){ var lab=_normName(hdr[cn]); if(lab.indexOf('ΕΠΩΝΥΜ')>=0||lab.indexOf('ΟΝΟΜΑ')>=0) nameCols.push(cn); }
   if(!nameCols.length){ for(var cf=0;cf<firstDateCol;cf++) nameCols.push(cf); }   // fallback: όλες οι μπροστινές
-  var matches=[], unmatched=[], datesOut={}, items=[];
+  var rows=[], datesOut={}, any=false;
   for(var r=1;r<grid.length;r++){ var row=grid[r]||[];
     var nm=''; nameCols.forEach(function(k){ nm+=' '+(row[k]||''); }); nm=nm.trim().replace(/\s+/g,' ');
     if(!nm) continue;
     var mr=_matchPerson(_nameTokens(nm), people);
-    if(!mr){ unmatched.push(nm); continue; }
-    var cnt=0;
+    var cells=[];
     for(var di=0;di<dateCols.length;di++){ var cc=dateCols[di], iso=colDate[cc], val=(row[cc]||'').trim();
       if(!val) continue;
       if(!bdates[iso]){ datesOut[iso]=1; continue; }
-      items.push({user_id:mr.p.uid, date:iso, text:val}); cnt++;
+      cells.push({date:iso, text:val});
     }
-    matches.push({excel:nm, board:mr.p.name, exact:mr.exact, count:cnt});
+    rows.push({excel:nm, uid:(mr?mr.p.uid:null), board:(mr?mr.p.name:null), exact:(mr?mr.exact:false), cells:cells}); any=true;
   }
-  var dOut=Object.keys(datesOut).sort();
-  if(!matches.length && !unmatched.length && !dOut.length) return false;
-  _pastePreview({matches:matches, unmatched:unmatched, datesOut:dOut, items:items,
-                 note:'Ημερομηνίες: από τη γραμμή-κεφαλίδα του Excel (ασφαλές — ταίριασμα κατά ημερομηνία).'});
+  if(!any && !Object.keys(datesOut).length) return false;
+  _pastePreview({rows:rows, people:people, datesOut:Object.keys(datesOut).sort(),
+                 note:'Ημερομηνίες: από τη γραμμή-κεφαλίδα του Excel (ταίριασμα κατά ημερομηνία — δεν γράφει σε λάθος μήνα).'});
   return true;
 }
 function _smartNoHeader(grid, people, bdates){
-  // πόσες μπροστινές στήλες είναι ΟΝΟΜΑ (μέχρι την 1η στήλη με βάρδια)
-  var L=Infinity;
+  var L=Infinity;   // πόσες μπροστινές στήλες είναι ΟΝΟΜΑ (μέχρι την 1η στήλη με βάρδια)
   grid.forEach(function(row){ for(var c=0;c<row.length;c++){ if(_shiftLike(row[c])){ if(c<L)L=c; break; } } });
   if(!isFinite(L) || L<1) return false;   // δεν ξεχωρίζει όνομα/περιεχόμενο → άσε το positional
   var ordered=Object.keys(bdates).sort();
   var anchor=(typeof curSel!=='undefined' && curSel.length)?_selSorted()[0]:null;
   var startDate=anchor?anchor.getAttribute('data-date'):(ordered[0]||null);
   var baseIdx=startDate?ordered.indexOf(startDate):0; if(baseIdx<0) baseIdx=0;
-  var matches=[], unmatched=[], items=[], beyond=0, tested=0, ok=0, maxJ=0;
+  var rows=[], beyond=0, tested=0, maxJ=0;
   grid.forEach(function(row){
     var nm=''; for(var k=0;k<L;k++) nm+=' '+(row[k]||''); nm=nm.trim().replace(/\s+/g,' ');
     if(!nm) return;
     tested++;
     var mr=_matchPerson(_nameTokens(nm), people);
-    if(!mr){ unmatched.push(nm); return; }
-    ok++; var cnt=0;
+    var cells=[];
     for(var j=0;(L+j)<row.length;j++){ var val=(row[L+j]||'').trim(); if(!val) continue;
       if((j+1)>maxJ) maxJ=j+1;
       var iso=ordered[baseIdx+j]; if(!iso){ beyond++; continue; }
-      items.push({user_id:mr.p.uid, date:iso, text:val}); cnt++;
+      cells.push({date:iso, text:val});
     }
-    matches.push({excel:nm, board:mr.p.name, exact:mr.exact, count:cnt});
+    rows.push({excel:nm, uid:(mr?mr.p.uid:null), board:(mr?mr.p.name:null), exact:(mr?mr.exact:false), cells:cells});
   });
-  if(!tested) return false;   // καμία γραμμή με όνομα → δεν είναι μπλοκ ονομάτων → positional fallback
-  // (αν tested>0 αλλά ok=0 → δείχνουμε προεπισκόπηση με «0 βρέθηκαν», ΔΕΝ πέφτουμε σε positional για ασφάλεια)
+  if(!tested) return false;
   var lastIso=ordered[baseIdx+maxJ-1];
-  var note='Το Excel ΔΕΝ είχε γραμμή ημερομηνιών → οι μέρες μπαίνουν <b>κατά σειρά</b> ξεκινώντας από <b>'+_rfmt(startDate||'')+'</b>'+(lastIso?(' έως <b>'+_rfmt(lastIso)+'</b>'):'')+'. Αν η αφετηρία είναι λάθος: Άκυρο → κλικ στο κελί της 1ης μέρας → ξανα-Ctrl+V.'+(beyond?(' · '+beyond+' στήλες πέρα από την προβολή αγνοήθηκαν.'):'');
-  _pastePreview({matches:matches, unmatched:unmatched, datesOut:[], items:items, note:note});
+  var note='Χωρίς γραμμή ημερομηνιών → οι μέρες μπαίνουν <b>κατά σειρά</b> από <b>'+_rfmt(startDate||'')+'</b>'+(lastIso?(' έως <b>'+_rfmt(lastIso)+'</b>'):'')+' (αρχή = το κελί που διάλεξες).'+(beyond?(' · '+beyond+' στήλες πέρα από την προβολή αγνοήθηκαν.'):'');
+  _pastePreview({rows:rows, people:people, datesOut:[], note:note});
   return true;
 }
 function _pastePreview(plan){
   var old=document.getElementById('pastePrev'); if(old)old.remove();
+  var ppl=plan.people||_boardPeople();
+  var optsBase='<option value="">— (να μη μπει) —</option>'+ppl.map(function(p){return '<option value="'+p.uid+'">'+_esc(p.name)+'</option>';}).join('');
   var ov=document.createElement('div'); ov.id='pastePrev';
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
   var box=document.createElement('div');
-  box.style.cssText='background:#fff;border-radius:14px;max-width:580px;width:94%;max-height:86vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-size:13px;color:#0f172a;';
-  var nfz=plan.matches.filter(function(m){return !m.exact;}).length;
+  box.style.cssText='background:#fff;border-radius:14px;max-width:700px;width:95%;max-height:88vh;overflow:auto;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.35);font-size:13px;color:#0f172a;';
+  var nfz=plan.rows.filter(function(x){return x.uid && !x.exact;}).length;
+  var nun=plan.rows.filter(function(x){return !x.uid;}).length;
   var h='<div style="font-weight:700;font-size:16px;margin-bottom:4px;"><i class="ti ti-file-spreadsheet"></i> Προεπισκόπηση επικόλλησης</div>';
-  h+='<div style="color:#475569;margin-bottom:8px;">Έλεγξε τις αντιστοιχίσεις — τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (μη-ακριβή) ταιριάσματα — δες τα κίτρινα.</b>'):'')+'</div>';
+  h+='<div style="color:#475569;margin-bottom:8px;">Έλεγξε/διόρθωσε τις αντιστοιχίσεις από τα μενού. Τίποτα δεν αποθηκεύεται μέχρι «Επιβεβαίωση».'+(nfz?(' <b style="color:#b45309;">'+nfz+' πιθανά (κίτρινα).</b>'):'')+(nun?(' <b style="color:#b91c1c;">'+nun+' χωρίς αντιστοίχιση (ροζ) — διάλεξε ή άσ\' τα.</b>'):'')+'</div>';
   if(plan.note){ h+='<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 10px;margin-bottom:10px;color:#1e40af;font-size:12px;">'+plan.note+'</div>'; }
-  if(plan.matches.length){
-    h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;"><th style="padding:4px;">Excel</th><th></th><th style="padding:4px;">Εργαζόμενος στο πρόγραμμα</th><th style="padding:4px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
-    plan.matches.forEach(function(m){
-      var bg=m.exact?'':'background:#fef9c3;';
-      h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:4px;">'+_esc(m.excel)+'</td><td style="padding:0 4px;color:#94a3b8;">→</td><td style="padding:4px;font-weight:600;">'+_esc(m.board)+' '+(m.exact?'<span style="color:#16a34a;">✓</span>':'<span title="πιθανό ταίριασμα — έλεγξέ το" style="color:#b45309;font-weight:700;">~ πιθανό</span>')+'</td><td style="padding:4px;text-align:center;">'+m.count+'</td></tr>';
-    });
-    h+='</tbody></table>';
-  }
-  if(plan.unmatched.length){ h+='<div style="color:#b45309;font-weight:600;margin-top:6px;">Δεν βρέθηκαν ('+plan.unmatched.length+') — θα αγνοηθούν:</div><div style="color:#64748b;max-height:92px;overflow:auto;margin-bottom:6px;">'+plan.unmatched.slice(0,40).map(_esc).join('<br>')+(plan.unmatched.length>40?'<br>…':'')+'</div>'; }
-  if(plan.datesOut.length){ h+='<div style="color:#b45309;margin-top:4px;">'+plan.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής (θα αγνοηθούν).</div>'; }
-  h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση &amp; επικόλληση ('+plan.items.length+')</button></div>';
+  h+='<table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><thead><tr style="text-align:left;color:#64748b;font-size:12px;"><th style="padding:4px;">Excel</th><th style="padding:4px;">→ Εργαζόμενος (μενού)</th><th style="padding:4px;text-align:center;">βάρδ.</th></tr></thead><tbody>';
+  plan.rows.forEach(function(x,i){
+    var bg = !x.uid ? 'background:#fee2e2;' : (x.exact?'':'background:#fef9c3;');
+    var badge = !x.uid ? '' : (x.exact?' <span style="color:#16a34a;">✓</span>':' <span title="πιθανό — έλεγξέ το" style="color:#b45309;font-weight:700;">~</span>');
+    h+='<tr style="border-top:1px solid #eef2f6;'+bg+'"><td style="padding:4px;">'+_esc(x.excel)+badge+'</td><td style="padding:4px;"><select class="ppSel" data-idx="'+i+'" style="max-width:240px;padding:3px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;">'+optsBase+'</select></td><td style="padding:4px;text-align:center;">'+x.cells.length+'</td></tr>';
+  });
+  h+='</tbody></table>';
+  if(plan.datesOut&&plan.datesOut.length){ h+='<div style="color:#b45309;margin:4px 0;">'+plan.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής (αγνοούνται).</div>'; }
+  h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;position:sticky;bottom:-18px;background:#fff;padding:8px 0;"><button id="ppCancel" class="btn">Άκυρο</button><button id="ppOk" class="btn pri">Επιβεβαίωση & επικόλληση</button></div>';
   box.innerHTML=h; ov.appendChild(box); document.body.appendChild(ov);
+  var sels=box.querySelectorAll('.ppSel');
+  plan.rows.forEach(function(x,i){ if(sels[i]) sels[i].value=(x.uid||''); });   // προεπιλογή = auto-match
   document.getElementById('ppCancel').onclick=function(){ov.remove();};
-  document.getElementById('ppOk').onclick=function(){ ov.remove(); _commitSmart(plan); };
+  document.getElementById('ppOk').onclick=function(){
+    var chosen=[]; box.querySelectorAll('.ppSel').forEach(function(s){ chosen[+s.getAttribute('data-idx')]=s.value||''; });
+    ov.remove(); _commitSmart(plan, chosen);
+  };
 }
-function _commitSmart(plan){
-  var items=plan.items;
-  if(!items.length){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:plan.unmatched,datesOut:plan.datesOut}); return; }
+function _commitSmart(plan, chosen){
+  var items=[];
+  plan.rows.forEach(function(x,i){ var uid=chosen[i]; if(!uid) return;
+    x.cells.forEach(function(c){ items.push({user_id:uid, date:c.date, text:c.text}); });
+  });
+  var unmatchedNames=plan.rows.filter(function(x,i){return !chosen[i] && x.cells.length;}).map(function(x){return x.excel;});
+  if(!items.length){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:unmatchedNames,datesOut:plan.datesOut||[]}); return; }
   var _pend=_histCapture(items.map(function(it){return {user_id:it.user_id,date:it.date};}));
   fetch('/dashboard/schedule/paste_excel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,board_hotel_id:BOARD_HOTEL_ID})})
     .then(function(r){return r.json();}).then(function(j){
       if(j&&j.ok){ refreshBoard(function(){_histCommit(_pend);}); }
       _pasteReport({done:(j&&j.done)||0, locked:(j&&j.locked)||0, blocked:(j&&j.blocked)||0,
-                    skipped:(j&&j.skipped)||0, unread:(j&&j.unread)||[], unmatched:plan.unmatched, datesOut:plan.datesOut});
-    }).catch(function(){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:plan.unmatched,datesOut:plan.datesOut,err:true}); });
+                    skipped:(j&&j.skipped)||0, unread:(j&&j.unread)||[], unmatched:unmatchedNames, datesOut:plan.datesOut||[]});
+    }).catch(function(){ _pasteReport({done:0,locked:0,skipped:0,unread:[],unmatched:unmatchedNames,datesOut:plan.datesOut||[],err:true}); });
 }
 function _esc(s){ return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
 function _pasteReport(o){
   var old=document.getElementById('pasteReport'); if(old)old.remove();
   var box=document.createElement('div'); box.id='pasteReport';
-  box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:9999;max-width:370px;background:#fff;border:1px solid #dbe3ea;border-left:5px solid #185FA5;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.24);padding:12px 14px;font-size:13px;color:#0f172a;';
+  box.style.cssText='position:fixed;right:16px;bottom:16px;z-index:9999;width:max-content;max-width:640px;min-width:280px;background:#fff;border:1px solid #dbe3ea;border-left:5px solid #185FA5;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.24);padding:12px 14px;font-size:13px;color:#0f172a;';
   var h='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;"><b><i class="ti ti-file-spreadsheet"></i> Επικόλληση από Excel</b><span id="prX" style="cursor:pointer;color:#94a3b8;font-size:15px;">✕</span></div>';
   h+='<div style="color:#16a34a;">✓ '+(o.done||0)+' βάρδιες φορτώθηκαν'+(o.locked?(' · '+o.locked+' σε κλειδωμένες'):'')+(o.blocked?(' · '+o.blocked+' μπλοκ (εκ περιτροπής)'):'')+'</div>';
-  if(o.unmatched&&o.unmatched.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.unmatched.length+' άτομα δεν βρέθηκαν</div><div style="color:#64748b;max-height:88px;overflow:auto;">'+o.unmatched.slice(0,20).map(_esc).join('<br>')+(o.unmatched.length>20?'<br>…':'')+'</div>'; }
+  if(o.unmatched&&o.unmatched.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.unmatched.length+' άτομα δεν μπήκαν:</div><div style="color:#64748b;max-height:180px;overflow:auto;line-height:1.6;">'+o.unmatched.map(_esc).join(' · ')+'</div>'; }
   if(o.datesOut&&o.datesOut.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.datesOut.length+' ημ/νίες εκτός τρέχουσας προβολής</div>'; }
-  if(o.unread&&o.unread.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+(o.skipped||o.unread.length)+' κελιά δεν αναγνωρίστηκαν</div><div style="color:#64748b;max-height:88px;overflow:auto;">'+o.unread.slice(0,15).map(_esc).join('<br>')+'</div>'; }
+  if(o.unread&&o.unread.length){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+(o.skipped||o.unread.length)+' κελιά δεν αναγνωρίστηκαν:</div><div style="color:#64748b;max-height:120px;overflow:auto;line-height:1.6;">'+o.unread.map(_esc).join(' · ')+'</div>'; }
   else if(o.skipped){ h+='<div style="margin-top:7px;color:#b45309;font-weight:600;">⚠ '+o.skipped+' κελιά δεν αναγνωρίστηκαν</div>'; }
   box.innerHTML=h; document.body.appendChild(box);
   document.getElementById('prX').onclick=function(){box.remove();};
