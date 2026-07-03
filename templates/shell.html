@@ -556,7 +556,7 @@ setInterval(function(){
   fetch('/version',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
     if(d&&d.build&&String(d.build)!==String(APP_BUILD)){ var nb=d.build; APP_BUILD=nb; _showUpdate(nb); }
   }).catch(function(){});
-}, 60000);
+}, 3600000);   // v12.388 — έλεγχος έκδοσης ανά 1 ώρα (πριν: 60s)
 </script>
 </body>
 </html>
