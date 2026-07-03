@@ -113,8 +113,8 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
-      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=year&year={{ sel_year }}&embed=1"><i class="ti ti-calendar"></i> Ετήσιο</a>
       <a class="btn pri" href="/dashboard/schedule/staff?embed=1"><i class="ti ti-users-plus"></i> Προσωπικό</a>
+      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1" title="Μετάβαση στο μηνιαίο">Μηνιαίο <i class="ti ti-chevron-right"></i></a>
     </span>
   </form>
   {% endif %}
@@ -128,7 +128,7 @@
   {% if view_mode=='month' %}
   <div class="sched-toolbar" style="margin-bottom:10px;">
     <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar-month"></i> {{ month_block.label if month_block }} — όλο το προσωπικό ({{ month_block.rows|length if month_block }})</h3>
-    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&embed=1"><i class="ti ti-arrow-left"></i> Εβδομαδιαία</a>
+    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&embed=1" title="Πίσω στο εβδομαδιαίο"><i class="ti ti-chevron-left"></i> Εβδομαδιαία</a>
     <div class="fsep"></div>
     <div class="fgrp"><span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
       <select onchange="location.href='/dashboard/schedule?view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1&hotel_id='+this.value">
@@ -149,20 +149,19 @@
         </div>
       </details></div>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
-      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=year&year={{ sel_year }}&embed=1"><i class="ti ti-calendar"></i> Ετήσιο</a>
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
       <a class="btn" href="/dashboard/schedule/month_export.xlsx?hotel_id={{ hotel_id }}&month={{ sel_month }}&year={{ sel_year }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
       <form method="POST" action="/dashboard/schedule/submit_month" onsubmit="return confirm('Υποβολή ΟΛΟΥ του μήνα {{ month_block.label if month_block }} στο λογιστήριο;');" style="margin:0;">
         <input type="hidden" name="hotel_id" value="{{ hotel_id }}"><input type="hidden" name="month" value="{{ sel_month }}"><input type="hidden" name="year" value="{{ sel_year }}">
         <button class="btn pri" type="submit"><i class="ti ti-send"></i> Υποβολή μήνα</button>
       </form>
+      <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=year&year={{ sel_year }}&embed=1" title="Μετάβαση στο ετήσιο">Ετήσιο <i class="ti ti-chevron-right"></i></a>
     </span>
   </div>
   {% elif view_mode=='year' %}
   <div class="sched-toolbar" style="margin-bottom:10px;">
     <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar"></i> Ετήσιο πρόγραμμα {{ year_block.label if year_block }} — όλο το προσωπικό ({{ year_block.rows|length if year_block }})</h3>
-    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&embed=1"><i class="ti ti-arrow-left"></i> Εβδομαδιαία</a>
-    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1"><i class="ti ti-calendar-month"></i> Μηνιαίο</a>
+    <a class="btn" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1" title="Πίσω στο μηνιαίο"><i class="ti ti-chevron-left"></i> Μηνιαίο</a>
     <div class="fsep"></div>
     <div class="fgrp"><span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
       <select onchange="location.href='/dashboard/schedule?view=year&year={{ sel_year }}&embed=1&hotel_id='+this.value">
@@ -181,10 +180,6 @@
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
     </span>
-  </div>
-  {% else %}
-  <div style="margin-bottom:10px;">
-    <a class="btn pri" href="/dashboard/schedule?hotel_id={{ hotel_id }}&view=month&month={{ sel_month }}&year={{ sel_year }}&embed=1"><i class="ti ti-calendar-month"></i> Μηνιαίο πλάνο (όλο το προσωπικό)</a>
   </div>
   {% endif %}
 
@@ -350,7 +345,9 @@ var curSel=[], selecting=false, anchor=null, ctrlPending=false;
 function _pos(el){var td=el.parentNode,tr=td.parentNode,tb=tr.parentNode;return {tb:tb,r:Array.prototype.indexOf.call(tb.children,tr),c:Array.prototype.indexOf.call(tr.children,td)};}
 function clearSel(){ curSel.forEach(function(c){c.classList.remove('sel');}); curSel=[]; _updSelBtn(); }
 function markRect(a,b){ clearSel(); var r0=Math.min(a.r,b.r),r1=Math.max(a.r,b.r),c0=Math.min(a.c,b.c),c1=Math.max(a.c,b.c);
-  a.tb.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){var p=_pos(el);if(p.r>=r0&&p.r<=r1&&p.c>=c0&&p.c<=c1){el.classList.add('sel');curSel.push(el);}}); }
+  a.tb.querySelectorAll('.cell[data-edit="1"]').forEach(function(el){var p=_pos(el);if(p.r>=r0&&p.r<=r1&&p.c>=c0&&p.c<=c1){
+    var tr=el.closest('tr'); if(tr && tr.offsetParent===null) return;   // v12.388 — κρυμμένη (φιλτραρισμένη) γραμμή → εκτός επιλογής
+    el.classList.add('sel');curSel.push(el);}}); }
 function toggleCell(el){var i=curSel.indexOf(el);if(i>=0){el.classList.remove('sel');curSel.splice(i,1);}else{el.classList.add('sel');curSel.push(el);} _updSelBtn(); }
 function _cellDown(e){ var el=this;
   if(e.ctrlKey||e.metaKey){ e.preventDefault(); toggleCell(el); ctrlPending=true; return; }
