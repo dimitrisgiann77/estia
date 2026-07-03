@@ -22,11 +22,16 @@
         border-bottom:2px solid var(--gold);letter-spacing:1.2px;font-size:12.5px;}
   table.ssy thead tr.mrow th.malt{background:linear-gradient(135deg,#1c4657,#143441);}
   table.ssy thead tr.crow th{top:32px;background:#334155;font-size:10.5px;font-weight:600;line-height:1.15;}
-  table.ssy .nameh{position:sticky;left:0;z-index:6;background:var(--navy2)!important;text-align:left;min-width:220px;box-shadow:2px 0 6px rgba(0,0,0,.12);}
-  table.ssy td.name{position:sticky;left:0;z-index:2;background:#fff;text-align:left;font-weight:700;color:var(--navy);
+  table.ssy .afmh,table.ssy td.afm{position:sticky;left:0;z-index:6;box-sizing:border-box;width:104px;min-width:104px;max-width:104px;text-align:left;}
+  table.ssy .hcodeh,table.ssy td.hcodecol{position:sticky;left:104px;z-index:6;box-sizing:border-box;width:52px;min-width:52px;max-width:52px;}
+  table.ssy thead .afmh,table.ssy thead .hcodeh{background:var(--navy2)!important;}
+  table.ssy td.afm{z-index:2;background:#fff;text-align:left;font-weight:600;color:#475569;font-variant-numeric:tabular-nums;font-size:11px;}
+  table.ssy td.hcodecol{z-index:2;background:#fff;font-weight:800;color:var(--navy2);letter-spacing:.5px;}
+  table.ssy .nameh{position:sticky;left:156px;z-index:6;background:var(--navy2)!important;text-align:left;min-width:200px;box-shadow:2px 0 6px rgba(0,0,0,.12);}
+  table.ssy td.name{position:sticky;left:156px;z-index:2;background:#fff;text-align:left;font-weight:700;color:var(--navy);
         border-right:2px solid var(--gold);box-shadow:2px 0 6px rgba(0,0,0,.05);}
   table.ssy tbody tr:nth-child(even) td{background:#f7f9fb;}
-  table.ssy tbody tr:nth-child(even) td.name{background:#eef3f7;}
+  table.ssy tbody tr:nth-child(even) td.name,table.ssy tbody tr:nth-child(even) td.afm,table.ssy tbody tr:nth-child(even) td.hcodecol{background:#eef3f7;}
   table.ssy td.num{text-align:right;font-variant-numeric:tabular-nums;}
   table.ssy td.hotel{font-weight:800;color:var(--navy2);letter-spacing:.5px;}
   /* group tints — νικούν το zebra */
@@ -38,7 +43,7 @@
   table.ssy thead tr.crow th.gbal{background:#8a6d1c;color:#fbeec4;}
   table.ssy .mgmt-tag{font-size:8.5px;font-weight:800;letter-spacing:1px;opacity:.9;margin-top:1px;}
   table.ssy tbody tr:hover td{background:#fff7e6!important;}
-  table.ssy tbody tr:hover td.name{background:#fdefc8!important;}
+  table.ssy tbody tr:hover td.name,table.ssy tbody tr:hover td.afm,table.ssy tbody tr:hover td.hcodecol{background:#fdefc8!important;}
   table.ssy .mstart{border-left:2px solid var(--gold)!important;}
   table.ssy .loanpill{color:var(--gold);font-weight:600;font-size:11px;}
   table.ssy tfoot td{position:sticky;bottom:0;z-index:4;background:linear-gradient(135deg,#fbf3de,#f3e6bf);
@@ -63,6 +68,8 @@
     {% set ncol = cols|length %}
     <thead>
       <tr class="mrow">
+        <th class="afmh" rowspan="2">ΑΦΜ</th>
+        <th class="hcodeh" rowspan="2" title="Κωδικός ξενοδοχείου">ΞΕΝ.</th>
         <th class="nameh" rowspan="2">Ονοματεπώνυμο</th>
         {% for mo in months %}<th class="mstart {{ 'malt' if loop.index0 % 2 else '' }}" colspan="{{ ncol }}">{{ month_el[mo]|upper }}</th>{% endfor %}
       </tr>
@@ -76,7 +83,9 @@
     <tbody>
     {% for r in rows %}
       <tr>
-        <td class="name">{{ r.name }}{% if not r.is_home %} <span class="loanpill">· {{ r.hotel_code }}</span>{% endif %}</td>
+        <td class="afm">{{ r.afm or '' }}</td>
+        <td class="hcodecol {{ 'loanpill' if not r.is_home else '' }}">{{ r.hotel_code or '' }}</td>
+        <td class="name">{{ r.name }}</td>
         {% for mo in months %}{% set m = r.months[mo] %}{% for c in cols %}
           {%- set v = m[c.src] -%}
           {%- set gc = 'gmgmt' if c.grp=='mgmt' else ('gacct' if (c.grp=='acct' and mo<=5) else ('gbal' if c.grp=='bal' else '')) -%}
@@ -86,13 +95,13 @@
         {% endfor %}{% endfor %}
       </tr>
     {% else %}
-      <tr><td class="name" colspan="{{ 1 + ncol*months|length }}" style="text-align:center;color:#94a3b8;padding:22px;">Καμία εγγραφή.</td></tr>
+      <tr><td class="name" colspan="{{ 3 + ncol*months|length }}" style="text-align:center;color:#94a3b8;padding:22px;">Καμία εγγραφή.</td></tr>
     {% endfor %}
     </tbody>
     {% if rows %}
     <tfoot>
       <tr>
-        <td class="tlabel">ΣΥΝΟΛΑ</td>
+        <td class="tlabel" colspan="3">ΣΥΝΟΛΑ</td>
         {% for mo in months %}{% for c in cols %}
           {%- set tv = totals[mo][c.src] if c.kind in ('money','num','int') else None -%}
           <td class="{{ 'mstart' if loop.first else '' }}">

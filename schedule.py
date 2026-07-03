@@ -3307,7 +3307,8 @@ def _staff_status_rows(year=None, months=None):
                         d[key] = round(d.get(key, 0.0) + val, 2); break
     rows = []
     for er in emp_rows:
-        u = er['user']; prof = er.get('profile')
+        u = er['user']; prof = er.get('profile'); pii = er.get('pii')
+        afm = (pii.afm if (pii and pii.afm) else '')
         home = er.get('hotel_id') or getattr(u, 'home_hotel_id', None)
         agreement = round(prof.agreement_amount, 2) if (prof and prof.agreement_amount) else None
         day_wage  = round(prof.day_wage, 2) if prof else None
@@ -3360,7 +3361,7 @@ def _staff_status_rows(year=None, months=None):
                 if active:
                     any_data = True
             if is_home or any_data:
-                rows.append({'user': u, 'hotel_id': hk, 'is_home': is_home,
+                rows.append({'user': u, 'hotel_id': hk, 'is_home': is_home, 'afm': afm,
                              'hotel_code': _hotel_short(hotel_name.get(hk, '')) if hk else '',
                              'name': u.full_name or u.username, 'months': mcells})
     rows.sort(key=lambda r: (r['name'] or '', 0 if r['is_home'] else 1, r['hotel_code'] or ''))
@@ -3426,11 +3427,12 @@ def schedule_staff_status_xlsx():
         if grp == 'acct' and mo <= 5: return acct_cell
         if grp == 'bal': return bal_cell
         return zebra if even else None
-    # Row1 name + month headers
-    ws.cell(row=1, column=1, value='Ονοματεπώνυμο')
-    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
-    a1 = ws.cell(row=1, column=1); a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy2; a1.alignment = center
-    c = 2
+    # Row1 identity (ΑΦΜ · ΞΕΝ · Ονοματεπώνυμο) + month headers
+    for col_i, lbl in ((1, 'ΑΦΜ'), (2, 'ΞΕΝ.'), (3, 'Ονοματεπώνυμο')):
+        ws.merge_cells(start_row=1, start_column=col_i, end_row=2, end_column=col_i)
+        a1 = ws.cell(row=1, column=col_i, value=lbl)
+        a1.font = Font(bold=True, color='FFFFFF'); a1.fill = navy2; a1.alignment = center
+    c = 4
     for mi, mo in enumerate(STAFF_STATUS_MONTHS):
         ws.merge_cells(start_row=1, start_column=c, end_row=1, end_column=c + ncol - 1)
         mc = ws.cell(row=1, column=c, value=MONTHS_EL[mo].upper())
@@ -3450,11 +3452,17 @@ def schedule_staff_status_xlsx():
     r = 3
     for ri, row in enumerate(rows):
         even = (ri % 2 == 1)
-        nc = ws.cell(row=r, column=1, value=(row['name'] if row['is_home'] else '%s  · %s' % (row['name'], row.get('hotel_code') or '')))
+        ac = ws.cell(row=r, column=1, value=(row.get('afm') or ''))
+        ac.font = Font(color='475569'); ac.alignment = Alignment(vertical='center')
+        hc2 = ws.cell(row=r, column=2, value=(row.get('hotel_code') or ''))
+        hc2.font = Font(bold=True, color='0F2A36'); hc2.alignment = Alignment(horizontal='center', vertical='center')
+        nc = ws.cell(row=r, column=3, value=row['name'])
         nc.font = Font(bold=True, color='153847'); nc.alignment = Alignment(vertical='center')
-        if even: nc.fill = zebra
-        nc.border = Border(left=thin, right=gside, top=thin, bottom=thin)
-        c = 2
+        if even:
+            ac.fill = zebra; hc2.fill = zebra; nc.fill = zebra
+        for _idc in (1, 2, 3):
+            ws.cell(row=r, column=_idc).border = Border(left=thin, right=(gside if _idc == 3 else thin), top=thin, bottom=thin)
+        c = 4
         for mi, mo in enumerate(STAFF_STATUS_MONTHS):
             cell = row['months'][mo]
             for j, col in enumerate(cols):
@@ -3470,10 +3478,13 @@ def schedule_staff_status_xlsx():
         r += 1
     # Totals
     tr = r
+    ws.merge_cells(start_row=tr, start_column=1, end_row=tr, end_column=3)
     tc = ws.cell(row=tr, column=1, value='ΣΥΝΟΛΑ')
-    tc.font = Font(bold=True, color='153847'); tc.fill = gold; tc.alignment = Alignment(vertical='center')
-    tc.border = Border(left=thin, right=gside, top=Side(style='medium', color='CAA64A'), bottom=thin)
-    c = 2
+    tc.font = Font(bold=True, color='153847'); tc.alignment = Alignment(vertical='center')
+    for _idc in (1, 2, 3):
+        tcell = ws.cell(row=tr, column=_idc); tcell.fill = gold
+        tcell.border = Border(left=thin, right=(gside if _idc == 3 else thin), top=Side(style='medium', color='CAA64A'), bottom=thin)
+    c = 4
     for mi, mo in enumerate(STAFF_STATUS_MONTHS):
         for j, col in enumerate(cols):
             if col['kind'] in ('money', 'num', 'int'):
@@ -3489,10 +3500,10 @@ def schedule_staff_status_xlsx():
             x.fill = totfill
             x.border = Border(left=(gside if j == 0 else thin), right=thin, top=Side(style='medium', color='CAA64A'), bottom=thin)
         c += ncol
-    ws.freeze_panes = 'B3'
+    ws.freeze_panes = 'D3'
     ws.row_dimensions[1].height = 22; ws.row_dimensions[2].height = 34
-    ws.column_dimensions['A'].width = 30
-    for i in range(2, 2 + ncol * nmonths):
+    ws.column_dimensions['A'].width = 13; ws.column_dimensions['B'].width = 7; ws.column_dimensions['C'].width = 28
+    for i in range(4, 4 + ncol * nmonths):
         ws.column_dimensions[get_column_letter(i)].width = 11
     bio = io.BytesIO(); wb.save(bio); bio.seek(0)
     return Response(bio.read(),
