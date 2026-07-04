@@ -444,6 +444,21 @@ def parse_cell(v):
             return ({'ΕΙΔ': 'Ειδ.Α', 'ΑΑ': 'ΑΠ'}.get(c, c), [], None)
     return (None, [], None)   # άγνωστο -> αγνοείται
 
+def parse_cell_entries(v):
+    """v12.389 — Όπως parse_cell αλλά επιστρέφει ΛΙΣΤΑ entries [(code, segs, tag), …].
+    Auto-split (P-067): αν σπαστό βγήκε ΕΩ αλλά ένα κομμάτι είναι ΑΚΡΙΒΩΣ 8,5h (κανονική μέρα),
+    το χωρίζει σε ΕΡΓ(κανονική μέρα) + ΕΩ(υπόλοιπες έξτρα ώρες)."""
+    code, segs, tag = parse_cell(v)
+    if not code:
+        return []
+    if code == 'ΕΩ' and segs and len(segs) >= 2:
+        idx = next((i for i, s in enumerate(segs) if abs(segments_hours([s]) - NORMAL_HOURS) < 0.001), -1)
+        if idx >= 0:
+            rest = [s for j, s in enumerate(segs) if j != idx]
+            if rest:
+                return [('ΕΡΓ', [segs[idx]], tag), ('ΕΩ', rest, tag)]
+    return [(code, segs, tag)]
+
 def assignment_hours(a):
     try:
         segs = json.loads(a.segments) if a.segments else []
@@ -1855,8 +1870,9 @@ def schedule_parse_preview():
     for t in (d.get('texts') or []):
         if t in out:
             continue
-        code, segs, tag = parse_cell(t or '')
-        out[t] = {'ok': bool(code), 'code': code or '', 'tag': tag or ''}
+        ents = parse_cell_entries(t or '')   # v12.389 P-067: δείχνει και το auto-split (π.χ. ΕΡΓ / ΕΩ)
+        out[t] = {'ok': bool(ents), 'code': ' / '.join(c for c, _, _ in ents),
+                  'tag': (ents[0][2] or '') if ents else ''}
     return jsonify(ok=True, results=out)
 
 
@@ -1884,8 +1900,8 @@ def schedule_paste_excel():
             uid = int(it['user_id']); wd = datetime.strptime(it['date'], '%Y-%m-%d').date()
         except Exception:
             continue
-        code, segs, tag = parse_cell(it.get('text') or '')
-        if not code:
+        entries = parse_cell_entries(it.get('text') or '')   # v12.389 P-067: auto-split ΕΡΓ+ΕΩ όπου χρειάζεται
+        if not entries:
             skipped += 1
             _t = (it.get('text') or '').strip()
             if _t and _t not in unread and len(unread) < 15:
@@ -1893,20 +1909,22 @@ def schedule_paste_excel():
             continue
         if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
-        whid = short2id.get((tag or '').upper()) if tag else None
-        # v12.380 F1 — εκ-περιτροπής guard ΚΑΙ στο Excel-paste (κλείδωμα/όριο + auto work_hotel)
-        _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
+        _c0, _s0, _tag0 = entries[0]
+        whid = short2id.get((_tag0 or '').upper()) if _tag0 else None
+        # v12.380 F1 — εκ-περιτροπής guard (κλείδωμα/όριο + auto work_hotel), με βάση τον 1ο κωδικό
+        _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, _c0, board_hid, _pending)
         if _grot:
             if not _gok:
                 blocked += 1; continue
             whid = _gwh
-            if is_work_code(code):
+            if is_work_code(_c0):
                 _pending.setdefault((uid, _gact), set()).add(wd)
         _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
-        db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
-            segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
-        _audit_past(user, uid, wd, _old, code, 'excel')
+        for _code, _segs, _tag in entries:
+            db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=_code,
+                segments=json.dumps(_segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+        _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _ in entries), 'excel')
         touched.add((uid, monday_of(wd)))
         done += 1
     for uid, ws in touched:
