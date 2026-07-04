@@ -444,19 +444,47 @@ def parse_cell(v):
             return ({'ΕΙΔ': 'Ειδ.Α', 'ΑΑ': 'ΑΠ'}.get(c, c), [], None)
     return (None, [], None)   # άγνωστο -> αγνοείται
 
+def _hhmm_to_min(hhmm):
+    a = (hhmm or '0:0').split(':'); return int(a[0]) * 60 + int(a[1])
+
+def _min_to_hhmm(mins):
+    mins = int(round(mins)) % 1440
+    return '%02d:%02d' % (mins // 60, mins % 60)
+
+def _split_segments(segs, limit_h):
+    """v12.389 P-067 — Χωρίζει τα segments (σε σειρά) στο cumulative όριο ωρών.
+    Επιστρέφει (πρώτα=μέχρι το όριο, υπόλοιπα). Σπάει και ενδιάμεσο segment αν χρειαστεί (νυχτ. ok)."""
+    first, rest, acc = [], [], 0.0
+    for s in (segs or []):
+        h = segments_hours([s])
+        if acc >= limit_h - 0.001:
+            rest.append(s); continue
+        if acc + h <= limit_h + 0.001:
+            first.append(s); acc += h
+        else:
+            need = limit_h - acc                      # ώρες που λείπουν για το όριο
+            mid = _min_to_hhmm(_hhmm_to_min(s['start']) + need * 60)
+            first.append({'start': s['start'], 'end': mid})
+            rest.append({'start': mid, 'end': s['end']})
+            acc = limit_h
+    return first, rest
+
 def parse_cell_entries(v):
     """v12.389 — Όπως parse_cell αλλά επιστρέφει ΛΙΣΤΑ entries [(code, segs, tag), …].
-    Auto-split (P-067): αν σπαστό βγήκε ΕΩ αλλά ένα κομμάτι είναι ΑΚΡΙΒΩΣ 8,5h (κανονική μέρα),
-    το χωρίζει σε ΕΡΓ(κανονική μέρα) + ΕΩ(υπόλοιπες έξτρα ώρες)."""
+    Auto-split (P-067): βάρδια εργασίας >8,5h (σπαστή Ή σερί) → τα πρώτα 8,5h ΕΡΓ, το υπόλοιπο ΕΩ.
+    Κόβει στο cumulative όριο 8,5h, σπάζοντας και ενδιάμεσο κομμάτι αν χρειαστεί."""
     code, segs, tag = parse_cell(v)
     if not code:
         return []
-    if code == 'ΕΩ' and segs and len(segs) >= 2:
-        idx = next((i for i, s in enumerate(segs) if abs(segments_hours([s]) - NORMAL_HOURS) < 0.001), -1)
-        if idx >= 0:
-            rest = [s for j, s in enumerate(segs) if j != idx]
-            if rest:
-                return [('ΕΡΓ', [segs[idx]], tag), ('ΕΩ', rest, tag)]
+    if code in ('ΕΡΓ', 'ΕΩ') and segs and segments_hours(segs) > NORMAL_HOURS + 0.001:
+        erg, ew = _split_segments(segs, NORMAL_HOURS)
+        out = []
+        if erg:
+            out.append(('ΕΡΓ', erg, tag))
+        if ew:
+            out.append(('ΕΩ', ew, tag))
+        if out:
+            return out
     return [(code, segs, tag)]
 
 def assignment_hours(a):
