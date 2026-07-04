@@ -428,6 +428,12 @@ def parse_cell(v):
     if m and (m.group(2).strip() == '' or 'ΕΡΓ' in m.group(2).upper() or _RANGE_RE.search(m.group(2))):
         tag = HOTEL_NORM.get(m.group(1).upper(), m.group(1).upper())
         s = m.group(2).strip()
+    # v12.389 — ετικέτα ξενοδοχείου και στο ΤΕΛΟΣ του κελιού: «ΕΡΓ 08:00 - 16:30 - PLM»
+    if tag is None:
+        m2 = re.search(r'[-–—:\s]+(AST|CNT|SRG|PSV|PLM|IRO|CND|ΗΡΩ)\s*$', s, re.I)
+        if m2:
+            tag = HOTEL_NORM.get(m2.group(1).upper(), m2.group(1).upper())
+            s = s[:m2.start()].strip()
     up = _acc(s).upper()
     ranges = _RANGE_RE.findall(s)
     if ranges or 'ΕΡΓ' in up or (tag is not None and s):
