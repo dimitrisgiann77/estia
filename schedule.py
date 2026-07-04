@@ -670,9 +670,25 @@ def week_deadline(week_start):
     d = week_start - timedelta(days=int(pol['lead_days']))
     return datetime.combine(d, dtime(hh, mm))
 
+try:
+    from zoneinfo import ZoneInfo as _ZoneInfo
+    _TZ_GR = _ZoneInfo('Europe/Athens')
+except Exception:
+    _TZ_GR = None
+
+def _now():
+    """v12.389 — Τρέχουσα ώρα Ελλάδας ως naive (ώστε να συγκρίνεται με τα naive datetimes της βάσης).
+    Ο server (Railway) τρέχει UTC· χωρίς αυτό, προθεσμίες/λήξεις ξεκλειδώματος μετατοπίζονται ~2-3h."""
+    if _TZ_GR is not None:
+        try:
+            return datetime.now(_TZ_GR).replace(tzinfo=None)
+        except Exception:
+            pass
+    return datetime.now()
+
 def _week_in_reopen(week_start, hotel_id=None):
     """v12.389 — True αν η εβδομάδα καλύπτεται από ΕΝΕΡΓΟ ρητό ξεκλείδωμα (admin re-open)."""
-    now = datetime.now()
+    now = _now()
     wk_end = week_start + timedelta(days=6)
     try:
         q = ScheduleReopen.query.filter(ScheduleReopen.expires_at > now,
@@ -685,10 +701,20 @@ def _week_in_reopen(week_start, hotel_id=None):
             return True
     return False
 
+def _week_submitted(week_start, hotel_id=None):
+    """v12.389 — True αν η εβδομάδα έχει υποβληθεί στο λογιστήριο (υπάρχει ScheduleSubmission)."""
+    try:
+        q = ScheduleSubmission.query.filter_by(week_start=week_start, status='submitted')
+        if hotel_id is not None:
+            q = q.filter_by(hotel_id=hotel_id)
+        return q.first() is not None
+    except Exception:
+        return False
+
 def week_editable(week_start, user=None, hotel_id=None):
     """v12.389 — Πότε επεξεργάζεται μια εβδομάδα. Κλιμάκωση:
-    admin owner-override (ρυθμιζόμενο) · πριν την προθεσμία · παράθυρο διόρθωσης (N μέρες μετά) ·
-    ενεργό re-open (admin το άνοιξε για managers) · legacy manager_edit_locked. Αλλιώς κλειδωμένο."""
+    admin owner-override (ρυθμιζόμενο) · ΠΑΓΩΜΑ μετά υποβολή (freeze_on_submit) · πριν την προθεσμία ·
+    παράθυρο διόρθωσης (N μέρες μετά) · ενεργό re-open · legacy manager_edit_locked. Αλλιώς κλειδωμένο."""
     if user is None:
         user = current_user()
     if user is None:
@@ -700,8 +726,11 @@ def week_editable(week_start, user=None, hotel_id=None):
     # staff (κάτω από manager) δεν επεξεργάζεται ποτέ
     if role_rank(user.role) < ROLE_RANK['manager']:
         return False
-    now = datetime.now()
-    # 2) πριν την προθεσμία οριστικοποίησης
+    now = _now()
+    # 2) ΠΑΓΩΜΑ μετά την υποβολή στο λογιστήριο — υπερισχύει προθεσμίας/παραθύρου· ξεκλειδώνει ΜΟΝΟ με re-open
+    if int(pol.get('freeze_on_submit', 0) or 0) and _week_submitted(week_start, hotel_id):
+        return _week_in_reopen(week_start, hotel_id)
+    # 3) πριν την προθεσμία οριστικοποίησης
     if now < week_deadline(week_start):
         return True
     # 3) παράθυρο διόρθωσης: μέχρι Κυριακή + N μέρες (τέλος ημέρας)
@@ -728,13 +757,14 @@ def can_edit_schedule():
 def _audit_past(actor, uid, wd, old_val, new_val, source):
     """v12.389 — Καταγραφή αλλαγής σε ΠΑΡΕΛΘΟΝ (μετά την προθεσμία της εβδομάδας). Idempotent-safe."""
     try:
-        if datetime.now() <= week_deadline(monday_of(wd)):
+        if _now() <= week_deadline(monday_of(wd)):
             return
         ov = (old_val or '').strip(); nv = (new_val or '').strip()
         if ov == nv:
             return
         tu = User.query.get(uid)
         db.session.add(ScheduleAudit(
+            ts=_now(),
             actor_id=(actor.id if actor else None),
             actor_name=((actor.full_name or actor.username) if actor else '')[:120],
             target_uid=uid, target_name=((tu.full_name if tu else '') or '')[:120],
@@ -2893,7 +2923,7 @@ def schedule_reopen():
     if frm > to:
         frm, to = to, frm
     if act == 'close':
-        now = datetime.now()
+        now = _now()
         for r in ScheduleReopen.query.filter(ScheduleReopen.expires_at > now,
                                              ScheduleReopen.from_date <= to,
                                              ScheduleReopen.to_date >= frm).all():
@@ -2903,9 +2933,9 @@ def schedule_reopen():
         return redirect(back)
     hours = request.form.get('hours', type=int) or 24
     hours = max(1, min(hours, 24 * 30))
-    exp = datetime.now() + timedelta(hours=hours)
+    exp = _now() + timedelta(hours=hours)
     db.session.add(ScheduleReopen(hotel_id=hotel_id, from_date=frm, to_date=to,
-        opened_by=u.id, expires_at=exp, note=(request.form.get('note') or '')[:200]))
+        opened_by=u.id, opened_at=_now(), expires_at=exp, note=(request.form.get('note') or '')[:200]))
     db.session.commit()
     return redirect(back)
 
