@@ -1501,20 +1501,21 @@ def schedule_cell():
         wd = datetime.strptime(d['date'], '%Y-%m-%d').date()
     except Exception:
         return jsonify(ok=False, err='bad'), 400
-    if not week_editable(monday_of(wd), user):
+    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
+    if not week_editable(monday_of(wd), user, board_hid):
         return jsonify(ok=False, err='locked'), 423
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     note = (d.get('note') or '')[:200]
     whid = d.get('work_hotel_id'); whid = int(whid) if whid else None
-    board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
+    _old = (a.shift_code if a else '')
     if not code:
         if a:
             _dok, _dmsg = _rotation_can_modify(uid, a, board_hid)
             if not _dok:
                 return jsonify(ok=False, err='rotation', msg=_dmsg), 400
-            db.session.delete(a); db.session.commit()
+            db.session.delete(a); _audit_past(user, uid, wd, _old, '', 'cell'); db.session.commit()
         return jsonify(ok=True, deleted=True)
     # προεπιλεγμένες ώρες αν ΕΡΓ χωρίς segments
     if code in ('ΕΡΓ', 'ΔΡ') and not segs:
@@ -1550,6 +1551,7 @@ def schedule_cell():
         if wp.status in ('submitted', 'locked'):
             wp.status = 'draft'
         wp.updated_by = user.id
+    _audit_past(user, uid, wd, _old, code, 'cell')
     db.session.commit()
     hrs = worked_hours(a)
     return jsonify(ok=True, hours=round(hrs, 1), work=is_work_code(code))
@@ -1597,7 +1599,7 @@ def schedule_cells_bulk():
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched = set(); _pending = {}
     for uid, wd in pairs:
-        if not week_editable(monday_of(wd), user):
+        if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
         _wh_use = _whid
         if code:
@@ -1652,9 +1654,9 @@ def schedule_day():
         wd = datetime.strptime(d['date'], '%Y-%m-%d').date()
     except Exception:
         return jsonify(ok=False, err='bad'), 400
-    if not week_editable(monday_of(wd), user):
-        return jsonify(ok=False, err='locked', msg='Κλειδωμένη εβδομάδα.'), 423
     board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
+    if not week_editable(monday_of(wd), user, board_hid):
+        return jsonify(ok=False, err='locked', msg='Κλειδωμένη εβδομάδα.'), 423
     norm = []
     for e in (d.get('entries') or []):
         code = (e.get('code') or '').strip()
@@ -1731,7 +1733,7 @@ def schedule_paste_cells():
             uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
         except Exception:
             continue
-        if not week_editable(monday_of(wd), user):
+        if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
         # v12.379 Φ2β — εκ-περιτροπής: guard ανά κελί (κλείδωμα/όριο + auto work_hotel)
         _entries_use = []; _blk = False
@@ -1859,7 +1861,7 @@ def schedule_paste_excel():
             if _t and _t not in unread and len(unread) < 15:
                 unread.append(_t)
             continue
-        if not week_editable(monday_of(wd), user):
+        if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
         whid = short2id.get((tag or '').upper()) if tag else None
         # v12.380 F1 — εκ-περιτροπής guard ΚΑΙ στο Excel-paste (κλείδωμα/όριο + auto work_hotel)
@@ -1870,9 +1872,11 @@ def schedule_paste_excel():
             whid = _gwh
             if is_work_code(code):
                 _pending.setdefault((uid, _gact), set()).add(wd)
+        _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
             segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
+        _audit_past(user, uid, wd, _old, code, 'excel')
         touched.add((uid, monday_of(wd)))
         done += 1
     for uid, ws in touched:
@@ -1903,7 +1907,7 @@ def schedule_copyprev():
     hotel_id = request.form.get('hotel_id', type=int)
     dept_id = request.form.get('department_id', type=int)
     week_start = monday_of(datetime.strptime(request.form['week'], '%Y-%m-%d').date())
-    if not week_editable(week_start, user):
+    if not week_editable(week_start, user, hotel_id):
         return redirect(f'/dashboard/schedule?hotel_id={hotel_id}&week={week_start}&embed=1&err=locked')
     prev = week_start - timedelta(days=7)
     users = _dept_users(hotel_id, dept_id) if dept_id else User.query.filter(User.is_active == True, User.home_hotel_id == hotel_id).all()
@@ -1915,12 +1919,14 @@ def schedule_copyprev():
             if not src:
                 continue
             dst = ShiftAssignment.query.filter_by(user_id=u.id, work_date=dd).first()
+            _old = (dst.shift_code if dst else '')
             if not dst:
                 dst = ShiftAssignment(user_id=u.id, work_date=dd, created_by=user.id)
                 db.session.add(dst)
             dst.shift_code = src.shift_code
             dst.segments = src.segments
             dst.work_hotel_id = src.work_hotel_id
+            _audit_past(user, u.id, dd, _old, src.shift_code, 'copyprev')
             n += 1
     db.session.commit()
     log_activity('schedule_copyprev', f'{n} κελιά', hotel_id=hotel_id)
@@ -2828,7 +2834,9 @@ def schedule_paste():
         except Exception:
             monday = _week_arg()
         rows, days = _parse_paste(raw, monday)
-        if request.form.get('action') == 'commit':
+        if request.form.get('action') == 'commit' and not week_editable(monday, current_user()):
+            saved = {'locked': True, 'new': 0, 'upd': 0, 'unmatched': 0}
+        elif request.form.get('action') == 'commit':
             user = current_user(); n_new = n_upd = 0
             for r in rows:
                 if not r['user']:
@@ -2837,6 +2845,7 @@ def schedule_paste():
                     if d['code'] is None:
                         continue
                     a = ShiftAssignment.query.filter_by(user_id=r['user'].id, work_date=d['date']).first()
+                    _old = (a.shift_code if a else '')
                     if a:
                         a.shift_code = d['code']; a.segments = json.dumps(d['segs'], ensure_ascii=False)
                         a.work_hotel_id = d['whid']; n_upd += 1
@@ -2844,6 +2853,7 @@ def schedule_paste():
                         db.session.add(ShiftAssignment(user_id=r['user'].id, work_date=d['date'],
                             shift_code=d['code'], segments=json.dumps(d['segs'], ensure_ascii=False),
                             work_hotel_id=d['whid'], created_by=user.id)); n_new += 1
+                    _audit_past(user, r['user'].id, d['date'], _old, d['code'], 'paste')
                     u = r['user']
                     if getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
                         wp = WeekPlan.query.filter_by(hotel_id=u.home_hotel_id, department_id=u.department_id, week_start=monday).first()
@@ -2880,6 +2890,8 @@ def schedule_reopen():
         to = datetime.strptime(request.form['to'], '%Y-%m-%d').date()
     except Exception:
         return redirect(back)
+    if frm > to:
+        frm, to = to, frm
     if act == 'close':
         now = datetime.now()
         for r in ScheduleReopen.query.filter(ScheduleReopen.expires_at > now,

@@ -15,7 +15,9 @@
 </style></head><body>
 {{ mp.topbar('clipboard-text', 'Επικόλληση Προγράμματος από Excel', 'Όνομα + Δ–Κ ανά γραμμή — ταίριασμα με Μητρώο') }}
 <div class="container pst">
-  {% if saved %}
+  {% if saved and saved.locked %}
+  <div class="card" style="background:#fee2e2;color:#b91c1c;"><b>🔒 Κλειδωμένη εβδομάδα:</b> δεν αποθηκεύτηκε τίποτα. Χρειάζεται ξεκλείδωμα από admin (Πρόγραμμα → «Ξεκλείδωσε για διόρθωση»).</div>
+  {% elif saved %}
   <div class="card" style="background:#dcfce7;color:#166534;"><b>✓ Αποθηκεύτηκε:</b> {{ saved.new }} νέες αναθέσεις, {{ saved.upd }} ενημερώσεις{% if saved.unmatched %} · <span style="color:#b45309;">{{ saved.unmatched }} γραμμές χωρίς ταίριασμα (αγνοήθηκαν)</span>{% endif %}.</div>
   {% endif %}
 
