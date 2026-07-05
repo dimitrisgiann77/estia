@@ -282,11 +282,30 @@ function leave(e){ e.currentTarget.classList.remove('over'); }
 function drop(e, hotel, dept){
   e.preventDefault(); e.currentTarget.classList.remove('over');
   var uid=e.dataTransfer.getData('uid'); if(!uid)return;
-  fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({user_id:uid, hotel_id:(hotel||''), department_id:(dept||'')})})
-    .then(function(r){return r.json();})
-    .then(function(j){ if(j&&j.ok) estiaSwap('orgwrap','initOrg'); else alert('Δεν αποθηκεύτηκε'+(j&&j.msg?': '+j.msg:'')); })
-    .catch(function(){ alert('Σφάλμα.'); });
+  // v12.391 P-068 Κομμάτι 2 — ρωτά «από ποια ημερομηνία» (γράφει ιστορικό ανάθεσης/period)
+  _askEffDate(function(eff){
+    fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user_id:uid, hotel_id:(hotel||''), department_id:(dept||''), effective_date:eff})})
+      .then(function(r){return r.json();})
+      .then(function(j){ if(j&&j.ok) estiaSwap('orgwrap','initOrg'); else alert('Δεν αποθηκεύτηκε'+(j&&j.msg?': '+j.msg:'')); })
+      .catch(function(){ alert('Σφάλμα.'); });
+  });
+}
+// v12.391 P-068 Κομμάτι 2 — προσθετικό popup «ημερομηνία ισχύος» (default σήμερα)
+function _askEffDate(cb){
+  var t=new Date(); var iso=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  var bx=document.createElement('div'); bx.style.cssText='background:#fff;border-radius:12px;padding:18px 20px;min-width:280px;box-shadow:0 10px 40px rgba(0,0,0,.2);font-size:14px;';
+  bx.innerHTML='<div style="font-weight:600;margin-bottom:10px;">Τοποθέτηση — από ημερομηνία</div>'+
+    '<div style="color:#64748b;font-size:12px;margin-bottom:8px;">Από πότε ισχύει η ανάθεση (default: σήμερα). Παρελθοντική ημ/νία = αναδρομική τοποθέτηση.</div>'+
+    '<input type="date" id="_effd" value="'+iso+'" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:14px;box-sizing:border-box;">'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button id="_effc" style="border:none;background:#f1f5f9;color:#475569;border-radius:8px;padding:7px 14px;cursor:pointer;">Άκυρο</button>'+
+    '<button id="_effo" style="border:none;background:var(--accent,#185FA5);color:#fff;border-radius:8px;padding:7px 14px;cursor:pointer;">Τοποθέτηση</button></div>';
+  ov.appendChild(bx); document.body.appendChild(ov);
+  function close(){ if(ov.parentNode) document.body.removeChild(ov); }
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  bx.querySelector('#_effc').onclick=close;
+  bx.querySelector('#_effo').onclick=function(){ var v=bx.querySelector('#_effd').value||iso; close(); cb(v); };
 }
 function filt(){
   var q=(document.getElementById('pf').value||'').toLowerCase();

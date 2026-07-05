@@ -617,11 +617,22 @@ def org_assign():
     hid = d.get('hotel_id'); did = d.get('department_id')
     hid = int(hid) if hid else None
     did = int(did) if did else None
+    _actor = (current_user().id if current_user() else None)
     # v12.169 — ΕΝΑ write-path (helper) με ιστορικό
     import people
-    people.assign_user_org(u, hid, did, actor_id=(current_user().id if current_user() else None))
+    people.assign_user_org(u, hid, did, actor_id=_actor)
+    # v12.391 P-068 Κομμάτι 2 — ιστορικό ανάθεσης (period) ΑΠΟ ημερομηνία ισχύος (default σήμερα).
+    from datetime import datetime as _dt, date as _date
+    _eff = d.get('effective_date')
+    try:
+        _eff_d = _dt.strptime(_eff, '%Y-%m-%d').date() if _eff else _date.today()
+    except Exception:
+        _eff_d = _date.today()
+    if hid:
+        import schedule as _sch
+        _sch.set_hotel_period(u, hid, _eff_d, source='orgchart', actor_id=_actor)
     db.session.commit()
-    log_activity('org_assign', '#%d -> hotel=%s dept=%s' % (u.id, hid, did))
+    log_activity('org_assign', '#%d -> hotel=%s dept=%s @%s' % (u.id, hid, did, _eff_d))
     return jsonify(ok=True)
 
 

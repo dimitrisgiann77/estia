@@ -212,6 +212,20 @@ class SchedulePeriodMark(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class UserHotelPeriod(db.Model):
+    """v12.391 P-068 Κομμάτι 2 — ΙΣΤΟΡΙΚΟ ανάθεσης εργαζόμενου↔ξενοδοχείο (owner χρέωσης ανά ημερομηνία).
+    Compact span (from/to), ΟΧΙ per-day. `date_to=NULL` = ανοιχτή (τρέχουσα) περίοδος.
+    Η μηνιαία θα διαβάζει την period που ίσχυε την ημ/νία της βάρδιας (Φ2) → κλειδώνει η ιστορική χρέωση,
+    δεν ξαναγράφεται αναδρομικά όταν μετακινείται ο εργαζόμενος. `home_hotel_id` = η ανοιχτή period."""
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'))
+    date_from  = db.Column(db.Date, nullable=False, index=True)
+    date_to    = db.Column(db.Date, index=True)            # NULL = ανοιχτή
+    source     = db.Column(db.String(16), default='orgchart')  # 'seed-home' | 'orgchart' | 'admin'
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class Holiday(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     hol_date    = db.Column(db.Date, unique=True, nullable=False)
@@ -315,9 +329,52 @@ def ensure_schedule_columns():
                 db.session.commit()
         except Exception as _e:
             db.session.rollback()
+        # v12.391 P-068 Κομμάτι 2 — baseline: μία ΑΝΟΙΧΤΗ period/εργαζόμενο = το τωρινό home (idempotent).
+        # Ισοδύναμο με τη σημερινή εικόνα (period=home) → μηδέν αλλαγή χρέωσης. Βάση για αναδρομικό «σπάσιμο».
+        try:
+            from datetime import date as _date
+            _have = set(x[0] for x in db.session.query(UserHotelPeriod.user_id).distinct().all())
+            _floor = _date(2000, 1, 1)
+            _n = 0
+            for _u in User.query.filter(User.home_hotel_id.isnot(None)).all():
+                if _u.id in _have:
+                    continue
+                db.session.add(UserHotelPeriod(user_id=_u.id, hotel_id=_u.home_hotel_id,
+                                               date_from=_floor, date_to=None, source='seed-home'))
+                _n += 1
+            if _n:
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 # ── ΜΗΧΑΝΗ ΩΡΩΝ ───────────────────────────────────────────────────────────────
+
+def set_hotel_period(user, hotel_id, effective_date, source='orgchart', actor_id=None):
+    """v12.391 P-068 Κομμάτι 2 — τοποθέτηση εργαζόμενου σε ξενοδοχείο ΑΠΟ μια ημερομηνία.
+    Κλείνει την ανοιχτή period (date_to = ημ/νία−1) και ανοίγει νέα από την effective_date.
+    Idempotent αν ίδιο ξενοδοχείο ήδη ανοιχτό. ΔΕΝ κάνει commit — ο caller το κάνει.
+    (Αυθαίρετο σπάσιμο ΚΛΕΙΣΤΗΣ ιστορικής period = admin editor, Φ4.)"""
+    if not user:
+        return False
+    hid = int(hotel_id) if hotel_id else None
+    ed = effective_date
+    open_p = (UserHotelPeriod.query
+              .filter(UserHotelPeriod.user_id == user.id, UserHotelPeriod.date_to.is_(None))
+              .order_by(UserHotelPeriod.date_from.desc()).first())
+    if open_p and open_p.hotel_id == hid and open_p.date_from <= ed:
+        return False   # ίδιο ξενοδοχείο ήδη ανοιχτό από πριν — καμία αλλαγή
+    if open_p and ed <= open_p.date_from:
+        # τοποθέτηση στην/πριν την έναρξη της ανοιχτής → αντικατάσταση (όχι μηδενικό span)
+        open_p.hotel_id = hid; open_p.date_from = ed; open_p.source = source
+        db.session.add(open_p)
+        return True
+    if open_p:
+        open_p.date_to = ed - timedelta(days=1)
+        db.session.add(open_p)
+    db.session.add(UserHotelPeriod(user_id=user.id, hotel_id=hid, date_from=ed,
+                                   date_to=None, source=source, created_by=actor_id))
+    return True
 _RANGE_RE = re.compile(r'(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})')
 
 def segments_hours(segments):
