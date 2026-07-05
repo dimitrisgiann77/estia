@@ -2475,10 +2475,12 @@ def schedule_monthly():
     hotels = allowed_hotels(user) or Hotel.query.order_by(Hotel.name).all()
     depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     deptmap = {d.id: d.name for d in depts}
-    # v12.403 P-070 Φ3 — pool αταξινόμητων (χωρίς έδρα) για τοποθέτηση από αυτή την οθόνη (admin)
-    unplaced = (User.query.filter(db.or_(User.is_active == True, User.is_active.is_(None)),
-                                  User.home_hotel_id.is_(None)).order_by(User.full_name).all()
-                if is_admin() else [])
+    # v12.405 P-071 Φ4b — λίστα εργαζομένων για ΑΝΑΖΗΤΗΣΗ (προσθήκη/μετακίνηση από αυτή την οθόνη, admin)
+    all_users = []
+    if is_admin():
+        _au = User.query.filter(db.or_(User.is_active == True, User.is_active.is_(None))).order_by(User.full_name).all()
+        all_users = [{'id': _u.id, 'name': _u.full_name or _u.username or ('#%d' % _u.id),
+                      'home': _u.home_hotel_id} for _u in _au]
     hol = {h.hol_date for h in Holiday.query.all()}
     WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
     day_hdr = []
@@ -2487,7 +2489,7 @@ def schedule_monthly():
         day_hdr.append({'d': d, 'wd': WD[dt.weekday()], 'we': dt.weekday() >= 5,
                         'hol': dt in hol, 'iso': dt.isoformat()})
     shift_types = ShiftType.query.filter_by(active=True).order_by(ShiftType.sort).all()
-    return render_template('schedule_monthly.html', data=data, year=year, month=month, unplaced=unplaced,
+    return render_template('schedule_monthly.html', data=data, year=year, month=month, all_users=all_users,
         hotel_id=hotel_id, dept_id=dept_id, view=view, hotels=hotels, depts=depts, deptmap=deptmap,
         months=MONTHS_EL, day_hdr=day_hdr, ndays=data['ndays'],
         can_edit=(can_edit_schedule() and is_admin()),

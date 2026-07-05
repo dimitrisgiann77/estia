@@ -93,31 +93,32 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
 
   {% if is_admin %}
   <style>
-    .poolbar{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;}
-    .poollbl{font-size:12px;color:#64748b;font-weight:600;flex-shrink:0;}
-    .poolchip{border:1px solid #2563eb;background:#eff6ff;color:#1e40af;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
-    .poolchip:hover{background:#dbeafe;}
-    .poolnone{font-size:12px;color:#94a3b8;}
-    .mvpop{display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:12px;width:220px;}
-    .mvpop .mvt{font-weight:600;font-size:13px;margin-bottom:6px;color:#1e40af;}
-    .mvpop label{font-size:11px;color:#64748b;display:block;margin:6px 0 3px;}
-    .mvpop select,.mvpop input{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:5px 8px;font-size:12.5px;box-sizing:border-box;}
-    .mvbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
-    .mvbtns button{border:none;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer;}
-    .mvcancel{background:#f1f5f9;color:#475569;} .mvgo{background:#2563eb;color:#fff;}
-    .mvmove{border:1px solid #cbd5e1;background:#fff;color:#2563eb;border-radius:6px;font-size:10px;padding:0 5px;cursor:pointer;margin-left:6px;}
+    .addbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid #2563eb;background:#eff6ff;color:#1e40af;border-radius:10px;padding:7px 12px;font-size:13px;cursor:pointer;margin-bottom:10px;}
+    .addbtn:hover{background:#dbeafe;}
+    .apop{display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.24);padding:14px;width:290px;}
+    .apop h4{margin:0 0 4px;font-size:14px;color:#1e40af;}
+    .apop label{font-size:11px;color:#64748b;display:block;margin:8px 0 3px;}
+    .apop input,.apop select{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:6px 8px;font-size:13px;box-sizing:border-box;}
+    .aulist{max-height:190px;overflow:auto;border:1px solid #eef2f7;border-radius:8px;margin-top:6px;}
+    .auitem{padding:6px 9px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+    .auitem:hover{background:#eff6ff;} .auitem.sel{background:#dbeafe;}
+    .auitem .ah{font-size:10px;color:#94a3b8;white-space:nowrap;}
+    .apbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;}
+    .apbtns button{border:none;border-radius:7px;padding:6px 14px;font-size:13px;cursor:pointer;}
+    .apc{background:#f1f5f9;color:#475569;} .apg{background:#2563eb;color:#fff;}
+    tr.temprow td{background:#fffdf5;}
+    tr.temprow .nm::after{content:' • προσωρινός (βάλε βάρδια)';font-size:10px;color:#b45309;font-weight:400;}
+    .gtable .nm{cursor:default;}
   </style>
-  <div class="poolbar">
-    <span class="poollbl"><i class="ti ti-user-plus"></i> Αταξινόμητοι{% if unplaced %} ({{ unplaced|length }}){% endif %}:</span>
-    {% if unplaced %}{% for u in unplaced %}<span class="poolchip" onclick="mvOpen(event,{{ u.id }},{{ u.full_name|tojson }},0,0)">{{ u.full_name }} <i class="ti ti-plus"></i></span>{% endfor %}
-    {% else %}<span class="poolnone">— όλοι είναι τοποθετημένοι —</span>{% endif %}
-  </div>
-  <div id="mvpop" class="mvpop" onclick="event.stopPropagation()">
-    <div class="mvt" id="mvname">Τοποθέτηση</div>
-    <label>Ξενοδοχείο</label><select id="mv-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select>
-    <label>Τμήμα</label><select id="mv-d"><option value="">—</option>{% for d in depts %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
-    <label>Ισχύει από <span style="color:#94a3b8;">(κενό=σήμερα)</span></label><input type="date" id="mv-dt">
-    <div class="mvbtns"><button class="mvcancel" onclick="mvClose()">Άκυρο</button><button class="mvgo" onclick="mvSave()">Αποθήκευση</button></div>
+  <button type="button" class="addbtn" onclick="apOpen(event)"><i class="ti ti-user-plus"></i> Προσθήκη εργαζόμενου</button>
+  <div id="apop" class="apop" onclick="event.stopPropagation()">
+    <h4 id="ap-title">Προσθήκη στο πρόγραμμα</h4>
+    <label>Ξενοδοχείο</label>
+    <select id="ap-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select>
+    <label>Αναζήτηση εργαζόμενου</label>
+    <input id="ap-q" placeholder="Πληκτρολόγησε όνομα…" oninput="apFilter()" autocomplete="off">
+    <div class="aulist" id="ap-list"></div>
+    <div class="apbtns"><button class="apc" onclick="apClose()">Άκυρο</button><button class="apg" onclick="apAdd()">Πρόσθεσε στο πρόγραμμα</button></div>
   </div>
   {% endif %}
 
@@ -151,7 +152,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
   {% else %}
     {# ───────── ΑΝΑΛΥΤΙΚΟ GRID (επεξεργάσιμο) ───────── #}
     {% for g in data.groups %}
-      <div class="card">
+      <div class="card" data-hotel="{{ g.hotel.id if g.hotel else '' }}">
       <div class="hotelhead">🏨 {{ g.hotel.name if g.hotel else '— (χωρίς ξενοδοχείο)' }}</div>
       <div class="scroll"><table class="gtable">
         <thead><tr><th class="name" style="text-align:left;position:sticky;left:0;background:#f1f5f9;">Εργαζόμενος</th>
@@ -159,7 +160,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
           <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th><th title="Δουλεμένο ρεπό">ΔΡ</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
-          <tr><td class="name" style="position:sticky;left:0;background:var(--card,#fff);"><div class="nm">{{ x.user.full_name }}{% if is_admin %}<button class="mvmove" title="Μετακίνηση/ανάθεση" onclick="mvOpen(event,{{ x.user.id }},{{ x.user.full_name|tojson }},{{ g.hotel.id or 0 }},{{ x.user.department_id or 0 }})"><i class="ti ti-arrows-exchange"></i></button>{% endif %}</div>{% if x.emp_code or x.afm %}<div class="nmeta">{% if x.emp_code %}<span class="tag {{ 'lock' if x.locked else 'mgmt' }}">#{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</div>{% endif %}</td>
+          <tr><td class="name" style="position:sticky;left:0;background:var(--card,#fff);"><div class="nm"{% if is_admin %} ondblclick="apOpen(event,{{ x.user.id }},{{ x.user.full_name|tojson }})" title="Διπλό κλικ: μετακίνηση σε άλλο ξενοδοχείο" style="cursor:pointer;"{% endif %}>{{ x.user.full_name }}</div>{% if x.emp_code or x.afm %}<div class="nmeta">{% if x.emp_code %}<span class="tag {{ 'lock' if x.locked else 'mgmt' }}">#{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for dh in day_hdr %}
               {% set dd = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
@@ -374,22 +375,63 @@ document.addEventListener('keydown',function(e){
 </script>
 {% endif %}
 {% if is_admin %}<script>
-/* v12.403 P-070 Φ3 — pool αταξινόμητων + μετακίνηση κόσμου (καλεί το ΙΔΙΟ org_assign) */
-var MV_UID=null;
-function mvOpen(ev,uid,name,hotel,dept){if(ev)ev.stopPropagation();MV_UID=uid;
-  var p=document.getElementById('mvpop');document.getElementById('mvname').textContent=name||'Τοποθέτηση';
-  var hs=document.getElementById('mv-h'),ds=document.getElementById('mv-d');
-  if(hotel)hs.value=String(hotel); ds.value=dept?String(dept):'';
-  p.style.display='block';
-  var mw=220,mh=p.offsetHeight||260,x=ev?ev.clientX:120,y=ev?ev.clientY:120;
+/* v12.405 P-071 Φ4b — αναζήτηση + προσωρινή γραμμή («η βάρδια ορίζει το ξενοδοχείο») */
+var ALLU={{ all_users|tojson }};
+var ADAYS=[{% for dh in day_hdr %}"{{ dh.iso }}"{{ ',' if not loop.last }}{% endfor %}];
+var AHOTELS={ {% for h in hotels %}"{{ h.id }}":{{ h.name|tojson }}{{ ',' if not loop.last }}{% endfor %} };
+var AP_SEL=null;
+function apOpen(ev,uid,name){if(ev)ev.stopPropagation();var p=document.getElementById('apop');
+  document.getElementById('ap-title').textContent=uid?('Μετακίνηση: '+(name||'')):'Προσθήκη στο πρόγραμμα';
+  var q=document.getElementById('ap-q'); q.value=uid?(name||''):''; AP_SEL=uid?String(uid):null;
+  apFilter(); p.style.display='block';
+  var mw=290,mh=p.offsetHeight||320,x=(ev&&ev.clientX)?ev.clientX:140,y=(ev&&ev.clientY)?ev.clientY:120;
   p.style.left=Math.max(8,Math.min(x,window.innerWidth-mw-10))+'px';
-  p.style.top=((y+mh>window.innerHeight)?Math.max(8,y-mh):y+8)+'px';}
-function mvClose(){var p=document.getElementById('mvpop');if(p)p.style.display='none';MV_UID=null;}
-function mvSave(){if(!MV_UID)return;
-  var hid=document.getElementById('mv-h').value,did=document.getElementById('mv-d').value,dt=document.getElementById('mv-dt').value;
-  if(!hid){alert('Διάλεξε ξενοδοχείο.');return;}
-  fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:MV_UID,hotel_id:hid,department_id:did,effective_date:dt})})
-    .then(function(r){return r.json();}).then(function(j){if(j&&j.ok){mvClose();location.reload();}else{alert((j&&j.msg)||'Δεν αποθηκεύτηκε.');}}).catch(function(){alert('Σφάλμα δικτύου.');});}
-document.addEventListener('click',mvClose);
+  p.style.top=((y+mh>window.innerHeight)?Math.max(8,window.innerHeight-mh-8):y+8)+'px';
+  if(!uid) setTimeout(function(){q.focus();},30);}
+function apClose(){var p=document.getElementById('apop');if(p)p.style.display='none';}
+function apFilter(){var q=(document.getElementById('ap-q').value||'').toLowerCase().trim();
+  var box=document.getElementById('ap-list'); box.innerHTML=''; var n=0;
+  for(var i=0;i<ALLU.length && n<40;i++){var u=ALLU[i];
+    if(q && (u.name||'').toLowerCase().indexOf(q)<0) continue;
+    var d=document.createElement('div'); d.className='auitem'+(String(u.id)===AP_SEL?' sel':'');
+    d.innerHTML='<span>'+u.name+'</span><span class="ah">'+(u.home?(AHOTELS[u.home]||''):'αταξινόμητος')+'</span>';
+    d.onclick=(function(uu){return function(){AP_SEL=String(uu.id);apFilter();};})(u);
+    box.appendChild(d); n++;}
+  if(!n) box.innerHTML='<div class="auitem" style="color:#94a3b8;cursor:default;">— κανένα —</div>';}
+function apAdd(){if(!AP_SEL){alert('Διάλεξε εργαζόμενο.');return;}
+  var hid=document.getElementById('ap-h').value; if(!hid)return;
+  var u=null; for(var i=0;i<ALLU.length;i++){if(String(ALLU[i].id)===AP_SEL){u=ALLU[i];break;}}
+  if(!u)return; addTempRow(u.id,u.name,hid); apClose();}
+function _tempCell(uid,iso,di,hid){var td=document.createElement('td');td.className='day edit';
+  td.setAttribute('data-edit','1');td.setAttribute('data-uid',uid);td.setAttribute('data-date',iso);
+  td.setAttribute('data-di',di);td.setAttribute('data-bhid',hid);td.setAttribute('data-home',AHOTELS[hid]||'');
+  td.setAttribute('data-entries','[]');td.setAttribute('data-code','');td.setAttribute('data-segs','[]');
+  td.innerHTML='<span style="color:#cbd5e1;">.</span>';return td;}
+function _buildGroup(hid){var wrap=document.getElementById('monthwrap');
+  var card=document.createElement('div');card.className='card';card.setAttribute('data-hotel',hid);
+  var ths='<th class="name" style="text-align:left;position:sticky;left:0;background:#f1f5f9;">Εργαζόμενος</th>';
+  for(var i=0;i<ADAYS.length;i++){ths+='<th class="day">'+parseInt(ADAYS[i].slice(8,10),10)+'</th>';}
+  ths+='<th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th><th>ΔΡ</th>';
+  card.innerHTML='<div class="hotelhead">🏨 '+(AHOTELS[hid]||'—')+'</div><div class="scroll"><table class="gtable"><thead><tr>'+ths+'</tr></thead><tbody></tbody></table></div>';
+  wrap.appendChild(card);return card;}
+function addTempRow(uid,name,hid){hid=String(hid);
+  var empty=document.querySelector('#monthwrap .empty-st'); if(empty&&empty.parentNode) empty.parentNode.remove();
+  var card=document.querySelector('#monthwrap [data-hotel="'+hid+'"]'); if(!card) card=_buildGroup(hid);
+  var tbody=card.querySelector('table.gtable tbody'); if(!tbody)return;
+  if(tbody.querySelector('tr[data-tempuid="'+uid+'"]')){card.scrollIntoView({block:'center'});return;}
+  var tr=document.createElement('tr');tr.className='temprow';tr.setAttribute('data-tempuid',uid);
+  var td=document.createElement('td');td.className='name';td.style.cssText='position:sticky;left:0;background:#fffdf5;';
+  td.innerHTML='<div class="nm">'+name+'</div>';tr.appendChild(td);
+  for(var i=0;i<ADAYS.length;i++){tr.appendChild(_tempCell(uid,ADAYS[i],i+1,hid));}
+  for(var k=0;k<6;k++){var t=document.createElement('td');t.textContent='0';tr.appendChild(t);}
+  tbody.appendChild(tr);
+  var nc=tr.querySelectorAll('td.edit');   // δένω ΜΟΝΟ τα νέα κελιά (όχι re-init → όχι διπλά listeners)
+  for(var j=0;j<nc.length;j++){
+    if(typeof _mCellDown==='function') nc[j].addEventListener('mousedown',_mCellDown);
+    if(typeof _mCellEnter==='function') nc[j].addEventListener('mouseenter',_mCellEnter);
+    if(typeof cells!=='undefined' && cells.push) cells.push(nc[j]);
+  }
+  tr.scrollIntoView({block:'center'});}
+document.addEventListener('click',apClose);
 </script>{% endif %}
 </body></html>
