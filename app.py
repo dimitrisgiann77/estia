@@ -362,11 +362,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.398'
-APP_BUILD   = '679'
+APP_VERSION = '12.399'
+APP_BUILD   = '680'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.399', 'b': '680', 'date': '05/07/2026', 'time': '23:20', 'title': 'ADMIN popup — σωστή εμφάνιση (δεν κρύβεται πια) + καθάρισμα favicon 404',
+     'items': ['Το popup ανάθεσης κρυβόταν πίσω από το πλέγμα (το «έκοβε» η οριζόντια κύλιση του πίνακα). Πλέον ανοίγει ως σταθερό παράθυρο ακριβώς κάτω από το chip — δεν το κόβει τίποτα, και αναδιπλώνεται προς τα πάνω αν δεν χωράει.',
+               'Σταμάτησαν τα 404 «favicon.ico» στο διαγνωστικό (ο browser το ζητούσε αυτόματα και δεν υπήρχε).']},
     {'v': '12.398', 'b': '679', 'date': '05/07/2026', 'time': '23:00', 'title': 'ADMIN mode — και στο μηνιαίο/ετήσιο + γυάλισμα (P-069 fixes)',
      'items': ['Το κουμπί «⚙ ADMIN» υπάρχει πλέον ΚΑΙ στο μηνιαίο & ετήσιο πρόγραμμα (πριν μόνο στο εβδομαδιαίο).',
                'Το chip ανάθεσης δείχνει τώρα το ΤΡΕΧΟΝ ξενοδοχείο · τμήμα του εργαζόμενου (πριν έγραφε γενικό «ανάθεση»). Καθαρότερη ετικέτα «Μετακίνηση εργαζόμενου» στο popup.',
@@ -2596,6 +2599,12 @@ def landing_for(user):
     if r >= ROLE_RANK['viewer'] and r != ROLE_RANK['staff']:
         return url_for('pools_dashboard')   # manager / viewer
     return url_for('pools_app')             # staff
+@app.route('/favicon.ico')
+def _favicon():
+    # v12.398 — σταματά τα 404 «favicon.ico» στο διαγνωστικό (ο browser το ζητά αυτόματα)
+    return ('', 204)
+
+
 @app.route('/')
 def index():
     if 'user_id' in session:

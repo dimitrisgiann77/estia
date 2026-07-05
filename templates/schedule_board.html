@@ -136,7 +136,7 @@
     body.sadmin .asg.open{z-index:400;}
     .asg-chip{border:1px solid #2563eb;background:#eff6ff;color:#1e40af;border-radius:6px;padding:2px 7px;font-size:10.5px;cursor:pointer;white-space:nowrap;align-items:center;gap:3px;display:inline-flex;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
     .asg-chip .asg-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-    .asg-menu{display:none;position:absolute;left:0;top:26px;z-index:401;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:11px;width:200px;text-align:left;}
+    .asg-menu{display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:11px;width:200px;text-align:left;}
     .asg.open .asg-menu{display:block;}
     .asg-menu .amt{font-size:11px;font-weight:600;color:#1e40af;margin-bottom:6px;}
     .asg-menu label{font-size:11px;color:#64748b;display:block;margin:6px 0 3px;}
@@ -988,9 +988,14 @@ initBoard();   // v12.382 P-058 — αρχικό bind (τρέχει και με�
   function apply(){document.body.classList.toggle('sadmin',SADM);var b=document.getElementById('admBtn');if(b)b.classList.toggle('on',SADM);}
   function closeAll(){document.querySelectorAll('.asg.open').forEach(function(x){x.classList.remove('open');});}
   window.admToggle=function(){SADM=!SADM;localStorage.setItem('estia_sadmin',SADM?'1':'0');apply();closeAll();};
-  window.asgOpen=function(el,e){e.stopPropagation();var box=el.parentNode;var was=box.classList.contains('open');closeAll();if(was)return;var h=box.getAttribute('data-hotel'),d=box.getAttribute('data-dept');var hs=box.querySelector('.asg-h'),ds=box.querySelector('.asg-d');if(h&&hs)hs.value=h;if(ds)ds.value=d||'';box.classList.add('open');};
+  window.asgOpen=function(el,e){e.stopPropagation();var box=el.parentNode;var was=box.classList.contains('open');closeAll();if(was)return;var h=box.getAttribute('data-hotel'),d=box.getAttribute('data-dept');var hs=box.querySelector('.asg-h'),ds=box.querySelector('.asg-d');if(h&&hs)hs.value=h;if(ds)ds.value=d||'';box.classList.add('open');
+    var menu=box.querySelector('.asg-menu'),r=el.getBoundingClientRect(),mw=200,mh=menu.offsetHeight||270;
+    var left=Math.max(8,Math.min(r.left,window.innerWidth-mw-10));
+    var top=(r.bottom+4+mh>window.innerHeight)?Math.max(8,r.top-mh-4):r.bottom+4;
+    menu.style.left=left+'px';menu.style.top=top+'px';};
   window.asgSave=function(btn){var box=btn.closest('.asg');var uid=box.getAttribute('data-uid');var hid=box.querySelector('.asg-h').value,did=box.querySelector('.asg-d').value,dt=box.querySelector('.asg-dt').value;if(!hid){alert('Διάλεξε ξενοδοχείο.');return;}btn.disabled=true;fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:uid,hotel_id:hid,department_id:did,effective_date:dt})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){closeAll();if(typeof refreshBoard==='function'){refreshBoard();}else{location.reload();}}else{btn.disabled=false;alert((j&&j.msg)||'Δεν αποθηκεύτηκε.');}}).catch(function(){btn.disabled=false;alert('Σφάλμα δικτύου.');});};
   document.addEventListener('click',closeAll);
+  window.addEventListener('scroll',closeAll,true);
   apply();
 })();
 {% endif %}
