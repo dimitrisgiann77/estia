@@ -79,15 +79,16 @@
     <div class="fgrp">
       <span class="flab"><i class="ti ti-building"></i> Ξενοδοχείο</span>
       <select name="hotel_id" onchange="this.form.submit()">
+        {% if is_admin %}<option value="all" {{ 'selected' if all_mode }}>■ Όλα τα ξενοδοχεία (ADMIN)</option>{% endif %}
         {% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id==hotel_id }}>{{ h.name }}</option>{% endfor %}
       </select>
     </div>
     <div class="fgrp">
       <span class="flab"><i class="ti ti-calendar"></i> Εβδομάδα</span>
       <span class="wk-nav">
-        <a title="Προηγ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ prev_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-left"></i></a>
+        <a title="Προηγ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ 'all' if all_mode else hotel_id }}&week={{ prev_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-left"></i></a>
         <input type="date" name="week" value="{{ week_start_iso }}" onchange="this.form.submit()">
-        <a title="Επόμ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ hotel_id }}&week={{ next_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-right"></i></a>
+        <a title="Επόμ. εβδομάδα" href="/dashboard/schedule?hotel_id={{ 'all' if all_mode else hotel_id }}&week={{ next_week }}&weeks={{ weeks }}&embed=1"><i class="ti ti-chevron-right"></i></a>
       </span>
     </div>
     <div class="fgrp">
@@ -286,7 +287,7 @@
   {% for blk in blocks %}
   <div class="card wkcard">
     <div class="wkhead">
-      <h3><i class="ti ti-calendar"></i> Εβδομάδα {{ blk.label }}</h3>
+      <h3><i class="ti ti-calendar"></i> {% if blk.hotel %}<span style="color:#185FA5;"><i class="ti ti-building"></i> {{ blk.hotel.name }}</span> · {% endif %}Εβδομάδα {{ blk.label }}</h3>
       {% if blk.editable %}<span class="banner open"><i class="ti ti-pencil"></i> Επεξεργάσιμο · προθεσμία {{ blk.deadline.strftime('%a %d/%m %H:%M') }}</span>
       {% else %}<span class="banner lock"><i class="ti ti-lock"></i> Κλειδωμένο</span>{% endif %}
     </div>

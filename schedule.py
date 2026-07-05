@@ -1458,8 +1458,10 @@ def schedule_board():
         return redirect(url_for('login'))
     user = current_user()
     hotels = allowed_hotels(user)
-    hotel_id = request.args.get('hotel_id', type=int) or active_hotel_id() or (hotels[0].id if hotels else None)
-    dept_list = _depts_present(hotel_id)
+    # v12.396 P-069 Φ2 — ADMIN «Όλα τα ξενοδοχεία»: ενιαία εβδομαδιαία όψη όλου του ομίλου (admin-only)
+    _all_mode = (request.args.get('hotel_id') == 'all') and is_admin()
+    hotel_id = None if _all_mode else (request.args.get('hotel_id', type=int) or active_hotel_id() or (hotels[0].id if hotels else None))
+    dept_list = _depts_present(hotel_id) if hotel_id else []
     week_start = _week_arg()
     pol = get_policy()
     horizon = max(1, int(pol.get('planning_horizon_weeks', 8)))
@@ -1477,9 +1479,16 @@ def schedule_board():
         weeks = ((monday_of(last) - week_start).days // 7) + 1
     prev_m = (date(sel_year, sel_month, 1) - timedelta(days=1))
     nxt = date(sel_year, sel_month, 28) + timedelta(days=10)
-    view_mode = request.args.get('view') or 'week'
+    view_mode = 'week' if _all_mode else (request.args.get('view') or 'week')
     month_block = None; year_block = None
-    if view_mode == 'month':
+    if _all_mode:
+        # ένα card ανά ξενοδοχείο (τρέχουσα εβδομάδα), ίδιο markup — μηδέν διπλή υλοποίηση
+        blocks = []
+        for _h in hotels:
+            _blk = _build_block(_h.id, _depts_present(_h.id), week_start, user)
+            _blk['hotel'] = _h
+            blocks.append(_blk)
+    elif view_mode == 'month':
         month_block = _build_month_block(hotel_id, dept_list, sel_year, sel_month, user)
         blocks = []
     elif view_mode == 'year':
@@ -1511,7 +1520,7 @@ def schedule_board():
     # v12.395 P-069 — ADMIN mode: λίστα τμημάτων για το inline chip ανάθεσης (μόνο admin το βλέπει)
     _all_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     return render_template('schedule_board.html',
-        shift_lookup=shift_lookup, shift_types_json=shift_types_json, all_depts=_all_depts,
+        shift_lookup=shift_lookup, shift_types_json=shift_types_json, all_depts=_all_depts, all_mode=_all_mode,
         hotels=hotels, hotel_id=hotel_id, cur_hotel=cur_hotel, dept_list=dept_list,
         weekdays=WEEKDAYS_EL, shift_types=shift_types, blocks=blocks, weeks=weeks, horizon=horizon,
         week_start=week_start, week_start_iso=week_start.isoformat(),
