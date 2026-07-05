@@ -2351,63 +2351,71 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
     by_user = {}
     for a in assigns:
         by_user.setdefault(a.user_id, []).append(a)
+    pmap = _load_period_map(list(by_user.keys()))   # v12.402 P-070 Φ2 — period-aware split
     rows = []
     for uid, alist in by_user.items():
         u = User.query.get(uid)
         if not u or not u.is_active:
             continue
         hh = getattr(u, 'home_hotel_id', None)
-        if hotel_id and hh != hotel_id:
-            continue
         if dept_id and getattr(u, 'department_id', None) != dept_id:
             continue
-        days = {}
-        hours = extra = 0.0
-        _wd = set(); _sun = set(); _hol = set(); _repo = set(); _wrepo = set()
-        for a in alist:
-            dd = days.setdefault(a.work_date.day, {'entries': [], 'code': '', 'wh': None, 'segs': '[]'})
-            try:
-                _es = json.loads(a.segments) if a.segments else []
-            except Exception:
-                _es = []
-            _tm = ' & '.join("%s - %s" % (x.get('start'), x.get('end')) for x in _es) if _es else ''
-            _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hh) else None
-            # v12.390 P-068: 'wh' (prefill dropdown) = πληροφοριακό sent_hotel_id· badge μένει σε work_hotel_id
-            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.sent_hotel_id,
-                                  'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
-                                  'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
-                                  'color': _colors.get(a.shift_code, '#64748b')})
-            if not dd['code']:
-                dd['code'] = a.shift_code; dd['wh'] = a.work_hotel_id; dd['segs'] = a.segments or '[]'
-            if is_extra_code(a.shift_code):
-                extra += worked_hours(a)
-            elif is_work_code(a.shift_code):
-                hours += worked_hours(a)
-                _wd.add(a.work_date)
-                if a.shift_code == 'ΔΡ':      # v12.376 — δουλεμένο ρεπό
-                    _wrepo.add(a.work_date)
-                if a.work_date.weekday() == 6:
-                    _sun.add(a.work_date)
-                if a.work_date in hol:
-                    _hol.add(a.work_date)
-            elif is_repo_code(a.shift_code):
-                _repo.add(a.work_date)
-        sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol); worked_repo = len(_wrepo)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
-        payable = 0.0
-        if prof and getattr(prof, 'agreement_amount', None):
-            if getattr(prof, 'agreement_type', None) == 'Management':
-                payable = round(prof.agreement_amount, 2)
-            else:
-                payable = round((getattr(prof, 'day_wage', 0) or 0) * work_days + extra_wage(prof, extra), 2)
         _pp = piimap.get(uid)
-        rows.append({'user': u, 'hotel_id': hh, 'days': days,
-                     'emp_code': (_pp.emp_code if _pp else None),
-                     'afm': (_pp.afm if _pp else None),
-                     'locked': (bool(_pp.locked) if _pp else False),
-                     'hours': round(hours, 1), 'extra': round(extra, 1),
-                     'sundays': sundays, 'holidays': hol_worked,
-                     'work_days': work_days, 'repo': repo, 'worked_repo': worked_repo, 'payable': payable})
+        # v12.402 P-070 Φ2 — «η γραμμή συνεχίζεται»: split βαρδιών ανά ξενοδοχείο-period
+        # (billing_hotel_id: εκ-περιτροπής work_hotel νικά → αλλιώς period(ημ/νία) → αλλιώς home)
+        # → ο εργαζόμενος εμφανίζεται σε ΚΑΘΕ ξενοδοχείο όπου δούλεψε, με τις βάρδιες εκείνης της περιόδου.
+        by_ch = {}
+        for a in alist:
+            by_ch.setdefault(billing_hotel_id(a, hh, pmap), []).append(a)
+        for ch, sub in by_ch.items():
+            if hotel_id and ch != hotel_id:
+                continue
+            days = {}
+            hours = extra = 0.0
+            _wd = set(); _sun = set(); _hol = set(); _repo = set(); _wrepo = set()
+            for a in sub:
+                dd = days.setdefault(a.work_date.day, {'entries': [], 'code': '', 'wh': None, 'segs': '[]'})
+                try:
+                    _es = json.loads(a.segments) if a.segments else []
+                except Exception:
+                    _es = []
+                _tm = ' & '.join("%s - %s" % (x.get('start'), x.get('end')) for x in _es) if _es else ''
+                _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hh) else None
+                # v12.390 P-068: 'wh' (prefill dropdown) = πληροφοριακό sent_hotel_id· badge μένει σε work_hotel_id
+                dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.sent_hotel_id,
+                                      'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
+                                      'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
+                                      'color': _colors.get(a.shift_code, '#64748b')})
+                if not dd['code']:
+                    dd['code'] = a.shift_code; dd['wh'] = a.work_hotel_id; dd['segs'] = a.segments or '[]'
+                if is_extra_code(a.shift_code):
+                    extra += worked_hours(a)
+                elif is_work_code(a.shift_code):
+                    hours += worked_hours(a)
+                    _wd.add(a.work_date)
+                    if a.shift_code == 'ΔΡ':      # v12.376 — δουλεμένο ρεπό
+                        _wrepo.add(a.work_date)
+                    if a.work_date.weekday() == 6:
+                        _sun.add(a.work_date)
+                    if a.work_date in hol:
+                        _hol.add(a.work_date)
+                elif is_repo_code(a.shift_code):
+                    _repo.add(a.work_date)
+            sundays = len(_sun); work_days = len(_wd); repo = len(_repo); hol_worked = len(_hol); worked_repo = len(_wrepo)
+            payable = 0.0
+            if prof and getattr(prof, 'agreement_amount', None):
+                if getattr(prof, 'agreement_type', None) == 'Management':
+                    payable = round(prof.agreement_amount, 2) if ch == hh else 0.0   # fixed μισθός ΜΟΝΟ στην έδρα (όχι x2)
+                else:
+                    payable = round((getattr(prof, 'day_wage', 0) or 0) * work_days + extra_wage(prof, extra), 2)
+            rows.append({'user': u, 'hotel_id': ch, 'days': days,
+                         'emp_code': (_pp.emp_code if _pp else None),
+                         'afm': (_pp.afm if _pp else None),
+                         'locked': (bool(_pp.locked) if _pp else False),
+                         'hours': round(hours, 1), 'extra': round(extra, 1),
+                         'sundays': sundays, 'holidays': hol_worked,
+                         'work_days': work_days, 'repo': repo, 'worked_repo': worked_repo, 'payable': payable})
     rows.sort(key=lambda r: (r['user'].full_name or ''))
     hotels_by_id = {h.id: h for h in Hotel.query.all()}
     groups = {}
