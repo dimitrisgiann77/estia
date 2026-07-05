@@ -1508,8 +1508,10 @@ def schedule_board():
             .order_by(ScheduleReopen.expires_at.desc()).first())
     except Exception:
         reopen_active = None
+    # v12.395 P-069 — ADMIN mode: λίστα τμημάτων για το inline chip ανάθεσης (μόνο admin το βλέπει)
+    _all_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     return render_template('schedule_board.html',
-        shift_lookup=shift_lookup, shift_types_json=shift_types_json,
+        shift_lookup=shift_lookup, shift_types_json=shift_types_json, all_depts=_all_depts,
         hotels=hotels, hotel_id=hotel_id, cur_hotel=cur_hotel, dept_list=dept_list,
         weekdays=WEEKDAYS_EL, shift_types=shift_types, blocks=blocks, weeks=weeks, horizon=horizon,
         week_start=week_start, week_start_iso=week_start.isoformat(),
