@@ -1182,10 +1182,24 @@ def _week_arg():
             pass
     return monday_of(date.today())
 
-def _dept_users(hotel_id, dept_id):
+def _dept_users(hotel_id, dept_id, d_from=None, d_to=None):
+    """v12.393 P-068 Κομμάτι 2 Φ3α (#3 time-view) — επιλογή προσωπικού ξενοδοχείου.
+    Αν δοθεί εύρος [d_from,d_to]: όσοι ΑΝΗΚΑΝ στο ξεν. ΤΟΤΕ (UserHotelPeriod που επικαλύπτει το εύρος)
+    — έτσι ο παλιός μήνας δείχνει ποιοι ήταν τότε. Χωρίς εύρος: το τρέχον home (παλιά συμπεριφορά).
+    Ασφάλεια «ίδιο σήμερα»: baseline period=home → τρέχουσες μέρες δίνουν ΙΔΙΟ ρόστερ."""
     q = User.query.filter(User.is_active == True)
     if hotel_id:
-        q = q.filter(User.home_hotel_id == hotel_id)
+        if d_from and d_to:
+            from sqlalchemy import or_ as _or, and_ as _and
+            sub = (db.session.query(UserHotelPeriod.user_id)
+                   .filter(UserHotelPeriod.hotel_id == hotel_id,
+                           UserHotelPeriod.date_from <= d_to,
+                           _or(UserHotelPeriod.date_to.is_(None), UserHotelPeriod.date_to >= d_from)))
+            # safety: εργαζόμενος ΧΩΡΙΣ καμία period (π.χ. legacy home-set πριν το boot) → μη τον χάσεις· home=αλήθεια
+            _noper = ~db.session.query(UserHotelPeriod.id).filter(UserHotelPeriod.user_id == User.id).exists()
+            q = q.filter(_or(User.id.in_(sub), _and(User.home_hotel_id == hotel_id, _noper)))
+        else:
+            q = q.filter(User.home_hotel_id == hotel_id)
     if dept_id:
         q = q.filter(User.department_id == dept_id)
     return q.order_by(User.full_name).all()
@@ -1198,7 +1212,7 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
     users=None → προσωπικό τμήματος· αλλιώς δοθείσα λίστα (π.χ. όλο το ξεν., ungrouped)."""
     borrowed_ids = set(); rot_ids = set()
     if users is None:
-        users = _dept_users(hotel_id, dept_id)
+        users = _dept_users(hotel_id, dept_id, days[0], days[-1])   # v12.393 #3 — ποιοι ανήκαν ΤΟΤΕ (period)
         # v12.378 Φ2a — εκ-περιτροπής που μοιράζονται σε ΑΥΤΟ το ξεν. (έδρα αλλού) → read-only ορατότητα
         try:
             import rotation as _ROT
@@ -1374,7 +1388,7 @@ def _build_span_block(hotel_id, dept_list, days, user, label):
     hol = {h.hol_date for h in Holiday.query.all()}
     seen = set(); users = []
     for dep in dept_list:
-        for u in _dept_users(hotel_id, dep.id):
+        for u in _dept_users(hotel_id, dep.id, days[0], days[-1]):   # v12.393 #3 — ποιοι ανήκαν ΤΟΤΕ (period)
             if u.id not in seen:
                 seen.add(u.id); users.append(u)
     users.sort(key=lambda u: (u.full_name or u.username or '').lower())
