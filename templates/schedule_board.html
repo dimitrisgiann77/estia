@@ -529,7 +529,7 @@ function saveDay(){
     if(en.code==='ΕΩ'&&!(en.segs&&en.segs.length)){alert('Η ΕΩ χρειάζεται ώρες.');return;}
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  var entries=dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});
+  var entries=dayEntries.map(function(en){return {code:en.code,sent_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});/* v12.390 P-068: πληροφοριακό */
   var _pend=_histCapture(cells);
   fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok){if(j.return_prompt){showReturnPrompt(j.return_prompt);}else{refreshBoard(function(){_histCommit(_pend);});}}});
 }
@@ -581,7 +581,7 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var _pend=_histCapture(cells);
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)refreshBoard(function(){_histCommit(_pend);});});
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,sent_hotel_id:wh,board_hotel_id:BOARD_HOTEL_ID})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)refreshBoard(function(){_histCommit(_pend);});});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -879,8 +879,8 @@ function _pasteReport(o){
 var undoStack=[], redoStack=[], UNDO_MAX=40;   // κρατά έως 40 βήματα
 function _cellEntriesPaste(cell){
   var es=[]; try{es=JSON.parse(cell.getAttribute('data-entries')||'[]');}catch(_){}
-  return es.map(function(e){return {code:e.code, work_hotel_id:(e.wh||null),
-    segments:((e.segs&&e.segs.length)?e.segs.map(function(s){return {start:s.start,end:s.end};}):[])};});
+  return es.map(function(e){return {code:e.code, sent_hotel_id:(e.wh||null),
+    segments:((e.segs&&e.segs.length)?e.segs.map(function(s){return {start:s.start,end:s.end};}):[])};});/* v12.390 P-068 */
 }
 function _snapCells(keys){
   return keys.map(function(k){
@@ -926,7 +926,7 @@ document.addEventListener('keydown',function(e){
   if((e.ctrlKey||e.metaKey)&&(e.code==='KeyY'||(e.code==='KeyZ'&&e.shiftKey))){ e.preventDefault(); doRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&curSel.length){
     var src=curSel[curSel.length-1]; var es=[];try{es=JSON.parse(src.getAttribute('data-entries')||'[]');}catch(_){}
-    clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),work_hotel_id:(x.wh||null)};});
+    clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),sent_hotel_id:(x.wh||null)};});/* v12.390 P-068 */
     clipTSV=_selToTSV(); _toClipboard(clipTSV);
     try{ sessionStorage.setItem('estia_clip',JSON.stringify(clip)); sessionStorage.setItem('estia_clipTSV',clipTSV); }catch(_){}
     e.preventDefault(); _toast((curSel.length>1?('Αντιγράφηκαν '+curSel.length+' κελιά'):(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε'))+' — μένει ενεργό για πολλά paste');

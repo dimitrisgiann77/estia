@@ -162,7 +162,8 @@ class ShiftAssignment(db.Model):
     work_date     = db.Column(db.Date, nullable=False, index=True)
     shift_code    = db.Column(db.String(12), default='ΕΡΓ')     # κωδικός ShiftType
     segments      = db.Column(db.Text)            # JSON [{'start':'07:00','end':'15:30'}, ...]
-    work_hotel_id = db.Column(db.Integer, db.ForeignKey('hotel.id'))   # != home αν δανεικός
+    work_hotel_id = db.Column(db.Integer, db.ForeignKey('hotel.id'))   # != home αν δανεικός · ΧΡΕΩΣΗ (None=έδρα)
+    sent_hotel_id = db.Column(db.Integer, db.ForeignKey('hotel.id'))   # v12.390 P-068: ΠΛΗΡΟΦΟΡΙΑΚΟ «πού στάλθηκε» — ΟΧΙ χρέωση
     note          = db.Column(db.String(200))
     created_by    = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at    = db.Column(db.DateTime, default=datetime.now)
@@ -293,6 +294,7 @@ def ensure_schedule_columns():
         _add_col('department_group', 'supervisor_user_id', 'supervisor_user_id INTEGER')  # v12.182
         _add_col('shift_type', 'count_as', "count_as VARCHAR(10)")  # v12.207
         _add_col('shift_type', 'break_deduct', 'break_deduct BOOLEAN')  # v12.207
+        _add_col('shift_assignment', 'sent_hotel_id', 'sent_hotel_id INTEGER')  # v12.390 P-068: πληροφοριακό «πού στάλθηκε»
         try:  # backfill κατηγοριών (idempotent)
             for _st in ShiftType.query.all():
                 if not _st.count_as:
@@ -1183,7 +1185,9 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                         _es = []
                     _tm = ' & '.join("%s - %s" % (s.get('start'), s.get('end')) for s in _es) if _es else ''
                     _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hotel_id) else None
-                    _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
+                    # v12.390 P-068: το 'wh' (prefill dropdown + clipboard) εκθέτει το ΠΛΗΡΟΦΟΡΙΑΚΟ sent_hotel_id·
+                    # το badge (hotel_short/elsewhere/locked) μένει σε work_hotel_id (εκ-περιτροπής).
+                    _entries.append({'code': a.shift_code, 'segs': _es, 'wh': a.sent_hotel_id,
                                      'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
                                      'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
                                      'color': _colors.get(a.shift_code, '#64748b')})
@@ -1586,7 +1590,9 @@ def schedule_cell():
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
     note = (d.get('note') or '')[:200]
-    whid = d.get('work_hotel_id'); whid = int(whid) if whid else None
+    # v12.390 P-068: το dropdown γράφει ΠΛΗΡΟΦΟΡΙΑΚΟ sent_hotel_id, ΟΧΙ χρέωση. work_hotel_id μόνο από rotation guard.
+    sent = d.get('sent_hotel_id'); sent = int(sent) if sent else None
+    whid = None
     a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
     _old = (a.shift_code if a else '')
     if not code:
@@ -1617,6 +1623,7 @@ def schedule_cell():
     a.shift_code = code
     a.segments = json.dumps(segs, ensure_ascii=False)
     a.work_hotel_id = whid
+    a.sent_hotel_id = sent   # v12.390 P-068
     a.note = note
     # WeekPlan -> draft (αν δεν υπάρχει)
     u = User.query.get(uid)
@@ -1665,7 +1672,7 @@ def schedule_cells_bulk():
                 continue
     code = (d.get('code') or '').strip()
     segs = d.get('segments') or []
-    _whid = d.get('work_hotel_id'); _whid = int(_whid) if _whid else None
+    _sent = d.get('sent_hotel_id'); _sent = int(_sent) if _sent else None   # v12.390 P-068: πληροφοριακό
     board_hid = d.get('board_hotel_id'); board_hid = int(board_hid) if board_hid else None
     if code in ('ΕΡΓ', 'ΔΡ') and not segs:
         st = ShiftType.query.filter_by(code=code).first()
@@ -1680,7 +1687,7 @@ def schedule_cells_bulk():
     for uid, wd in pairs:
         if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
-        _wh_use = _whid
+        _wh_use = None   # v12.390 P-068: dropdown δεν τροφοδοτεί πια work_hotel_id (μόνο ο guard)
         if code:
             _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
             if _grot:
@@ -1699,7 +1706,8 @@ def schedule_cells_bulk():
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
         if code:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
-                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_wh_use, created_by=user.id))
+                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_wh_use,
+                sent_hotel_id=_sent, created_by=user.id))   # v12.390 P-068
         _audit_past(user, uid, wd, _old, code or '', 'bulk')
         touched.add((uid, monday_of(wd)))
         done += 1
@@ -1742,7 +1750,9 @@ def schedule_day():
         if not code:
             continue
         segs = e.get('segments') or []
-        whid = e.get('work_hotel_id'); whid = int(whid) if whid else None
+        # v12.390 P-068: το dropdown γράφει πληροφοριακό sent_hotel_id· work_hotel_id μόνο από guard
+        sent = e.get('sent_hotel_id'); sent = int(sent) if sent else None
+        whid = None
         if code in ('ΕΡΓ', 'ΔΡ') and not segs:
             st = ShiftType.query.filter_by(code='ΕΡΓ').first()
             if st and st.default_start and st.default_end:
@@ -1752,20 +1762,21 @@ def schedule_day():
             if not ok:
                 return jsonify(ok=False, err='invalid', msg=msg), 400
         else:
-            segs = []; whid = None
+            segs = []; whid = None; sent = None
         # v12.379 Φ2β — εκ-περιτροπής: κλείδωμα/όριο + auto work_hotel
         _gok, _gmsg, _gwh, _grot, _ = _rotation_guard(uid, wd, code, board_hid)
         if not _gok:
             return jsonify(ok=False, err='rotation', msg=_gmsg), 400
         if _grot:
             whid = _gwh
-        norm.append((code, segs, whid))
+        norm.append((code, segs, whid, sent))
     _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
     ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
-    for code, segs, whid in norm:
+    for code, segs, whid, sent in norm:
         db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
-            segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
-    _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _ in norm), 'cell')
+            segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid,
+            sent_hotel_id=sent, created_by=user.id))   # v12.390 P-068
+    _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _, _ in norm), 'cell')
     u = User.query.get(uid)
     if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
         ws = monday_of(wd)
@@ -1797,14 +1808,16 @@ def schedule_paste_cells():
         if not code:
             continue
         segs = e.get('segments') or e.get('segs') or []
-        whid = e.get('work_hotel_id') or e.get('wh'); whid = int(whid) if whid else None
+        # v12.390 P-068: το dropdown/clipboard κουβαλά πληροφοριακό sent_hotel_id (fallback: παλιό 'wh' key)
+        sent = e.get('sent_hotel_id') or e.get('wh'); sent = int(sent) if sent else None
+        whid = None
         if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ'):
             ok, msg = _validate_work_code(code, segs)
             if not ok:
                 return jsonify(ok=False, err='invalid', msg=msg), 400
         else:
-            segs = []; whid = None
-        norm.append((code, segs, whid))
+            segs = []; whid = None; sent = None
+        norm.append((code, segs, whid, sent))
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched_wp = set(); _pending = {}
     for c in (d.get('cells') or []):
@@ -1816,7 +1829,7 @@ def schedule_paste_cells():
             locked += 1; continue
         # v12.379 Φ2β — εκ-περιτροπής: guard ανά κελί (κλείδωμα/όριο + auto work_hotel)
         _entries_use = []; _blk = False
-        for code, segs, whid in norm:
+        for code, segs, whid, sent in norm:
             _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
             if _grot:
                 if not _gok:
@@ -1824,15 +1837,16 @@ def schedule_paste_cells():
                 whid = _gwh
                 if is_work_code(code):
                     _pending.setdefault((uid, _gact), set()).add(wd)
-            _entries_use.append((code, segs, whid))
+            _entries_use.append((code, segs, whid, sent))
         if _blk:
             blocked += 1; continue
         _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
         ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
-        for code, segs, whid in _entries_use:
+        for code, segs, whid, sent in _entries_use:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
-                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid, created_by=user.id))
-        _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _ in _entries_use), 'excel')
+                segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid,
+                sent_hotel_id=sent, created_by=user.id))   # v12.390 P-068
+        _audit_past(user, uid, wd, _old, ' / '.join(c for c, _, _, _ in _entries_use), 'excel')
         u = User.query.get(uid)
         if u and getattr(u, 'home_hotel_id', None) and getattr(u, 'department_id', None):
             ws = monday_of(wd)
@@ -1854,7 +1868,8 @@ def schedule_paste_cells():
         try:
             _uid = int(cells_in[0]['user_id'])
             _wd = datetime.strptime(cells_in[0]['date'], '%Y-%m-%d').date()
-            _wh = next((w for (_c, _s, w) in norm if w), None)
+            # v12.390 P-068: work_hotel (rotation) μετά τον guard, από _entries_use (norm.whid πλέον πάντα None)
+            _wh = next((w for (_c, _s, w, _sn) in _entries_use if w), None)
             ctx = _schedule_return_context(_uid, _wd, _wh)
             if ctx and not ctx['marked']:
                 prompt = ctx
@@ -2206,7 +2221,8 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
                 _es = []
             _tm = ' & '.join("%s - %s" % (x.get('start'), x.get('end')) for x in _es) if _es else ''
             _hn = _hotels.get(a.work_hotel_id) if (a.work_hotel_id and a.work_hotel_id != hh) else None
-            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.work_hotel_id,
+            # v12.390 P-068: 'wh' (prefill dropdown) = πληροφοριακό sent_hotel_id· badge μένει σε work_hotel_id
+            dd['entries'].append({'code': a.shift_code, 'segs': _es, 'wh': a.sent_hotel_id,
                                   'times': _tm, 'hotel': _hn, 'hotel_short': _hotel_short(_hn) if _hn else '',
                                   'hours': (round(worked_hours(a), 1) if is_work_code(a.shift_code) else 0),
                                   'color': _colors.get(a.shift_code, '#64748b')})

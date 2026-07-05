@@ -293,7 +293,7 @@ function saveDay(){
     if(en.code==='ΕΩ'&&!(en.segs&&en.segs.length)){alert('Η ΕΩ χρειάζεται ώρες.');return;}
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  var entries=dayEntries.map(function(en){return {code:en.code,work_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});
+  var entries=dayEntries.map(function(en){return {code:en.code,sent_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});/* v12.390 P-068: πληροφοριακό */
   fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)estiaSwap('monthwrap','initMonthly');});
 }
 function openEd(){
@@ -317,7 +317,7 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,work_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,sent_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -328,7 +328,7 @@ document.addEventListener('keydown',function(e){
   var tag=(e.target&&e.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='select'||tag==='textarea')return;
   if((e.ctrlKey||e.metaKey)&&e.code==='KeyC'&&curSel.length){
     var src=curSel[curSel.length-1]; var es=[];try{es=JSON.parse(src.getAttribute('data-entries')||'[]');}catch(_){}
-    clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),work_hotel_id:(x.wh||null)};});
+    clip=es.map(function(x){return {code:x.code,segments:(x.segs||[]),sent_hotel_id:(x.wh||null)};});/* v12.390 P-068 */
     e.preventDefault(); _toast(clip.length?('Αντιγράφηκε ('+clip.length+' βάρδ.)'):'Αντιγράφηκε (κενό κελί)');
   } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&clip&&curSel.length){
     e.preventDefault();
