@@ -717,12 +717,29 @@ def _period_hotel(pmap, uid, d):
     return None
 
 def billing_hotel_id(a, home, pmap):
-    """Ξενοδοχείο ΧΡΕΩΣΗΣ μιας βάρδιας: εκ-περιτροπής (work_hotel_id, guard-set) ΝΙΚΑ →
+    """Ξενοδοχείο ΧΡΕΩΣΗΣ μιας βάρδιας: ρητό `work_hotel_id` ΝΙΚΑ (εκ-περιτροπής guard-set Ή
+    v12.404 P-071: το group-ξενοδοχείο όπου καταχωρήθηκε η βάρδια, αν ≠ έδρα) →
     αλλιώς period(ημ/νία βάρδιας) → αλλιώς home (fallback αν λείπει period)."""
-    if is_work_code(a.shift_code) and a.work_hotel_id:
+    # v12.404b P-071 (reviewer): work_hotel_id τιμάται ΜΟΝΟ για κωδικούς-χρήματος (ΕΡΓ/ΔΡ/ΕΩ) —
+    # κλείνει την τρύπα ιστορικών εισαγόμενων αδειών/ρεπό που τυχόν κουβαλούν work_hotel_id.
+    if a.work_hotel_id and (is_work_code(a.shift_code) or is_extra_code(a.shift_code)):
         return a.work_hotel_id
     p = _period_hotel(pmap, a.user_id, a.work_date)
     return p if p is not None else home
+
+def _charge_wh(uid, board_hid, cache=None):
+    """v12.404 P-071 — «η βάρδια ορίζει το ξενοδοχείο»: αν καταχωρείται σε group-ξενοδοχείο ≠ έδρα
+    → η βάρδια χρεώνεται εκεί (`work_hotel_id=board_hid`). Στην έδρα → None (χρέωση=period/έδρα, ίδιο με πριν).
+    cache: {uid: home} για batch (αποφυγή N+1). Ο rotation guard υπερισχύει μετά."""
+    if not board_hid:
+        return None
+    if cache is not None and uid in cache:
+        home = cache[uid]
+    else:
+        home = getattr(User.query.get(uid), 'home_hotel_id', None)
+        if cache is not None:
+            cache[uid] = home
+    return board_hid if board_hid != home else None
 
 def monthly_settlement(year, month, hotel_id=None, split=False):
     """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα.
@@ -1743,7 +1760,7 @@ def schedule_cell():
     note = (d.get('note') or '')[:200]
     # v12.390 P-068: το dropdown γράφει ΠΛΗΡΟΦΟΡΙΑΚΟ sent_hotel_id, ΟΧΙ χρέωση. work_hotel_id μόνο από rotation guard.
     sent = d.get('sent_hotel_id'); sent = int(sent) if sent else None
-    whid = None
+    whid = _charge_wh(uid, board_hid) if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') else None   # v12.404 P-071 — χρέωση στο group-ξεν. (αν ≠ έδρα)
     a = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).first()
     _old = (a.shift_code if a else '')
     if not code:
@@ -1834,11 +1851,11 @@ def schedule_cells_bulk():
         if not _ok:
             return jsonify(ok=False, err='invalid', msg=_msg), 400
     done = 0; locked = 0; blocked = 0; _last_msg = ''
-    touched = set(); _pending = {}
+    touched = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
     for uid, wd in pairs:
         if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
-        _wh_use = None   # v12.390 P-068: dropdown δεν τροφοδοτεί πια work_hotel_id (μόνο ο guard)
+        _wh_use = _charge_wh(uid, board_hid, _hc) if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') else None   # v12.404 P-071 — χρέωση στο group-ξεν.· ο guard υπερισχύει
         if code:
             _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
             if _grot:
@@ -1903,7 +1920,7 @@ def schedule_day():
         segs = e.get('segments') or []
         # v12.390 P-068: το dropdown γράφει πληροφοριακό sent_hotel_id· work_hotel_id μόνο από guard
         sent = e.get('sent_hotel_id'); sent = int(sent) if sent else None
-        whid = None
+        whid = _charge_wh(uid, board_hid)   # v12.404 P-071 — χρέωση στο group-ξεν. (αν ≠ έδρα)
         if code in ('ΕΡΓ', 'ΔΡ') and not segs:
             st = ShiftType.query.filter_by(code='ΕΡΓ').first()
             if st and st.default_start and st.default_end:
@@ -1970,7 +1987,7 @@ def schedule_paste_cells():
             segs = []; whid = None; sent = None
         norm.append((code, segs, whid, sent))
     done = 0; locked = 0; blocked = 0; _last_msg = ''
-    touched_wp = set(); _pending = {}
+    touched_wp = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
     for c in (d.get('cells') or []):
         try:
             uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
@@ -1981,6 +1998,7 @@ def schedule_paste_cells():
         # v12.379 Φ2β — εκ-περιτροπής: guard ανά κελί (κλείδωμα/όριο + auto work_hotel)
         _entries_use = []; _blk = False
         for code, segs, whid, sent in norm:
+            whid = _charge_wh(uid, board_hid, _hc) if code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') else None   # v12.404 P-071 — χρέωση στο group-ξεν.
             _gok, _gmsg, _gwh, _grot, _gact = _rotation_guard(uid, wd, code, board_hid, _pending)
             if _grot:
                 if not _gok:
