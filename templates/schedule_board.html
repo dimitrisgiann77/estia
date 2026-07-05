@@ -131,17 +131,20 @@
   {% if qs.get('ok')=='msub' %}<div class="banner open" style="margin-bottom:10px;"><i class="ti ti-check"></i> Υποβλήθηκαν {{ qs.get('n') }} εβδομάδες του μήνα στο λογιστήριο{% if qs.get('b') and qs.get('b')!='0' %} · {{ qs.get('b') }} μπλοκαρίστηκαν (κανόνες){% endif %}.</div>{% endif %}
 
   {% if is_admin %}<style>
-    .asg{display:none;position:relative;margin-top:4px;}
-    body.sadmin .asg{display:inline-flex;}
-    .asg-chip{border:1px solid #2563eb;background:#eff6ff;color:#2563eb;border-radius:7px;padding:2px 8px;font-size:11px;cursor:pointer;white-space:nowrap;align-items:center;gap:4px;display:inline-flex;}
-    .asg-menu{display:none;position:absolute;left:0;top:24px;z-index:70;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.16);padding:10px;width:210px;text-align:left;}
+    .asg{display:none;margin-top:3px;}
+    body.sadmin .asg{display:inline-block;position:relative;}
+    body.sadmin .asg.open{z-index:400;}
+    .asg-chip{border:1px solid #2563eb;background:#eff6ff;color:#1e40af;border-radius:6px;padding:2px 7px;font-size:10.5px;cursor:pointer;white-space:nowrap;align-items:center;gap:3px;display:inline-flex;max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+    .asg-chip .asg-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .asg-menu{display:none;position:absolute;left:0;top:26px;z-index:401;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:11px;width:200px;text-align:left;}
     .asg.open .asg-menu{display:block;}
-    .asg-menu label{font-size:11px;color:#64748b;display:block;margin:5px 0 3px;}
+    .asg-menu .amt{font-size:11px;font-weight:600;color:#1e40af;margin-bottom:6px;}
+    .asg-menu label{font-size:11px;color:#64748b;display:block;margin:6px 0 3px;}
     .asg-menu select,.asg-menu input{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:5px 8px;font-size:12.5px;box-sizing:border-box;}
-    .asg-go{margin-top:9px;width:100%;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:7px;font-size:13px;cursor:pointer;}
+    .asg-go{margin-top:10px;width:100%;background:#2563eb;color:#fff;border:none;border-radius:7px;padding:7px;font-size:13px;cursor:pointer;}
     #admBtn.on{background:#2563eb;color:#fff;border-color:#2563eb;}
   </style>{% endif %}
-  {% macro asg_chip(user) %}<span class="asg" data-uid="{{ user.id }}" data-hotel="{{ user.home_hotel_id or '' }}" data-dept="{{ user.department_id or '' }}"><span class="asg-chip" onclick="asgOpen(this,event)"><i class="ti ti-arrow-move-right"></i> <span class="asg-lbl">ανάθεση</span></span><span class="asg-menu" onclick="event.stopPropagation()"><label>Ξενοδοχείο</label><select class="asg-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select><label>Τμήμα</label><select class="asg-d"><option value="">—</option>{% for d in all_depts %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select><label>Ισχύει από</label><input type="date" class="asg-dt"><button type="button" class="asg-go" onclick="asgSave(this)">Αποθήκευση</button></span></span>{% endmacro %}
+  {% macro asg_chip(user) %}<span class="asg" data-uid="{{ user.id }}" data-hotel="{{ user.home_hotel_id or '' }}" data-dept="{{ user.department_id or '' }}"><span class="asg-chip" onclick="asgOpen(this,event)"><i class="ti ti-arrow-move-right"></i> <span class="asg-lbl">{{ hotel_names.get(user.home_hotel_id) or 'ανάθεση' }}{% if user.department_id and dept_names.get(user.department_id) %} · {{ dept_names.get(user.department_id) }}{% endif %}</span></span><span class="asg-menu" onclick="event.stopPropagation()"><div class="amt">Μετακίνηση εργαζόμενου</div><label>Ξενοδοχείο</label><select class="asg-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select><label>Τμήμα</label><select class="asg-d"><option value="">—</option>{% for d in all_depts %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select><label>Ισχύει από</label><input type="date" class="asg-dt"><button type="button" class="asg-go" onclick="asgSave(this)">Αποθήκευση</button></span></span>{% endmacro %}
   {% if view_mode=='month' %}
   <div class="sched-toolbar" style="margin-bottom:10px;">
     <h3 style="flex-basis:100%;margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:7px;"><i class="ti ti-calendar-month"></i> {{ month_block.label if month_block }} — όλο το προσωπικό ({{ month_block.rows|length if month_block }})</h3>
@@ -168,6 +171,7 @@
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
       <button type="button" class="btn" id="undoBtn" onclick="doUndo()" title="Αναίρεση (Ctrl+Z)" disabled><i class="ti ti-arrow-back-up"></i></button>
       <button type="button" class="btn" id="redoBtn" onclick="doRedo()" title="Επανάληψη (Ctrl+Y)" disabled><i class="ti ti-arrow-forward-up"></i></button>
+      {% if is_admin %}<button type="button" class="btn" id="admBtn" onclick="admToggle()" title="ADMIN mode — inline ανάθεση εργαζομένων"><i class="ti ti-settings"></i> ADMIN</button>{% endif %}
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
       <a class="btn" href="/dashboard/schedule/month_export.xlsx?hotel_id={{ hotel_id }}&month={{ sel_month }}&year={{ sel_year }}"><i class="ti ti-file-spreadsheet"></i> Excel</a>
       <form method="POST" action="/dashboard/schedule/submit_month" onsubmit="return confirm('Υποβολή ΟΛΟΥ του μήνα {{ month_block.label if month_block }} στο λογιστήριο;');" style="margin:0;">
@@ -199,6 +203,7 @@
     <span style="margin-left:auto;display:flex;gap:6px;align-items:flex-end;">
       <button type="button" class="btn" id="undoBtn" onclick="doUndo()" title="Αναίρεση (Ctrl+Z)" disabled><i class="ti ti-arrow-back-up"></i></button>
       <button type="button" class="btn" id="redoBtn" onclick="doRedo()" title="Επανάληψη (Ctrl+Y)" disabled><i class="ti ti-arrow-forward-up"></i></button>
+      {% if is_admin %}<button type="button" class="btn" id="admBtn" onclick="admToggle()" title="ADMIN mode — inline ανάθεση εργαζομένων"><i class="ti ti-settings"></i> ADMIN</button>{% endif %}
       <button type="button" class="btn" id="denseBtn" onclick="toggleDense()"><i class="ti ti-layout-rows"></i> Συμπαγή</button>
     </span>
   </div>
