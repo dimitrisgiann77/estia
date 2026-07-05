@@ -43,6 +43,31 @@
       </form>
     </div>
 
+    <div class="card"><h3>Ιστορικό ανάθεσης ξενοδοχείου <span class="muted" style="font-size:12px;font-weight:400;">η ΧΡΕΩΣΗ των βαρδιών ανά περίοδο — admin</span></h3>
+      <p class="muted" style="font-size:12px;margin:0 0 8px;">Σε ποιο ξενοδοχείο <b>ανήκε &amp; χρεωνόταν</b> ο εργαζόμενος σε κάθε περίοδο. Η μηνιαία χρεώνει βάσει αυτού — άσε την «Έως» κενή για την τρέχουσα (ανοιχτή) περίοδο. Οι περίοδοι δεν επικαλύπτονται.</p>
+      {% if perr %}<div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:12px;padding:6px 10px;border-radius:8px;margin-bottom:8px;">{{ perr }}</div>{% endif %}
+      {% for p in hotel_periods %}
+      <form method="post" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border-top:1px solid #eef2f7;padding:6px 0;">
+        <input type="hidden" name="period_id" value="{{ p.id }}">
+        <div class="row" style="min-width:150px;"><label>Ξενοδοχείο</label>
+          <select name="period_hotel_id">{% for h in all_hotels %}<option value="{{ h.id }}" {{ 'selected' if p.hotel_id==h.id }}>{{ h.name }}</option>{% endfor %}</select></div>
+        <div class="row"><label>Από</label><input type="date" name="period_from" value="{{ p.date_from.isoformat() }}"></div>
+        <div class="row"><label>Έως</label><input type="date" name="period_to" value="{{ p.date_to.isoformat() if p.date_to else '' }}"></div>
+        <button class="b" type="submit" name="action" value="period_edit">Αποθήκευση</button>
+        <button class="b" type="submit" name="action" value="period_del" onclick="return confirm('Διαγραφή περιόδου;');" style="background:#fee2e2;color:#b91c1c;">Διαγραφή</button>
+      </form>
+      {% endfor %}
+      {% if not hotel_periods %}<p class="meta" style="color:#94a3b8;">Καμία περίοδος ακόμη — πρόσθεσε παρακάτω ή μετακίνησε τον από το Οργανόγραμμα.</p>{% endif %}
+      <form method="post" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;border-top:1px dashed #e2e8f0;padding-top:8px;margin-top:4px;">
+        <input type="hidden" name="action" value="period_add">
+        <div class="row" style="min-width:150px;"><label>Ξενοδοχείο</label>
+          <select name="period_hotel_id"><option value="">— επίλεξε —</option>{% for h in all_hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select></div>
+        <div class="row"><label>Από</label><input type="date" name="period_from"></div>
+        <div class="row"><label>Έως <span class="muted" style="font-size:11px;">(κενό=ανοιχτή)</span></label><input type="date" name="period_to"></div>
+        <button class="b" type="submit">+ Προσθήκη περιόδου</button>
+      </form>
+    </div>
+
     <div class="card" id="rotation"><h3>Εκ περιτροπής εργασία
       {% if rot_shares %}<span class="pill ok">ενεργό</span>{% else %}<span class="pill no">ανενεργό</span>{% endif %}
       <a href="/dashboard/rotation" style="float:right;font-size:12px;font-weight:400;">Συνολική εικόνα ▸</a></h3>

@@ -366,7 +366,13 @@ def set_hotel_period(user, hotel_id, effective_date, source='orgchart', actor_id
         return False   # ίδιο ξενοδοχείο ήδη ανοιχτό από πριν — καμία αλλαγή
     if open_p and ed <= open_p.date_from:
         # τοποθέτηση στην/πριν την έναρξη της ανοιχτής → αντικατάσταση (όχι μηδενικό span)
-        open_p.hotel_id = hid; open_p.date_from = ed; open_p.source = source
+        # F3 guard (reviewer): ΜΗΝ επεκτείνεις μέσα σε ΚΛΕΙΣΤΗ προηγούμενη period → clamp στο date_to+1
+        prior = (UserHotelPeriod.query
+                 .filter(UserHotelPeriod.user_id == user.id, UserHotelPeriod.id != open_p.id,
+                         UserHotelPeriod.date_to.isnot(None), UserHotelPeriod.date_to >= ed)
+                 .order_by(UserHotelPeriod.date_to.desc()).first())
+        new_from = (prior.date_to + timedelta(days=1)) if prior else ed
+        open_p.hotel_id = hid; open_p.date_from = new_from; open_p.source = source
         db.session.add(open_p)
         return True
     if open_p:
@@ -375,6 +381,18 @@ def set_hotel_period(user, hotel_id, effective_date, source='orgchart', actor_id
     db.session.add(UserHotelPeriod(user_id=user.id, hotel_id=hid, date_from=ed,
                                    date_to=None, source=source, created_by=actor_id))
     return True
+
+def _period_overlaps(user_id, d_from, d_to, exclude_id=None):
+    """v12.394 P-068 Κομμάτι 2 Φ3β — True αν [d_from, d_to] (d_to=None=ανοιχτή) επικαλύπτει
+    ΑΛΛΗ period του εργαζόμενου. Χρησιμοποιείται από τον admin editor (μη-επικάλυψη = ένας/μία μέρα)."""
+    _INF = date(9999, 12, 31)
+    df, dt = d_from, (d_to or _INF)
+    for p in UserHotelPeriod.query.filter(UserHotelPeriod.user_id == user_id).all():
+        if exclude_id and p.id == exclude_id:
+            continue
+        if p.date_from <= dt and (p.date_to or _INF) >= df:
+            return True
+    return False
 _RANGE_RE = re.compile(r'(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})')
 
 def segments_hours(segments):

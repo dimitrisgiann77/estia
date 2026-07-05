@@ -497,6 +497,44 @@ def payroll_employee(uid):
             _PPL.set_user_position(u, int(_p) if _p else None, actor_id=(cu.id if cu else None))
             db.session.commit()
             log_activity('payroll_org_assign', u.full_name or u.username)
+        elif action in ('period_add', 'period_edit', 'period_del'):
+            # v12.394 P-068 Κομμάτι 2 Φ3β (#1) — admin editor ιστορικού ανάθεσης (χρέωση)
+            from schedule import UserHotelPeriod as _UHP, _period_overlaps
+            from urllib.parse import quote as _q
+            cu = current_user(); perr = None; pid = request.form.get('period_id')
+            if action == 'period_del':
+                p = _UHP.query.get(int(pid)) if pid else None
+                if p and p.user_id == uid:
+                    db.session.delete(p); db.session.commit()
+                    log_activity('period_del', u.full_name or u.username)
+            else:
+                _h = request.form.get('period_hotel_id')
+                _f = request.form.get('period_from'); _t = request.form.get('period_to')
+                try:
+                    _hid = int(_h) if _h else None
+                    _df = datetime.strptime(_f, '%Y-%m-%d').date() if _f else None
+                    _dt = datetime.strptime(_t, '%Y-%m-%d').date() if _t else None
+                except Exception:
+                    _hid = _df = _dt = None
+                _exc = int(pid) if (action == 'period_edit' and pid) else None
+                if not _hid or not _df:
+                    perr = 'Συμπλήρωσε ξενοδοχείο και ημερομηνία «Από».'
+                elif _dt and _dt < _df:
+                    perr = 'Το «Έως» δεν μπορεί να είναι πριν το «Από».'
+                elif _period_overlaps(uid, _df, _dt, exclude_id=_exc):
+                    perr = 'Επικάλυψη με άλλη περίοδο — ένας εργαζόμενος ανήκει σε ένα ξενοδοχείο κάθε στιγμή.'
+                else:
+                    if action == 'period_edit' and pid:
+                        p = _UHP.query.get(int(pid))
+                        if p and p.user_id == uid:
+                            p.hotel_id = _hid; p.date_from = _df; p.date_to = _dt; p.source = 'admin'
+                    else:
+                        db.session.add(_UHP(user_id=uid, hotel_id=_hid, date_from=_df, date_to=_dt,
+                                            source='admin', created_by=(cu.id if cu else None)))
+                    db.session.commit()
+                    log_activity('period_%s' % ('edit' if _exc else 'add'), u.full_name or u.username)
+            if perr:
+                return redirect(url_for('payroll_employee', uid=uid) + '?perr=' + _q(perr))
         return redirect(url_for('payroll_employee', uid=uid))
     comp = _company_for_hotel(getattr(u, 'home_hotel_id', None))
     hotel = Hotel.query.get(u.home_hotel_id) if getattr(u, 'home_hotel_id', None) else None
@@ -569,7 +607,15 @@ def payroll_employee(uid):
         all_positions = _JP2.query.filter_by(active=True).order_by(_JP2.sort, _JP2.name).all()
     except Exception:
         all_depts, all_positions = [], []
+    # v12.394 P-068 Κομμάτι 2 Φ3β (#1) — ιστορικό ανάθεσης ξενοδοχείου (χρέωση), editable
+    try:
+        from schedule import UserHotelPeriod as _UHP
+        hotel_periods = _UHP.query.filter_by(user_id=uid).order_by(_UHP.date_from.desc()).all()
+    except Exception:
+        hotel_periods = []
+    hotel_name_map = {h.id: h.name for h in Hotel.query.all()}
     return render_template('payroll_employee.html',
+        hotel_periods=hotel_periods, hotel_name_map=hotel_name_map, perr=request.args.get('perr'),
         u=u, prof=prof, pii=pii, comp=comp, hotel=hotel, agreements=agreements, work_history=work_history,
         fin=fin, fin_tot=fin_tot, fin_months=fin_months, month_gr=_MONTH_GR,
         assignments=assignments, events=events, flags=flags,
