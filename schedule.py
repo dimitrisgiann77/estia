@@ -728,18 +728,12 @@ def billing_hotel_id(a, home, pmap):
     return p if p is not None else home
 
 def _charge_wh(uid, board_hid, cache=None):
-    """v12.404 P-071 — «η βάρδια ορίζει το ξενοδοχείο»: αν καταχωρείται σε group-ξενοδοχείο ≠ έδρα
-    → η βάρδια χρεώνεται εκεί (`work_hotel_id=board_hid`). Στην έδρα → None (χρέωση=period/έδρα, ίδιο με πριν).
-    cache: {uid: home} για batch (αποφυγή N+1). Ο rotation guard υπερισχύει μετά."""
-    if not board_hid:
-        return None
-    if cache is not None and uid in cache:
-        home = cache[uid]
-    else:
-        home = getattr(User.query.get(uid), 'home_hotel_id', None)
-        if cache is not None:
-            cache[uid] = home
-    return board_hid if board_hid != home else None
+    """v12.408 P-071 — «η βάρδια αποθηκεύει το ξενοδοχείο που δούλεψε»: ΚΑΘΕ βάρδια-χρήματος
+    κλειδώνει ΠΑΝΩ ΤΗΣ το ξενοδοχείο της γραμμής όπου μπήκε (`work_hotel_id=board_hid`), ΠΑΝΤΑ —
+    ακόμα κι αν = έδρα. Έτσι η χρέωση δεν παρασύρεται ποτέ αναδρομικά (αλλαγή έδρας/period) και
+    ο ίδιος μπορεί να «δουλεύει και στα δύο» ξενοδοχεία τον ίδιο μήνα. (uid/cache: αχρησιμοποίητα πλέον
+    — κρατιούνται για συμβατότητα call-sites.) Ο rotation guard υπερισχύει μετά."""
+    return board_hid or None
 
 def monthly_settlement(year, month, hotel_id=None, split=False):
     """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα.

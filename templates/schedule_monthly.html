@@ -316,7 +316,10 @@ function renderEntries(){
   var add=document.createElement('button'); add.type='button'; add.textContent='+ Προσθήκη βάρδιας'; add.style.cssText='width:100%;border:1px dashed #94a3b8;background:#f8fafc;border-radius:8px;cursor:pointer;padding:7px 10px;font-size:12px;color:#475569;margin-top:2px;'; add.onclick=function(){dayEntries.push({code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]});renderEntries();};
   w.appendChild(add);
 }
-function _bhid(){var c=curSel&&curSel[0];var v=c&&c.getAttribute('data-bhid');return v?parseInt(v,10):null;}  /* v12.401 P-070 Φ1 — ξενοδοχείο batch (rotation/lock/scope) */
+function _bhid(){var c=curSel&&curSel[0];if(!c)return null;   /* v12.408 — ξενοδοχείο γραμμής: data-bhid κελιού → αλλιώς data-hotel της ομάδας-κάρτας (αξιόπιστο) */
+  var v=c.getAttribute('data-bhid');
+  if(!v){var card=c.closest&&c.closest('[data-hotel]');v=card&&card.getAttribute('data-hotel');}
+  return v?parseInt(v,10):null;}
 function saveDay(){
   for(var i=0;i<dayEntries.length;i++){var en=dayEntries[i];
     if(en.code==='ΕΡΓ'||en.code==='ΔΡ'){if(Math.abs(presenceOf(en.segs)-8.5)>0.001){alert('Ο κωδικός '+en.code+' είναι μόνο για 8ω + 30΄ (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}}
@@ -399,21 +402,12 @@ function apFilter(){var q=(document.getElementById('ap-q').value||'').toLowerCas
     d.onclick=(function(uu){return function(){AP_SEL=String(uu.id);apFilter();};})(u);
     box.appendChild(d); n++;}
   if(!n) box.innerHTML='<div class="auitem" style="color:#94a3b8;cursor:default;">— κανένα —</div>';}
-var MONTH_START="{{ year }}-{{ '%02d'|format(month) }}-01";
+// v12.408 — τοποθέτηση = ΜΟΝΟ ανοίγει προσωρινή γραμμή (client-side). ΔΕΝ γράφει περίοδο/έδρα.
+// Η χρέωση κλειδώνει ΑΝΑ ΒΑΡΔΙΑ (work_hotel_id = ξενοδοχείο της γραμμής) → «δουλεύει και στα δύο», χωρίς αναδρομικό παράσυρμα.
 function apAdd(){if(!AP_SEL){alert('Διάλεξε εργαζόμενο.');return;}
   var hid=document.getElementById('ap-h').value; if(!hid){alert('Διάλεξε ξενοδοχείο.');return;}
   var u=null; for(var i=0;i<ALLU.length;i++){if(String(ALLU[i].id)===AP_SEL){u=ALLU[i];break;}}
-  if(!u)return; placeUser(u.id,u.name,hid,u.dept); apClose();}
-// v12.406 — τοποθέτηση = ΓΡΑΦΕΙ ανάθεση (έδρα+περίοδο) → οι βάρδιες χρεώνονται εκεί σταθερά,
-// ανεξάρτητα από ποια γραμμή/κελί πατάς. Μετά εμφανίζω την προσωρινή γραμμή για άμεσο προγραμματισμό.
-function placeUser(uid,name,hid,dept){
-  fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({user_id:uid,hotel_id:parseInt(hid,10),department_id:(dept||null),effective_date:MONTH_START})})
-   .then(function(r){return r.json();}).then(function(j){
-     if(j&&j.ok){ addTempRow(uid,name,hid); }
-     else{ alert((j&&j.msg)||'Δεν αποθηκεύτηκε η τοποθέτηση.'); }
-   }).catch(function(){alert('Σφάλμα δικτύου στην τοποθέτηση.');});
-}
+  if(!u)return; addTempRow(u.id,u.name,hid); apClose();}
 function _tempCell(uid,iso,di,hid){var td=document.createElement('td');td.className='day edit';
   td.setAttribute('data-edit','1');td.setAttribute('data-uid',uid);td.setAttribute('data-date',iso);
   td.setAttribute('data-di',di);td.setAttribute('data-bhid',hid);td.setAttribute('data-home',AHOTELS[hid]||'');
