@@ -114,7 +114,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
   <div id="apop" class="apop" onclick="event.stopPropagation()">
     <h4 id="ap-title">Προσθήκη στο πρόγραμμα</h4>
     <label>Ξενοδοχείο</label>
-    <select id="ap-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select>
+    <select id="ap-h"><option value="">— διάλεξε ξενοδοχείο —</option>{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select>
     <label>Αναζήτηση εργαζόμενου</label>
     <input id="ap-q" placeholder="Πληκτρολόγησε όνομα…" oninput="apFilter()" autocomplete="off">
     <div class="aulist" id="ap-list"></div>
@@ -383,6 +383,7 @@ var AP_SEL=null;
 function apOpen(ev,uid,name){if(ev)ev.stopPropagation();var p=document.getElementById('apop');
   document.getElementById('ap-title').textContent=uid?('Μετακίνηση: '+(name||'')):'Προσθήκη στο πρόγραμμα';
   var q=document.getElementById('ap-q'); q.value=uid?(name||''):''; AP_SEL=uid?String(uid):null;
+  document.getElementById('ap-h').value='';   // v12.407 — πάντα ρητή επιλογή ξενοδοχείου (τέλος το κατά λάθος «πρώτο»)
   apFilter(); p.style.display='block';
   var mw=290,mh=p.offsetHeight||320,x=(ev&&ev.clientX)?ev.clientX:140,y=(ev&&ev.clientY)?ev.clientY:120;
   p.style.left=Math.max(8,Math.min(x,window.innerWidth-mw-10))+'px';
@@ -400,7 +401,7 @@ function apFilter(){var q=(document.getElementById('ap-q').value||'').toLowerCas
   if(!n) box.innerHTML='<div class="auitem" style="color:#94a3b8;cursor:default;">— κανένα —</div>';}
 var MONTH_START="{{ year }}-{{ '%02d'|format(month) }}-01";
 function apAdd(){if(!AP_SEL){alert('Διάλεξε εργαζόμενο.');return;}
-  var hid=document.getElementById('ap-h').value; if(!hid)return;
+  var hid=document.getElementById('ap-h').value; if(!hid){alert('Διάλεξε ξενοδοχείο.');return;}
   var u=null; for(var i=0;i<ALLU.length;i++){if(String(ALLU[i].id)===AP_SEL){u=ALLU[i];break;}}
   if(!u)return; placeUser(u.id,u.name,hid,u.dept); apClose();}
 // v12.406 — τοποθέτηση = ΓΡΑΦΕΙ ανάθεση (έδρα+περίοδο) → οι βάρδιες χρεώνονται εκεί σταθερά,
