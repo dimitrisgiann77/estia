@@ -59,7 +59,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
 .legend .dot{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:middle;}
 .empty-st{text-align:center;color:#64748b;padding:40px;}
 </style></head><body>
-{{ mp.topbar('calendar-stats', 'ΕΣΤΙΑ — Μηνιαία συγκεντρωτική κατάσταση', 'Σύνολα ωρών/ρεπό/εργάσιμων ανά εργαζόμενο & ξενοδοχείο — για μεροκάματα') }}
+{% if not request.args.get('embed') %}{{ mp.topbar('calendar-stats', 'ΕΣΤΙΑ — Μηνιαία συγκεντρωτική κατάσταση', 'Σύνολα ωρών/ρεπό/εργάσιμων ανά εργαζόμενο & ξενοδοχείο — για μεροκάματα') }}{% endif %}
 <div class="container">
 
   <form method="GET" class="card filters" id="ff">
@@ -121,7 +121,6 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
     </div>
   {% else %}
     {# ───────── ΑΝΑΛΥΤΙΚΟ GRID (επεξεργάσιμο) ───────── #}
-    {% if can_edit %}<div class="card" style="font-size:13px;color:#475569;"><i class="ti ti-pencil"></i> Κάνε κλικ σε ένα κελί για να αλλάξεις τη βάρδια. Οι αλλαγές αποθηκεύονται αυτόματα (κλειδωμένες εβδομάδες δεν αλλάζουν).</div>{% endif %}
     {% for g in data.groups %}
       <div class="card">
       <div class="hotelhead">🏨 {{ g.hotel.name if g.hotel else '— (χωρίς ξενοδοχείο)' }}</div>
@@ -136,7 +135,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
               {% set dd = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
                   {% if can_edit %}data-edit="1"{% endif %} data-uid="{{ x.user.id }}" data-date="{{ dh.iso }}"
-                  data-di="{{ dh.d }}" data-wh="{{ dd.wh if dd and dd.wh else '' }}" data-home="{{ g.hotel.name if g.hotel else '' }}" data-entries='{{ dd.entries|tojson if dd else "[]" }}' data-code="{{ dd.code if dd else '' }}" data-segs='{{ dd.segs if dd else "[]" }}'>
+                  data-di="{{ dh.d }}" data-wh="{{ dd.wh if dd and dd.wh else '' }}" data-home="{{ g.hotel.name if g.hotel else '' }}" data-bhid="{{ g.hotel.id if g.hotel else '' }}" data-entries='{{ dd.entries|tojson if dd else "[]" }}' data-code="{{ dd.code if dd else '' }}" data-segs='{{ dd.segs if dd else "[]" }}'>
                 {% if dd %}<span class="mcellwrap">{% for en in dd.entries %}<span class="mchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hours %} · {{ en.hours }}h{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="background:{{ en.color }}26;border:1px solid {{ en.color }}66;">{{ en.code }}{% if en.hotel_short %}<span class="mhb">{{ en.hotel_short }}</span>{% endif %}</span>{% endfor %}</span>{% else %}<span class="cell empty">·</span>{% endif %}
               </td>
             {% endfor %}
@@ -287,6 +286,7 @@ function renderEntries(){
   var add=document.createElement('button'); add.type='button'; add.textContent='+ Προσθήκη βάρδιας'; add.style.cssText='width:100%;border:1px dashed #94a3b8;background:#f8fafc;border-radius:8px;cursor:pointer;padding:7px 10px;font-size:12px;color:#475569;margin-top:2px;'; add.onclick=function(){dayEntries.push({code:'ΕΡΓ',wh:null,segs:[{start:'07:00',end:'15:30'}]});renderEntries();};
   w.appendChild(add);
 }
+function _bhid(){var c=curSel&&curSel[0];var v=c&&c.getAttribute('data-bhid');return v?parseInt(v,10):null;}  /* v12.401 P-070 Φ1 — ξενοδοχείο batch (rotation/lock/scope) */
 function saveDay(){
   for(var i=0;i<dayEntries.length;i++){var en=dayEntries[i];
     if(en.code==='ΕΡΓ'||en.code==='ΔΡ'){if(Math.abs(presenceOf(en.segs)-8.5)>0.001){alert('Ο κωδικός '+en.code+' είναι μόνο για 8ω + 30΄ (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}}
@@ -294,7 +294,7 @@ function saveDay(){
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var entries=dayEntries.map(function(en){return {code:en.code,sent_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});/* v12.390 P-068: πληροφοριακό */
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)estiaSwap('monthwrap','initMonthly');});
+  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:_bhid()})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)estiaSwap('monthwrap','initMonthly');});
 }
 function openEd(){
   var last=curSel[curSel.length-1]; var ed=document.getElementById('editor');
@@ -317,7 +317,7 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,sent_hotel_id:wh})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
+  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,sent_hotel_id:wh,board_hotel_id:_bhid()})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}
@@ -333,7 +333,7 @@ document.addEventListener('keydown',function(e){
   } else if((e.ctrlKey||e.metaKey)&&e.code==='KeyV'&&clip&&curSel.length){
     e.preventDefault();
     var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));estiaSwap('monthwrap','initMonthly');}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
+    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:clip,board_hotel_id:_bhid()})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok){_toast('Επικολλήθηκε σε '+j.done+(j.locked?(' · '+j.locked+' κλειδωμ.'):''));estiaSwap('monthwrap','initMonthly');}else{alert((j&&j.msg)||'Δεν επικολλήθηκε.');}});
   }
 });
 (function(){var ed=document.getElementById('editor'),t=document.getElementById('ed-title'),dx=0,dy=0,drag=false;
