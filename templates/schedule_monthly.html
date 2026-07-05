@@ -92,6 +92,36 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
     </div>
   </form>
 
+  {% if is_admin %}
+  <style>
+    .poolbar{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;overflow-x:auto;white-space:nowrap;}
+    .poollbl{font-size:12px;color:#64748b;font-weight:600;flex-shrink:0;}
+    .poolchip{border:1px solid #2563eb;background:#eff6ff;color:#1e40af;border-radius:20px;padding:3px 10px;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+    .poolchip:hover{background:#dbeafe;}
+    .poolnone{font-size:12px;color:#94a3b8;}
+    .mvpop{display:none;position:fixed;z-index:9999;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);padding:12px;width:220px;}
+    .mvpop .mvt{font-weight:600;font-size:13px;margin-bottom:6px;color:#1e40af;}
+    .mvpop label{font-size:11px;color:#64748b;display:block;margin:6px 0 3px;}
+    .mvpop select,.mvpop input{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:5px 8px;font-size:12.5px;box-sizing:border-box;}
+    .mvbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;}
+    .mvbtns button{border:none;border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer;}
+    .mvcancel{background:#f1f5f9;color:#475569;} .mvgo{background:#2563eb;color:#fff;}
+    .mvmove{border:1px solid #cbd5e1;background:#fff;color:#2563eb;border-radius:6px;font-size:10px;padding:0 5px;cursor:pointer;margin-left:6px;}
+  </style>
+  <div class="poolbar">
+    <span class="poollbl"><i class="ti ti-user-plus"></i> Αταξινόμητοι{% if unplaced %} ({{ unplaced|length }}){% endif %}:</span>
+    {% if unplaced %}{% for u in unplaced %}<span class="poolchip" onclick="mvOpen(event,{{ u.id }},{{ u.full_name|tojson }},0,0)">{{ u.full_name }} <i class="ti ti-plus"></i></span>{% endfor %}
+    {% else %}<span class="poolnone">— όλοι είναι τοποθετημένοι —</span>{% endif %}
+  </div>
+  <div id="mvpop" class="mvpop" onclick="event.stopPropagation()">
+    <div class="mvt" id="mvname">Τοποθέτηση</div>
+    <label>Ξενοδοχείο</label><select id="mv-h">{% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}</select>
+    <label>Τμήμα</label><select id="mv-d"><option value="">—</option>{% for d in depts %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
+    <label>Ισχύει από <span style="color:#94a3b8;">(κενό=σήμερα)</span></label><input type="date" id="mv-dt">
+    <div class="mvbtns"><button class="mvcancel" onclick="mvClose()">Άκυρο</button><button class="mvgo" onclick="mvSave()">Αποθήκευση</button></div>
+  </div>
+  {% endif %}
+
   <div id="monthwrap"><!-- v12.382 P-058 Φ2: fragment swap αντικαθιστά ΜΟΝΟ αυτό -->
   {% if not data.groups %}
     <div class="card empty-st"><i class="ti ti-calendar-off" style="font-size:34px;display:block;margin-bottom:8px;"></i>
@@ -130,7 +160,7 @@ html[data-theme="dark"] .editor{background:#1c2937;border-color:#33475b;}
           <th>Ώρ</th><th>Έξ</th><th>Κυ</th><th>Εργ</th><th>Ρεπ</th><th title="Δουλεμένο ρεπό">ΔΡ</th></tr></thead>
         <tbody>
         {% for x in g.rows %}
-          <tr><td class="name" style="position:sticky;left:0;background:var(--card,#fff);"><div class="nm">{{ x.user.full_name }}</div>{% if x.emp_code or x.afm %}<div class="nmeta">{% if x.emp_code %}<span class="tag {{ 'lock' if x.locked else 'mgmt' }}">#{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</div>{% endif %}</td>
+          <tr><td class="name" style="position:sticky;left:0;background:var(--card,#fff);"><div class="nm">{{ x.user.full_name }}{% if is_admin %}<button class="mvmove" title="Μετακίνηση/ανάθεση" onclick="mvOpen(event,{{ x.user.id }},{{ x.user.full_name|tojson }},{{ g.hotel.id or 0 }},{{ x.user.department_id or 0 }})"><i class="ti ti-arrows-exchange"></i></button>{% endif %}</div>{% if x.emp_code or x.afm %}<div class="nmeta">{% if x.emp_code %}<span class="tag {{ 'lock' if x.locked else 'mgmt' }}">#{{ x.emp_code }}</span>{% endif %}{% if x.afm %}<span class="tag afm">ΑΦΜ {{ x.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for dh in day_hdr %}
               {% set dd = x.days.get(dh.d) %}
               <td class="day {{ 'edit' if can_edit }} {{ 'hol' if dh.hol else ('we' if dh.we) }}"
@@ -344,4 +374,23 @@ document.addEventListener('keydown',function(e){
 })();
 </script>
 {% endif %}
+{% if is_admin %}<script>
+/* v12.403 P-070 Φ3 — pool αταξινόμητων + μετακίνηση κόσμου (καλεί το ΙΔΙΟ org_assign) */
+var MV_UID=null;
+function mvOpen(ev,uid,name,hotel,dept){if(ev)ev.stopPropagation();MV_UID=uid;
+  var p=document.getElementById('mvpop');document.getElementById('mvname').textContent=name||'Τοποθέτηση';
+  var hs=document.getElementById('mv-h'),ds=document.getElementById('mv-d');
+  if(hotel)hs.value=String(hotel); ds.value=dept?String(dept):'';
+  p.style.display='block';
+  var mw=220,mh=p.offsetHeight||260,x=ev?ev.clientX:120,y=ev?ev.clientY:120;
+  p.style.left=Math.max(8,Math.min(x,window.innerWidth-mw-10))+'px';
+  p.style.top=((y+mh>window.innerHeight)?Math.max(8,y-mh):y+8)+'px';}
+function mvClose(){var p=document.getElementById('mvpop');if(p)p.style.display='none';MV_UID=null;}
+function mvSave(){if(!MV_UID)return;
+  var hid=document.getElementById('mv-h').value,did=document.getElementById('mv-d').value,dt=document.getElementById('mv-dt').value;
+  if(!hid){alert('Διάλεξε ξενοδοχείο.');return;}
+  fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:MV_UID,hotel_id:hid,department_id:did,effective_date:dt})})
+    .then(function(r){return r.json();}).then(function(j){if(j&&j.ok){mvClose();location.reload();}else{alert((j&&j.msg)||'Δεν αποθηκεύτηκε.');}}).catch(function(){alert('Σφάλμα δικτύου.');});}
+document.addEventListener('click',mvClose);
+</script>{% endif %}
 </body></html>
