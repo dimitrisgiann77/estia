@@ -361,7 +361,7 @@ def set_hotel_period(user, hotel_id, effective_date, source='orgchart', actor_id
     ed = effective_date
     open_p = (UserHotelPeriod.query
               .filter(UserHotelPeriod.user_id == user.id, UserHotelPeriod.date_to.is_(None))
-              .order_by(UserHotelPeriod.date_from.desc()).first())
+              .order_by(UserHotelPeriod.date_from.desc(), UserHotelPeriod.id.desc()).first())
     if open_p and open_p.hotel_id == hid and open_p.date_from <= ed:
         return False   # ίδιο ξενοδοχείο ήδη ανοιχτό από πριν — καμία αλλαγή
     if open_p and ed <= open_p.date_from:
@@ -677,6 +677,35 @@ def aggregate(assignments, home_hotel_id=None):
             'holidays_worked': hol_worked, 'extra_hours': round(extra, 2),
             'elsewhere_days': elsewhere, 'total_days': work, 'worked_repo': worked_repo}
 
+# ── v12.392 P-068 Κομμάτι 2 Φ2 — ΧΡΕΩΣΗ ανά period(ημ/νία) ─────────────────────
+def _load_period_map(user_ids):
+    """Φορτώνει ΟΛΕΣ τις περιόδους των users μία φορά (perf — αντί ερώτημα ανά βάρδια).
+    {uid: [(date_from, date_to|None, hotel_id), ...] ταξινομημένα ΦΘΙΝΟΥΣΑ κατά date_from}."""
+    pmap = {}
+    ids = list(user_ids or [])
+    if not ids:
+        return pmap
+    for p in (UserHotelPeriod.query
+              .filter(UserHotelPeriod.user_id.in_(ids))
+              .order_by(UserHotelPeriod.date_from.desc(), UserHotelPeriod.id.desc()).all()):  # id = ντετερμινιστικό tie-break (F4)
+        pmap.setdefault(p.user_id, []).append((p.date_from, p.date_to, p.hotel_id))
+    return pmap
+
+def _period_hotel(pmap, uid, d):
+    """Το ξενοδοχείο-period που καλύπτει την ημερομηνία d (ή None). Λίστα φθίνουσα → πρώτο match."""
+    for df, dt, hid in pmap.get(uid, ()):
+        if df <= d and (dt is None or dt >= d):
+            return hid
+    return None
+
+def billing_hotel_id(a, home, pmap):
+    """Ξενοδοχείο ΧΡΕΩΣΗΣ μιας βάρδιας: εκ-περιτροπής (work_hotel_id, guard-set) ΝΙΚΑ →
+    αλλιώς period(ημ/νία βάρδιας) → αλλιώς home (fallback αν λείπει period)."""
+    if is_work_code(a.shift_code) and a.work_hotel_id:
+        return a.work_hotel_id
+    p = _period_hotel(pmap, a.user_id, a.work_date)
+    return p if p is not None else home
+
 def monthly_settlement(year, month, hotel_id=None, split=False):
     """Λίστα «ΠΡΟΣ ΛΟΓΙΣΤΗΡΙΟ» ανά εργαζόμενο για μήνα.
     v12.381 Φ3 — split=True: ΕΚ-ΠΕΡΙΤΡΟΠΗΣ βγαίνει σε μία γραμμή ΑΝΑ ξενοδοχείο-χρέωσης
@@ -697,6 +726,8 @@ def monthly_settlement(year, month, hotel_id=None, split=False):
     except Exception:
         rot_ids = set()
     _hotels = {h.id: h.name for h in Hotel.query.all()}
+    # v12.392 Φ2 — χρέωση ανά period(ημ/νία)· preload μία φορά (μόνο όταν split, δηλ. στο view — ΟΧΙ build_run)
+    pmap = _load_period_map(by_user.keys()) if split else {}
     out = []
     for uid, alist in by_user.items():
         u = User.query.get(uid)
@@ -704,15 +735,16 @@ def monthly_settlement(year, month, hotel_id=None, split=False):
             continue
         home = getattr(u, 'home_hotel_id', None)
         prof = EmploymentProfile.query.filter_by(user_id=uid).first()
-        # Ομαδοποίηση ανά ξεν.-χρέωσης: work→work_hotel (ή home), ρεπό/άδεια→home. Split ΜΟΝΟ αν ζητηθεί + εκ-περιτροπής.
-        if split and uid in rot_ids:
+        # Ομαδοποίηση ανά ξεν.-χρέωσης βάσει period(ημ/νία): εκ-περιτροπής→work_hotel· αλλιώς period· αλλιώς home.
+        # Split ΜΟΝΟ στο view (split=True) — build_run (split=False) μένει μία γραμμή/εργαζόμενο, αμετάβλητη πληρωμή.
+        if split:
             groups = {}
             for a in alist:
-                ch = a.work_hotel_id if (is_work_code(a.shift_code) and a.work_hotel_id) else home
+                ch = billing_hotel_id(a, home, pmap)
                 groups.setdefault(ch, []).append(a)
         else:
             groups = {home: alist}
-        is_split = (split and uid in rot_ids and len(groups) > 1)
+        is_split = (split and len(groups) > 1)
         for ch, sub in groups.items():
             if hotel_id and ch != hotel_id:
                 continue
@@ -3637,10 +3669,14 @@ def _staff_status_rows(year=None, months=None):
                   .filter(ShiftAssignment.user_id.in_(uids),
                           ShiftAssignment.work_date >= start,
                           ShiftAssignment.work_date < end).all())
-    # (uid, work_hotel_id|None, month) -> [assignments]
+    # (uid, ξενοδοχείο-ΧΡΕΩΣΗΣ, month) -> [assignments]
+    # v12.392 Φ2 — η χρέωση ανά βάρδια = period(ημ/νία) (εκ-περιτροπής work_hotel νικά· αλλιώς period· αλλιώς home)
+    _home_by_uid = {r['user'].id: (r.get('hotel_id') or getattr(r['user'], 'home_hotel_id', None)) for r in emp_rows}
+    _pmap = _load_period_map(uids)
     by_uhm = {}
     for a in shifts:
-        by_uhm.setdefault((a.user_id, a.work_hotel_id, a.work_date.month), []).append(a)
+        _bh = billing_hotel_id(a, _home_by_uid.get(a.user_id), _pmap)
+        by_uhm.setdefault((a.user_id, _bh, a.work_date.month), []).append(a)
     # (uid, μήνας) -> {net, gift_xmas, comp_leave, gift_easter, leave_allow, comp_dismiss}
     # Καθαρά Λογιστηρίου (LegalNetImport.net_legal) ανά κατηγορία period_kind.
     SPECIAL_MATCH = [
