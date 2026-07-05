@@ -228,18 +228,21 @@ var SHIFTS={{ shift_types_json|safe }}, COLORS={}; SHIFTS.forEach(function(s){CO
 /* χρωματισμός πλέον ανά τσιπ (mchip) */
 var pickedCode='ΕΡΓ', curSel=[];
 var cells=[];
-var selecting=false, selUid=null, anchorDi=null, ctrlPending=false;
-function rowCells(uid){return cells.filter(function(c){return c.getAttribute('data-uid')===uid;});}
+var selecting=false, selKey=null, anchorDi=null, ctrlPending=false;
+// v12.409 — μοναδική γραμμή = εργαζόμενος × ξενοδοχείο. Ο ίδιος uid σε 2 ξεν. (π.χ. AST + CNT) ΔΕΝ πρέπει
+// να μπερδεύεται σε μία επιλογή (αλλιώς η βάρδια χρεώνεται σε λάθος ξεν.). Κλειδί = uid@bhid.
+function _rowKey(td){return td.getAttribute('data-uid')+'@'+(td.getAttribute('data-bhid')||'');}
+function rowCells(key){return cells.filter(function(c){return _rowKey(c)===key;});}
 function clearSel(){curSel.forEach(function(c){c.classList.remove('sel');});curSel=[];}
-function markRange(uid,a,b){clearSel();var lo=Math.min(a,b),hi=Math.max(a,b);
-  rowCells(uid).forEach(function(c){var di=parseInt(c.getAttribute('data-di'));if(di>=lo&&di<=hi){c.classList.add('sel');curSel.push(c);}});
+function markRange(key,a,b){clearSel();var lo=Math.min(a,b),hi=Math.max(a,b);
+  rowCells(key).forEach(function(c){var di=parseInt(c.getAttribute('data-di'));if(di>=lo&&di<=hi){c.classList.add('sel');curSel.push(c);}});
   curSel.sort(function(p,q){return parseInt(p.getAttribute('data-di'))-parseInt(q.getAttribute('data-di'));});}
 function toggleCell(td){var i=curSel.indexOf(td);if(i>=0){td.classList.remove('sel');curSel.splice(i,1);}else{td.classList.add('sel');curSel.push(td);}}
 function _mCellDown(e){ var td=this;
   if(e.ctrlKey||e.metaKey){e.preventDefault();toggleCell(td);ctrlPending=true;return;}
-  e.preventDefault();selecting=true;selUid=td.getAttribute('data-uid');anchorDi=parseInt(td.getAttribute('data-di'));markRange(selUid,anchorDi,anchorDi);
+  e.preventDefault();selecting=true;selKey=_rowKey(td);anchorDi=parseInt(td.getAttribute('data-di'));markRange(selKey,anchorDi,anchorDi);
 }
-function _mCellEnter(){ var td=this; if(selecting&&td.getAttribute('data-uid')===selUid)markRange(selUid,anchorDi,parseInt(td.getAttribute('data-di'))); }
+function _mCellEnter(){ var td=this; if(selecting&&_rowKey(td)===selKey)markRange(selKey,anchorDi,parseInt(td.getAttribute('data-di'))); }
 // v12.382 P-058 Φ2 — τρέχει στο load ΚΑΙ μετά από κάθε fragment swap (re-bind cells + scroll)
 function initMonthly(){
   cells=Array.prototype.slice.call(document.querySelectorAll('td.edit'));
