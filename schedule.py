@@ -2480,7 +2480,7 @@ def schedule_monthly():
     if is_admin():
         _au = User.query.filter(db.or_(User.is_active == True, User.is_active.is_(None))).order_by(User.full_name).all()
         all_users = [{'id': _u.id, 'name': _u.full_name or _u.username or ('#%d' % _u.id),
-                      'home': _u.home_hotel_id} for _u in _au]
+                      'home': _u.home_hotel_id, 'dept': _u.department_id} for _u in _au]
     hol = {h.hol_date for h in Holiday.query.all()}
     WD = ['Δε', 'Τρ', 'Τε', 'Πε', 'Πα', 'Σα', 'Κυ']
     day_hdr = []

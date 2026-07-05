@@ -398,10 +398,21 @@ function apFilter(){var q=(document.getElementById('ap-q').value||'').toLowerCas
     d.onclick=(function(uu){return function(){AP_SEL=String(uu.id);apFilter();};})(u);
     box.appendChild(d); n++;}
   if(!n) box.innerHTML='<div class="auitem" style="color:#94a3b8;cursor:default;">— κανένα —</div>';}
+var MONTH_START="{{ year }}-{{ '%02d'|format(month) }}-01";
 function apAdd(){if(!AP_SEL){alert('Διάλεξε εργαζόμενο.');return;}
   var hid=document.getElementById('ap-h').value; if(!hid)return;
   var u=null; for(var i=0;i<ALLU.length;i++){if(String(ALLU[i].id)===AP_SEL){u=ALLU[i];break;}}
-  if(!u)return; addTempRow(u.id,u.name,hid); apClose();}
+  if(!u)return; placeUser(u.id,u.name,hid,u.dept); apClose();}
+// v12.406 — τοποθέτηση = ΓΡΑΦΕΙ ανάθεση (έδρα+περίοδο) → οι βάρδιες χρεώνονται εκεί σταθερά,
+// ανεξάρτητα από ποια γραμμή/κελί πατάς. Μετά εμφανίζω την προσωρινή γραμμή για άμεσο προγραμματισμό.
+function placeUser(uid,name,hid,dept){
+  fetch('/dashboard/org/assign',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({user_id:uid,hotel_id:parseInt(hid,10),department_id:(dept||null),effective_date:MONTH_START})})
+   .then(function(r){return r.json();}).then(function(j){
+     if(j&&j.ok){ addTempRow(uid,name,hid); }
+     else{ alert((j&&j.msg)||'Δεν αποθηκεύτηκε η τοποθέτηση.'); }
+   }).catch(function(){alert('Σφάλμα δικτύου στην τοποθέτηση.');});
+}
 function _tempCell(uid,iso,di,hid){var td=document.createElement('td');td.className='day edit';
   td.setAttribute('data-edit','1');td.setAttribute('data-uid',uid);td.setAttribute('data-date',iso);
   td.setAttribute('data-di',di);td.setAttribute('data-bhid',hid);td.setAttribute('data-home',AHOTELS[hid]||'');
