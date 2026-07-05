@@ -1532,6 +1532,22 @@ def schedule_board():
         prev_month=prev_m.month, prev_year=prev_m.year, next_month=nxt.month, next_year=nxt.year)
 
 
+@app.route('/dashboard/schedule/sig')
+def schedule_sig():
+    """v12.397 P-069 Φ3 — ελαφριά «υπογραφή» δεδομένων για auto-refresh (soft indicator).
+    Επιστρέφει count + max(updated_at) των βαρδιών στο εύρος → αν αλλάξει, το board δείχνει «νέες αλλαγές»."""
+    if not _auth():
+        return ('', 401)
+    try:
+        frm = datetime.strptime(request.args['from'], '%Y-%m-%d').date()
+        to = datetime.strptime(request.args['to'], '%Y-%m-%d').date()
+    except Exception:
+        return jsonify(sig='')
+    cnt, mx = (db.session.query(db.func.count(ShiftAssignment.id), db.func.max(ShiftAssignment.updated_at))
+               .filter(ShiftAssignment.work_date >= frm, ShiftAssignment.work_date <= to).one())
+    return jsonify(sig='%s|%s' % (cnt or 0, mx.isoformat() if mx else ''))
+
+
 @app.route('/dashboard/schedule/submit_month', methods=['POST'])
 def schedule_submit_month():
     """v12.213 — Υποβολή ΟΛΟΥ του μήνα: υποβάλλει κάθε εβδομάδα (με δεδομένα) που περνά τους κανόνες."""
