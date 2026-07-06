@@ -157,7 +157,7 @@
       {% for c in sel.categories %}
       <div class="cat" id="cat{{ c.id }}">
         <div class="chead">
-          <h4>{{ ml(c.name_i18n).get('el') or '—' }} {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
+          <h4>{{ mlget(c.name_i18n, 'el') or '—' }} {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
           <details><summary>✎</summary>
             <div class="subform">
               <form method="post" action="/dashboard/piato/category/save">
@@ -178,7 +178,7 @@
         {% for it in c.items %}
         <div class="item-row">
           <div>
-            <span class="t">{{ ml(it.title_i18n).get('el') or '—' }}</span>
+            <span class="t">{{ mlget(it.title_i18n, 'el') or '—' }}</span>
             {% if not it.available %}<span class="badge draft">εξαντλήθηκε</span>{% endif %}
             {% if it.allergens %}<span class="muted"> · {{ it.allergens|length }} αλλεργ.</span>{% endif %}
           </div>
@@ -245,7 +245,7 @@
         {% endfor %}
 
         <details style="margin-top:10px;">
-          <summary>➕ Νέο πιάτο σε «{{ ml(c.name_i18n).get('el') or '—' }}»</summary>
+          <summary>➕ Νέο πιάτο σε «{{ mlget(c.name_i18n, 'el') or '—' }}»</summary>
           <div class="subform">
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="category_id" value="{{ c.id }}">

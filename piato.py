@@ -316,7 +316,8 @@ def piato_admin():
     return render_template('piato_admin.html',
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
-                           allergens=allergens, ml=_ml, base_url=request.host_url.rstrip('/'))
+                           allergens=allergens, ml=_ml, mlget=_ml_get,
+                           base_url=request.host_url.rstrip('/'))
 
 
 # ── OUTLET CRUD ──────────────────────────────────────────────────────────────
