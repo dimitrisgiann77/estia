@@ -330,7 +330,15 @@ function saveDay(){
   }
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
   var entries=dayEntries.map(function(en){return {code:en.code,sent_hotel_id:en.wh,segments:((en.code==='ΕΡΓ'||en.code==='ΕΩ'||en.code==='ΔΡ')?en.segs:[])};});/* v12.390 P-068: πληροφοριακό */
-  fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,entries:entries,board_hotel_id:_bhid()})}).then(function(r){return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j&&j.ok)estiaSwap('monthwrap','initMonthly');});
+  var _body={cells:cells,entries:entries,board_hotel_id:_bhid()};
+  function _post(cf){ if(cf)_body.confirm=true;   // v12.417 — double-booking → επαλήθευση & retry
+    fetch('/dashboard/schedule/paste_cells',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_body)}).then(function(r){return r.json();}).then(function(j){
+      if(j&&j.needs_confirm){ if(confirm(j.msg))_post(true); return; }
+      if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}
+      if(j&&j.ok)estiaSwap('monthwrap','initMonthly');
+    });
+  }
+  _post(false);
 }
 function openEd(){
   var last=curSel[curSel.length-1]; var ed=document.getElementById('editor');
@@ -353,7 +361,15 @@ function apply(code){if(!curSel.length)return;var segs=segsNow();var wh=(documen
   if((code==='ΕΡΓ'||code==='ΔΡ')&&Math.abs(presenceOf(segs)-8.5)>0.001){alert('Ο κωδικός '+code+' είναι μόνο για 8ω + 30΄ διάλειμμα (8,5 παρουσία). Για διαφορετικές ώρες διάλεξε ΕΩ.');return;}
   if(code==='ΕΩ'&&!segs.length){alert('Ο κωδικός ΕΩ χρειάζεται ώρες.');return;}
   var cells=curSel.map(function(c){return {user_id:c.getAttribute('data-uid'),date:c.getAttribute('data-date')};});
-  fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cells:cells,code:code,segments:segs,sent_hotel_id:wh,board_hotel_id:_bhid()})}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}if(j)estiaSwap('monthwrap','initMonthly');});
+  var _bb={cells:cells,code:code,segments:segs,sent_hotel_id:wh,board_hotel_id:_bhid()};
+  function _postB(cf){ if(cf)_bb.confirm=true;   // v12.417 — double-booking → επαλήθευση & retry
+    fetch('/dashboard/schedule/cells_bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_bb)}).then(function(r){if(r.status===423){alert('Κλειδωμένη εβδομάδα.');return null;}return r.json();}).then(function(j){
+      if(j&&j.needs_confirm){ if(confirm(j.msg))_postB(true); return; }
+      if(j&&j.ok===false){alert(j.msg||'Δεν αποθηκεύτηκε.');return;}
+      if(j)estiaSwap('monthwrap','initMonthly');
+    });
+  }
+  _postB(false);
 }
 function saveCell(){saveDay();}
 function clearCell(){dayEntries=[];saveDay();}

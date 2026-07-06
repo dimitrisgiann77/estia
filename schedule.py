@@ -1978,6 +1978,16 @@ def schedule_cells_bulk():
             return jsonify(ok=False, err='invalid', msg=_msg), 400
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
+    # v12.417 P-073 — double-booking guard: work-βάρδια ενώ υπάρχει ΗΔΗ σε ΑΛΛΟ ξεν. την ίδια μέρα → επαλήθευση
+    if board_hid and code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') and not d.get('confirm'):
+        for uid, wd in pairs:
+            _other = next((a.work_hotel_id for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all()
+                           if is_work_code(a.shift_code) and a.work_hotel_id and a.work_hotel_id != board_hid), None)
+            if _other:
+                _oh = Hotel.query.get(_other); _uu = User.query.get(uid)
+                return jsonify(ok=False, needs_confirm=True,
+                               msg='%s έχει ήδη βάρδια στις %s στο «%s». Θα κρατηθούν ΚΑΙ ΟΙ ΔΥΟ (δουλεύει σε 2 ξενοδοχεία τη μέρα). Σίγουρα;'
+                                   % ((_uu.full_name if _uu else '#%d' % uid), wd.strftime('%d/%m'), (_oh.name if _oh else '#%d' % _other)))
     for uid, wd in pairs:
         if not week_editable(monday_of(wd), user, board_hid):
             locked += 1; continue
@@ -1996,8 +2006,15 @@ def schedule_cells_bulk():
                 _dok, _dmsg = _rotation_can_modify(uid, _ex, board_hid)
                 if not _dok:
                     blocked += 1; _last_msg = _dmsg; continue
-        _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
-        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        _existing = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all()
+        _old = ' / '.join(a.shift_code for a in _existing)
+        # v12.417 P-073 — scoped delete: μόνο βάρδιες ΑΥΤΟΥ του ξεν.· κρατά τυχόν βάρδια άλλου ξεν. (double μετά από confirm)
+        if uid not in _hc:
+            _hc[uid] = getattr(User.query.get(uid), 'home_hotel_id', None)
+        for a in _existing:
+            _belongs = (a.work_hotel_id == board_hid) if a.work_hotel_id else (board_hid is None or _hc[uid] == board_hid)
+            if _belongs:
+                db.session.delete(a)
         if code:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
                 segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=_wh_use,
@@ -2114,6 +2131,20 @@ def schedule_paste_cells():
         norm.append((code, segs, whid, sent))
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched_wp = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
+    # v12.417 P-073 — double-booking guard: work-βάρδια ενώ υπάρχει ΗΔΗ σε ΑΛΛΟ ξεν. την ίδια μέρα → επαλήθευση (πριν οποιαδήποτε εγγραφή)
+    if board_hid and (not d.get('confirm')) and any(c0 in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') for c0, _, _, _ in norm):
+        for c in (d.get('cells') or []):
+            try:
+                _u = int(c['user_id']); _wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
+            except Exception:
+                continue
+            _other = next((a.work_hotel_id for a in ShiftAssignment.query.filter_by(user_id=_u, work_date=_wd).all()
+                           if is_work_code(a.shift_code) and a.work_hotel_id and a.work_hotel_id != board_hid), None)
+            if _other:
+                _oh = Hotel.query.get(_other); _uu = User.query.get(_u)
+                return jsonify(ok=False, needs_confirm=True,
+                               msg='%s έχει ήδη βάρδια στις %s στο «%s». Θα κρατηθούν ΚΑΙ ΟΙ ΔΥΟ (δουλεύει σε 2 ξενοδοχεία τη μέρα). Σίγουρα;'
+                                   % ((_uu.full_name if _uu else '#%d' % _u), _wd.strftime('%d/%m'), (_oh.name if _oh else '#%d' % _other)))
     for c in (d.get('cells') or []):
         try:
             uid = int(c['user_id']); wd = datetime.strptime(c['date'], '%Y-%m-%d').date()
@@ -2135,8 +2166,15 @@ def schedule_paste_cells():
             _entries_use.append((code, segs, whid, sent))
         if _blk:
             blocked += 1; continue
-        _old = ' / '.join(a.shift_code for a in ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all())
-        ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).delete()
+        _existing = ShiftAssignment.query.filter_by(user_id=uid, work_date=wd).all()
+        _old = ' / '.join(a.shift_code for a in _existing)
+        # v12.417 P-073 — διαγράφω ΜΟΝΟ τις βάρδιες ΑΥΤΟΥ του ξενοδοχείου· κρατώ τυχόν βάρδια άλλου ξεν. την ίδια μέρα (double μετά από confirm)
+        if uid not in _hc:
+            _hc[uid] = getattr(User.query.get(uid), 'home_hotel_id', None)
+        for a in _existing:
+            _belongs = (a.work_hotel_id == board_hid) if a.work_hotel_id else (board_hid is None or _hc[uid] == board_hid)
+            if _belongs:
+                db.session.delete(a)
         for code, segs, whid, sent in _entries_use:
             db.session.add(ShiftAssignment(user_id=uid, work_date=wd, shift_code=code,
                 segments=json.dumps(segs, ensure_ascii=False), work_hotel_id=whid,
