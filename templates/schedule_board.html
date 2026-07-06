@@ -230,7 +230,7 @@
         <tbody>
         {% for r in month_block.rows %}
           <tr data-dept="{{ r.user.department_id or '' }}">
-            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
+            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}{% if r.loaned %}<span class="ntag" style="background:#fef3c7;color:#92400e;" title="Δανεικός — έδρα: {{ r.home_hotel }} (χρεώνεται εδώ)"><i class="ti ti-hand-stop" style="font-size:10px;"></i> δανεικός · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for c in r.cells %}
               <td class="{{ 'sun' if month_block.day_hdr[loop.index0].we }}{{ ' today' if month_block.day_hdr[loop.index0].today }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if (c.edit and not c.locked) else '0' }}">{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span><span class="tm">{% if en.segs and en.segs|length %}{% for sg in en.segs %}{% if not loop.first %}<br><span class="segc">{% endif %}{{ sg.start }} - {{ sg.end }}{% if not loop.last %} &{% else %}{% if not loop.first %}</span>{% endif %}{% endif %}{% endfor %}{% elif en.times %}{{ en.times }}{% endif %}</span></span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
             {% endfor %}
@@ -257,7 +257,7 @@
         <tbody>
         {% for r in year_block.rows %}
           <tr data-dept="{{ r.user.department_id or '' }}">
-            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
+            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}{% if r.loaned %}<span class="ntag" style="background:#fef3c7;color:#92400e;" title="Δανεικός — έδρα: {{ r.home_hotel }} (χρεώνεται εδώ)"><i class="ti ti-hand-stop" style="font-size:10px;"></i> δανεικός · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for c in r.cells %}
               <td class="{{ 'sun' if year_block.day_hdr[loop.index0].we }}{{ ' today' if year_block.day_hdr[loop.index0].today }}" style="{{ 'border-left:2px solid #185FA5;' if year_block.day_hdr[loop.index0].mstart }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if (c.edit and not c.locked) else '0' }}">{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span><span class="tm">{% if en.segs and en.segs|length %}{% for sg in en.segs %}{% if not loop.first %}<br><span class="segc">{% endif %}{{ sg.start }} - {{ sg.end }}{% if not loop.last %} &{% else %}{% if not loop.first %}</span>{% endif %}{% endif %}{% endfor %}{% elif en.times %}{{ en.times }}{% endif %}</span></span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
             {% endfor %}
@@ -283,7 +283,7 @@
     </div>
 
     {% for dg in blk.deptgrids %}
-    <div class="deptsec" data-dept="{{ dg.dept.id }}">
+    <div class="deptsec" data-dept="{{ dg.dept.id }}" data-hotel="{{ blk.hotel.id if blk.hotel else (hotel_id or '') }}" data-week="{{ blk.days[0].isoformat() if blk.days else week_start_iso }}">
       <h4><span class="dot" style="background:{{ dg.dept.color }}"></span>{{ dg.dept.name }} <span style="color:#94a3b8;font-weight:400;">({{ dg.rows|length }})</span>{% if dg.supervisor %}<span title="Υπεύθυνος προγράμματος τμήματος" style="margin-left:8px;font-size:11px;font-weight:500;color:#185FA5;"><i class="ti ti-user-star"></i> {{ dg.supervisor }}</span>{% endif %}</h4>
       <div class="gridwrap" style="overflow-x:auto;">
       <table class="grid">
@@ -293,7 +293,7 @@
         <tbody>
         {% for r in dg.rows %}
           <tr>
-            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
+            <td class="name"><div class="nm">{{ r.user.full_name }}</div><div class="nmeta">{{ lock_badge(r.user) }}{% if r.borrowed %}<span class="ntag" style="background:#e0f2fe;color:#0369a1;" title="Εκ περιτροπής — έδρα: {{ r.home_hotel }} (read-only εδώ)">εκ περιτροπής · {{ r.home_hotel }}</span>{% endif %}{% if r.loaned %}<span class="ntag" style="background:#fef3c7;color:#92400e;" title="Δανεικός — έδρα: {{ r.home_hotel }} (χρεώνεται εδώ)"><i class="ti ti-hand-stop" style="font-size:10px;"></i> δανεικός · {{ r.home_hotel }}</span>{% endif %}</div>{% if r.emp_code or r.afm %}<div class="nmeta">{% if r.emp_code %}<span class="ntag idc">#{{ r.emp_code }}</span>{% endif %}{% if r.afm %}<span class="ntag afm">ΑΦΜ {{ r.afm }}</span>{% endif %}</div>{% endif %}</td>
             {% for c in r.cells %}{% set st=shift_lookup.get(c.code) %}
               <td class="{{ 'sun' if loop.index0==6 }}"><div class="cell {{ 'empty' if not c.code }}" data-uid="{{ r.user.id }}" data-date="{{ c.date }}" data-code="{{ c.code }}" data-segs='{{ c.segs|tojson }}' data-wh="{{ c.wh or '' }}" data-home="{{ cur_hotel.name if cur_hotel else '' }}" data-entries='{{ c.entries|tojson }}' data-edit="{{ '1' if (blk.editable and not c.locked) else '0' }}" >{% if c.entries %}{% for en in c.entries %}<span class="shchip" title="{{ en.code }}{% if en.times %} · {{ en.times }}{% endif %}{% if en.hotel %} · {{ en.hotel }}{% endif %}" style="border-left:3px solid {{ en.color }};background:{{ en.color }}1a;"><span class="ctop"><span class="cd">{{ en.code }}</span><span class="tm">{% if en.segs and en.segs|length %}{% for sg in en.segs %}{% if not loop.first %}<br><span class="segc">{% endif %}{{ sg.start }} - {{ sg.end }}{% if not loop.last %} &{% else %}{% if not loop.first %}</span>{% endif %}{% endif %}{% endfor %}{% elif en.times %}{{ en.times }}{% endif %}</span></span>{% if en.hours %}<span class="cmid">{{ en.hours }}h</span>{% endif %}{% if en.hotel_short %}<span class="cbot"><span class="hb">{{ en.hotel_short }}</span></span>{% endif %}</span>{% endfor %}{% else %}<span style="color:#cbd5e1;">+</span>{% endif %}</div></td>
             {% endfor %}
@@ -977,4 +977,93 @@ initBoard();   // v12.382 P-058 — αρχικό bind (τρέχει και με�
   setInterval(function(){fs(function(s){if(s==null)return;if(curSig==null){curSig=s;return;}if(s!==curSig&&!shown)banner(true);});},45000);
 })();
 </script>
+{% if is_admin %}
+<style>
+  #ctxmenu{position:fixed;z-index:10000;background:#fff;border:1px solid #cbd5e1;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:4px;display:none;min-width:190px;}
+  #ctxmenu .ci{display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 10px;border-radius:6px;cursor:pointer;color:#1e293b;white-space:nowrap;}
+  #ctxmenu .ci:hover{background:#f1f5f9;}
+  #ctxmenu .ci i{font-size:16px;color:#185FA5;}
+  .lnpop{position:fixed;z-index:10001;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.24);padding:14px;width:290px;display:none;}
+  .lnpop h4{margin:0 0 8px;font-size:14px;color:#185FA5;}
+  .lnpop label{font-size:11px;color:#64748b;display:block;margin:6px 0 3px;}
+  .lnpop input{width:100%;border:1px solid #cbd5e1;border-radius:7px;padding:6px 8px;font-size:13px;box-sizing:border-box;}
+  #ln-list{max-height:170px;overflow:auto;margin-top:6px;border:1px solid #eef2f7;border-radius:8px;}
+  #ln-list .li{padding:7px 9px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+  #ln-list .li:hover,#ln-list .li.sel{background:#eff6ff;color:#185FA5;}
+  .lnpop .lnbtn{margin-top:10px;width:100%;background:#185FA5;color:#fff;border:none;border-radius:8px;padding:8px;font-size:13px;cursor:pointer;}
+</style>
+<div id="ctxmenu" onclick="event.stopPropagation()">
+  <div class="ci" onclick="ctxLoan()"><i class="ti ti-hand-stop"></i> Δάνεισε άτομο εδώ</div>
+</div>
+<div id="lnpop" class="lnpop" onclick="event.stopPropagation()">
+  <h4><i class="ti ti-hand-stop"></i> Δάνεισε στο <span id="ln-dept">—</span></h4>
+  <input id="ln-q" placeholder="Πληκτρολόγησε όνομα…" oninput="lnFilter()" autocomplete="off">
+  <div id="ln-list"></div>
+  <div style="display:flex;gap:8px;">
+    <div style="flex:1;"><label>Από</label><input type="date" id="ln-from"></div>
+    <div style="flex:1;"><label>Έως (προαιρετικό)</label><input type="date" id="ln-to"></div>
+  </div>
+  <button type="button" class="lnbtn" onclick="lnAdd()">Δάνεισε</button>
+</div>
+<script>
+(function(){
+  var ALLU={{ all_users|tojson }}, DN={{ dept_names|tojson }}, HN={{ hotel_names|tojson }};
+  var CTX={hid:'',did:'',week:''}, SEL=null;
+  function hideCtx(){document.getElementById('ctxmenu').style.display='none';}
+  function popClose(){document.getElementById('lnpop').style.display='none';}
+  document.addEventListener('contextmenu',function(e){
+    var h=e.target.closest&&e.target.closest('.deptsec h4'); if(!h)return;
+    var sec=h.closest('.deptsec'); if(!sec)return;
+    e.preventDefault();
+    CTX.hid=sec.getAttribute('data-hotel')||'{{ hotel_id or "" }}';
+    CTX.did=sec.getAttribute('data-dept')||'';
+    CTX.week=sec.getAttribute('data-week')||'{{ week_start_iso }}';
+    var m=document.getElementById('ctxmenu'); m.style.display='block';
+    var mw=200,mh=m.offsetHeight||50;
+    m.style.left=Math.min(e.clientX,window.innerWidth-mw-8)+'px';
+    m.style.top=Math.min(e.clientY,window.innerHeight-mh-8)+'px';
+  });
+  document.addEventListener('click',function(e){
+    hideCtx();
+    var p=document.getElementById('lnpop'); if(p.style.display==='block'&&!p.contains(e.target))popClose();
+  });
+  window.ctxLoan=function(){
+    hideCtx();
+    if(!CTX.hid){alert('Δεν βρέθηκε ξενοδοχείο για αυτό το τμήμα.');return;}
+    document.getElementById('ln-dept').textContent=(DN[CTX.did]||'τμήμα')+' · '+(HN[CTX.hid]||'');
+    document.getElementById('ln-q').value=''; SEL=null;
+    document.getElementById('ln-from').value=CTX.week; document.getElementById('ln-to').value='';
+    lnFilter();
+    var p=document.getElementById('lnpop'); p.style.display='block';
+    p.style.left=Math.max(8,(window.innerWidth-290)/2)+'px'; p.style.top='90px';
+    setTimeout(function(){document.getElementById('ln-q').focus();},30);
+  };
+  window.lnFilter=function(){
+    var q=(document.getElementById('ln-q').value||'').toLowerCase().trim();
+    var box=document.getElementById('ln-list'); box.innerHTML=''; var n=0;
+    for(var i=0;i<ALLU.length&&n<40;i++){var u=ALLU[i];
+      if(String(u.home)===String(CTX.hid))continue;   // ήδη έδρα εδώ → δεν δανείζεται
+      if(q&&(u.name||'').toLowerCase().indexOf(q)<0)continue;
+      var d=document.createElement('div'); d.className='li'+(SEL===String(u.id)?' sel':'');
+      d.textContent=u.name;
+      d.onclick=(function(uu){return function(){SEL=String(uu.id);lnFilter();};})(u);
+      box.appendChild(d); n++;
+    }
+    if(!n)box.innerHTML='<div class="li" style="color:#94a3b8;cursor:default;">— κανένα —</div>';
+  };
+  window.lnAdd=function(){
+    if(!SEL){alert('Διάλεξε εργαζόμενο.');return;}
+    var body={user_id:parseInt(SEL,10),hotel_id:parseInt(CTX.hid,10),
+              dept_id:(CTX.did?parseInt(CTX.did,10):null),
+              date_from:document.getElementById('ln-from').value||CTX.week,
+              date_to:document.getElementById('ln-to').value||null};
+    fetch('/dashboard/schedule/loan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+     .then(function(r){return r.json();}).then(function(j){
+       if(j&&j.ok){popClose();if(typeof refreshBoard==='function'){refreshBoard();}else{location.reload();}}
+       else{alert((j&&j.msg)||'Δεν αποθηκεύτηκε ο δανεισμός.');}
+     }).catch(function(){alert('Σφάλμα δικτύου στον δανεισμό.');});
+  };
+})();
+</script>
+{% endif %}
 </body></html>

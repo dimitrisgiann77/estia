@@ -226,6 +226,20 @@ class UserHotelPeriod(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+class HotelLoan(db.Model):
+    """v12.411 P-073 — ΔΑΝΕΙΣΜΟΣ εργαζόμενου σε ξενοδοχείο/τμήμα ≠ έδρα, AD-HOC για ένα διάστημα.
+    ΔΕΝ αλλάζει έδρα (home_hotel_id μένει)· ΔΕΝ είναι εκ-περιτροπής (RotationShare=κανόνας/ρυθμός)·
+    ΔΕΝ είναι sent_hotel (=σημείωση που δεν χρεώνει). Ο δανεικός εμφανίζεται & ΕΠΕΞΕΡΓΑΖΕΤΑΙ στο board
+    προορισμού· η χρέωση κάθε βάρδιας κλειδώνει σε work_hotel_id (per shift). date_to=NULL = ανοιχτός."""
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    hotel_id   = db.Column(db.Integer, db.ForeignKey('hotel.id'), nullable=False, index=True)
+    dept_id    = db.Column(db.Integer, db.ForeignKey('department.id'), index=True)  # τμήμα προορισμού (nullable)
+    date_from  = db.Column(db.Date, nullable=False, index=True)
+    date_to    = db.Column(db.Date, index=True)            # NULL = ανοιχτός δανεισμός
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
 class Holiday(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     hol_date    = db.Column(db.Date, unique=True, nullable=False)
@@ -1233,6 +1247,16 @@ def _dept_users(hotel_id, dept_id, d_from=None, d_to=None):
         q = q.filter(User.department_id == dept_id)
     return q.order_by(User.full_name).all()
 
+def loaned_user_ids(hotel_id, dept_id, d_from, d_to):
+    """v12.411 P-073 — user_ids ΔΑΝΕΙΚΩΝ στο (hotel[, dept]) που ο δανεισμός επικαλύπτει [d_from,d_to]."""
+    from sqlalchemy import or_ as _or
+    q = HotelLoan.query.filter(HotelLoan.hotel_id == hotel_id,
+                               HotelLoan.date_from <= d_to,
+                               _or(HotelLoan.date_to.is_(None), HotelLoan.date_to >= d_from))
+    if dept_id:
+        q = q.filter(HotelLoan.dept_id == dept_id)
+    return {r.user_id for r in q.all()}
+
 def week_grid(hotel_id, dept_id, week_start):
     return _grid_for_days(hotel_id, dept_id, [week_start + timedelta(days=i) for i in range(7)])
 
@@ -1260,6 +1284,20 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                     users = sorted(users, key=lambda x: x.full_name or '')
         except Exception:
             borrowed_ids = set(); rot_ids = set()
+    # v12.411 P-073 — ΔΑΝΕΙΚΟΙ σε αυτό το (ξεν., τμήμα, εύρος) → ΕΠΕΞΕΡΓΑΣΙΜΕΣ γραμμές (όχι read-only όπως rotation)
+    loaned_ids = set()
+    if hotel_id:
+        try:
+            loaned_ids = loaned_user_ids(hotel_id, dept_id, days[0], days[-1])
+            if loaned_ids:
+                have = {u.id for u in users}
+                extra = [lu for lu in loaned_ids if lu not in have]
+                if extra:
+                    for lu in User.query.filter(User.is_active == True, User.id.in_(extra)).all():
+                        users.append(lu)
+                    users = sorted(users, key=lambda x: x.full_name or '')
+        except Exception:
+            loaned_ids = set()
     uids = [u.id for u in users]
     amap = {}
     if uids:
@@ -1280,11 +1318,14 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
     rows = []
     for u in users:
         _is_rot = (u.id in rot_ids) or (u.id in borrowed_ids)   # v12.379 Φ2β
+        _loaned = u.id in loaned_ids   # v12.411 P-073 — δανεικός εδώ (editable)
         _uhome = getattr(u, 'home_hotel_id', None)
         cells = []
         wk_hours = 0.0; wk_extra = 0.0; repo = 0; work_days = 0
         for d in days:
             alist = amap.get((u.id, d.isoformat())) or []
+            if _loaned:   # v12.411 — ο δανεικός δείχνει ΜΟΝΟ τις βάρδιες που χρεώνονται σε ΑΥΤΟ το ξεν. (όχι της έδρας του)
+                alist = [a for a in alist if a.work_hotel_id == hotel_id]
             if alist:
                 day_hours = 0.0; day_extra = 0.0; day_work = False; day_repo = False
                 labels = []; first = alist[0]
@@ -1336,12 +1377,13 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
                               'locked': False})
         _m = _meta.get(u.id) or {}
         _borrowed = u.id in borrowed_ids
+        _loaned = u.id in loaned_ids   # v12.411 P-073
         _rotational = (u.id in rot_ids) or _borrowed
         rows.append({'user': u, 'cells': cells, 'wk_hours': round(wk_hours, 1), 'wk_extra': round(wk_extra, 1), 'repo': repo, 'work_days': work_days,
                      'emp_code': _m.get('emp_code'), 'afm': _m.get('afm'), 'locked': _m.get('locked', False),
-                     'rotational': _rotational, 'borrowed': _borrowed,  # v12.378 Φ2a
-                     'home_hotel': (_hotels.get(getattr(u, 'home_hotel_id', None)) if _borrowed else None),
-                     'readonly': _borrowed})
+                     'rotational': _rotational, 'borrowed': _borrowed, 'loaned': _loaned,  # v12.378 Φ2a · v12.411 P-073
+                     'home_hotel': (_hotels.get(getattr(u, 'home_hotel_id', None)) if (_borrowed or _loaned) else None),
+                     'readonly': _borrowed})   # δανεικός = ΕΠΕΞΕΡΓΑΣΙΜΟΣ (όχι readonly)
     return days, rows
 
 def validate_hotel_week(hotel_id, week_start):
@@ -1532,9 +1574,13 @@ def schedule_board():
     _all_depts = Department.query.filter_by(active=True).order_by(Department.sort, Department.name).all()
     _hotel_names = {h.id: h.name for h in Hotel.query.all()}
     _dept_names = {d.id: d.name for d in _all_depts}
+    # v12.411 P-073 — λίστα προσωπικού για την αναζήτηση στο δεξί-κλικ «Δάνεισε»
+    _all_users = [{'id': _u.id, 'name': _u.full_name or _u.username or ('#%d' % _u.id),
+                   'home': _u.home_hotel_id, 'dept': _u.department_id}
+                  for _u in User.query.filter(User.is_active == True).order_by(User.full_name).all()]
     return render_template('schedule_board.html',
         shift_lookup=shift_lookup, shift_types_json=shift_types_json, all_depts=_all_depts, all_mode=_all_mode,
-        hotel_names=_hotel_names, dept_names=_dept_names,
+        hotel_names=_hotel_names, dept_names=_dept_names, all_users=_all_users,
         hotels=hotels, hotel_id=hotel_id, cur_hotel=cur_hotel, dept_list=dept_list,
         weekdays=WEEKDAYS_EL, shift_types=shift_types, blocks=blocks, weeks=weeks, horizon=horizon,
         week_start=week_start, week_start_iso=week_start.isoformat(),
@@ -1732,6 +1778,65 @@ def _rotation_can_modify(uid, a, board_hotel_id):
             return (False, 'Τα ρεπό/άδειες του εκ περιτροπής ορίζονται από την έδρα.')
     return (True, '')
 
+
+@app.route('/dashboard/schedule/loan', methods=['POST'])
+def schedule_loan():
+    """v12.411 P-073 — ΔΑΝΕΙΣΜΟΣ εργαζόμενου σε ξενοδοχείο/τμήμα (ad-hoc, ΔΕΝ αλλάζει έδρα)."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    user = current_user()
+    d = request.json or {}
+    try:
+        uid = int(d['user_id']); hid = int(d['hotel_id'])
+    except Exception:
+        return jsonify(ok=False, err='bad'), 400
+    did = d.get('dept_id'); did = int(did) if did else None
+    def _pd(s):
+        try:
+            return datetime.strptime(s, '%Y-%m-%d').date()
+        except Exception:
+            return None
+    d_from = _pd(d.get('date_from')) or date.today()
+    d_to = _pd(d.get('date_to'))   # None = ανοιχτός δανεισμός
+    u = User.query.get(uid)
+    if not u:
+        return jsonify(ok=False, err='not found'), 404
+    if u.home_hotel_id == hid:
+        return jsonify(ok=False, msg='Ο εργαζόμενος έχει ήδη έδρα εδώ — δεν χρειάζεται δανεισμός.'), 400
+    ex = (HotelLoan.query.filter_by(user_id=uid, hotel_id=hid, dept_id=did)
+          .filter(HotelLoan.date_to.is_(None)).first())
+    if ex:
+        return jsonify(ok=True, id=ex.id, dup=True)
+    ln = HotelLoan(user_id=uid, hotel_id=hid, dept_id=did, date_from=d_from, date_to=d_to,
+                   created_by=(user.id if user else None))
+    db.session.add(ln); db.session.commit()
+    log_activity('loan', '#%d δανεικός -> hotel=%s dept=%s @%s' % (uid, hid, did, d_from), hotel_id=hid)
+    return jsonify(ok=True, id=ln.id)
+
+@app.route('/dashboard/schedule/loan/delete', methods=['POST'])
+def schedule_loan_delete():
+    """v12.411 P-073 — αφαίρεση δανεισμού· ΜΟΝΟ αν δεν έχει βάρδιες χρεωμένες εδώ."""
+    if not _auth():
+        return ('', 401)
+    if not can_edit_schedule():
+        return jsonify(ok=False, err='forbidden'), 403
+    d = request.json or {}
+    try:
+        uid = int(d['user_id']); hid = int(d['hotel_id'])
+    except Exception:
+        return jsonify(ok=False, err='bad'), 400
+    cnt = ShiftAssignment.query.filter_by(user_id=uid, work_hotel_id=hid).count()
+    if cnt:
+        return jsonify(ok=False, msg='Έχει %d βάρδιες εδώ — καθάρισέ τες πρώτα.' % cnt), 400
+    q = HotelLoan.query.filter_by(user_id=uid, hotel_id=hid)
+    did = d.get('dept_id')
+    if did:
+        q = q.filter_by(dept_id=int(did))
+    n = q.delete(); db.session.commit()
+    log_activity('loan_delete', '#%d δανεισμός αφαιρέθηκε (hotel=%s)' % (uid, hid), hotel_id=hid)
+    return jsonify(ok=True, n=n)
 
 @app.route('/dashboard/schedule/cell', methods=['POST'])
 def schedule_cell():
