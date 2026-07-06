@@ -741,6 +741,15 @@ def billing_hotel_id(a, home, pmap):
     p = _period_hotel(pmap, a.user_id, a.work_date)
     return p if p is not None else home
 
+def _display_hotel_id(a, home, pmap):
+    """v12.416 P-073 — ξενοδοχείο ΕΜΦΑΝΙΣΗΣ/ομαδοποίησης (Μηνιαία grid), ΣΥΝΕΠΕΣ με το board:
+    `work_hotel_id` ΓΙΑ ΟΛΟΥΣ τους κωδικούς (και ρεπό/άδειες δανεικής περιόδου) → period → home.
+    ΔΙΑΦΕΡΕΙ από `billing_hotel_id` (=ΧΡΕΩΣΗ, τιμά work_hotel μόνο για work/extra) — η μισθοδοσία μένει σωστή."""
+    if a.work_hotel_id:
+        return a.work_hotel_id
+    p = _period_hotel(pmap, a.user_id, a.work_date)
+    return p if p is not None else home
+
 def _charge_wh(uid, board_hid, cache=None):
     """v12.408 P-071 — «η βάρδια αποθηκεύει το ξενοδοχείο που δούλεψε»: ΚΑΘΕ βάρδια-χρήματος
     κλειδώνει ΠΑΝΩ ΤΗΣ το ξενοδοχείο της γραμμής όπου μπήκε (`work_hotel_id=board_hid`), ΠΑΝΤΑ —
@@ -2502,7 +2511,7 @@ def _monthly_rows(year, month, hotel_id=None, dept_id=None):
         # → ο εργαζόμενος εμφανίζεται σε ΚΑΘΕ ξενοδοχείο όπου δούλεψε, με τις βάρδιες εκείνης της περιόδου.
         by_ch = {}
         for a in alist:
-            by_ch.setdefault(billing_hotel_id(a, hh, pmap), []).append(a)
+            by_ch.setdefault(_display_hotel_id(a, hh, pmap), []).append(a)   # v12.416 P-073 — ομαδοποίηση ΕΜΦΑΝΙΣΗΣ (work_hotel για όλους) ΣΥΝΕΠΗΣ με board· χρέωση/payable μένει billing
         for ch, sub in by_ch.items():
             if hotel_id and ch != hotel_id:
                 continue
