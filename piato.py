@@ -37,7 +37,7 @@ OTYPE_LABEL = {k: v for k, v in OUTLET_TYPES}
 # Παλέτες guest μενού (code, label). Πρώτη = προεπιλογή.
 PIATO_PALETTES = [('olive', 'Olive & Brass'), ('charcoal', 'Charcoal & Gold'),
                   ('oxblood', 'Oxblood & Copper'), ('pine', 'Pine & Champagne'),
-                  ('ink', 'Ink & Amber'), ('aegean', 'Aegean (φωτεινό)')]
+                  ('ink', 'Ink & Amber'), ('aegean', 'Boho Earth (γήινο/φωτεινό)')]
 PALETTE_CODES = [c for c, _ in PIATO_PALETTES]
 
 # 14 αλλεργιογόνα EU 1169/2011 (code, el, en, emoji)
