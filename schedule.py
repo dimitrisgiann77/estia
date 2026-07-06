@@ -1248,14 +1248,30 @@ def _dept_users(hotel_id, dept_id, d_from=None, d_to=None):
     return q.order_by(User.full_name).all()
 
 def loaned_user_ids(hotel_id, dept_id, d_from, d_to):
-    """v12.411 P-073 — user_ids ΔΑΝΕΙΚΩΝ στο (hotel[, dept]) που ο δανεισμός επικαλύπτει [d_from,d_to]."""
+    """v12.414 P-073 — ΔΑΝΕΙΚΟΙ που ΠΡΕΠΕΙ να φανούν στο [d_from,d_to]:
+    (α) όσοι έχουν βάρδια χρεωμένη εδώ ΜΕΣΑ στο εύρος, Ή (β) φρέσκος δανεισμός (date_from στο εύρος
+    ΚΑΙ ΚΑΜΙΑ βάρδια εδώ ακόμα) → για την αρχική τοποθέτηση.
+    Έτσι ο ανοιχτός δανεισμός ΔΕΝ «κρέμεται» σε μελλοντικά εύρη χωρίς βάρδιες (π.χ. Μάιος κενός)."""
     from sqlalchemy import or_ as _or
     q = HotelLoan.query.filter(HotelLoan.hotel_id == hotel_id,
                                HotelLoan.date_from <= d_to,
                                _or(HotelLoan.date_to.is_(None), HotelLoan.date_to >= d_from))
     if dept_id:
         q = q.filter(HotelLoan.dept_id == dept_id)
-    return {r.user_id for r in q.all()}
+    loans = q.all()
+    if not loans:
+        return set()
+    uids = {l.user_id for l in loans}
+    with_shifts = {a.user_id for a in ShiftAssignment.query.filter(
+                       ShiftAssignment.user_id.in_(uids),
+                       ShiftAssignment.work_hotel_id == hotel_id,
+                       ShiftAssignment.work_date >= d_from,
+                       ShiftAssignment.work_date <= d_to).all()}
+    any_here = {a.user_id for a in ShiftAssignment.query.filter(
+                       ShiftAssignment.user_id.in_(uids),
+                       ShiftAssignment.work_hotel_id == hotel_id).all()}
+    fresh = {l.user_id for l in loans if (d_from <= l.date_from <= d_to) and l.user_id not in any_here}
+    return with_shifts | fresh
 
 def week_grid(hotel_id, dept_id, week_start):
     return _grid_for_days(hotel_id, dept_id, [week_start + timedelta(days=i) for i in range(7)])
