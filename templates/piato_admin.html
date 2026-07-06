@@ -1,0 +1,288 @@
+{% import '_monitoring.html' as mp %}
+<!DOCTYPE html><html lang="el"><head>{{ mp.head('Piato — Ψηφιακό Μενού') }}
+<style>
+  .grid{display:grid;grid-template-columns:290px 1fr;gap:16px;align-items:start;}
+  @media(max-width:820px){.grid{grid-template-columns:1fr;}}
+  .card h3{margin:0 0 10px;font-size:15px;}
+  .muted{color:#64748b;font-size:12px;}
+  .o-list a{display:block;text-decoration:none;color:#1f2937;border:1px solid #eef2f7;
+            border-radius:10px;padding:9px 11px;margin-bottom:7px;}
+  .o-list a.on{border-color:var(--accent,#185FA5);background:#f0f7ff;}
+  .o-list .nm{font-weight:600;font-size:14px;}
+  .badge{display:inline-block;font-size:10px;font-weight:700;border-radius:6px;padding:1px 6px;
+         text-transform:uppercase;vertical-align:middle;}
+  .badge.pub{background:#dcfce7;color:#166534;}
+  .badge.draft{background:#fef3c7;color:#92400e;}
+  label{display:block;font-size:12px;color:#475569;margin:8px 0 3px;font-weight:600;}
+  input[type=text],input[type=number],select,textarea{width:100%;padding:7px 9px;border:1px solid #d7dde5;
+         border-radius:8px;font-size:13px;font-family:inherit;}
+  textarea{min-height:44px;resize:vertical;}
+  .btn{display:inline-block;background:var(--accent,#185FA5);color:#fff;border:none;border-radius:8px;
+       padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;}
+  .btn.sm{padding:5px 10px;font-size:12px;}
+  .btn.gray{background:#64748b;} .btn.green{background:#16a34a;} .btn.red{background:#dc2626;}
+  .btn.ghost{background:#fff;color:var(--accent,#185FA5);border:1px solid var(--accent,#185FA5);}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .cat{border:1px solid #e6ebf1;border-radius:12px;padding:12px;margin-top:12px;}
+  .cat > .chead{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .cat h4{margin:0;font-size:15px;}
+  .item-row{display:flex;justify-content:space-between;gap:8px;align-items:center;
+            border-top:1px solid #f1f5f9;padding:8px 0;}
+  .item-row .t{font-weight:600;font-size:14px;} .item-row .p{color:var(--accent,#185FA5);font-weight:700;}
+  details{margin-top:8px;} summary{cursor:pointer;font-size:12px;color:var(--accent,#185FA5);font-weight:600;}
+  .subform{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:11px;margin-top:8px;}
+  .langbox{border:1px dashed #d7dde5;border-radius:8px;padding:8px;margin-top:4px;}
+  .allg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px;margin-top:4px;}
+  .allg-grid label{display:flex;align-items:center;gap:5px;font-weight:400;margin:0;font-size:12px;cursor:pointer;}
+  .allg-grid input{width:auto;}
+  .link-box{background:#f8fafc;border:1px solid #eef2f7;border-radius:8px;padding:8px 10px;font-size:12px;
+            word-break:break-all;margin-top:6px;}
+  .vm-chip{display:inline-flex;align-items:center;gap:5px;background:#eef2f7;border-radius:8px;
+           padding:2px 4px 2px 9px;font-size:12px;margin:2px 3px 2px 0;}
+  .vm-chip form{display:inline;} .vm-chip button{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;}
+</style></head><body>
+{{ mp.topbar('tools-kitchen-2', 'Piato — Ψηφιακό Μενού', 'Owner-screen: ο F&B υπεύθυνος γράφει το μενού · ο πελάτης το διαβάζει (QR)') }}
+
+{% macro langfields(prefix, data) %}
+  <input type="text" name="{{ prefix }}_el" value="{{ data.get('el','') }}" placeholder="Ελληνικά *">
+  <details><summary>+ άλλες γλώσσες ({{ langs|length - 1 }})</summary>
+    <div class="langbox">
+    {% for code, name in langs if code != 'el' %}
+      <label style="margin-top:4px;">{{ name }}</label>
+      <input type="text" name="{{ prefix }}_{{ code }}" value="{{ data.get(code,'') }}" placeholder="{{ name }}">
+    {% endfor %}
+    </div>
+  </details>
+{% endmacro %}
+
+<div class="container">
+<div class="grid">
+
+  <!-- ΑΡΙΣΤΕΡΑ: λίστα outlets + νέο -->
+  <div>
+    <div class="card">
+      <h3>Σημεία εστίασης</h3>
+      <div class="o-list">
+        {% for o in outlets %}
+          <a href="/dashboard/piato?outlet={{ o.id }}{{ '&embed=1' if request.args.get('embed') else '' }}"
+             class="{{ 'on' if sel and sel.id == o.id else '' }}">
+            <span class="nm">{{ o.name }}</span>
+            <span class="badge {{ 'pub' if o.published else 'draft' }}">{{ 'Δημοσ.' if o.published else 'Draft' }}</span>
+            <div class="muted">{{ hotel_names.get(o.hotel_id,'—') }} · {{ otype_label.get(o.otype, o.otype) }}</div>
+          </a>
+        {% else %}
+          <p class="muted">Κανένα σημείο ακόμη. Δημιούργησε το πρώτο δεξιά.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <h3>➕ Νέο σημείο</h3>
+      <form method="post" action="/dashboard/piato/outlet/save">
+        <label>Ονομασία *</label>
+        <input type="text" name="name" required placeholder="π.χ. Main Restaurant">
+        <label>Ξενοδοχείο *</label>
+        <select name="hotel_id" required>
+          {% for h in hotels %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
+        </select>
+        <label>Τύπος</label>
+        <select name="otype">
+          {% for k, v in otypes %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+        </select>
+        <label>Ωράριο (κείμενο)</label>
+        <input type="text" name="hours" placeholder="π.χ. 12:00–23:00">
+        <div style="margin-top:10px;"><button class="btn" type="submit">Δημιουργία</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ΔΕΞΙΑ: editor επιλεγμένου outlet -->
+  <div>
+  {% if not sel %}
+    <div class="card"><h3>Ψηφιακό Μενού</h3>
+      <p class="muted">Επίλεξε ή δημιούργησε ένα σημείο εστίασης για να διαχειριστείς το μενού του
+      (κατηγορίες, πιάτα, αλλεργιογόνα, πολυγλωσσία), να δεις προεπισκόπηση και να δημοσιεύσεις.</p>
+    </div>
+  {% else %}
+    <!-- Κεφαλίδα outlet + publish + links -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h3 style="margin:0;">{{ sel.name }}
+          <span class="badge {{ 'pub' if sel.published else 'draft' }}">{{ 'Δημοσιευμένο' if sel.published else 'Draft' }}</span>
+        </h3>
+        <div class="row">
+          <a class="btn ghost sm" href="/piato/preview/{{ sel.preview_token }}" target="_blank">👁 Προεπισκόπηση</a>
+          {% if sel.published %}
+            <form method="post" action="/dashboard/piato/outlet/publish">
+              <input type="hidden" name="id" value="{{ sel.id }}"><input type="hidden" name="to" value="0">
+              <button class="btn gray sm" type="submit">Απόσυρση</button></form>
+          {% else %}
+            <form method="post" action="/dashboard/piato/outlet/publish">
+              <input type="hidden" name="id" value="{{ sel.id }}"><input type="hidden" name="to" value="1">
+              <button class="btn green sm" type="submit">Δημοσίευση</button></form>
+          {% endif %}
+        </div>
+      </div>
+      <div class="link-box">
+        <b>Δημόσιο QR link:</b> {{ base_url }}/piato/{{ sel.qr_token }}
+        {% if not sel.published %}<span class="muted"> (ενεργό μόνο μετά τη δημοσίευση)</span>{% endif %}<br>
+        <b>Preview (μυστικό):</b> {{ base_url }}/piato/preview/{{ sel.preview_token }}
+      </div>
+      <details>
+        <summary>Επεξεργασία / διαγραφή σημείου</summary>
+        <div class="subform">
+          <form method="post" action="/dashboard/piato/outlet/save">
+            <input type="hidden" name="id" value="{{ sel.id }}">
+            <label>Ονομασία</label><input type="text" name="name" value="{{ sel.name }}" required>
+            <label>Ξενοδοχείο</label>
+            <select name="hotel_id">{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id == sel.hotel_id else '' }}>{{ h.name }}</option>{% endfor %}</select>
+            <label>Τύπος</label>
+            <select name="otype">{% for k, v in otypes %}<option value="{{ k }}" {{ 'selected' if k == sel.otype else '' }}>{{ v }}</option>{% endfor %}</select>
+            <label>Ωράριο</label><input type="text" name="hours" value="{{ sel.hours }}">
+            <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
+          </form>
+          <form method="post" action="/dashboard/piato/outlet/delete" style="margin-top:8px;"
+                onsubmit="return confirm('Διαγραφή σημείου «{{ sel.name }}» και ΟΛΟΥ του μενού του;');">
+            <input type="hidden" name="id" value="{{ sel.id }}">
+            <button class="btn red sm" type="submit">🗑 Διαγραφή σημείου</button>
+          </form>
+        </div>
+      </details>
+    </div>
+
+    <!-- Κατηγορίες + πιάτα -->
+    <div class="card" style="margin-top:14px;">
+      <h3>Μενού — κατηγορίες & πιάτα</h3>
+
+      {% for c in sel.categories %}
+      <div class="cat" id="cat{{ c.id }}">
+        <div class="chead">
+          <h4>{{ ml(c.name_i18n).get('el') or '—' }} {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
+          <details><summary>✎</summary>
+            <div class="subform">
+              <form method="post" action="/dashboard/piato/category/save">
+                <input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="outlet_id" value="{{ sel.id }}">
+                <label>Όνομα κατηγορίας</label>{{ langfields('cname', ml(c.name_i18n)) }}
+                <label>Ωράριο διαθεσιμότητας</label><input type="text" name="chours" value="{{ c.hours }}" placeholder="π.χ. Πρωινό 07:00–11:00">
+                <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
+              </form>
+              <form method="post" action="/dashboard/piato/category/delete" style="margin-top:8px;"
+                    onsubmit="return confirm('Διαγραφή κατηγορίας και των πιάτων της;');">
+                <input type="hidden" name="id" value="{{ c.id }}">
+                <button class="btn red sm" type="submit">🗑 Διαγραφή κατηγορίας</button>
+              </form>
+            </div>
+          </details>
+        </div>
+
+        {% for it in c.items %}
+        <div class="item-row">
+          <div>
+            <span class="t">{{ ml(it.title_i18n).get('el') or '—' }}</span>
+            {% if not it.available %}<span class="badge draft">εξαντλήθηκε</span>{% endif %}
+            {% if it.allergens %}<span class="muted"> · {{ it.allergens|length }} αλλεργ.</span>{% endif %}
+          </div>
+          <div class="row">
+            <span class="p">€ {{ '%.2f'|format(it.price) }}</span>
+            <form method="post" action="/dashboard/piato/item/available">
+              <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="to" value="{{ '0' if it.available else '1' }}">
+              <button class="btn sm {{ 'gray' if it.available else 'green' }}" type="submit">{{ '86 (εξάντληση)' if it.available else 'Διαθέσιμο' }}</button>
+            </form>
+          </div>
+        </div>
+        <details>
+          <summary>✎ Επεξεργασία πιάτου</summary>
+          <div class="subform">
+            <form method="post" action="/dashboard/piato/item/save">
+              <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="category_id" value="{{ c.id }}">
+              <label>Τίτλος</label>{{ langfields('title', ml(it.title_i18n)) }}
+              <label>Περιγραφή</label>{{ langfields('desc', ml(it.desc_i18n)) }}
+              <div class="row">
+                <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" value="{{ '%.2f'|format(it.price) }}"></div>
+                <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost" value="{{ '%.2f'|format(it.cost) if it.cost is not none else '' }}"></div>
+              </div>
+              <label>Φωτό (URL)</label><input type="text" name="photo_url" value="{{ it.photo_url }}" placeholder="https://…">
+              <label style="font-weight:400;"><input type="checkbox" name="available" value="1" {{ 'checked' if it.available else '' }} style="width:auto;"> Διαθέσιμο</label>
+              <label>Αλλεργιογόνα (EU 1169/2011)</label>
+              <div class="allg-grid">
+                {% set sel_ids = it.allergens|map(attribute='allergen_id')|list %}
+                {% for a in allergens %}
+                  <label><input type="checkbox" name="allergens" value="{{ a.id }}" {{ 'checked' if a.id in sel_ids else '' }}> {{ a.icon }} {{ ml(a.name_i18n).get('el') }}</label>
+                {% endfor %}
+              </div>
+              <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση πιάτου</button></div>
+            </form>
+
+            <!-- variants / modifiers -->
+            <div style="margin-top:10px;">
+              <label>Παραλλαγές</label>
+              {% for v in it.variants %}<span class="vm-chip">{{ ml(v.label_i18n).get('el') }}{% if v.price_delta %} +€{{ '%.2f'|format(v.price_delta) }}{% endif %}
+                <form method="post" action="/dashboard/piato/vm/delete"><input type="hidden" name="kind" value="variant"><input type="hidden" name="id" value="{{ v.id }}"><button type="submit">✕</button></form></span>{% endfor %}
+              <form method="post" action="/dashboard/piato/vm/save" class="row" style="margin-top:5px;">
+                <input type="hidden" name="kind" value="variant"><input type="hidden" name="item_id" value="{{ it.id }}">
+                <input type="text" name="vmlabel_el" placeholder="π.χ. Μεγάλο" style="flex:2;">
+                <input type="text" name="delta" placeholder="+€" style="flex:1;">
+                <button class="btn sm gray" type="submit">+</button>
+              </form>
+              <label style="margin-top:8px;">Extras</label>
+              {% for m in it.modifiers %}<span class="vm-chip">{{ ml(m.label_i18n).get('el') }}{% if m.price_delta %} +€{{ '%.2f'|format(m.price_delta) }}{% endif %}
+                <form method="post" action="/dashboard/piato/vm/delete"><input type="hidden" name="kind" value="modifier"><input type="hidden" name="id" value="{{ m.id }}"><button type="submit">✕</button></form></span>{% endfor %}
+              <form method="post" action="/dashboard/piato/vm/save" class="row" style="margin-top:5px;">
+                <input type="hidden" name="kind" value="modifier"><input type="hidden" name="item_id" value="{{ it.id }}">
+                <input type="text" name="vmlabel_el" placeholder="π.χ. Extra τυρί" style="flex:2;">
+                <input type="text" name="delta" placeholder="+€" style="flex:1;">
+                <button class="btn sm gray" type="submit">+</button>
+              </form>
+            </div>
+
+            <form method="post" action="/dashboard/piato/item/delete" style="margin-top:10px;"
+                  onsubmit="return confirm('Διαγραφή πιάτου;');">
+              <input type="hidden" name="id" value="{{ it.id }}">
+              <button class="btn red sm" type="submit">🗑 Διαγραφή πιάτου</button>
+            </form>
+          </div>
+        </details>
+        {% endfor %}
+
+        <details style="margin-top:10px;">
+          <summary>➕ Νέο πιάτο σε «{{ ml(c.name_i18n).get('el') or '—' }}»</summary>
+          <div class="subform">
+            <form method="post" action="/dashboard/piato/item/save">
+              <input type="hidden" name="category_id" value="{{ c.id }}">
+              <label>Τίτλος</label>{{ langfields('title', {}) }}
+              <label>Περιγραφή</label>{{ langfields('desc', {}) }}
+              <div class="row">
+                <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" placeholder="0.00"></div>
+                <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost"></div>
+              </div>
+              <label>Φωτό (URL)</label><input type="text" name="photo_url" placeholder="https://…">
+              <label style="font-weight:400;"><input type="checkbox" name="available" value="1" checked style="width:auto;"> Διαθέσιμο</label>
+              <label>Αλλεργιογόνα</label>
+              <div class="allg-grid">
+                {% for a in allergens %}<label><input type="checkbox" name="allergens" value="{{ a.id }}"> {{ a.icon }} {{ ml(a.name_i18n).get('el') }}</label>{% endfor %}
+              </div>
+              <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Προσθήκη πιάτου</button></div>
+            </form>
+          </div>
+        </details>
+      </div>
+      {% endfor %}
+
+      <details style="margin-top:14px;">
+        <summary>➕ Νέα κατηγορία</summary>
+        <div class="subform">
+          <form method="post" action="/dashboard/piato/category/save">
+            <input type="hidden" name="outlet_id" value="{{ sel.id }}">
+            <label>Όνομα κατηγορίας</label>{{ langfields('cname', {}) }}
+            <label>Ωράριο διαθεσιμότητας (προαιρ.)</label><input type="text" name="chours" placeholder="π.χ. Πρωινό 07:00–11:00">
+            <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Προσθήκη κατηγορίας</button></div>
+          </form>
+        </div>
+      </details>
+    </div>
+  {% endif %}
+  </div>
+
+</div>
+</div>
+</body></html>

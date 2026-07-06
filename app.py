@@ -362,11 +362,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.418'
-APP_BUILD   = '699'
+APP_VERSION = '12.419'
+APP_BUILD   = '700'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.419', 'b': '700', 'date': '06/07/2026', 'time': '09:15', 'title': 'Piato — Ψηφιακό Μενού (νέο module Εστίασης · Φ1)',
+     'items': ['Νέο αυτόνομο module «Piato» (F&B) για τα 5 ξενοδοχεία: ο πελάτης σκανάρει QR και βλέπει ψηφιακό μενού με φωτό, τιμές, αλλεργιογόνα και πολυγλωσσία — χωρίς εφαρμογή/login.',
+               'Κονσόλα διαχείρισης (μενού «Piato — Ψηφιακό Μενού»): ο υπεύθυνος φτιάχνει σημεία εστίασης (εστιατόριο/μπαρ/pool-bar/room-service), κατηγορίες και πιάτα, με 14 αλλεργιογόνα EU (1169/2011), 7 γλώσσες, παραλλαγές/extras και διακόπτη «εξάντληση» (86’d) ανά πιάτο.',
+               'Προεπισκόπηση πριν τη δημοσίευση: κρυφό preview link δείχνει όλο το look & feel online· το δημόσιο QR ανοίγει ΜΟΝΟ μετά το κουμπί «Δημοσίευση». Ο πελάτης φιλτράρει «κρύψε πιάτα με αλλεργιογόνο» και αλλάζει γλώσσα.',
+               'Φ1 = μόνο μενού. Παραγγελίες/πληρωμές/κρατήσεις/loyalty έρχονται σε επόμενες φάσεις. Σέβεται μία-πηγή-αλήθειας (reuse Ξενοδοχείων/Χρηστών, scoping ανά ξενοδοχείο), καμία αλλαγή στα υπόλοιπα.']},
     {'v': '12.418', 'b': '699', 'date': '06/07/2026', 'time': '08:40', 'title': 'Θωράκιση (subagent review) — το πρόγραμμα δείχνει σωστά τις βάρδιες σε κάθε ξενοδοχείο',
      'items': ['Έλεγχος ασφαλείας βρήκε ότι το πρόγραμμα μπορούσε να κρύψει σπάνιες παλιές βάρδιες (χωρίς αποθηκευμένο ξενοδοχείο, χρεωμένες μέσω ιστορικού ανάθεσης). Τώρα το πρόγραμμα δείχνει τις βάρδιες με την ΙΔΙΑ λογική όπως η Μηνιαία (ξεν. εργασίας → ιστορικό ανάθεσης → έδρα).',
                'Ίδια θωράκιση και στη διαγραφή: δεν σβήνεται βάρδια που ανήκει σε άλλο ξενοδοχείο. Μισθοδοσία επιβεβαιωμένα ανεπηρέαστη.']},
@@ -4957,8 +4962,10 @@ evaluations = _try_import('evaluations')
 console  = _try_import('console')
 rotation = _try_import('rotation')           # v12.377 «εκ περιτροπής» (ΠΡΙΝ init_db: create_all να πιάσει RotationShare)
 measurements = _try_import('measurements')   # Φ1 ενοποίηση μετρήσεων (ΠΡΙΝ init_db: create_all να πιάσει MonitorPeriod)
+piato    = _try_import('piato')              # P-075 module Εστίασης (ΠΡΙΝ init_db: create_all να πιάσει Outlet/MenuItem κ.λπ.)
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
+if piato:    piato.ensure_piato_columns()      # P-075 — auto-migration piato_* + seed 14 EU αλλεργιογόνων
 if evaluations:
     evaluations.ensure_eval_columns()  # auto-migration ΠΡΩΤΑ: eval_template.hotel_id (πριν από οποιοδήποτε query)
     evaluations.ensure_eval_setup()   # seed ΜΟΝΟ του βασικού προτύπου CONDIAN σε ΑΔΕΙΑ βάση (one-time)

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ outlet.name }} — {{ hotel_name }}</title>
+<style>
+  :root{ --bg:#faf8f5; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#ece7e0;
+         --accent:#8a6d3b; --accent2:#b08d57; --danger:#c0392b; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+       font-size:16px;line-height:1.4;padding-bottom:40px;}
+  .wrap{max-width:640px;margin:0 auto;}
+  header{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+         padding:22px 18px 18px;}
+  header .brand{font-size:24px;font-weight:700;letter-spacing:.3px;}
+  header .sub{opacity:.9;font-size:13px;margin-top:2px;}
+  header .hours{opacity:.85;font-size:12px;margin-top:6px;}
+  .preview-banner{background:#fef3c7;color:#92400e;text-align:center;font-size:13px;
+                  font-weight:600;padding:8px 12px;}
+  .langs{display:flex;gap:6px;flex-wrap:wrap;padding:12px 16px 4px;}
+  .langs a{font-size:12px;text-decoration:none;color:var(--muted);border:1px solid var(--line);
+           background:var(--card);border-radius:20px;padding:4px 11px;}
+  .langs a.on{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
+  .filter{padding:8px 16px 4px;}
+  .filter .lbl{font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;
+               justify-content:space-between;align-items:center;}
+  .filter .lbl button{background:none;border:none;color:var(--accent);font-size:12px;
+                      font-weight:600;cursor:pointer;padding:0;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{font-size:12px;border:1px solid var(--line);background:var(--card);border-radius:20px;
+        padding:5px 10px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:4px;}
+  .chip.avoid{background:#fde8e6;border-color:var(--danger);color:var(--danger);
+              text-decoration:line-through;font-weight:600;}
+  section{margin:16px 12px 0;}
+  section h2{font-size:18px;margin:0 0 2px;padding:0 4px;color:var(--accent);
+             border-bottom:2px solid var(--line);padding-bottom:6px;}
+  section .cat-hours{font-size:12px;color:var(--muted);padding:2px 4px 0;}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:12px;margin-top:10px;display:flex;gap:12px;}
+  .item.na{opacity:.5;}
+  .item .thumb{width:74px;height:74px;border-radius:10px;object-fit:cover;flex-shrink:0;
+               background:#f0ece6;}
+  .item .body{flex:1;min-width:0;}
+  .item .row1{display:flex;justify-content:space-between;gap:8px;align-items:baseline;}
+  .item .ttl{font-weight:700;font-size:16px;}
+  .item .price{font-weight:700;color:var(--accent);white-space:nowrap;}
+  .item .desc{font-size:13px;color:var(--muted);margin-top:3px;}
+  .item .na-tag{display:inline-block;background:var(--danger);color:#fff;font-size:10px;
+                font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;
+                vertical-align:middle;text-transform:uppercase;}
+  .vm{font-size:12px;color:var(--muted);margin-top:5px;}
+  .vm b{color:var(--ink);font-weight:600;}
+  .allg{margin-top:6px;font-size:15px;line-height:1;}
+  .allg span{margin-right:3px;}
+  .empty{color:var(--muted);text-align:center;padding:40px 20px;}
+  footer{text-align:center;color:var(--muted);font-size:11px;margin-top:24px;padding:0 16px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  {% if preview %}<div class="preview-banner">👁 Προεπισκόπηση — δεν είναι δημοσιευμένο ακόμη</div>{% endif %}
+  <header>
+    <div class="brand">{{ outlet.name }}</div>
+    <div class="sub">{{ hotel_name }}</div>
+    {% if outlet.hours %}<div class="hours">🕒 {{ outlet.hours }}</div>{% endif %}
+  </header>
+
+  <div class="langs">
+    {% for code, name in langs %}
+      <a href="?lang={{ code }}" class="{{ 'on' if code == lang else '' }}">{{ name }}</a>
+    {% endfor %}
+  </div>
+
+  {% if allergens %}
+  <div class="filter">
+    <div class="lbl"><span>Απόκρυψη πιάτων με αλλεργιογόνα:</span>
+      <button type="button" onclick="clearAllergens()">Καθαρισμός</button></div>
+    <div class="chips" id="allgChips">
+      {% for a in allergens %}
+        <span class="chip" data-code="{{ a.code }}" onclick="toggleAllergen(this)">
+          <span>{{ a.icon }}</span>{{ a.name }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="menu">
+  {% for c in cats %}
+    <section data-cat="{{ c.id }}">
+      <h2>{{ c.name }}</h2>
+      {% if c.hours %}<div class="cat-hours">🕒 {{ c.hours }}</div>{% endif %}
+      {% for it in c.dishes %}
+        <div class="item {{ 'na' if not it.available else '' }}" data-allergens="{{ it.allergen_codes|join(' ') }}">
+          {% if it.photo %}<img class="thumb" src="{{ it.photo }}" alt="" loading="lazy">{% endif %}
+          <div class="body">
+            <div class="row1">
+              <div class="ttl">{{ it.title }}{% if not it.available %}<span class="na-tag">εξαντλήθηκε</span>{% endif %}</div>
+              <div class="price">€ {{ '%.2f'|format(it.price) }}</div>
+            </div>
+            {% if it.desc %}<div class="desc">{{ it.desc }}</div>{% endif %}
+            {% if it.variants %}<div class="vm"><b>Επιλογές:</b>
+              {% for v in it.variants %}{{ v.label }}{% if v.delta %} (+€{{ '%.2f'|format(v.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+            {% if it.modifiers %}<div class="vm"><b>Extra:</b>
+              {% for m in it.modifiers %}{{ m.label }}{% if m.delta %} (+€{{ '%.2f'|format(m.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+            {% if it.allergens %}<div class="allg">{% for a in it.allergens %}<span title="{{ a.name }}">{{ a.icon }}</span>{% endfor %}</div>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  {% else %}
+    <div class="empty">Το μενού ετοιμάζεται…</div>
+  {% endfor %}
+  </div>
+
+  <footer>Powered by Piato · CONDIAN Hotels</footer>
+</div>
+
+<script>
+  var avoid = new Set();
+  function toggleAllergen(el){
+    var code = el.getAttribute('data-code');
+    if(avoid.has(code)){ avoid.delete(code); el.classList.remove('avoid'); }
+    else { avoid.add(code); el.classList.add('avoid'); }
+    applyFilter();
+  }
+  function clearAllergens(){
+    avoid.clear();
+    document.querySelectorAll('#allgChips .chip').forEach(function(c){ c.classList.remove('avoid'); });
+    applyFilter();
+  }
+  function applyFilter(){
+    document.querySelectorAll('#menu .item').forEach(function(it){
+      var codes = (it.getAttribute('data-allergens') || '').split(' ').filter(Boolean);
+      var hit = codes.some(function(c){ return avoid.has(c); });
+      it.style.display = hit ? 'none' : '';
+    });
+    document.querySelectorAll('#menu section').forEach(function(sec){
+      var vis = sec.querySelectorAll('.item:not([style*="none"])').length;
+      sec.style.display = vis ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>

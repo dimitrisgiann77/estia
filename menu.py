@@ -20,6 +20,7 @@ MENU_CATALOG = [
     ('areas_rec',   'Καταγραφή τομέων',       'ti-clipboard-list',   '/areas',                       False),
     ('areas_dash',  'Πίνακας τομέων',         'ti-map-pin',          '/areas/dashboard',             False),
     ('surveys',     'Ερωτηματολόγια',         'ti-clipboard-check',  '/dashboard/surveys',           False),
+    ('piato',       'Piato — Ψηφιακό Μενού',  'ti-tools-kitchen-2',  '/dashboard/piato',             False),
     ('hr_hub',      'Προσωπικό (Κέντρο)',     'ti-layout-dashboard', '/dashboard/hr',                False),
     ('people',      'Διαχείριση προσωπικού',  'ti-users-group',      '/dashboard/people',            False),
     ('org',         'Οργανόγραμμα',           'ti-sitemap',          '/dashboard/org',               False),
@@ -70,6 +71,7 @@ WS_LABEL = {'operations': 'Operations', 'staffhub': 'Staff HUB', 'guestapp': 'Gu
 DEFAULT_LAYOUT = [
     {'ws': 'operations', 'title': 'Συντήρηση', 'items': ['today', 'meas_entry', 'areas_rec', 'fault_submit', 'faults_board', 'records', 'meas_stats', 'areas_dash']},
     {'ws': 'operations', 'title': 'Υποδοχή', 'items': ['surveys']},
+    {'ws': 'operations', 'title': 'Εστίαση (Piato)', 'items': ['piato']},
     {'ws': 'operations', 'title': 'Πρόγραμμα & Αξιολόγηση', 'items': ['sched', 'sched_monthly', 'sched_oversight', 'evals']},
     {'ws': 'operations', 'title': 'Ενημέρωση', 'items': ['search', 'roadmap', 'help', 'feedback']},
     {'ws': 'staffhub', 'title': 'Ο χώρος μου', 'items': ['whatsnew']},
@@ -93,6 +95,7 @@ DEFAULT_META = {
     'meas_stats':     {'ws': ['operations'], 'roles': ['manager']},
     'areas_dash':     {'ws': ['operations'], 'roles': ['manager']},
     'surveys':        {'ws': ['operations'], 'roles': ['manager']},
+    'piato':          {'ws': ['operations'], 'roles': ['manager']},
     'sched':          {'ws': ['operations'], 'roles': ['manager']},
     'sched_monthly':  {'ws': ['operations'], 'roles': ['manager']},
     'sched_oversight':{'ws': ['operations'], 'roles': ['manager']},
