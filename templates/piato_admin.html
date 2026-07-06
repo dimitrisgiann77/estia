@@ -111,6 +111,8 @@
         <input type="text" name="hours" placeholder="π.χ. 12:00–23:00">
         <label>Παλέτα</label>
         <select name="palette">{% for k, v in palettes %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+        <label>Παρουσίαση</label>
+        <select name="layout">{% for k, v in layouts %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
         <div style="margin-top:10px;"><button class="btn" type="submit">Δημιουργία</button></div>
       </form>
     </div>
@@ -161,6 +163,8 @@
             <label>Ωράριο</label><input type="text" name="hours" value="{{ sel.hours }}">
             <label>Χρωματική παλέτα (guest μενού)</label>
             <select name="palette">{% for k, v in palettes %}<option value="{{ k }}" {{ 'selected' if k == sel.palette else '' }}>{{ v }}</option>{% endfor %}</select>
+            <label>Τρόπος παρουσίασης</label>
+            <select name="layout">{% for k, v in layouts %}<option value="{{ k }}" {{ 'selected' if k == sel.layout else '' }}>{{ v }}</option>{% endfor %}</select>
             <label>Υπότιτλος (tagline)</label><input type="text" name="tagline" value="{{ sel.tagline or '' }}" placeholder="π.χ. Mediterranean & Cretan cuisine">
             <label>Φωτό κάρτας/hero (URL)</label><input type="text" name="hero_image" value="{{ sel.hero_image or '' }}" placeholder="https://…">
             <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>

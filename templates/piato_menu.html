@@ -103,6 +103,7 @@
   .root[data-mode="grid"] .price{width:100%;order:3;margin-top:2px;}
   .root[data-mode="grid"] .thumb{display:block;}
   .root[data-mode="spread"][data-device="tablet"] #menu{column-count:2;column-gap:30px;padding:0 6px;}
+  @media(min-width:760px){ .root[data-mode="spread"][data-device="full"] #menu{column-count:2;column-gap:30px;padding:0 6px;} }
   .root[data-mode="spread"] #menu section{break-inside:avoid;}
 
   .foot{text-align:center;padding:32px 24px 40px;border-top:1px solid var(--line);margin-top:12px;}
@@ -117,21 +118,19 @@
 <div class="rvbar">
   <span class="lbl">Προεπισκόπηση</span>
   <div class="seg" id="modeseg">
-    <button class="on" data-m="scroll">Scroll</button><button data-m="tabs">Tabs</button>
     <button data-m="grid">Grid</button><button data-m="spread">Spread</button>
   </div>
   <div class="seg" id="devseg">
     <button data-d="phone">Κινητό</button><button data-d="tablet">Tablet</button><button class="on" data-d="full">Πλήρες</button>
   </div>
   <div class="seg" id="palseg">
-    <button data-p="olive">Olive</button><button data-p="charcoal">Charcoal</button>
-    <button data-p="oxblood">Oxblood</button><button data-p="pine">Pine</button>
-    <button data-p="ink">Ink</button><button data-p="aegean">Boho</button>
+    <button data-p="olive">Olive</button><button data-p="aegean">Boho</button>
+    <button data-p="charcoal">Charcoal</button><button data-p="ink">Ink</button>
   </div>
 </div>
 {% endif %}
 
-<div class="root" data-mode="scroll" data-device="full" id="root">
+<div class="root" data-mode="{{ outlet.layout or 'grid' }}" data-device="full" id="root">
   <header class="hero">
     <div class="eyebrow">{{ hotel_name }}</div>
     <h1 class="title">{{ outlet.name }}</h1>
@@ -192,7 +191,7 @@
 </div>
 
 <script>
-  var root=document.getElementById("root"), mode="scroll";
+  var root=document.getElementById("root"), mode=root.getAttribute("data-mode")||"grid";
   var MASTER={{ allergens|tojson }};
   var present={};
   document.querySelectorAll(".dish").forEach(function(d){
@@ -237,6 +236,7 @@
   var mseg=document.getElementById("modeseg");
   if(mseg){
     mseg.querySelectorAll("button").forEach(function(b){
+      if(b.getAttribute("data-m")===mode) b.classList.add("on");
       b.onclick=function(){
         mseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
         mode=b.getAttribute("data-m");root.setAttribute("data-mode",mode);

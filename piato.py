@@ -34,11 +34,14 @@ OUTLET_TYPES = [('restaurant', 'Εστιατόριο'), ('bar', 'Μπαρ'),
                 ('room_service', 'Room service'), ('cafe', 'Café')]
 OTYPE_LABEL = {k: v for k, v in OUTLET_TYPES}
 
-# Παλέτες guest μενού (code, label). Πρώτη = προεπιλογή.
-PIATO_PALETTES = [('olive', 'Olive & Brass'), ('charcoal', 'Charcoal & Gold'),
-                  ('oxblood', 'Oxblood & Copper'), ('pine', 'Pine & Champagne'),
-                  ('ink', 'Ink & Amber'), ('aegean', 'Boho Earth (γήινο/φωτεινό)')]
+# Παλέτες guest μενού (code, label). Πρώτη = προεπιλογή. (aegean = Boho Earth φωτεινό)
+PIATO_PALETTES = [('olive', 'Olive & Brass'), ('aegean', 'Boho Earth (φωτεινό)'),
+                  ('charcoal', 'Charcoal & Gold'), ('ink', 'Ink & Amber')]
 PALETTE_CODES = [c for c, _ in PIATO_PALETTES]
+
+# Τρόποι παρουσίασης μενού (code, label). Πρώτη = προεπιλογή.
+PIATO_LAYOUTS = [('grid', 'Πλέγμα (κάρτες)'), ('spread', 'Δίστηλο (magazine)')]
+LAYOUT_CODES = [c for c, _ in PIATO_LAYOUTS]
 
 # 14 αλλεργιογόνα EU 1169/2011 (code, el, en, emoji)
 EU_ALLERGENS = [
@@ -71,6 +74,7 @@ class Outlet(db.Model):
     preview_token = db.Column(db.String(36), unique=True, index=True)   # μυστικό (preview)
     published     = db.Column(db.Boolean, default=False)
     palette       = db.Column(db.String(20), default='olive')   # χρωματικό θέμα guest μενού
+    layout        = db.Column(db.String(12), default='grid')     # τρόπος παρουσίασης (grid/spread)
     hero_image    = db.Column(db.String(500), default='')        # φωτό για κάρτα hub / hero
     tagline       = db.Column(db.String(160), default='')        # υπότιτλος (π.χ. «Mediterranean cuisine»)
     sort          = db.Column(db.Integer, default=0)
@@ -164,6 +168,7 @@ def ensure_piato_columns():
             from app import _add_col
             _add_col('piato_item', 'cost', 'cost FLOAT')
             _add_col('piato_outlet', 'palette', "palette VARCHAR(20) DEFAULT 'olive'")
+            _add_col('piato_outlet', 'layout', "layout VARCHAR(12) DEFAULT 'grid'")
             _add_col('piato_outlet', 'hero_image', 'hero_image VARCHAR(500)')
             _add_col('piato_outlet', 'tagline', 'tagline VARCHAR(160)')
         except Exception as e:
@@ -386,7 +391,8 @@ def piato_admin():
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
                            allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
-                           palettes=PIATO_PALETTES, base_url=request.host_url.rstrip('/'))
+                           palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS,
+                           base_url=request.host_url.rstrip('/'))
 
 
 # ── OUTLET CRUD ──────────────────────────────────────────────────────────────
@@ -402,6 +408,9 @@ def piato_outlet_save():
     palette = request.form.get('palette') or 'olive'
     if palette not in PALETTE_CODES:
         palette = 'olive'
+    layout = request.form.get('layout') or 'grid'
+    if layout not in LAYOUT_CODES:
+        layout = 'grid'
     hero = (request.form.get('hero_image') or '').strip()
     tagline = (request.form.get('tagline') or '').strip()
     if not name or hid not in _my_hids():
@@ -409,14 +418,14 @@ def piato_outlet_save():
     if oid:
         o = _outlet_or_403(oid)
         o.name, o.otype, o.hours = name, otype, hours
-        o.palette, o.hero_image, o.tagline = palette, hero, tagline
+        o.palette, o.layout, o.hero_image, o.tagline = palette, layout, hero, tagline
         # hotel_id αλλάζει μόνο αν το νέο είναι στο scope
         if hid in _my_hids():
             o.hotel_id = hid
         log_activity('piato_outlet_edit', name)
     else:
         o = Outlet(hotel_id=hid, name=name, otype=otype, hours=hours,
-                   palette=palette, hero_image=hero, tagline=tagline,
+                   palette=palette, layout=layout, hero_image=hero, tagline=tagline,
                    qr_token=_tok(), preview_token=_tok(), published=False)
         db.session.add(o)
         log_activity('piato_outlet_add', name)
