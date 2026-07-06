@@ -34,6 +34,12 @@ OUTLET_TYPES = [('restaurant', 'Εστιατόριο'), ('bar', 'Μπαρ'),
                 ('room_service', 'Room service'), ('cafe', 'Café')]
 OTYPE_LABEL = {k: v for k, v in OUTLET_TYPES}
 
+# Παλέτες guest μενού (code, label). Πρώτη = προεπιλογή.
+PIATO_PALETTES = [('olive', 'Olive & Brass'), ('charcoal', 'Charcoal & Gold'),
+                  ('oxblood', 'Oxblood & Copper'), ('pine', 'Pine & Champagne'),
+                  ('ink', 'Ink & Amber'), ('aegean', 'Aegean (φωτεινό)')]
+PALETTE_CODES = [c for c, _ in PIATO_PALETTES]
+
 # 14 αλλεργιογόνα EU 1169/2011 (code, el, en, emoji)
 EU_ALLERGENS = [
     ('gluten',      'Γλουτένη (δημητριακά)',   'Cereals containing gluten', '🌾'),
@@ -64,11 +70,26 @@ class Outlet(db.Model):
     qr_token      = db.Column(db.String(36), unique=True, index=True)   # δημόσιο
     preview_token = db.Column(db.String(36), unique=True, index=True)   # μυστικό (preview)
     published     = db.Column(db.Boolean, default=False)
+    palette       = db.Column(db.String(20), default='olive')   # χρωματικό θέμα guest μενού
+    hero_image    = db.Column(db.String(500), default='')        # φωτό για κάρτα hub / hero
+    tagline       = db.Column(db.String(160), default='')        # υπότιτλος (π.χ. «Mediterranean cuisine»)
     sort          = db.Column(db.Integer, default=0)
     created_at    = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     categories    = db.relationship('MenuCategory', backref='outlet',
                                     order_by='MenuCategory.sort', cascade='all, delete-orphan')
+
+class PiatoHotel(db.Model):
+    """Ρυθμίσεις Piato ανά ξενοδοχείο (owner: Piato· FK στο Hotel). Οθόνη-hub υποδοχής."""
+    __tablename__ = 'piato_hotel'
+    id            = db.Column(db.Integer, primary_key=True)
+    hotel_id      = db.Column(db.Integer, db.ForeignKey('hotel.id'), unique=True, index=True, nullable=False)
+    hub_token     = db.Column(db.String(36), unique=True, index=True)   # δημόσιο
+    hub_preview_token = db.Column(db.String(36), unique=True, index=True)  # ομάδα
+    tagline       = db.Column(db.String(200), default='')
+    hero_image    = db.Column(db.String(500), default='')
+    created_at    = db.Column(db.DateTime, default=datetime.now)
+    updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
 class MenuCategory(db.Model):
     __tablename__ = 'piato_category'
@@ -141,8 +162,10 @@ def ensure_piato_columns():
     with app.app_context():
         try:
             from app import _add_col
-            # placeholder forward-compat (μελλοντικές στήλες μπαίνουν εδώ, non-destructive):
             _add_col('piato_item', 'cost', 'cost FLOAT')
+            _add_col('piato_outlet', 'palette', "palette VARCHAR(20) DEFAULT 'olive'")
+            _add_col('piato_outlet', 'hero_image', 'hero_image VARCHAR(500)')
+            _add_col('piato_outlet', 'tagline', 'tagline VARCHAR(160)')
         except Exception as e:
             db.session.rollback(); print('[piato] ensure cols skipped:', e)
         seed_allergens()
@@ -293,6 +316,49 @@ def piato_preview(preview_token):
     return _render_menu(o, preview=True)  # ορατό ανεξαρτήτως published (μυστικό token)
 
 
+# ── HUB (οθόνη υποδοχής ξενοδοχείου → επιλογή outlet) ────────────────────────
+def _hub_for(hotel_id):
+    """get-or-create ρυθμίσεων hub για ξενοδοχείο (owner-screen: admin console)."""
+    hub = PiatoHotel.query.filter_by(hotel_id=hotel_id).first()
+    if not hub:
+        hub = PiatoHotel(hotel_id=hotel_id, hub_token=_tok(), hub_preview_token=_tok())
+        db.session.add(hub); db.session.commit()
+    return hub
+
+def _hub_cards(hotel_id, preview):
+    q = Outlet.query.filter_by(hotel_id=hotel_id)
+    if not preview:
+        q = q.filter_by(published=True)
+    cards = []
+    for o in q.order_by(Outlet.sort, Outlet.name).all():
+        link = ('/piato/preview/' + o.preview_token) if preview else ('/piato/' + o.qr_token)
+        cards.append({'name': o.name, 'otype': o.otype, 'otype_label': OTYPE_LABEL.get(o.otype, o.otype),
+                      'tagline': o.tagline or '', 'hero': o.hero_image or '',
+                      'palette': o.palette or 'olive', 'hours': o.hours or '',
+                      'link': link, 'published': bool(o.published)})
+    return cards
+
+def _render_hub(hub, preview=False):
+    h = Hotel.query.get(hub.hotel_id)
+    return render_template('piato_hub.html', hub=hub, hotel_name=(h.name if h else ''),
+                           cards=_hub_cards(hub.hotel_id, preview),
+                           langs=PIATO_LANGS, lang=_cur_lang(), preview=preview)
+
+@app.route('/piato/h/<hub_token>')
+def piato_hub_public(hub_token):
+    hub = PiatoHotel.query.filter_by(hub_token=hub_token).first()
+    if not hub:
+        abort(404)
+    return _render_hub(hub, preview=False)
+
+@app.route('/piato/h/preview/<token>')
+def piato_hub_preview(token):
+    hub = PiatoHotel.query.filter_by(hub_preview_token=token).first()
+    if not hub:
+        abort(404)
+    return _render_hub(hub, preview=True)
+
+
 # ── ADMIN CONSOLE ────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato')
 def piato_admin():
@@ -313,11 +379,14 @@ def piato_admin():
             sel = None
     hotels = [h for h in allowed_hotels(current_user())]
     allergens = sorted(Allergen.query.all(), key=lambda a: a.sort)
+    # hub links: get-or-create ρυθμίσεις ανά ξενοδοχείο που έχει ≥1 outlet
+    hotels_with_outlets = {o.hotel_id for o in outlets}
+    hubs = {hid: _hub_for(hid) for hid in hotels_with_outlets}
     return render_template('piato_admin.html',
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
-                           allergens=allergens, ml=_ml, mlget=_ml_get,
-                           base_url=request.host_url.rstrip('/'))
+                           allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
+                           palettes=PIATO_PALETTES, base_url=request.host_url.rstrip('/'))
 
 
 # ── OUTLET CRUD ──────────────────────────────────────────────────────────────
@@ -330,17 +399,24 @@ def piato_outlet_save():
     hid = _i(request.form.get('hotel_id'))
     otype = request.form.get('otype') or 'restaurant'
     hours = (request.form.get('hours') or '').strip()
+    palette = request.form.get('palette') or 'olive'
+    if palette not in PALETTE_CODES:
+        palette = 'olive'
+    hero = (request.form.get('hero_image') or '').strip()
+    tagline = (request.form.get('tagline') or '').strip()
     if not name or hid not in _my_hids():
         return redirect(url_for('piato_admin'))
     if oid:
         o = _outlet_or_403(oid)
         o.name, o.otype, o.hours = name, otype, hours
+        o.palette, o.hero_image, o.tagline = palette, hero, tagline
         # hotel_id αλλάζει μόνο αν το νέο είναι στο scope
         if hid in _my_hids():
             o.hotel_id = hid
         log_activity('piato_outlet_edit', name)
     else:
         o = Outlet(hotel_id=hid, name=name, otype=otype, hours=hours,
+                   palette=palette, hero_image=hero, tagline=tagline,
                    qr_token=_tok(), preview_token=_tok(), published=False)
         db.session.add(o)
         log_activity('piato_outlet_add', name)

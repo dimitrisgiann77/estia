@@ -18,6 +18,7 @@
   body[data-pal="oxblood"]{--ground:#180E0F;--panel:#211416;--line:#3A2427;--ink:#EEE0DC;--muted:#A8938E;--accent:#C98A5E;--accent2:#9A6142;--tagfg:#BFA08C;--tagbd:rgba(191,160,140,.32);--hero:#231416;}
   body[data-pal="pine"]{--ground:#0E1512;--panel:#13201B;--line:#26362E;--ink:#E6EADD;--muted:#93A08E;--accent:#D8C79A;--accent2:#9C8A5E;--tagfg:#9FB39A;--tagbd:rgba(159,179,154,.3);--hero:#122019;}
   body[data-pal="ink"]{--ground:#0E1116;--panel:#141922;--line:#263041;--ink:#E4E8EE;--muted:#8E96A6;--accent:#E0A63E;--accent2:#A9781F;--tagfg:#7FA0B0;--tagbd:rgba(127,160,176,.3);--hero:#141B26;}
+  body[data-pal="aegean"]{--ground:#FBFBF9;--panel:#FFFFFF;--line:#E4E7EA;--ink:#1E2A32;--muted:#6E7A82;--accent:#1E6FA8;--accent2:#9DBBCC;--tagfg:#2E7D7D;--tagbd:rgba(46,125,125,.28);--hero:#EAF2F6;}
   html{background:#0D110A;}
   body{min-height:100vh;background:var(--ground);color:var(--ink);font-family:var(--sans);
     -webkit-font-smoothing:antialiased;transition:background .35s,color .35s;}
@@ -111,7 +112,7 @@
   .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:24px;}
 </style>
 </head>
-<body data-pal="olive">
+<body data-pal="{{ outlet.palette or 'olive' }}">
 {% if preview %}
 <div class="rvbar">
   <span class="lbl">Προεπισκόπηση</span>
@@ -123,8 +124,9 @@
     <button data-d="phone">Κινητό</button><button data-d="tablet">Tablet</button><button class="on" data-d="full">Πλήρες</button>
   </div>
   <div class="seg" id="palseg">
-    <button class="on" data-p="olive">Olive</button><button data-p="charcoal">Charcoal</button>
-    <button data-p="oxblood">Oxblood</button><button data-p="pine">Pine</button><button data-p="ink">Ink</button>
+    <button data-p="olive">Olive</button><button data-p="charcoal">Charcoal</button>
+    <button data-p="oxblood">Oxblood</button><button data-p="pine">Pine</button>
+    <button data-p="ink">Ink</button><button data-p="aegean">Aegean</button>
   </div>
 </div>
 {% endif %}
@@ -247,8 +249,9 @@
       b.onclick=function(){dseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
         root.setAttribute("data-device",b.getAttribute("data-d"));};
     });
-    var pseg=document.getElementById("palseg");
+    var pseg=document.getElementById("palseg"), curpal=document.body.getAttribute("data-pal");
     pseg.querySelectorAll("button").forEach(function(b){
+      if(b.getAttribute("data-p")===curpal) b.classList.add("on");
       b.onclick=function(){pseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
         document.body.setAttribute("data-pal",b.getAttribute("data-p"));};
     });
