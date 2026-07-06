@@ -71,13 +71,56 @@ def _i18n(en):
     return json.dumps({'en': en}, ensure_ascii=False) if en else '{}'
 
 
+def _sq(s):
+    """Escape single quote για ασφαλές SQL literal."""
+    return (s or '').replace("'", "''")
+
+
+def emit_sql(hotel_like='asterias'):
+    """Παράγει Postgres DO-block (paste στο Railway Query console). Idempotent, DRAFT.
+    ΠΡΟΫΠΟΘΕΣΗ: έχει γίνει push+deploy το Piato (τα piato_* + 14 αλλεργιογόνα υπάρχουν)."""
+    L = []
+    L.append('-- Piato · Oliva A la carte Restaurant -> Asterias Village Resort (P-075)')
+    L.append('-- Paste ΟΛΟΚΛΗΡΟ στο Railway → Postgres → Query. Τρέξε ΜΕΤΑ το deploy του Piato.')
+    L.append('-- Idempotent (αν υπάρχει ήδη το outlet → καμία αλλαγή). Το μενού μπαίνει DRAFT.')
+    L.append('DO $$')
+    L.append('DECLARE v_hotel int; v_outlet int; v_cat int; v_item int;')
+    L.append('BEGIN')
+    L.append("  SELECT id INTO v_hotel FROM hotel WHERE name ILIKE '%%%s%%' ORDER BY id LIMIT 1;" % _sq(hotel_like))
+    L.append("  IF v_hotel IS NULL THEN RAISE EXCEPTION 'Δεν βρέθηκε ξενοδοχείο (%%)', '%s'; END IF;" % _sq(hotel_like))
+    L.append("  IF EXISTS (SELECT 1 FROM piato_outlet WHERE hotel_id=v_hotel AND name='%s') THEN" % _sq(OUTLET_NAME))
+    L.append("     RAISE NOTICE 'Το outlet υπάρχει ήδη — καμία αλλαγή'; RETURN; END IF;")
+    L.append("  INSERT INTO piato_outlet (hotel_id,name,otype,hours,qr_token,preview_token,published,sort,created_at,updated_at)")
+    L.append("  VALUES (v_hotel,'%s','restaurant','',md5(random()::text||clock_timestamp()::text),md5(random()::text||clock_timestamp()::text||'p'),false,0,now(),now())" % _sq(OUTLET_NAME))
+    L.append("  RETURNING id INTO v_outlet;")
+    for ci, (cat_en, chours, items) in enumerate(MENU, start=1):
+        L.append("  -- %s" % cat_en)
+        L.append("  INSERT INTO piato_category (outlet_id,name_i18n,hours,active,sort,created_at,updated_at)")
+        L.append("  VALUES (v_outlet,'%s','',true,%d,now(),now()) RETURNING id INTO v_cat;" % (_sq(_i18n(cat_en)), ci))
+        for ii, (t_en, price, desc_en, acodes) in enumerate(items, start=1):
+            L.append("  INSERT INTO piato_item (category_id,title_i18n,desc_i18n,price,photo_url,available,sort,created_at,updated_at)")
+            L.append("  VALUES (v_cat,'%s','%s',%.2f,'',true,%d,now(),now()) RETURNING id INTO v_item;"
+                     % (_sq(_i18n(t_en)), _sq(_i18n(desc_en)), price, ii))
+            if acodes:
+                codes = ",".join("'%s'" % c for c in acodes)
+                L.append("  INSERT INTO piato_item_allergen (item_id,allergen_id) SELECT v_item,id FROM piato_allergen WHERE code IN (%s);" % codes)
+    L.append("  RAISE NOTICE 'OK: Oliva φορτώθηκε (DRAFT). Έλεγξε αλλεργιογόνα & δημοσίευσε από την κονσόλα.';")
+    L.append('END $$;')
+    return "\n".join(L)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--hotel', default='asterias')
     ap.add_argument('--rebuild', action='store_true')
     ap.add_argument('--publish', action='store_true')
     ap.add_argument('--create-hotel', action='store_true')
+    ap.add_argument('--emit-sql', action='store_true', help='τύπωσε SQL (paste στο Railway), χωρίς εγγραφή')
     args = ap.parse_args()
+
+    if args.emit_sql:
+        print(emit_sql(args.hotel))
+        return 0
 
     with A.app.app_context():
         # 1) ξενοδοχείο
