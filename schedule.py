@@ -1324,6 +1324,7 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
         except Exception:
             loaned_ids = set()
     uids = [u.id for u in users]
+    _pmap = _load_period_map(uids) if uids else {}   # v12.418 P-073 — period-aware display filter (συνεπές με Μηνιαία)
     amap = {}
     if uids:
         for a in (ShiftAssignment.query
@@ -1349,10 +1350,8 @@ def _grid_for_days(hotel_id, dept_id, days, users=None):
         wk_hours = 0.0; wk_extra = 0.0; repo = 0; work_days = 0
         for d in days:
             alist = amap.get((u.id, d.isoformat())) or []
-            if _loaned:   # v12.411 — ο δανεικός δείχνει ΜΟΝΟ τις βάρδιες που χρεώνονται σε ΑΥΤΟ το ξεν. (όχι της έδρας του)
-                alist = [a for a in alist if a.work_hotel_id == hotel_id]
-            elif not _is_rot and hotel_id:   # v12.415 P-073 — κανονικό μέλος: δείξε μόνο ό,τι «ανήκει εδώ» (work_hotel==ξεν. Ή [None & έδρα==ξεν.]) — όχι δανεικές του σε άλλο ξεν.
-                alist = [a for a in alist if (a.work_hotel_id == hotel_id) or (not a.work_hotel_id and _uhome == hotel_id)]
+            if (not _is_rot) and hotel_id:   # v12.418 P-073 — δείξε μόνο ό,τι «ανήκει εδώ» (period-aware, ίδιο με Μηνιαία): work_hotel → period → home. Καλύπτει δανεικούς & κανονικά μέλη· εκ-περιτροπής εξαιρείται (κρατά per-day lock).
+                alist = [a for a in alist if _display_hotel_id(a, _uhome, _pmap) == hotel_id]
             if alist:
                 day_hours = 0.0; day_extra = 0.0; day_work = False; day_repo = False
                 labels = []; first = alist[0]
@@ -1978,6 +1977,7 @@ def schedule_cells_bulk():
             return jsonify(ok=False, err='invalid', msg=_msg), 400
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
+    _pm = _load_period_map([_u for _u, _w in pairs]) if pairs else {}   # v12.418 — period-aware scoped delete
     # v12.417 P-073 — double-booking guard: work-βάρδια ενώ υπάρχει ΗΔΗ σε ΑΛΛΟ ξεν. την ίδια μέρα → επαλήθευση
     if board_hid and code in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') and not d.get('confirm'):
         for uid, wd in pairs:
@@ -2012,7 +2012,7 @@ def schedule_cells_bulk():
         if uid not in _hc:
             _hc[uid] = getattr(User.query.get(uid), 'home_hotel_id', None)
         for a in _existing:
-            _belongs = (a.work_hotel_id == board_hid) if a.work_hotel_id else (board_hid is None or _hc[uid] == board_hid)
+            _belongs = True if board_hid is None else (_display_hotel_id(a, _hc[uid], _pm) == board_hid)   # v12.418 — period-aware (κρατά βάρδιες που ανήκουν αλλού μέσω work_hotel/period)
             if _belongs:
                 db.session.delete(a)
         if code:
@@ -2131,6 +2131,7 @@ def schedule_paste_cells():
         norm.append((code, segs, whid, sent))
     done = 0; locked = 0; blocked = 0; _last_msg = ''
     touched_wp = set(); _pending = {}; _hc = {}   # v12.404 P-071 — home cache
+    _pm = _load_period_map([int(_c['user_id']) for _c in (d.get('cells') or []) if str(_c.get('user_id', '')).isdigit()])   # v12.418 — period-aware scoped delete
     # v12.417 P-073 — double-booking guard: work-βάρδια ενώ υπάρχει ΗΔΗ σε ΑΛΛΟ ξεν. την ίδια μέρα → επαλήθευση (πριν οποιαδήποτε εγγραφή)
     if board_hid and (not d.get('confirm')) and any(c0 in ('ΕΡΓ', 'ΕΩ', 'ΔΡ') for c0, _, _, _ in norm):
         for c in (d.get('cells') or []):
@@ -2172,7 +2173,7 @@ def schedule_paste_cells():
         if uid not in _hc:
             _hc[uid] = getattr(User.query.get(uid), 'home_hotel_id', None)
         for a in _existing:
-            _belongs = (a.work_hotel_id == board_hid) if a.work_hotel_id else (board_hid is None or _hc[uid] == board_hid)
+            _belongs = True if board_hid is None else (_display_hotel_id(a, _hc[uid], _pm) == board_hid)   # v12.418 — period-aware (κρατά βάρδιες που ανήκουν αλλού μέσω work_hotel/period)
             if _belongs:
                 db.session.delete(a)
         for code, segs, whid, sent in _entries_use:
