@@ -22,13 +22,13 @@
   body{min-height:100vh;background:var(--ground);color:var(--ink);font-family:var(--sans);
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
 
-  .root{max-width:720px;margin:0 auto;background:var(--ground);transition:max-width .3s ease;}
+  .root{max-width:100%;margin:0 auto;position:relative;background:var(--ground);transition:max-width .3s ease;}
   .root[data-device="phone"]{max-width:434px;}
   .root[data-device="tablet"]{max-width:840px;}
 
   /* top action bar: back link + language selector */
-  .topbar{position:sticky;top:0;z-index:22;display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:10px 16px;background:var(--navbar);border-bottom:1px solid var(--line);}
+  .topbar{position:absolute;top:0;left:0;right:0;z-index:22;display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:16px 20px;background:transparent;}
   .back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);
     font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px 6px 9px;border:1px solid var(--line);
     border-radius:999px;background:transparent;transition:color .15s,border-color .15s;max-width:62%;overflow:hidden;
@@ -46,7 +46,7 @@
   .langsel select option{background:var(--panel);color:var(--ink);}
 
   /* hero */
-  .hero{padding:44px 28px 28px;text-align:center;border-bottom:1px solid var(--line);
+  .hero{padding:78px 28px 30px;text-align:center;border-bottom:1px solid var(--line);
     background:radial-gradient(120% 90% at 50% 0%,var(--hero),var(--ground) 74%);}
   .eyebrow{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:500;}
   .title{font-family:var(--serif);font-size:48px;line-height:1;font-weight:600;margin:12px 0 4px;text-wrap:balance;}
@@ -225,8 +225,9 @@
     {% endif %}
     <div class="mk">{{ outlet.name }}</div>
     <div class="fmeta">{{ hotel_name }}<br>Πληροφορίες αλλεργιογόνων διαθέσιμες κατόπιν αιτήματος</div>
-    <div class="pw">Powered by Εστία</div>
-    <div class="pw2">CONDIAN Hotels · © 2026</div>
+    <div class="pw">Powered by Piato</div>
+    <div class="pw2">Εστία © 2026</div>
+    <div class="pw2">CONDIAN Hotels</div>
   </footer>
 </div>
 
