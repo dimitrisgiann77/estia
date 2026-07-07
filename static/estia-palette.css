@@ -40,3 +40,12 @@ html[data-palette] .app-header{box-shadow:inset 0 -2px 0 var(--accent);}
 /* accent στα ενεργά tabs/περιόδους κοινών σελίδων */
 html[data-palette] .period-btn.active,
 html[data-palette] .period-btn.pool.active{border-bottom-color:var(--accent)!important;color:var(--brand)!important;}
+
+/* v12.437 — ΕΝΙΑΙΟ «κουμπί AI»: outline στο brand σκούρο πετρόλ CONDIAN (#193847) + sparkle icon· ίδιο παντού */
+.ai-btn{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#193847;
+  border:1px solid #193847;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:inherit;line-height:1.35;transition:background .15s,color .15s,box-shadow .15s;}
+.ai-btn:hover{background:#193847;color:#fff;box-shadow:0 2px 8px rgba(25,56,71,.25);}
+.ai-btn:active{transform:scale(.98);}
+.ai-btn:disabled{opacity:.5;cursor:default;}
+.ai-btn.sm{padding:3px 10px;font-size:11px;}
