@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Σοφία — Εστία · CONDIAN HOTELS</title>
+<title>Sophia — Εστία · CONDIAN HOTELS</title>
 <meta name="theme-color" content="#193847">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
@@ -28,6 +28,7 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
 .composer button { background:#193847; color:white; border:none; border-radius:10px; width:48px; font-size:20px; cursor:pointer; }
 .composer button:disabled { background:#9bbcc6; }
 .welcome { text-align:center; color:#7a98a3; font-size:13px; margin-top:30px; padding:0 20px; }
+.filter-label { font-size:12px; color:#7a98a3; margin-bottom:6px; display:flex; align-items:center; gap:5px; }
 </style>
 <style>:root{--brand:{{ theme.primary }};--accent:{{ theme.accent }};}
 .app-header,.app-header.pool,.topbar{background:var(--brand)!important;}
@@ -43,7 +44,7 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
     <a href="/pools" style="color:white;text-decoration:none;margin-right:6px;"><i class="ti ti-arrow-left" style="font-size:20px;"></i></a>
     <img src="/static/img/logo-white.svg" alt="CONDIAN" class="header-icon" style="height:26px;width:auto;">
     <div>
-      <div class="header-title">Σοφία</div>
+      <div class="header-title">Sophia</div>
       <div class="header-sub">Εστία — CONDIAN HOTELS</div>
     </div>
   </div>
@@ -55,6 +56,7 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
 </header>
 
 <div class="asst-tools">
+  <div class="filter-label"><i class="ti ti-filter"></i> Προαιρετικό — επίλεξε πισίνα μόνο για ερωτήσεις χημείας νερού:</div>
   <div class="row">
     <select id="hotel-select" class="select-field" onchange="onHotelChange()"></select>
     <select id="pool-select" class="select-field"></select>
@@ -62,7 +64,7 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
   {% if not configured %}
   <div class="notice">
     <i class="ti ti-alert-triangle" style="flex-shrink:0;"></i>
-    <span>Η Σοφία δεν έχει ρυθμιστεί ακόμα. Πρόσθεσε ένα <b>ANTHROPIC_API_KEY</b> ή <b>OPENAI_API_KEY</b> στις μεταβλητές του Railway για να ενεργοποιηθεί.</span>
+    <span>Η Sophia δεν έχει ρυθμιστεί ακόμα. Πρόσθεσε ένα <b>ANTHROPIC_API_KEY</b> ή <b>OPENAI_API_KEY</b> στις μεταβλητές του Railway για να ενεργοποιηθεί.</span>
   </div>
   {% endif %}
 </div>
@@ -70,15 +72,15 @@ body { display:flex; flex-direction:column; height:100vh; max-width:560px; }
 <div class="chat" id="chat">
   <div class="welcome" id="welcome">
     <i class="ti ti-message-chatbot" style="font-size:34px;"></i>
-    <p style="margin-top:10px;">Είμαι η Σοφία. Διάλεξε πισίνα (προαιρετικά) και ρώτησέ με για χημεία νερού, ΖΝΧ/νερά χρήσης, δοσολογία, καθαρισμό ή ελέγχους εξοπλισμού.</p>
+    <p style="margin-top:10px;">Είμαι η <b>Sophia</b>, ο ψηφιακός βοηθός της Εστίας. Ρώτησέ με για τη δουλειά σου — λειτουργίες, πρόγραμμα/βάρδιες, συντήρηση, βλάβες ή χημεία πισίνας. Απαντώ με βάση όσα βλέπεις εσύ.</p>
   </div>
 </div>
 
 <div class="chips" id="chips">
-  <div class="chip" onclick="quick(this)">Ερμήνευσε τις τελευταίες μετρήσεις</div>
+  <div class="chip" onclick="quick(this)">Τι μπορείς να κάνεις;</div>
+  <div class="chip" onclick="quick(this)">Ερμήνευσε τις μετρήσεις της πισίνας</div>
   <div class="chip" onclick="quick(this)">Δοσολογία για διόρθωση pH</div>
-  <div class="chip" onclick="quick(this)">Πρόγραμμα καθαρισμού σήμερα</div>
-  <div class="chip" onclick="quick(this)">Έλεγχοι εξοπλισμού</div>
+  <div class="chip" onclick="quick(this)">Πρόγραμμα καθαρισμού</div>
 </div>
 
 <div class="composer">
@@ -100,7 +102,7 @@ function buildHotels(){
 }
 function onHotelChange(){
   const hi=+document.getElementById('hotel-select').value;
-  const ps=document.getElementById('pool-select'); ps.innerHTML='';
+  const ps=document.getElementById('pool-select'); ps.innerHTML='<option value="">— Γενική ερώτηση (χωρίς πισίνα) —</option>';
   (HOTELS[hi]?.pools||[]).forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=p.location?`${p.name} — ${p.location}`:p.name; ps.appendChild(o); });
 }
 function currentPoolId(){ return document.getElementById('pool-select').value || null; }
@@ -130,7 +132,7 @@ async function send(){
     const data=await res.json();
     typing.remove();
     if(data.error==='not_configured'){
-      addMsg('Η Σοφία δεν έχει ρυθμιστεί ακόμα (λείπει API key). Πρόσθεσε ANTHROPIC_API_KEY ή OPENAI_API_KEY στο Railway.','bot err');
+      addMsg('Η Sophia δεν έχει ρυθμιστεί ακόμα (λείπει API key). Πρόσθεσε ANTHROPIC_API_KEY ή OPENAI_API_KEY στο Railway.','bot err');
     } else if(data.error){
       addMsg('Σφάλμα: '+data.error,'bot err');
     } else {

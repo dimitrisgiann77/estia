@@ -11,7 +11,8 @@
 .card h2{font-size:15px;color:#193847;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
 .card .sub{font-size:12px;color:#8a9aa3;margin-bottom:14px;}
 label{display:block;font-weight:500;font-size:14px;margin:14px 0 6px;}
-input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;}
+input,select,textarea{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;}
+textarea{resize:vertical;min-height:120px;line-height:1.5;}
 .hint{font-size:12px;color:#999;margin-top:4px;}
 .btn{margin-top:18px;padding:12px 22px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;background:#193847;color:white;}
 .btn.ghost{background:transparent;color:#193847;border:1px solid #193847;margin-right:10px;}
@@ -70,7 +71,6 @@ table.audit td.dt{color:#6b7a82;}
 </style><script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head><body>
-<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">AI — Κονσόλα διακυβέρνησης</strong></div><div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div></div>
 <div class="container">
   {% if request.args.get('saved') %}<div class="saved"><i class="ti ti-check"></i> Αποθηκεύτηκε!</div>{% endif %}
 
@@ -88,6 +88,15 @@ table.audit td.dt{color:#6b7a82;}
     <div class="tile"><div class="tl">Μοντέλο</div><div class="tv" style="font-size:14px;">{{ active.model or '—' }}</div></div>
     <div class="tile"><div class="tl">Ενεργά κελιά δεδομένων</div><div class="tv">{{ stats.active_cells }}<span style="font-size:13px;color:#93a3ab;font-weight:600;">/ {{ stats.total_cells }}</span></div></div>
     <div class="tile"><div class="tl">Χρήσεις AI σήμερα</div><div class="tv">{{ stats.uses_today }}</div></div>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-id-badge-2"></i> Ρόλος &amp; Ταυτότητα της Sophia</h2>
+    <div class="sub">Ποια είναι η Sophia και πώς απαντά (system prompt). Άφησέ το <strong>κενό</strong> για τον προεπιλεγμένο ρόλο. Απαντά πάντα σύμφωνα με τα <strong>δικαιώματα &amp; τα ξενοδοχεία</strong> που βλέπει ο κάθε χρήστης.</div>
+    <form method="POST" action="/dashboard/ai/persona">
+      <textarea name="persona" rows="9" placeholder="{{ persona_default }}">{{ persona }}</textarea>
+      <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση ρόλου</button>
+    </form>
   </div>
 
   <div class="card" id="matrix">
