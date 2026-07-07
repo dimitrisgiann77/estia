@@ -17,6 +17,7 @@
   body[data-pal="charcoal"]{--ground:#14130F;--panel:#1C1B15;--line:#33322A;--ink:#EEE8DA;--muted:#A09B8A;--faint:#74705F;--accent:#D4AF5A;--accent2:#97803B;--tagfg:#B0A17E;--tagbd:rgba(176,161,126,.35);--tagbg:rgba(176,161,126,.08);--hero:#1E1C15;--navbar:#100F0B;}
   body[data-pal="ink"]{--ground:#0E1116;--panel:#141922;--line:#263041;--ink:#E4E8EE;--muted:#8E96A6;--faint:#5E6675;--accent:#E0A63E;--accent2:#A9781F;--tagfg:#7FA0B0;--tagbd:rgba(127,160,176,.3);--tagbg:rgba(127,160,176,.08);--hero:#141B26;--navbar:#0A0D12;}
   body[data-pal="aegean"]{--ground:#F6EBCF;--panel:#FEF9ED;--line:#E7D6AF;--ink:#4A3826;--muted:#8E7A55;--faint:#B09A64;--accent:#C26A38;--accent2:#B0913F;--tagfg:#836F3B;--tagbd:rgba(131,111,59,.42);--tagbg:rgba(131,111,59,.1);--hero:#FBF1D6;--navbar:#F2E5C2;}
+  body[data-pal="linen"]{--ground:#EEEADF;--panel:#F7F4EC;--line:#DAD3C0;--ink:#343A2B;--muted:#6C7358;--faint:#9BA085;--accent:#5F7A4A;--accent2:#8A9B67;--tagfg:#566B41;--tagbd:rgba(86,107,65,.38);--tagbg:rgba(86,107,65,.09);--hero:#F3EFE4;--navbar:#E6E1D1;}
   html{background:var(--ground,#0D110A);}
   body{min-height:100vh;background:var(--ground);color:var(--ink);font-family:var(--sans);
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
@@ -25,19 +26,9 @@
   .root[data-device="phone"]{max-width:434px;}
   .root[data-device="tablet"]{max-width:840px;}
 
-  /* preview toolbar (only in preview) */
-  .rvbar{position:sticky;top:0;z-index:30;background:#0C0F08;border-bottom:1px solid #2C3320;
-    padding:9px 14px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:center;color:#cfc9b4;}
-  .rvbar .lbl{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#C6A15B;}
-  .seg{display:flex;gap:5px;}
-  .seg button{background:#1b1e16;border:1px solid #3a4030;color:#cfc9b4;font-size:11px;letter-spacing:.08em;
-    text-transform:uppercase;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:var(--sans);}
-  .seg button.on{background:#C6A15B;border-color:#C6A15B;color:#14180F;font-weight:500;}
-
   /* top action bar: back link + language selector */
   .topbar{position:sticky;top:0;z-index:22;display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:10px 16px;background:var(--navbar);border-bottom:1px solid var(--line);}
-  .rvbar ~ .root .topbar{top:44px;}
   .back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);
     font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px 6px 9px;border:1px solid var(--line);
     border-radius:999px;background:transparent;transition:color .15s,border-color .15s;max-width:62%;overflow:hidden;
@@ -78,7 +69,6 @@
   /* category nav */
   .nav{position:sticky;top:0;z-index:10;display:flex;gap:20px;overflow-x:auto;padding:13px 22px;
     background:var(--ground);border-bottom:1px solid var(--line);scrollbar-width:none;}
-  .rvbar ~ .root .nav{top:44px;}
   .nav::-webkit-scrollbar{display:none;}
   .nav a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:12px;letter-spacing:.13em;
     text-transform:uppercase;padding-bottom:3px;cursor:pointer;transition:color .15s;}
@@ -159,9 +149,9 @@
   .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:24px;}
 </style>
 </head>
-<body data-pal="{{ outlet.palette if outlet.palette in ['olive','aegean','charcoal','ink'] else 'olive' }}">
+<body data-pal="{{ outlet.palette if outlet.palette in ['olive','aegean','charcoal','ink','linen'] else 'olive' }}">
 
-<div class="root" data-mode="{{ outlet.layout if outlet.layout in ['grid','spread'] else 'grid' }}" data-device="full" id="root">
+<div class="root" data-mode="{{ outlet.layout if outlet.layout in ['grid','spread','list'] else 'grid' }}" data-device="full" id="root">
 
   <div class="topbar">
     <a class="back" href="{{ hub_link }}"><span class="arw">←</span><span class="bt">{{ hotel_name or 'Πίσω' }}</span></a>
@@ -235,7 +225,6 @@
 </div>
 
 <script>
-  var root=document.getElementById("root"), mode=root.getAttribute("data-mode")||"grid";
   var MASTER={{ allergens|tojson }};
   var GROUPS={{ groups|map(attribute='code')|list|tojson }};
   var curKind=GROUPS.length?GROUPS[0]:null;
@@ -300,29 +289,6 @@
   document.querySelectorAll("#catnav a").forEach(function(a){
     a.onclick=function(){var el=document.getElementById(a.getAttribute("data-sec"));if(el)el.scrollIntoView({behavior:"smooth"});};
   });
-
-  // preview toolbar controls
-  var mseg=document.getElementById("modeseg");
-  if(mseg){
-    mseg.querySelectorAll("button").forEach(function(b){
-      if(b.getAttribute("data-m")===mode) b.classList.add("on");
-      b.onclick=function(){
-        mseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
-        mode=b.getAttribute("data-m");root.setAttribute("data-mode",mode);apply();
-      };
-    });
-    var dseg=document.getElementById("devseg");
-    dseg.querySelectorAll("button").forEach(function(b){
-      b.onclick=function(){dseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
-        root.setAttribute("data-device",b.getAttribute("data-d"));};
-    });
-    var pseg=document.getElementById("palseg"), curpal=document.body.getAttribute("data-pal");
-    pseg.querySelectorAll("button").forEach(function(b){
-      if(b.getAttribute("data-p")===curpal) b.classList.add("on");
-      b.onclick=function(){pseg.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");
-        document.body.setAttribute("data-pal",b.getAttribute("data-p"));};
-    });
-  }
 
   // scroll-spy (only within active kind)
   window.addEventListener("scroll",function(){

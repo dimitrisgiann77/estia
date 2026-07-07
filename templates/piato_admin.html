@@ -145,6 +145,10 @@
         <b>Δημόσιο QR link:</b> {{ base_url }}/piato/{{ sel.qr_token }}
         {% if not sel.published %}<span class="muted"> (ενεργό μόνο μετά τη δημοσίευση)</span>{% endif %}
       </div>
+      <div class="link-box" style="margin-top:6px;">
+        <b>Προεπισκόπηση</b> (πραγματικό μενού με την επιλεγμένη παλέτα/layout — δουλεύει και σε draft):
+        <a href="{{ base_url }}/piato/preview/{{ sel.preview_token }}" target="_blank" rel="noopener">Άνοιγμα ↗</a>
+      </div>
       <details>
         <summary>Επεξεργασία / διαγραφή σημείου</summary>
         <div class="subform">

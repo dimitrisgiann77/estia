@@ -36,11 +36,13 @@ OTYPE_LABEL = {k: v for k, v in OUTLET_TYPES}
 
 # Παλέτες guest μενού (code, label). Πρώτη = προεπιλογή. (aegean = Boho Earth φωτεινό)
 PIATO_PALETTES = [('olive', 'Olive & Brass'), ('aegean', 'Boho Earth (φωτεινό)'),
-                  ('charcoal', 'Charcoal & Gold'), ('ink', 'Ink & Amber')]
+                  ('charcoal', 'Charcoal & Gold'), ('ink', 'Ink & Amber'),
+                  ('linen', 'Linen & Sage (φωτεινό)')]
 PALETTE_CODES = [c for c, _ in PIATO_PALETTES]
 
 # Τρόποι παρουσίασης μενού (code, label). Πρώτη = προεπιλογή.
-PIATO_LAYOUTS = [('grid', 'Πλέγμα (κάρτες)'), ('spread', 'Δίστηλο (magazine)')]
+PIATO_LAYOUTS = [('grid', 'Πλέγμα (κάρτες)'), ('spread', 'Δίστηλο (magazine)'),
+                 ('list', 'Λίστα (κλασική)')]
 LAYOUT_CODES = [c for c, _ in PIATO_LAYOUTS]
 
 # Ομαδοποίηση κατηγοριών σε δύο κύριες ενότητες (Φαγητό / Ποτό).
