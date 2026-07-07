@@ -40,8 +40,9 @@
   .vm-chip{display:inline-flex;align-items:center;gap:5px;background:#eef2f7;border-radius:8px;
            padding:2px 4px 2px 9px;font-size:12px;margin:2px 3px 2px 0;}
   .vm-chip form{display:inline;} .vm-chip button{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;}
+  .container{max-width:100%!important;padding:18px 22px!important;}
 </style></head><body>
-{{ mp.topbar('tools-kitchen-2', 'Piato — Ψηφιακό Μενού', 'Owner-screen: ο F&B υπεύθυνος γράφει το μενού · ο πελάτης το διαβάζει (QR)') }}
+{# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
 {% macro langfields(prefix, data) %}
   <input type="text" name="{{ prefix }}_el" value="{{ data.get('el','') }}" placeholder="Ελληνικά *">
@@ -68,11 +69,7 @@
         <div style="border:1px solid #eef2f7;border-radius:10px;padding:9px;margin-top:7px;">
           <div style="font-weight:600;font-size:14px;">{{ hotel_names.get(hid, '—') }}</div>
           <div class="link-box">
-            <b>Δημόσιο QR:</b> {{ base_url }}/piato/h/{{ hub.hub_token }}<br>
-            <b>Preview (ομάδα):</b> {{ base_url }}/piato/h/preview/{{ hub.hub_preview_token }}
-          </div>
-          <div class="row" style="margin-top:6px;">
-            <a class="btn ghost sm" href="/piato/h/preview/{{ hub.hub_preview_token }}" target="_blank">👁 Προεπισκόπηση hub</a>
+            <b>Δημόσιο QR:</b> {{ base_url }}/piato/h/{{ hub.hub_token }}
           </div>
         </div>
       {% endfor %}
@@ -133,7 +130,6 @@
           <span class="badge {{ 'pub' if sel.published else 'draft' }}">{{ 'Δημοσιευμένο' if sel.published else 'Draft' }}</span>
         </h3>
         <div class="row">
-          <a class="btn ghost sm" href="/piato/preview/{{ sel.preview_token }}" target="_blank">👁 Προεπισκόπηση</a>
           {% if sel.published %}
             <form method="post" action="/dashboard/piato/outlet/publish">
               <input type="hidden" name="id" value="{{ sel.id }}"><input type="hidden" name="to" value="0">
@@ -147,8 +143,7 @@
       </div>
       <div class="link-box">
         <b>Δημόσιο QR link:</b> {{ base_url }}/piato/{{ sel.qr_token }}
-        {% if not sel.published %}<span class="muted"> (ενεργό μόνο μετά τη δημοσίευση)</span>{% endif %}<br>
-        <b>Preview (μυστικό):</b> {{ base_url }}/piato/preview/{{ sel.preview_token }}
+        {% if not sel.published %}<span class="muted"> (ενεργό μόνο μετά τη δημοσίευση)</span>{% endif %}
       </div>
       <details>
         <summary>Επεξεργασία / διαγραφή σημείου</summary>
@@ -167,6 +162,7 @@
             <select name="layout">{% for k, v in layouts %}<option value="{{ k }}" {{ 'selected' if k == sel.layout else '' }}>{{ v }}</option>{% endfor %}</select>
             <label>Υπότιτλος (tagline)</label><input type="text" name="tagline" value="{{ sel.tagline or '' }}" placeholder="π.χ. Mediterranean & Cretan cuisine">
             <label>Φωτό κάρτας/hero (URL)</label><input type="text" name="hero_image" value="{{ sel.hero_image or '' }}" placeholder="https://…">
+            <label>Link αξιολόγησης «Αξιολογήστε μας» (προαιρ.)</label><input type="text" name="review_url" value="{{ sel.review_url or '' }}" placeholder="π.χ. https://g.page/… ή TripAdvisor">
             <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
           </form>
           <form method="post" action="/dashboard/piato/outlet/delete" style="margin-top:8px;"
@@ -185,12 +181,16 @@
       {% for c in sel.categories %}
       <div class="cat" id="cat{{ c.id }}">
         <div class="chead">
-          <h4>{{ mlget(c.name_i18n, 'el') or '—' }} {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
+          <h4>{{ mlget(c.name_i18n, 'el') or '—' }}
+            <span class="badge" style="background:#eef2f7;color:#475569;">{{ 'Ποτό' if (c.kind or 'food') == 'drink' else 'Φαγητό' }}</span>
+            {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
           <details><summary>✎</summary>
             <div class="subform">
               <form method="post" action="/dashboard/piato/category/save">
                 <input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="outlet_id" value="{{ sel.id }}">
                 <label>Όνομα κατηγορίας</label>{{ langfields('cname', ml(c.name_i18n)) }}
+                <label>Ενότητα</label>
+                <select name="kind">{% for k, v in kinds %}<option value="{{ k }}" {{ 'selected' if k == (c.kind or 'food') else '' }}>{{ v }}</option>{% endfor %}</select>
                 <label>Ωράριο διαθεσιμότητας</label><input type="text" name="chours" value="{{ c.hours }}" placeholder="π.χ. Πρωινό 07:00–11:00">
                 <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
               </form>
@@ -302,6 +302,8 @@
           <form method="post" action="/dashboard/piato/category/save">
             <input type="hidden" name="outlet_id" value="{{ sel.id }}">
             <label>Όνομα κατηγορίας</label>{{ langfields('cname', {}) }}
+            <label>Ενότητα</label>
+            <select name="kind">{% for k, v in kinds %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
             <label>Ωράριο διαθεσιμότητας (προαιρ.)</label><input type="text" name="chours" placeholder="π.χ. Πρωινό 07:00–11:00">
             <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Προσθήκη κατηγορίας</button></div>
           </form>

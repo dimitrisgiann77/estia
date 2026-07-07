@@ -43,6 +43,21 @@ PALETTE_CODES = [c for c, _ in PIATO_PALETTES]
 PIATO_LAYOUTS = [('grid', 'Πλέγμα (κάρτες)'), ('spread', 'Δίστηλο (magazine)')]
 LAYOUT_CODES = [c for c, _ in PIATO_LAYOUTS]
 
+# Ομαδοποίηση κατηγοριών σε δύο κύριες ενότητες (Φαγητό / Ποτό).
+PIATO_KINDS = [('food', 'Φαγητό'), ('drink', 'Ποτό')]
+KIND_CODES = [c for c, _ in PIATO_KINDS]
+
+# Γνωστές κατηγορίες ποτού (case-insensitive substrings, en/el) — για idempotent seed
+# defaults ΜΟΝΟ όταν το kind δεν έχει οριστεί ακόμη. Ο admin πάντα υπερισχύει.
+DRINK_NAME_HINTS = [
+    'aperitif', 'sparkling', 'beer', 'wine', 'white wine', 'red wine', 'rose wine', 'rosé',
+    'spirit', 'cocktail', 'brandy', 'whiskey', 'whisky', 'refreshment', 'coffee', 'tea',
+    'juice', 'soft drink', 'liqueur', 'ouzo', 'raki', 'tsikoudia', 'vodka', 'gin', 'rum',
+    'μπύρ', 'μπίρ', 'κρασ', 'λευκό κρασ', 'κόκκινο κρασ', 'ροζέ', 'κοκτέιλ', 'κοκτέηλ',
+    'ποτ', 'αναψυκτ', 'καφέ', 'καφές', 'χυμ', 'ρακ', 'τσικουδ', 'ούζο', 'λικέρ',
+    'ουίσκ', 'κονιάκ', 'αφρώδ', 'απεριτίφ', 'ρόφημα', 'ροφήματ',
+]
+
 # 14 αλλεργιογόνα EU 1169/2011 (code, el, en, emoji)
 EU_ALLERGENS = [
     ('gluten',      'Γλουτένη (δημητριακά)',   'Cereals containing gluten', '🌾'),
@@ -77,6 +92,7 @@ class Outlet(db.Model):
     layout        = db.Column(db.String(12), default='grid')     # τρόπος παρουσίασης (grid/spread)
     hero_image    = db.Column(db.String(500), default='')        # φωτό για κάρτα hub / hero
     tagline       = db.Column(db.String(160), default='')        # υπότιτλος (π.χ. «Mediterranean cuisine»)
+    review_url    = db.Column(db.String(500), default='')        # «Αξιολογήστε μας» link (Google/TripAdvisor)
     sort          = db.Column(db.Integer, default=0)
     created_at    = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
@@ -100,6 +116,7 @@ class MenuCategory(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     outlet_id  = db.Column(db.Integer, db.ForeignKey('piato_outlet.id'), index=True, nullable=False)
     name_i18n  = db.Column(db.Text, default='{}')                 # JSON {lang: τίτλος}
+    kind       = db.Column(db.String(8), default='food')          # 'food' | 'drink' (top-level ομαδοποίηση)
     hours      = db.Column(db.String(200), default='')           # διαθεσιμότητα κατηγορίας
     active     = db.Column(db.Boolean, default=True)
     sort       = db.Column(db.Integer, default=0)
@@ -171,9 +188,12 @@ def ensure_piato_columns():
             _add_col('piato_outlet', 'layout', "layout VARCHAR(12) DEFAULT 'grid'")
             _add_col('piato_outlet', 'hero_image', 'hero_image VARCHAR(500)')
             _add_col('piato_outlet', 'tagline', 'tagline VARCHAR(160)')
+            _add_col('piato_outlet', 'review_url', 'review_url VARCHAR(500)')
+            _add_col('piato_category', 'kind', "kind VARCHAR(8) DEFAULT 'food'")
         except Exception as e:
             db.session.rollback(); print('[piato] ensure cols skipped:', e)
         seed_allergens()
+        seed_category_kinds()
 
 def seed_allergens():
     """Seed 14 EU αλλεργιογόνων (μία φορά· idempotent ανά code)."""
@@ -190,6 +210,35 @@ def seed_allergens():
             db.session.commit(); print('[piato] seeded %d allergens' % n)
     except Exception as e:
         db.session.rollback(); print('[piato] seed allergens skipped:', e)
+
+
+def _looks_like_drink(name_i18n):
+    """Heuristic: το όνομα κατηγορίας μοιάζει με «ποτό» (en/el substrings)."""
+    d = _ml(name_i18n)
+    blob = ' '.join(str(v) for v in d.values()).lower()
+    return any(h in blob for h in DRINK_NAME_HINTS)
+
+
+def seed_category_kinds():
+    """Idempotent seed: κατηγορίες με όνομα-ποτού → kind='drink'. Τρέχει ΜΟΝΟ σε
+    εγγραφές που έχουν ακόμη το default 'food' (ώστε ο admin να μην ξεπερνιέται)
+    και μόνο μία φορά ανά κατηγορία (σφραγίδα _kinds_seeded στο PiatoHotel; εδώ
+    απλά: αν ήδη έχει γίνει αλλαγή σε 'drink' κάπου, θεωρούμε ότι το seed έτρεξε)."""
+    try:
+        cats = MenuCategory.query.all()
+        if not cats:
+            return
+        # Αν υπάρχει ήδη ≥1 κατηγορία 'drink', ο admin/seed έχει ήδη ενεργήσει → μην ξανα-seed.
+        if any((c.kind or 'food') == 'drink' for c in cats):
+            return
+        n = 0
+        for c in cats:
+            if (c.kind or 'food') == 'food' and _looks_like_drink(c.name_i18n):
+                c.kind = 'drink'; n += 1
+        if n:
+            db.session.commit(); print('[piato] seeded %d drink-category kinds' % n)
+    except Exception as e:
+        db.session.rollback(); print('[piato] seed kinds skipped:', e)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -289,6 +338,7 @@ def _build_menu(outlet, lang):
             })
         if items:
             cats.append({'id': c.id, 'name': _ml_get(c.name_i18n, lang),
+                         'kind': (c.kind if c.kind in KIND_CODES else 'food'),
                          'hours': c.hours or '', 'dishes': items})
     allergen_master = [{'code': a.code, 'icon': a.icon, 'name': _ml_get(a.name_i18n, lang)}
                        for a in sorted(allg.values(), key=lambda x: x.sort)]
@@ -299,10 +349,20 @@ def _render_menu(outlet, preview=False):
     lang = _cur_lang()
     cats, allergens = _build_menu(outlet, lang)
     h = Hotel.query.get(outlet.hotel_id)
+    # Back-link προς το hub του ξενοδοχείου (get-or-create ώστε να υπάρχει πάντα token).
+    hub = _hub_for(outlet.hotel_id)
+    hub_link = ('/piato/h/preview/' + hub.hub_preview_token) if preview else ('/piato/h/' + hub.hub_token)
+    # Ομαδοποίηση Φαγητό/Ποτό — μόνο οι ενότητες που έχουν ≥1 κατηγορία.
+    groups = []
+    for code, label in PIATO_KINDS:
+        gcats = [c for c in cats if c.get('kind', 'food') == code]
+        if gcats:
+            groups.append({'code': code, 'label': label, 'cats': gcats})
     return render_template('piato_menu.html',
                            outlet=outlet, hotel_name=(h.name if h else ''),
-                           cats=cats, allergens=allergens,
-                           langs=PIATO_LANGS, lang=lang, preview=preview)
+                           cats=cats, groups=groups, allergens=allergens,
+                           langs=PIATO_LANGS, lang=lang, preview=preview,
+                           hub_link=hub_link)
 
 
 # ── GUEST ROUTES (public — χωρίς login) ──────────────────────────────────────
@@ -391,7 +451,7 @@ def piato_admin():
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
                            allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
-                           palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS,
+                           palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS, kinds=PIATO_KINDS,
                            base_url=request.host_url.rstrip('/'))
 
 
@@ -413,12 +473,14 @@ def piato_outlet_save():
         layout = 'grid'
     hero = (request.form.get('hero_image') or '').strip()
     tagline = (request.form.get('tagline') or '').strip()
+    review_url = (request.form.get('review_url') or '').strip()
     if not name or hid not in _my_hids():
         return redirect(url_for('piato_admin'))
     if oid:
         o = _outlet_or_403(oid)
         o.name, o.otype, o.hours = name, otype, hours
         o.palette, o.layout, o.hero_image, o.tagline = palette, layout, hero, tagline
+        o.review_url = review_url
         # hotel_id αλλάζει μόνο αν το νέο είναι στο scope
         if hid in _my_hids():
             o.hotel_id = hid
@@ -426,6 +488,7 @@ def piato_outlet_save():
     else:
         o = Outlet(hotel_id=hid, name=name, otype=otype, hours=hours,
                    palette=palette, layout=layout, hero_image=hero, tagline=tagline,
+                   review_url=review_url,
                    qr_token=_tok(), preview_token=_tok(), published=False)
         db.session.add(o)
         log_activity('piato_outlet_add', name)
@@ -462,14 +525,17 @@ def piato_category_save():
     o = _outlet_or_403(request.form.get('outlet_id'))
     name = _ml_from_form('cname')
     hours = (request.form.get('chours') or '').strip()
+    kind = request.form.get('kind') or 'food'
+    if kind not in KIND_CODES:
+        kind = 'food'
     if cid:
         c = MenuCategory.query.get(_i(cid))
         if not c or c.outlet_id != o.id:
             abort(404)
-        c.name_i18n, c.hours = name, hours
+        c.name_i18n, c.hours, c.kind = name, hours, kind
     else:
         mx = db.session.query(db.func.max(MenuCategory.sort)).filter_by(outlet_id=o.id).scalar() or 0
-        c = MenuCategory(outlet_id=o.id, name_i18n=name, hours=hours, sort=mx + 1)
+        c = MenuCategory(outlet_id=o.id, name_i18n=name, hours=hours, kind=kind, sort=mx + 1)
         db.session.add(c)
     db.session.commit()
     log_activity('piato_category_save', o.name)
