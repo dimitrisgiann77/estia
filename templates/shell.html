@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>{{ theme.app_title }} — CONDIAN</title>
 <meta name="theme-color" content="{{ theme.primary }}">
-<script>/* v12.8 — εφαρμογή θέματος πριν το paint (no flash) */(function(){try{var m=(document.cookie.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||'system';var dark=m==='dark'||(m==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light');var p=(document.cookie.match(/(?:^|; )estia_palette=([^;]+)/)||[])[1]||'aurora';document.documentElement.setAttribute('data-palette',p);}catch(e){}})();</script>
+<script>/* v12.8 — εφαρμογή θέματος πριν το paint (no flash) */(function(){try{var m=(document.cookie.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||'day';var dark=m==='dark'||(m==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.setAttribute('data-theme',dark?'dark':'light');var p=(document.cookie.match(/(?:^|; )estia_palette=([^;]+)/)||[])[1]||'aurora';document.documentElement.setAttribute('data-palette',p);}catch(e){}})();</script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -223,7 +223,6 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
         <div class="pm-row" id="pm-langs">
           <button class="pm-pill {{ 'on' if session.get('language','el')=='el' }}" onclick="setLang('el')">🇬🇷 ΕΛ</button>
           <button class="pm-pill {{ 'on' if session.get('language')=='en' }}" onclick="setLang('en')">🇬🇧 EN</button>
-          <button class="pm-pill {{ 'on' if session.get('language')=='uk' }}" onclick="setLang('uk')">🇺🇦 UK</button>
         </div>
         <div class="pm-label">Θέμα</div>
         <div class="pm-row" id="pm-themes">
@@ -236,7 +235,7 @@ html[data-theme="dark"] .nm-foot{border-top-color:#243140;}
           <button class="pm-pill" data-pal="aurora" onclick="setPalette('aurora')"><span class="sw" style="background:#193847;"></span> Aurora</button>
           <button class="pm-pill" data-pal="emerald" onclick="setPalette('emerald')"><span class="sw" style="background:#0e5c43;"></span> Emerald</button>
           <button class="pm-pill" data-pal="business" onclick="setPalette('business')"><span class="sw" style="background:#33475b;"></span> Business</button>
-          <button class="pm-pill" data-pal="girlie" onclick="setPalette('girlie')"><span class="sw" style="background:#c0367a;"></span> Soft Rose</button>
+          <button class="pm-pill" data-pal="rose" onclick="setPalette('rose')"><span class="sw" style="background:#c0367a;"></span> Soft Rose</button>
         </div>
         <div class="pm-sep"></div>
         <a class="pm-item" href="#" onclick="navTo('/settings?embed=1');return false;"><i class="ti ti-settings"></i> Ρυθμίσεις</a>
@@ -427,7 +426,7 @@ document.addEventListener('click', function(e){ var n=document.getElementById('n
 function _ck(n){ return (document.cookie.match(new RegExp('(?:^|; )'+n+'=([^;]+)'))||[])[1]; }
 function setLang(code){ document.cookie='estia_lang='+code+';path=/;max-age=31536000'; location.href='/set-language/'+code; }
 function applyTheme(){
-  var m=_ck('estia_theme')||'system';
+  var m=_ck('estia_theme')||'day';
   var dark = m==='dark' || (m==='system' && window.matchMedia && matchMedia('(prefers-color-scheme:dark)').matches);
   document.documentElement.setAttribute('data-theme', dark?'dark':'light');
   document.querySelectorAll('#pm-themes .pm-pill').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-mode')===m); });

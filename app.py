@@ -362,11 +362,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.433'
-APP_BUILD   = '714'
+APP_VERSION = '12.434'
+APP_BUILD   = '715'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.434', 'b': '715', 'date': '07/07/2026', 'time': '20:10', 'title': 'Πλατφόρμα — μενού λογαριασμού: γλώσσες ΕΛ/EN, προεπιλογή θέματος «Φωτεινό»',
+     'items': ['Οι διαθέσιμες γλώσσες περιορίστηκαν σε **Ελληνικά / Αγγλικά** (αφαιρέθηκε το «UK» — ήταν Ουκρανικά, χωρίς μετάφραση ακόμη). Νέες γλώσσες θα προστεθούν όταν υπάρξει πλήρης μετάφραση.',
+               'Η **προεπιλογή θέματος** άλλαξε σε **Φωτεινό** (πριν ήταν «Σύστημα» → σκούραινε αν ο υπολογιστής ήταν σε dark mode). Οι επιλογές «Σκούρο» & «Σύστημα» παραμένουν για όποιον τις θέλει.',
+               'Μικρός καθαρισμός: εσωτερικός κωδικός της παλέτας «Soft Rose».']},
     {'v': '12.433', 'b': '714', 'date': '07/07/2026', 'time': '19:34', 'title': 'Piato — ΟΡΙΣΤΙΚΗ διόρθωση «γκρι/σκούρου φόντου» στις οθόνες πελάτη',
      'items': ['**Βρέθηκε & λύθηκε η ρίζα του «γκρι».** Ο μηχανισμός «dark mode παντού» της εφαρμογής (auto-inject του admin theme σε κάθε σελίδα) έμπαινε ΚΑΙ στις guest οθόνες Piato και πατούσε τα χρώματά τους (σκούρο φόντο μενού, σκούρη μπάρα στο hub) — ενεργό όταν το σύστημα του χρήστη ήταν σε dark mode. Πλέον οι σελίδες `/piato/…` **εξαιρούνται** (έχουν δικό τους πλήρες εικαστικό) → δείχνουν ΑΚΡΙΒΩΣ όπως σχεδιάστηκαν, σε κάθε browser/συσκευή.',
                'Επιπλέον θωράκιση με δήλωση `color-scheme` (hub=light, μενού=ανά παλέτα).']},
@@ -1693,7 +1697,7 @@ def app_version_json():
 # v12.12 — Dark mode παντού: αυτόματη ένεση του theme snippet σε ΚΑΘΕ HTML σελίδα
 # (εξαιρούνται login/register που έχουν δικό τους σκούρο design, και όσες το έχουν ήδη).
 _DARK_SNIPPET = ('<script>(function(){try{var c=document.cookie;'
-                 'var m=(c.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||"system";'
+                 'var m=(c.match(/(?:^|; )estia_theme=([^;]+)/)||[])[1]||"day";'
                  'var d=m==="dark"||(m==="system"&&window.matchMedia&&matchMedia("(prefers-color-scheme:dark)").matches);'
                  'if(d)document.documentElement.setAttribute("data-theme","dark");'
                  'var p=(c.match(/(?:^|; )estia_palette=([^;]+)/)||[])[1]||"aurora";'
@@ -3043,7 +3047,7 @@ def api_record(record_id):
 
 @app.route('/set-language/<lang>')
 def set_language(lang):
-    if lang in ['el', 'en', 'uk'] and 'user_id' in session:
+    if lang in ['el', 'en'] and 'user_id' in session:
         session['language'] = lang
         user = User.query.get(session['user_id'])
         if user:
