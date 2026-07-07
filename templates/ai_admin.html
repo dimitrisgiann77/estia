@@ -43,12 +43,32 @@ input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8p
 .row .txt{font-size:13px;}
 .row .txt small{display:block;color:#93a3ab;font-size:11px;margin-top:1px;}
 .row .txt small.sens{color:#b45309;font-weight:600;}
+.masterbar{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#193847;color:#fff;padding:16px 20px;border-radius:12px;margin-bottom:18px;}
+.masterbar .mb-t{font-weight:700;font-size:15px;}
+.masterbar .mb-s{font-size:12px;color:#b9cdd6;margin-top:3px;max-width:520px;line-height:1.4;}
+.switch.big{width:52px;height:30px;}
+.switch.big .slider:before{height:24px;width:24px;}
+.switch.big input:checked+.slider:before{transform:translateX(22px);}
+table.audit{width:100%;border-collapse:collapse;font-size:13px;}
+table.audit td{padding:8px 6px;border-top:1px solid #eef3f6;vertical-align:top;}
+table.audit tr:first-child td{border-top:none;}
+table.audit td.tm{color:#93a3ab;white-space:nowrap;font-size:12px;}
+table.audit td.ac{color:#193847;font-weight:600;white-space:nowrap;}
+table.audit td.dt{color:#6b7a82;}
 </style><script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head><body>
 <div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">AI — Κονσόλα διακυβέρνησης</strong></div><div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div></div>
 <div class="container">
   {% if request.args.get('saved') %}<div class="saved"><i class="ti ti-check"></i> Αποθηκεύτηκε!</div>{% endif %}
+
+  <form method="POST" action="/dashboard/ai/master" class="masterbar">
+    <div>
+      <div class="mb-t"><i class="ti ti-power"></i> Γενικός διακόπτης AI</div>
+      <div class="mb-s">Όταν είναι κλειστός, καμία λειτουργία AI δεν εκτελείται — ό,τι κι αν λέει ο πίνακας παρακάτω. Επείγουσα «παύση».</div>
+    </div>
+    <label class="switch big"><input type="checkbox" name="master" onchange="this.form.submit()" {{ 'checked' if master_on }}><span class="slider"></span></label>
+  </form>
 
   <div class="status">
     <span class="dot {{ 'g' if configured else 'r' }}"></span>
@@ -111,6 +131,20 @@ input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8p
       {% endfor %}
       <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση πίνακα</button>
     </form>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-history"></i> Ιστορικό χρήσης AI</h2>
+    <div class="sub">Ποιος &amp; πότε χρησιμοποίησε AI ή άλλαξε ρυθμίσεις — διαφάνεια.</div>
+    {% if audit %}
+    <table class="audit">
+      {% for a in audit %}
+      <tr><td class="tm">{{ a.tm }}</td><td>{{ a.who }}</td><td class="ac">{{ a.label }}</td><td class="dt">{{ a.detail }}</td></tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <div class="hint">Καμία δραστηριότητα AI ακόμη.</div>
+    {% endif %}
   </div>
 
 </div>

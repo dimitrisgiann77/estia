@@ -4137,8 +4137,33 @@ def ai_admin():
         for dt in m['types']:
             allow['%s_%s' % (m['key'], dt['key'])] = (_ai_setting('ai_allow_%s_%s' % (m['key'], dt['key']), '0') == '1')
     master_on = (_ai_setting('ai_master', '1') == '1')
+    _audit_label = {'piato_ai_describe': 'Piato · περιγραφή AI', 'ai_config': 'Ρύθμιση παρόχου',
+                    'ai_matrix': 'Αλλαγή πίνακα', 'ai_master': 'Γενικός διακόπτης'}
+    try:
+        rows = (ActivityLog.query.filter(ActivityLog.action.in_(list(_audit_label.keys())))
+                .order_by(ActivityLog.id.desc()).limit(12).all())
+    except Exception:
+        rows = []
+    audit = [{'tm': a.created_at.strftime('%d/%m %H:%M') if a.created_at else '',
+              'who': (a.user.full_name if a.user else '—'),
+              'label': _audit_label.get(a.action, a.action), 'detail': a.detail or ''} for a in rows]
     return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None),
-                           active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on)
+                           active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on, audit=audit)
+
+
+@app.route('/dashboard/ai/master', methods=['POST'])
+def ai_master_toggle():
+    u = current_user()
+    if u is None or u.role != 'masteradmin':
+        return redirect(url_for('login'))
+    on = '1' if request.form.get('master') else '0'
+    row = Setting.query.get('ai_master')
+    if row is None:
+        db.session.add(Setting(key='ai_master', value=on))
+    else:
+        row.value = on
+    db.session.commit(); log_activity('ai_master', 'ενεργός' if on == '1' else 'ΚΛΕΙΣΤΟΣ')
+    return redirect(url_for('ai_admin') + '?saved=1')
 
 
 @app.route('/dashboard/ai/matrix', methods=['POST'])
