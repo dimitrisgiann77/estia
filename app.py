@@ -4064,21 +4064,36 @@ def ai_admin():
     if request.method == 'POST':
         setk('provider', request.form.get('provider', 'auto'))
         setk('model', request.form.get('model', '').strip())
+        setk('base_url', request.form.get('base_url', '').strip())
         if request.form.get('clear_keys'):
-            setk('anthropic', ''); setk('openai', '')
+            setk('anthropic', ''); setk('openai', ''); setk('groq', '')
         else:
-            ak = request.form.get('anthropic', '').strip()
-            if ak and not ak.startswith('*'):
-                setk('anthropic', ak)
-            ok = request.form.get('openai', '').strip()
-            if ok and not ok.startswith('*'):
-                setk('openai', ok)
+            for kk in ('anthropic', 'openai', 'groq'):
+                v = request.form.get(kk, '').strip()
+                if v and not v.startswith('*'):
+                    setk(kk, v)
         db.session.commit(); log_activity('ai_config')
         return redirect(url_for('ai_admin') + '?saved=1')
     c = get_ai_config()
-    masked = {'anthropic': ('*' * 8 + c['anthropic'][-4:]) if c['anthropic'] else '',
-              'openai': ('*' * 8 + c['openai'][-4:]) if c['openai'] else ''}
-    return render_template('ai_admin.html', cfg=c, masked=masked, configured=(resolve_provider() is not None))
+    masked = {k: ('*' * 8 + c[k][-4:]) if c.get(k) else '' for k in ('anthropic', 'openai', 'groq')}
+    prov = resolve_provider()
+    _defmodel = {'anthropic': 'claude-sonnet-4-6', 'openai': 'gpt-4o-mini', 'groq': 'llama-3.3-70b-versatile'}
+    _provlabel = {'anthropic': 'Anthropic (Claude)', 'openai': 'OpenAI (ChatGPT)', 'groq': 'Groq (Llama)'}
+    active = {'provider': prov, 'provider_label': _provlabel.get(prov, ''),
+              'model': c['model'] or (_defmodel.get(prov, '') if prov else '')}
+    return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None), active=active)
+
+
+@app.route('/dashboard/ai/test', methods=['POST'])
+def ai_test():
+    u = current_user()
+    if u is None or u.role != 'masteradmin':
+        return jsonify(error='forbidden'), 403
+    reply, err = call_llm('You are a connectivity test. Reply with exactly: OK',
+                          [{'role': 'user', 'content': 'ping'}])
+    if err:
+        return jsonify(ok=False, error=err)
+    return jsonify(ok=True, provider=resolve_provider(), reply=(reply or '').strip()[:80])
 
 # ── GENERIC AREAS (Πλατφόρμα Συντήρησης) ──
 def can_access_area(u, area):

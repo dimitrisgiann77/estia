@@ -1,45 +1,99 @@
 <!DOCTYPE html>
 <html lang="el"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI σύνδεση — CONDIAN</title>
+<title>AI — Κονσόλα διακυβέρνησης · CONDIAN</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;color:#1a1a1a;}
 .topbar{background:#193847;color:white;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
 .topbar a{color:white;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,0.15);border-radius:6px;}
-.container{max-width:680px;margin:0 auto;padding:24px;}
-.card{background:white;border-radius:12px;padding:22px;border:1px solid #d6eef3;}
+.container{max-width:720px;margin:0 auto;padding:24px;}
+.card{background:white;border-radius:12px;padding:22px;border:1px solid #d6eef3;margin-bottom:18px;}
+.card h2{font-size:15px;color:#193847;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.card .sub{font-size:12px;color:#8a9aa3;margin-bottom:14px;}
 label{display:block;font-weight:500;font-size:14px;margin:14px 0 6px;}
-input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8px;font-size:15px;}
+input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8px;font-size:15px;font-family:inherit;}
 .hint{font-size:12px;color:#999;margin-top:4px;}
 .btn{margin-top:18px;padding:12px 22px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;background:#193847;color:white;}
-.pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:12px;}
+.btn.ghost{background:transparent;color:#193847;border:1px solid #193847;margin-right:10px;}
+.btn.ghost:hover{background:#193847;color:#fff;}
+.pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;}
 .on{background:#dcfce7;color:#16a34a;} .off{background:#fee2e2;color:#dc2626;}
 .saved{background:#dcfce7;color:#16a34a;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;}
 .chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:#555;}
+.status{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:12px;border:1px solid #d6eef3;background:#f6fcfd;margin-bottom:18px;}
+.status .dot{width:12px;height:12px;border-radius:50%;flex:none;}
+.status .dot.g{background:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,.15);}
+.status .dot.r{background:#dc2626;box-shadow:0 0 0 4px rgba(220,38,38,.15);}
+.status .big{font-size:16px;font-weight:700;color:#193847;}
+.status .small{font-size:12px;color:#7c8a92;margin-top:2px;}
+#testout{margin-top:12px;font-size:13px;display:none;padding:10px 12px;border-radius:8px;}
+#testout.ok{display:block;background:#dcfce7;color:#166534;}
+#testout.err{display:block;background:#fee2e2;color:#991b1b;}
+#testout.wait{display:block;background:#eef4f8;color:#334;}
 </style><script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head><body>
-<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">AI σύνδεση (Βοηθός)</strong></div><div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div></div>
+<div class="topbar"><div><strong><img src="/static/img/logo-white.svg" style="height:20px;vertical-align:middle;margin-right:8px;">AI — Κονσόλα διακυβέρνησης</strong></div><div><a href="/dashboard"><i class="ti ti-arrow-left"></i> Dashboard</a></div></div>
 <div class="container">
-  {% if request.args.get('saved') %}<div class="saved">Αποθηκεύτηκε!</div>{% endif %}
+  {% if request.args.get('saved') %}<div class="saved"><i class="ti ti-check"></i> Αποθηκεύτηκε!</div>{% endif %}
+
+  <div class="status">
+    <span class="dot {{ 'g' if configured else 'r' }}"></span>
+    <div>
+      {% if configured %}
+        <div class="big">Ενεργό AI: {{ active.provider_label }}</div>
+        <div class="small">Μοντέλο: {{ active.model }}</div>
+      {% else %}
+        <div class="big">AI ανενεργό</div>
+        <div class="small">Δεν έχει οριστεί κλειδί για τον επιλεγμένο πάροχο.</div>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="card">
-    <p>Κατάσταση: {% if configured %}<span class="pill on">Ενεργός</span>{% else %}<span class="pill off">Ανενεργός</span>{% endif %}</p>
+    <h2><i class="ti ti-plug-connected"></i> Πάροχος &amp; Μοντέλο</h2>
+    <div class="sub">Ποιος πάροχος AI τροφοδοτεί τις λειτουργίες + το κλειδί σύνδεσης.</div>
     <form method="POST">
       <label>Πάροχος</label>
       <select name="provider">
         <option value="auto" {{ 'selected' if cfg.provider=='auto' }}>Αυτόματα (όποιο key υπάρχει)</option>
         <option value="anthropic" {{ 'selected' if cfg.provider=='anthropic' }}>Anthropic (Claude)</option>
         <option value="openai" {{ 'selected' if cfg.provider=='openai' }}>OpenAI (ChatGPT)</option>
+        <option value="groq" {{ 'selected' if cfg.provider=='groq' }}>Groq (Llama · δωρεάν)</option>
       </select>
       <label>Anthropic API key</label>
       <input type="text" name="anthropic" value="{{ masked.anthropic }}" placeholder="sk-ant-...">
-      <div class="hint">Άφησέ το όπως είναι (με αστερίσκους) για να μην αλλάξει.</div>
       <label>OpenAI API key</label>
       <input type="text" name="openai" value="{{ masked.openai }}" placeholder="sk-...">
+      <label>Groq API key</label>
+      <input type="text" name="groq" value="{{ masked.groq }}" placeholder="gsk_...">
+      <div class="hint">Άφησε τα keys όπως είναι (με αστερίσκους) για να μην αλλάξουν. Ιδανικά ορίζονται από Railway Variables.</div>
       <label>Μοντέλο (προαιρετικό)</label>
-      <input type="text" name="model" value="{{ cfg.model }}" placeholder="π.χ. claude-sonnet-4-6 ή gpt-4o-mini">
+      <input type="text" name="model" value="{{ cfg.model }}" placeholder="π.χ. llama-3.3-70b-versatile ή claude-sonnet-4-6">
+      <label>Base URL (προαιρετικό — μόνο για custom endpoint)</label>
+      <input type="text" name="base_url" value="{{ cfg.base_url }}" placeholder="π.χ. https://api.groq.com/openai/v1/chat/completions">
       <label class="chk"><input type="checkbox" name="clear_keys" value="1" style="width:auto;"> Διαγραφή αποθηκευμένων keys</label>
-      <button class="btn" type="submit"><i class="ti ti-plug"></i> Αποθήκευση & σύνδεση</button>
+      <div>
+        <button class="btn ghost" type="button" onclick="aiTest(this)"><i class="ti ti-wifi"></i> Δοκιμή σύνδεσης</button>
+        <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+      </div>
+      <div id="testout"></div>
     </form>
   </div>
-</div></body></html>
+
+</div>
+<script>
+function aiTest(btn){
+  var out=document.getElementById('testout');
+  out.className='wait';out.textContent='Δοκιμή σύνδεσης…';btn.disabled=true;
+  fetch('/dashboard/ai/test',{method:'POST',headers:{'X-Requested-With':'fetch'}})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.ok){out.className='ok';out.textContent='✓ Σύνδεση OK ('+d.provider+') — απάντηση: '+(d.reply||'—');}
+      else{out.className='err';out.textContent='✗ Αποτυχία: '+(d.error||'άγνωστο σφάλμα');}
+    })
+    .catch(function(){out.className='err';out.textContent='✗ Σφάλμα δικτύου.';})
+    .finally(function(){btn.disabled=false;});
+}
+</script>
+</body></html>
