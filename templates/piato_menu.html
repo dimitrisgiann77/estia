@@ -136,9 +136,10 @@
 
   /* footer + rate-us */
   .foot{text-align:center;padding:34px 24px 44px;border-top:1px solid var(--line);margin-top:16px;}
+  .rates{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-bottom:22px;}
   .rate{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-family:var(--sans);
     font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);
-    border:1px solid var(--accent2);border-radius:999px;padding:11px 24px;margin-bottom:22px;transition:all .15s;}
+    border:1px solid var(--accent2);border-radius:999px;padding:11px 24px;transition:all .15s;}
   .rate:hover{background:var(--accent);color:var(--ground);border-color:var(--accent);}
   .rate .st{font-size:14px;}
   .foot .mk{font-family:var(--serif);font-size:22px;color:var(--accent);letter-spacing:.05em;}
@@ -215,7 +216,13 @@
   {% endif %}
 
   <footer class="foot">
-    {% if outlet.review_url %}<a class="rate" href="{{ outlet.review_url }}" target="_blank" rel="noopener"><span class="st">★</span> Αξιολογήστε μας</a><br>{% endif %}
+    {% if outlet.google_url or outlet.tripadvisor_url or outlet.survey_token %}
+    <div class="rates">
+      {% if outlet.google_url %}<a class="rate" href="{{ outlet.google_url }}" target="_blank" rel="noopener"><span class="st">★</span> Google</a>{% endif %}
+      {% if outlet.tripadvisor_url %}<a class="rate" href="{{ outlet.tripadvisor_url }}" target="_blank" rel="noopener"><span class="st">◉</span> TripAdvisor</a>{% endif %}
+      {% if outlet.survey_token %}<a class="rate" href="/s/{{ outlet.survey_token }}" target="_blank" rel="noopener"><span class="st">✎</span> Ερωτηματολόγιο</a>{% endif %}
+    </div>
+    {% endif %}
     <div class="mk">{{ outlet.name }}</div>
     <div class="fmeta">{{ hotel_name }}<br>Πληροφορίες αλλεργιογόνων διαθέσιμες κατόπιν αιτήματος</div>
     <div class="pw">Powered by Εστία</div>

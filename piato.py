@@ -94,7 +94,10 @@ class Outlet(db.Model):
     layout        = db.Column(db.String(12), default='grid')     # τρόπος παρουσίασης (grid/spread)
     hero_image    = db.Column(db.String(500), default='')        # φωτό για κάρτα hub / hero
     tagline       = db.Column(db.String(160), default='')        # υπότιτλος (π.χ. «Mediterranean cuisine»)
-    review_url    = db.Column(db.String(500), default='')        # «Αξιολογήστε μας» link (Google/TripAdvisor)
+    review_url    = db.Column(db.String(500), default='')        # legacy (deprecated· αντικαταστάθηκε από τα 3 παρακάτω)
+    google_url    = db.Column(db.String(500), default='')        # Google review link
+    tripadvisor_url = db.Column(db.String(500), default='')      # TripAdvisor link
+    survey_token  = db.Column(db.String(36), default='')         # token υπάρχοντος Survey (Εστία) → /s/<token>
     sort          = db.Column(db.Integer, default=0)
     created_at    = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
@@ -191,6 +194,9 @@ def ensure_piato_columns():
             _add_col('piato_outlet', 'hero_image', 'hero_image VARCHAR(500)')
             _add_col('piato_outlet', 'tagline', 'tagline VARCHAR(160)')
             _add_col('piato_outlet', 'review_url', 'review_url VARCHAR(500)')
+            _add_col('piato_outlet', 'google_url', 'google_url VARCHAR(500)')
+            _add_col('piato_outlet', 'tripadvisor_url', 'tripadvisor_url VARCHAR(500)')
+            _add_col('piato_outlet', 'survey_token', 'survey_token VARCHAR(36)')
             _add_col('piato_category', 'kind', "kind VARCHAR(8) DEFAULT 'food'")
         except Exception as e:
             db.session.rollback(); print('[piato] ensure cols skipped:', e)
@@ -449,11 +455,21 @@ def piato_admin():
     # hub links: get-or-create ρυθμίσεις ανά ξενοδοχείο που έχει ≥1 outlet
     hotels_with_outlets = {o.hotel_id for o in outlets}
     hubs = {hid: _hub_for(hid) for hid in hotels_with_outlets}
+    # Ερωτηματολόγια (Surveys module) στο scope — για το dropdown «Ερωτηματολόγιο» ανά outlet.
+    surveys = []
+    try:
+        from surveys import Survey
+        surveys = (Survey.query
+                   .filter(db.or_(Survey.hotel_id.in_(my or {-1}), Survey.hotel_id.is_(None)))
+                   .order_by(Survey.title).all())
+    except Exception as e:
+        print('[piato] surveys list skipped:', e)
     return render_template('piato_admin.html',
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
                            allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
                            palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS, kinds=PIATO_KINDS,
+                           surveys=surveys,
                            base_url=request.host_url.rstrip('/'))
 
 
@@ -475,14 +491,16 @@ def piato_outlet_save():
         layout = 'grid'
     hero = (request.form.get('hero_image') or '').strip()
     tagline = (request.form.get('tagline') or '').strip()
-    review_url = (request.form.get('review_url') or '').strip()
+    google_url = (request.form.get('google_url') or '').strip()
+    tripadvisor_url = (request.form.get('tripadvisor_url') or '').strip()
+    survey_token = (request.form.get('survey_token') or '').strip()
     if not name or hid not in _my_hids():
         return redirect(url_for('piato_admin'))
     if oid:
         o = _outlet_or_403(oid)
         o.name, o.otype, o.hours = name, otype, hours
         o.palette, o.layout, o.hero_image, o.tagline = palette, layout, hero, tagline
-        o.review_url = review_url
+        o.google_url, o.tripadvisor_url, o.survey_token = google_url, tripadvisor_url, survey_token
         # hotel_id αλλάζει μόνο αν το νέο είναι στο scope
         if hid in _my_hids():
             o.hotel_id = hid
@@ -490,7 +508,7 @@ def piato_outlet_save():
     else:
         o = Outlet(hotel_id=hid, name=name, otype=otype, hours=hours,
                    palette=palette, layout=layout, hero_image=hero, tagline=tagline,
-                   review_url=review_url,
+                   google_url=google_url, tripadvisor_url=tripadvisor_url, survey_token=survey_token,
                    qr_token=_tok(), preview_token=_tok(), published=False)
         db.session.add(o)
         log_activity('piato_outlet_add', name)

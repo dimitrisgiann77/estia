@@ -166,7 +166,13 @@
             <select name="layout">{% for k, v in layouts %}<option value="{{ k }}" {{ 'selected' if k == sel.layout else '' }}>{{ v }}</option>{% endfor %}</select>
             <label>Υπότιτλος (tagline)</label><input type="text" name="tagline" value="{{ sel.tagline or '' }}" placeholder="π.χ. Mediterranean & Cretan cuisine">
             <label>Φωτό κάρτας/hero (URL)</label><input type="text" name="hero_image" value="{{ sel.hero_image or '' }}" placeholder="https://…">
-            <label>Link αξιολόγησης «Αξιολογήστε μας» (προαιρ.)</label><input type="text" name="review_url" value="{{ sel.review_url or '' }}" placeholder="π.χ. https://g.page/… ή TripAdvisor">
+            <label>Google review (link)</label><input type="text" name="google_url" value="{{ sel.google_url or '' }}" placeholder="π.χ. https://g.page/r/…">
+            <label>TripAdvisor (link)</label><input type="text" name="tripadvisor_url" value="{{ sel.tripadvisor_url or '' }}" placeholder="π.χ. https://www.tripadvisor.com/…">
+            <label>Ερωτηματολόγιο (Εστία — module Surveys)</label>
+            <select name="survey_token">
+              <option value="">— κανένα —</option>
+              {% for s in surveys %}<option value="{{ s.token }}" {{ 'selected' if s.token == sel.survey_token else '' }}>{{ s.title }}</option>{% endfor %}
+            </select>
             <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
           </form>
           <form method="post" action="/dashboard/piato/outlet/delete" style="margin-top:8px;"
