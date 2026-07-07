@@ -2483,6 +2483,57 @@ def resolve_provider():
             return 'groq'
     return None
 
+
+# ── AI governance matrix (P-081): κάθε module × τύπος δεδομένου· default OFF ──
+# Το AI αγγίζει ΜΟΝΟ ό,τι έχει ρητά ενεργοποιηθεί εδώ. Νέος τύπος → πρόσθεσέ τον.
+AI_MATRIX = [
+    {'key': 'piato', 'label': 'Piato (Εστιατόρια)', 'icon': 'ti-tools-kitchen-2', 'types': [
+        {'key': 'menu_desc',  'label': 'Περιγραφές πιάτων', 'note': 'τίτλοι & περιγραφές μενού'},
+        {'key': 'menu_trans', 'label': 'Μεταφράσεις μενού', 'note': 'συμπλήρωση γλωσσών'},
+        {'key': 'menu_import','label': 'Εισαγωγή μενού (PDF/φωτο)', 'note': 'ανάγνωση αρχείου'},
+    ]},
+    {'key': 'faults', 'label': 'Βλάβες', 'icon': 'ti-alert-triangle', 'types': [
+        {'key': 'summary', 'label': 'Σύνοψη/κατηγοριοποίηση', 'note': 'κείμενα βλαβών'},
+    ]},
+    {'key': 'surveys', 'label': 'Έρευνες / Ερωτηματολόγια', 'icon': 'ti-clipboard-text', 'types': [
+        {'key': 'analysis', 'label': 'Ανάλυση σχολίων', 'note': 'ελεύθερα σχόλια επισκεπτών'},
+    ]},
+    {'key': 'people', 'label': 'Προσωπικό (HR)', 'icon': 'ti-users', 'types': [
+        {'key': 'profile_text', 'label': 'Κείμενα προφίλ/ρόλων', 'note': 'περιγραφές θέσεων'},
+    ]},
+    {'key': 'payroll', 'label': 'Μισθοδοσία', 'icon': 'ti-cash', 'types': [
+        {'key': 'insights', 'label': 'Ερμηνεία στοιχείων', 'note': 'ΕΥΑΙΣΘΗΤΑ οικονομικά δεδομένα'},
+    ]},
+    {'key': 'evaluations', 'label': 'Αξιολογήσεις', 'icon': 'ti-star', 'types': [
+        {'key': 'feedback', 'label': 'Σύνθεση feedback', 'note': 'σχόλια αξιολόγησης'},
+    ]},
+    {'key': 'measurements', 'label': 'Μετρήσεις', 'icon': 'ti-gauge', 'types': [
+        {'key': 'insights', 'label': 'Ερμηνεία μετρήσεων', 'note': 'τιμές & όρια'},
+    ]},
+    {'key': 'schedule', 'label': 'Πρόγραμμα', 'icon': 'ti-calendar', 'types': [
+        {'key': 'suggest', 'label': 'Προτάσεις βάρδιας', 'note': 'διαθεσιμότητες προσωπικού'},
+    ]},
+]
+
+
+def _ai_setting(key, default=''):
+    try:
+        row = Setting.query.get(key)
+        return row.value if row and row.value is not None else default
+    except Exception:
+        return default
+
+
+def ai_allowed(module, dtype):
+    """Πύλη διακυβέρνησης AI. Επιτρέπει (module, dtype) ΜΟΝΟ αν: (1) υπάρχει πάροχος,
+    (2) ο γενικός διακόπτης είναι ON, (3) το συγκεκριμένο κελί είναι ρητά ON. Default OFF."""
+    if resolve_provider() is None:
+        return False
+    if _ai_setting('ai_master', '1') != '1':
+        return False
+    return _ai_setting('ai_allow_%s_%s' % (module, dtype), '0') == '1'
+
+
 def call_llm(system_prompt, messages):
     """messages: list of {'role':'user'|'assistant','content':str}. Returns (reply, error)."""
     provider = resolve_provider()
@@ -4081,7 +4132,33 @@ def ai_admin():
     _provlabel = {'anthropic': 'Anthropic (Claude)', 'openai': 'OpenAI (ChatGPT)', 'groq': 'Groq (Llama)'}
     active = {'provider': prov, 'provider_label': _provlabel.get(prov, ''),
               'model': c['model'] or (_defmodel.get(prov, '') if prov else '')}
-    return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None), active=active)
+    allow = {}
+    for m in AI_MATRIX:
+        for dt in m['types']:
+            allow['%s_%s' % (m['key'], dt['key'])] = (_ai_setting('ai_allow_%s_%s' % (m['key'], dt['key']), '0') == '1')
+    master_on = (_ai_setting('ai_master', '1') == '1')
+    return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None),
+                           active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on)
+
+
+@app.route('/dashboard/ai/matrix', methods=['POST'])
+def ai_matrix_save():
+    u = current_user()
+    if u is None or u.role != 'masteradmin':
+        return redirect(url_for('login'))
+
+    def setk(k, v):
+        row = Setting.query.get(k)
+        if row is None:
+            row = Setting(key=k, value=v); db.session.add(row)
+        else:
+            row.value = v
+    for m in AI_MATRIX:
+        for dt in m['types']:
+            k = 'ai_allow_%s_%s' % (m['key'], dt['key'])
+            setk(k, '1' if request.form.get(k) else '0')
+    db.session.commit(); log_activity('ai_matrix')
+    return redirect(url_for('ai_admin') + '?saved=1#matrix')
 
 
 @app.route('/dashboard/ai/test', methods=['POST'])

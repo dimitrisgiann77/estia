@@ -750,12 +750,14 @@ def piato_vm_delete():
 def piato_ai_describe():
     if not _can_manage():
         return jsonify(error='forbidden'), 403
+    from app import call_llm, ai_allowed
+    if not ai_allowed('piato', 'menu_desc'):
+        return jsonify(error='ai_disabled'), 403   # πύλη διακυβέρνησης: κλειστό από την κονσόλα AI
     title = (request.form.get('title') or '').strip()
     if not title:
         return jsonify(error='no_title'), 400
     desc = (request.form.get('desc') or '').strip()       # υπάρχουσα περιγραφή (πηγή· αλλιώς παράγεται)
     allerg = (request.form.get('allergens') or '').strip()
-    from app import call_llm
     langs_txt = 'el (Greek), en (English), de (German), it (Italian), fr (French)'
     sys_p = ('You localize restaurant menu items for a Greek hotel. Given a dish name and an optional '
              'description in Greek, produce for EACH language [' + langs_txt + ']: (1) the dish name '

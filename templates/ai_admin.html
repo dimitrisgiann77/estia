@@ -30,6 +30,19 @@ input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8p
 #testout.ok{display:block;background:#dcfce7;color:#166534;}
 #testout.err{display:block;background:#fee2e2;color:#991b1b;}
 #testout.wait{display:block;background:#eef4f8;color:#334;}
+.switch{position:relative;display:inline-block;width:42px;height:24px;flex:none;}
+.switch input{opacity:0;width:0;height:0;}
+.slider{position:absolute;cursor:pointer;inset:0;background:#cbd5db;border-radius:24px;transition:.2s;}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+.switch input:checked+.slider{background:#16a34a;}
+.switch input:checked+.slider:before{transform:translateX(18px);}
+.mod{border:1px solid #e6eef2;border-radius:10px;padding:10px 14px;margin-top:12px;}
+.mod .mh{display:flex;align-items:center;gap:8px;font-weight:600;color:#193847;font-size:14px;margin-bottom:2px;}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px dashed #eef3f6;}
+.row.first{border-top:none;}
+.row .txt{font-size:13px;}
+.row .txt small{display:block;color:#93a3ab;font-size:11px;margin-top:1px;}
+.row .txt small.sens{color:#b45309;font-weight:600;}
 </style><script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head><body>
@@ -78,6 +91,25 @@ input,select{width:100%;padding:11px 13px;border:1px solid #ddd;border-radius:8p
         <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
       </div>
       <div id="testout"></div>
+    </form>
+  </div>
+
+  <div class="card" id="matrix">
+    <h2><i class="ti ti-shield-lock"></i> Πίνακας δεδομένων — τι επιτρέπεται στο AI</h2>
+    <div class="sub">Το AI αγγίζει <strong>μόνο</strong> ό,τι ανάψεις εδώ. Όλα ξεκινούν <strong>κλειστά (OFF)</strong> — δικλείδα ασφαλείας για τα δεδομένα σου.</div>
+    <form method="POST" action="/dashboard/ai/matrix">
+      {% for m in matrix %}
+      <div class="mod">
+        <div class="mh"><i class="ti {{ m.icon }}"></i> {{ m.label }}</div>
+        {% for dt in m.types %}
+        <div class="row{{ ' first' if loop.first }}">
+          <div class="txt">{{ dt.label }}<small{% if 'ΕΥΑΙΣΘΗΤΑ' in dt.note %} class="sens"{% endif %}>{{ dt.note }}</small></div>
+          <label class="switch"><input type="checkbox" name="ai_allow_{{ m.key }}_{{ dt.key }}" {{ 'checked' if allow[m.key ~ '_' ~ dt.key] }}><span class="slider"></span></label>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση πίνακα</button>
     </form>
   </div>
 
