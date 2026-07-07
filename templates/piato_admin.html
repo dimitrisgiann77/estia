@@ -26,6 +26,33 @@
   .cat{border:1px solid #e6ebf1;border-radius:12px;padding:12px;margin-top:12px;}
   .cat > .chead{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .cat h4{margin:0;font-size:15px;}
+  .fold{background:none;border:none;cursor:pointer;font-size:14px;color:#64748b;padding:2px 4px;transition:transform .15s;}
+  .cat.folded .fold{transform:rotate(-90deg);}
+  .cat.folded .cat-body{display:none;}
+  .chead .lhs{display:flex;align-items:center;gap:6px;min-width:0;}
+  .catcount{font-weight:400;color:#94a3b8;font-size:12px;}
+  .mv{display:inline-flex;gap:2px;}
+  .mv form{display:inline;} .mv button{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;
+    color:#475569;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px;}
+  .mv button:hover{background:#e2e8f0;}
+  .item-row .imv{display:inline-flex;gap:2px;margin-right:6px;vertical-align:middle;}
+  .toolbar{display:flex;justify-content:flex-end;gap:8px;margin-bottom:2px;}
+  .toolbar button{background:none;border:none;color:var(--accent,#185FA5);cursor:pointer;font-size:12px;font-weight:600;}
+  /* Β: πολυγλωσσία tabs */
+  .lf{margin-top:2px;}
+  .lf-tabs{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px;}
+  .lf-tab{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:2px 8px;font-size:11px;
+    font-weight:600;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  .lf-tab.on{background:var(--accent,#185FA5);border-color:var(--accent,#185FA5);color:#fff;}
+  .lf-dot{width:6px;height:6px;border-radius:50%;background:#cbd5e1;display:inline-block;}
+  .lf-dot.filled{background:#16a34a;}
+  .lf-tab.on .lf-dot{background:rgba(255,255,255,.45);} .lf-tab.on .lf-dot.filled{background:#8ef0a8;}
+  /* Β: ένδειξη μεταφράσεων ανά πιάτο */
+  .tstat{display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle;}
+  .tl{font-size:9px;font-weight:700;color:#cbd5e1;border:1px solid #e2e8f0;border-radius:4px;padding:0 3px;line-height:1.5;}
+  .tl.on{color:#166534;background:#dcfce7;border-color:#bbf7d0;}
+  /* Γ: thumbnail φωτό */
+  .item-row .thumb{width:34px;height:34px;object-fit:cover;border-radius:7px;vertical-align:middle;margin-right:7px;}
   .item-row{display:flex;justify-content:space-between;gap:8px;align-items:center;
             border-top:1px solid #f1f5f9;padding:8px 0;}
   .item-row .t{font-weight:600;font-size:14px;} .item-row .p{color:var(--accent,#185FA5);font-weight:700;}
@@ -45,15 +72,12 @@
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
 {% macro langfields(prefix, data) %}
-  <input type="text" name="{{ prefix }}_el" value="{{ data.get('el','') }}" placeholder="Ελληνικά *">
-  <details><summary>+ άλλες γλώσσες ({{ langs|length - 1 }})</summary>
-    <div class="langbox">
-    {% for code, name in langs if code != 'el' %}
-      <label style="margin-top:4px;">{{ name }}</label>
-      <input type="text" name="{{ prefix }}_{{ code }}" value="{{ data.get(code,'') }}" placeholder="{{ name }}">
-    {% endfor %}
+  <div class="lf" data-lf>
+    <div class="lf-tabs">
+      {% for code, name in langs %}<button type="button" class="lf-tab{{ ' on' if loop.first else '' }}" data-code="{{ code }}" onclick="lfTab(this)" title="{{ name }}">{{ code|upper }}{% if loop.first %} *{% endif %}<i class="lf-dot{{ ' filled' if data.get(code) else '' }}"></i></button>{% endfor %}
     </div>
-  </details>
+    {% for code, name in langs %}<input type="text" name="{{ prefix }}_{{ code }}" value="{{ data.get(code,'') }}" placeholder="{{ name }}" class="lf-in" data-code="{{ code }}" oninput="lfMark(this)"{% if not loop.first %} style="display:none"{% endif %}>{% endfor %}
+  </div>
 {% endmacro %}
 
 <div class="container">
@@ -187,14 +211,27 @@
     <!-- Κατηγορίες + πιάτα -->
     <div class="card" style="margin-top:14px;">
       <h3>Μενού — κατηγορίες & πιάτα</h3>
+      {% if sel.categories %}<div class="toolbar">
+        <button type="button" onclick="foldAll(true)">▸ Σύμπτυξη όλων</button>
+        <button type="button" onclick="foldAll(false)">▾ Άνοιγμα όλων</button>
+      </div>{% endif %}
 
       {% for c in sel.categories %}
       <div class="cat" id="cat{{ c.id }}">
         <div class="chead">
-          <h4>{{ mlget(c.name_i18n, 'el') or '—' }}
-            <span class="badge" style="background:#eef2f7;color:#475569;">{{ 'Ποτό' if (c.kind or 'food') == 'drink' else 'Φαγητό' }}</span>
-            {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
-          <details><summary>✎</summary>
+          <div class="lhs">
+            <button type="button" class="fold" onclick="toggleCat('cat{{ c.id }}')" title="Σύμπτυξη/άνοιγμα">▾</button>
+            <h4>{{ mlget(c.name_i18n, 'el') or '—' }}
+              <span class="badge" style="background:#eef2f7;color:#475569;">{{ 'Ποτό' if (c.kind or 'food') == 'drink' else 'Φαγητό' }}</span>
+              <span class="catcount">· {{ c.items|length }} πιάτα</span>
+              {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
+          </div>
+          <div class="row">
+            <span class="mv">
+              <form method="post" action="/dashboard/piato/category/move"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="dir" value="up"><button type="submit" title="Πάνω">↑</button></form>
+              <form method="post" action="/dashboard/piato/category/move"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="dir" value="down"><button type="submit" title="Κάτω">↓</button></form>
+            </span>
+            <details><summary>✎</summary>
             <div class="subform">
               <form method="post" action="/dashboard/piato/category/save">
                 <input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="outlet_id" value="{{ sel.id }}">
@@ -211,20 +248,28 @@
               </form>
             </div>
           </details>
+          </div>
         </div>
+        <div class="cat-body" id="body-cat{{ c.id }}">
 
         {% for it in c.items %}
         <div class="item-row">
           <div>
+            <span class="imv mv">
+              <form method="post" action="/dashboard/piato/item/move"><input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="dir" value="up"><button type="submit" title="Πάνω">↑</button></form>
+              <form method="post" action="/dashboard/piato/item/move"><input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="dir" value="down"><button type="submit" title="Κάτω">↓</button></form>
+            </span>
+            {% if it.photo_url %}<img class="thumb" src="{{ it.photo_url }}" alt="">{% endif %}
             <span class="t">{{ mlget(it.title_i18n, 'el') or '—' }}</span>
             {% if not it.available %}<span class="badge draft">εξαντλήθηκε</span>{% endif %}
             {% if it.allergens %}<span class="muted"> · {{ it.allergens|length }} αλλεργ.</span>{% endif %}
+            <span class="tstat" title="Μεταφράσεις τίτλου">{% set td = ml(it.title_i18n) %}{% for code, name in langs %}<span class="tl{{ ' on' if td.get(code) else '' }}">{{ code|upper }}</span>{% endfor %}</span>
           </div>
           <div class="row">
             <span class="p">€ {{ '%.2f'|format(it.price) }}</span>
             <form method="post" action="/dashboard/piato/item/available">
               <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="to" value="{{ '0' if it.available else '1' }}">
-              <button class="btn sm {{ 'gray' if it.available else 'green' }}" type="submit">{{ '86 (εξάντληση)' if it.available else 'Διαθέσιμο' }}</button>
+              <button class="btn sm {{ 'gray' if it.available else 'green' }}" type="submit">{{ 'Σήμανε εξαντλημένο' if it.available else 'Ξανά διαθέσιμο' }}</button>
             </form>
           </div>
         </div>
@@ -303,6 +348,7 @@
             </form>
           </div>
         </details>
+        </div>
       </div>
       {% endfor %}
 
@@ -325,4 +371,18 @@
 
 </div>
 </div>
+<script>
+  function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
+  function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }
+  function lfTab(btn){
+    var box=btn.closest('[data-lf]'); if(!box) return; var code=btn.getAttribute('data-code');
+    box.querySelectorAll('.lf-tab').forEach(function(b){ b.classList.toggle('on', b===btn); });
+    box.querySelectorAll('.lf-in').forEach(function(i){ i.style.display = (i.getAttribute('data-code')===code) ? '' : 'none'; });
+  }
+  function lfMark(inp){
+    var box=inp.closest('[data-lf]'); if(!box) return; var code=inp.getAttribute('data-code');
+    var tab=box.querySelector('.lf-tab[data-code="'+code+'"]'); if(!tab) return;
+    var dot=tab.querySelector('.lf-dot'); if(dot) dot.classList.toggle('filled', !!inp.value.trim());
+  }
+</script>
 </body></html>

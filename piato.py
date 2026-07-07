@@ -23,8 +23,9 @@ from app import (app, db, current_user, is_admin, allowed_hotels, active_hotel_i
 
 # ── Σταθερές ──────────────────────────────────────────────────────────────────
 # Γλώσσες μενού (guest-facing· πρώτη = προεπιλογή/fallback). Εύκολα επεκτάσιμο.
-# Φ1: μόνο EL/EN (μόνο αυτές έχουν περιεχόμενο). Επεκτάσιμο — πρόσθεσε γλώσσα εδώ όταν υπάρχει μετάφραση.
-PIATO_LANGS = [('el', 'Ελληνικά'), ('en', 'English')]
+# Γλώσσες μενού (guest-facing· πρώτη = προεπιλογή/fallback). Επεκτάσιμο.
+PIATO_LANGS = [('el', 'Ελληνικά'), ('en', 'English'), ('de', 'Deutsch'),
+               ('it', 'Italiano'), ('fr', 'Français')]
 LANG_CODES = [c for c, _ in PIATO_LANGS]
 DEF_LANG = 'el'
 
@@ -598,6 +599,35 @@ def piato_category_delete():
     return redirect(url_for('piato_admin', outlet=o.id))
 
 
+def _reorder(rows, row_id, direction):
+    """Μετακίνησε τη γραμμή row_id up/down μέσα στη λίστα rows· ξαναγράφει sort=θέση (contiguous).
+    Επιστρέφει True αν άλλαξε κάτι (χρειάζεται commit)."""
+    lst = sorted(rows, key=lambda x: (x.sort or 0, x.id))
+    idx = next((k for k, x in enumerate(lst) if x.id == row_id), None)
+    if idx is None:
+        return False
+    j = idx - 1 if direction == 'up' else idx + 1
+    if j < 0 or j >= len(lst):
+        return False
+    lst[idx], lst[j] = lst[j], lst[idx]
+    for k, x in enumerate(lst):
+        x.sort = k
+    return True
+
+
+@app.route('/dashboard/piato/category/move', methods=['POST'])
+def piato_category_move():
+    if not _can_manage():
+        return redirect(url_for('login'))
+    c = MenuCategory.query.get(_i(request.form.get('id')))
+    if not c:
+        abort(404)
+    o = _outlet_or_403(c.outlet_id)
+    if _reorder(list(o.categories), c.id, request.form.get('dir')):
+        db.session.commit()
+    return redirect(url_for('piato_admin', outlet=o.id) + '#cat%d' % c.id)
+
+
 # ── ITEM CRUD ────────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/item/save', methods=['POST'])
 def piato_item_save():
@@ -660,6 +690,20 @@ def piato_item_delete():
     o = _outlet_or_403(c.outlet_id)
     db.session.delete(it); db.session.commit()
     log_activity('piato_item_delete', o.name)
+    return redirect(url_for('piato_admin', outlet=o.id) + '#cat%d' % c.id)
+
+
+@app.route('/dashboard/piato/item/move', methods=['POST'])
+def piato_item_move():
+    if not _can_manage():
+        return redirect(url_for('login'))
+    it = MenuItem.query.get(_i(request.form.get('id')))
+    if not it:
+        abort(404)
+    c = MenuCategory.query.get(it.category_id)
+    o = _outlet_or_403(c.outlet_id)
+    if _reorder(list(c.items), it.id, request.form.get('dir')):
+        db.session.commit()
     return redirect(url_for('piato_admin', outlet=o.id) + '#cat%d' % c.id)
 
 
