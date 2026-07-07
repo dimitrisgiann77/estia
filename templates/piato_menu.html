@@ -27,8 +27,8 @@
   .root[data-device="tablet"]{max-width:840px;}
 
   /* top action bar: back link + language selector */
-  .topbar{position:absolute;top:0;left:0;right:0;z-index:22;display:flex;align-items:center;justify-content:space-between;
-    gap:10px;padding:16px 20px;background:transparent;}
+  .topbar{position:static;z-index:22;display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:14px 20px;background:var(--ground);}
   .back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);
     font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px 6px 9px;border:1px solid var(--line);
     border-radius:999px;background:transparent;transition:color .15s,border-color .15s;max-width:62%;overflow:hidden;
@@ -46,7 +46,7 @@
   .langsel select option{background:var(--panel);color:var(--ink);}
 
   /* hero */
-  .hero{padding:78px 28px 30px;text-align:center;border-bottom:1px solid var(--line);
+  .hero{padding:44px 28px 28px;text-align:center;border-bottom:1px solid var(--line);
     background:radial-gradient(120% 90% at 50% 0%,var(--hero),var(--ground) 74%);}
   .eyebrow{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:500;}
   .title{font-family:var(--serif);font-size:48px;line-height:1;font-weight:600;margin:12px 0 4px;text-wrap:balance;}
@@ -65,7 +65,7 @@
   .kindtabs button.on{color:var(--ground);background:var(--accent);border-color:var(--accent);font-weight:500;}
 
   /* category nav */
-  .nav{position:sticky;top:0;z-index:10;display:flex;gap:20px;overflow-x:auto;padding:13px 22px;
+  .nav{position:sticky;top:0;z-index:20;display:flex;gap:20px;overflow-x:auto;padding:13px 22px;
     background:var(--ground);border-bottom:1px solid var(--line);scrollbar-width:none;}
   .nav::-webkit-scrollbar{display:none;}
   .nav a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:12px;letter-spacing:.13em;
@@ -144,9 +144,47 @@
   .rate .st{font-size:14px;}
   .foot .mk{font-family:var(--serif);font-size:22px;color:var(--accent);letter-spacing:.05em;}
   .foot .fmeta{font-size:11px;letter-spacing:.07em;color:var(--muted);margin-top:8px;line-height:1.7;}
-  .foot .pw{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent2);margin-top:14px;}
-  .foot .pw2{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
+  .foot .brand{margin-top:14px;}
+  .foot .pw{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent2);margin-top:3px;}
   .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:24px;}
+
+  /* order pad (client-side — ο πελάτης δείχνει την οθόνη στον σερβιτόρο· καμία αποστολή) */
+  .additem{margin-top:10px;display:inline-flex;align-items:center;gap:5px;font-family:var(--sans);font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--accent);background:transparent;border:1px solid var(--accent2);
+    border-radius:999px;padding:6px 14px;cursor:pointer;transition:all .15s;}
+  .additem:hover{background:var(--accent);color:var(--ground);border-color:var(--accent);}
+  .ordfab{position:fixed;right:20px;bottom:20px;z-index:40;display:none;align-items:center;gap:9px;background:var(--accent);
+    color:var(--ground);border:none;border-radius:999px;padding:13px 20px;cursor:pointer;font-family:var(--sans);
+    font-size:13px;font-weight:500;letter-spacing:.04em;box-shadow:0 6px 24px rgba(0,0,0,.35);}
+  .ordfab.show{display:inline-flex;}
+  .ordfab .oc{background:var(--ground);color:var(--accent);border-radius:999px;min-width:20px;height:20px;
+    display:inline-flex;align-items:center;justify-content:center;font-size:12px;padding:0 5px;font-weight:600;}
+  .orderpanel{position:fixed;top:0;right:0;z-index:50;height:100%;width:min(370px,86vw);background:var(--panel);
+    border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(100%);
+    transition:transform .28s ease;box-shadow:-8px 0 34px rgba(0,0,0,.3);}
+  .orderpanel.open{transform:none;}
+  .ord-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line);}
+  .ord-head h3{font-family:var(--serif);font-size:22px;color:var(--ink);font-weight:600;}
+  .ord-x{background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;}
+  .ord-body{flex:1;overflow-y:auto;padding:6px 20px;}
+  .ord-empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:44px 10px;}
+  .ord-row{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid var(--line);}
+  .ord-row .on{flex:1;min-width:0;}
+  .ord-row .onm{font-family:var(--serif);font-size:16px;color:var(--ink);line-height:1.2;}
+  .ord-row .op{font-size:12px;color:var(--accent);margin-top:2px;}
+  .ord-qty{display:flex;align-items:center;gap:8px;flex:none;}
+  .ord-qty button{width:26px;height:26px;border-radius:999px;border:1px solid var(--accent2);background:transparent;
+    color:var(--accent);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+  .ord-qty .qn{min-width:16px;text-align:center;font-size:14px;color:var(--ink);}
+  .ord-rm{background:none;border:none;color:var(--faint);font-size:15px;cursor:pointer;flex:none;}
+  .ord-rm:hover{color:var(--accent);}
+  .ord-foot{padding:16px 20px 20px;border-top:1px solid var(--line);}
+  .ord-total{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--sans);font-size:12px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .ord-total b{font-family:var(--serif);font-size:24px;color:var(--accent);letter-spacing:0;}
+  .ord-note{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;letter-spacing:.02em;}
+  .ord-clear{width:100%;margin-top:12px;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;
+    padding:9px;cursor:pointer;font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;}
 </style>
 </head>
 <body data-pal="{{ outlet.palette if outlet.palette in ['olive','aegean','charcoal','ink','linen'] else 'olive' }}">
@@ -205,6 +243,7 @@
         {% if it.variants %}<div class="vm"><b>Επιλογές:</b> {% for v in it.variants %}{{ v.label }}{% if v.delta %} (+{{ '%.2f'|format(v.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
         {% if it.modifiers %}<div class="vm"><b>Extra:</b> {% for m in it.modifiers %}{{ m.label }}{% if m.delta %} (+{{ '%.2f'|format(m.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
         {% if it.allergens %}<div class="dtags">{% for a in it.allergens %}<span class="tag">{{ a.name }}</span>{% endfor %}</div>{% endif %}
+        {% if it.available %}<button class="additem" data-id="{{ it.id }}" data-name="{{ it.title }}" data-price="{{ it.price }}" onclick="ORDER.add(this)">＋ Προσθήκη</button>{% endif %}
       </div>
       {% endfor %}
     </section>
@@ -225,13 +264,54 @@
     {% endif %}
     <div class="mk">{{ outlet.name }}</div>
     <div class="fmeta">{{ hotel_name }}<br>Πληροφορίες αλλεργιογόνων διαθέσιμες κατόπιν αιτήματος</div>
-    <div class="pw">Powered by Piato</div>
-    <div class="pw2">Εστία © 2026</div>
-    <div class="pw2">CONDIAN Hotels</div>
+    <div class="brand">
+      <div class="pw">Powered by Piato</div>
+      <div class="pw">ESTIA © 2026</div>
+      <div class="pw">CONDIAN Hotels</div>
+    </div>
   </footer>
 </div>
 
+<aside class="orderpanel" id="orderpanel" aria-label="Η παραγγελία μου">
+  <div class="ord-head"><h3>Η παραγγελία μου</h3><button class="ord-x" onclick="ORDER.toggle()" aria-label="Κλείσιμο">×</button></div>
+  <div class="ord-body" id="ordbody"><div class="ord-empty">Διαλέξτε πιάτα με το «＋ Προσθήκη».</div></div>
+  <div class="ord-foot">
+    <div class="ord-total"><span>Σύνολο</span><b id="ordtotal">0.00</b></div>
+    <div class="ord-note">Δείξτε την οθόνη στον σερβιτόρο για να καταχωρήσει την παραγγελία.</div>
+    <button class="ord-clear" id="ordclear" onclick="ORDER.clear()" style="display:none">Καθαρισμός</button>
+  </div>
+</aside>
+<button class="ordfab" id="ordfab" onclick="ORDER.toggle()"><span>🛒 Παραγγελία</span><span class="oc" id="ordcount">0</span></button>
+
 <script>
+  // ── Order pad (client-side μόνο· καμία αποστολή — ο πελάτης δείχνει το tablet στον σερβιτόρο) ──
+  function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  var ORDER={
+    items:{},
+    add:function(btn){var id=btn.getAttribute('data-id');
+      if(!this.items[id]) this.items[id]={name:btn.getAttribute('data-name'),price:parseFloat(btn.getAttribute('data-price'))||0,qty:0};
+      this.items[id].qty++; this.render();},
+    inc:function(id){if(this.items[id]){this.items[id].qty++;this.render();}},
+    dec:function(id){if(this.items[id]){this.items[id].qty--;if(this.items[id].qty<=0)delete this.items[id];this.render();}},
+    rm:function(id){delete this.items[id];this.render();},
+    clear:function(){this.items={};this.render();},
+    toggle:function(){document.getElementById('orderpanel').classList.toggle('open');},
+    render:function(){
+      var body=document.getElementById('ordbody'),ids=Object.keys(this.items),total=0,count=0,html='';
+      if(!ids.length){html='<div class="ord-empty">Διαλέξτε πιάτα με το «＋ Προσθήκη».</div>';}
+      ids.forEach(function(id){var it=ORDER.items[id];total+=it.price*it.qty;count+=it.qty;
+        html+='<div class="ord-row"><div class="on"><div class="onm">'+esc(it.name)+'</div><div class="op">'+it.price.toFixed(2)+'</div></div>'+
+          '<div class="ord-qty"><button onclick="ORDER.dec(\''+id+'\')" aria-label="Λιγότερα">−</button>'+
+          '<span class="qn">'+it.qty+'</span><button onclick="ORDER.inc(\''+id+'\')" aria-label="Περισσότερα">＋</button></div>'+
+          '<button class="ord-rm" onclick="ORDER.rm(\''+id+'\')" aria-label="Αφαίρεση">✕</button></div>';});
+      body.innerHTML=html;
+      document.getElementById('ordtotal').textContent=total.toFixed(2);
+      document.getElementById('ordcount').textContent=count;
+      document.getElementById('ordclear').style.display=ids.length?'':'none';
+      document.getElementById('ordfab').classList.toggle('show',count>0);
+    }
+  };
+
   var MASTER={{ allergens|tojson }};
   var GROUPS={{ groups|map(attribute='code')|list|tojson }};
   var curKind=GROUPS.length?GROUPS[0]:null;
