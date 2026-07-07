@@ -10,11 +10,11 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   :root{--serif:"Cormorant Garamond",Georgia,serif;--sans:"Jost",ui-sans-serif,-apple-system,"Segoe UI",Arial,sans-serif;
-    --paper:#F7F5EF;--card:#FFFFFF;--ink:#2A2A20;--muted:#7C7869;--faint:#A8A492;--line:#E8E4D8;--gold:#A9863F;}
+    --paper:#FFFFFF;--card:#FFFFFF;--ink:#2A2A20;--muted:#7C7869;--faint:#A8A492;--line:#E8E2D2;--gold:#A9863F;}
   html{background:var(--paper);}
   body{min-height:100vh;background:var(--paper);color:var(--ink);font-family:var(--sans);
     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
-  .wrap{max-width:940px;margin:0 auto;padding:44px 20px 56px;}
+  .wrap{max-width:940px;margin:0 auto;padding:46px 20px 56px;}
 
   .top{text-align:center;padding:0 8px 30px;}
   .crest{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);font-weight:600;}
@@ -28,33 +28,34 @@
   .cards{display:grid;grid-template-columns:1fr;gap:20px;}
   @media(min-width:680px){.cards{grid-template-columns:1fr 1fr;}}
   .card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:196px;
-    padding:24px 24px 22px;border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ink);
-    background:var(--card);border:1px solid var(--line);box-shadow:0 8px 26px rgba(42,38,24,.07);
-    transition:transform .2s,box-shadow .2s;}
-  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--acc);}
-  .card:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(42,38,24,.14);}
-  .card .emblem{position:absolute;top:18px;right:20px;font-size:26px;opacity:.55;letter-spacing:2px;}
-  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:7px;}
+    padding:24px;border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ink);
+    background:var(--card);border:1px solid var(--line);box-shadow:0 6px 22px rgba(42,38,24,.08);
+    transition:transform .2s,box-shadow .2s,border-color .2s;}
+  .card:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(42,38,24,.15);border-color:#D9CFB6;}
+  .card .emblem{position:absolute;top:18px;right:20px;display:flex;gap:7px;color:var(--gold);}
+  .card .ico{width:23px;height:23px;flex:none;}
+  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:7px;}
   .card .nm{font-family:var(--serif);font-size:31px;font-weight:600;line-height:1.04;color:var(--ink);}
   .card .meta{font-size:12.5px;margin-top:9px;color:var(--muted);line-height:1.5;}
-  .card .go{margin-top:15px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:500;}
+  .card .go{margin-top:15px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:500;}
   .card .go .arw{display:inline-block;transition:transform .2s;}
   .card:hover .go .arw{transform:translateX(4px);}
   .card .draft{position:absolute;top:14px;left:16px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
     color:#8a6d1a;border:1px solid #cbb26a;border-radius:999px;padding:2px 9px;background:#fbf6e6;}
 
   .foot{text-align:center;padding:42px 16px 6px;}
-  .langs{display:flex;justify-content:center;gap:15px;flex-wrap:wrap;margin-bottom:20px;}
+  .langs{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;}
   .langs a{color:var(--muted);font-size:12px;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:color .15s;}
   .langs a:hover{color:var(--ink);}
   .langs a.on{color:var(--gold);border-bottom:1px solid var(--gold);padding-bottom:2px;}
   .brand{margin-top:2px;}
   .pw{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-top:3px;}
-  .pvnote{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:18px;opacity:.85;}
   .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:60px 16px;grid-column:1/-1;}
 </style>
 </head>
 <body>
+{% set SVG_FOOD %}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v18"/><path d="M4 3v5a2 2 0 0 0 4 0V3"/><path d="M17.5 3c-1.7 1.4-2.1 4.6-1 7 .3.7 1 1 1 1v10"/></svg>{% endset %}
+{% set SVG_DRINK %}<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16l-8 8-8-8Z"/><path d="M12 12v6"/><path d="M8.5 20h7"/></svg>{% endset %}
 <div class="wrap">
   <header class="top">
     <div class="crest">Condian Hotels</div>
@@ -66,10 +67,9 @@
 
   <div class="cards">
     {% for c in cards %}
-      {% set ACC = {'olive':'#8F7638','charcoal':'#9A7B2E','ink':'#B8792A','aegean':'#C26A38','linen':'#5F7A4A'}.get(c.palette,'#A9863F') %}
-      <a class="card" href="{{ c.link }}" style="--acc:{{ ACC }}">
+      <a class="card" href="{{ c.link }}">
         {% if preview and not c.published %}<span class="draft">Draft</span>{% endif %}
-        <div class="emblem">{% if c.has_food and c.has_drink %}🍽 🍸{% elif c.has_drink %}🍸{% elif c.has_food %}🍽{% else %}{{ {'restaurant':'🍽','bar':'🍸','pool_bar':'🍸','beach_bar':'🍸','room_service':'🛎','cafe':'☕'}.get(c.otype,'✦') }}{% endif %}</div>
+        <div class="emblem">{% if c.has_food %}{{ SVG_FOOD }}{% endif %}{% if c.has_drink %}{{ SVG_DRINK }}{% endif %}{% if not c.has_food and not c.has_drink %}{{ SVG_DRINK if c.otype in ['bar','pool_bar','beach_bar'] else SVG_FOOD }}{% endif %}</div>
         <div class="type">{{ c.otype_label }}</div>
         <div class="nm">{{ c.name }}</div>
         {% if c.tagline or c.hours %}<div class="meta">{% if c.tagline %}{{ c.tagline }}{% endif %}{% if c.tagline and c.hours %} · {% endif %}{% if c.hours %}{{ c.hours }}{% endif %}</div>{% endif %}
@@ -87,7 +87,6 @@
       <div class="pw">ESTIA © 2026</div>
       <div class="pw">CONDIAN Hotels</div>
     </div>
-    {% if preview %}<div class="pvnote">Προεπισκόπηση · περιλαμβάνει μη δημοσιευμένα σημεία</div>{% endif %}
   </div>
 </div>
 </body>

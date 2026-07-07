@@ -23,9 +23,8 @@ from app import (app, db, current_user, is_admin, allowed_hotels, active_hotel_i
 
 # ── Σταθερές ──────────────────────────────────────────────────────────────────
 # Γλώσσες μενού (guest-facing· πρώτη = προεπιλογή/fallback). Εύκολα επεκτάσιμο.
-PIATO_LANGS = [('el', 'Ελληνικά'), ('en', 'English'), ('de', 'Deutsch'),
-               ('fr', 'Français'), ('it', 'Italiano'), ('ru', 'Русский'),
-               ('bg', 'Български')]
+# Φ1: μόνο EL/EN (μόνο αυτές έχουν περιεχόμενο). Επεκτάσιμο — πρόσθεσε γλώσσα εδώ όταν υπάρχει μετάφραση.
+PIATO_LANGS = [('el', 'Ελληνικά'), ('en', 'English')]
 LANG_CODES = [c for c, _ in PIATO_LANGS]
 DEF_LANG = 'el'
 
@@ -48,6 +47,27 @@ LAYOUT_CODES = [c for c, _ in PIATO_LAYOUTS]
 # Ομαδοποίηση κατηγοριών σε δύο κύριες ενότητες (Φαγητό / Ποτό).
 PIATO_KINDS = [('food', 'Φαγητό'), ('drink', 'Ποτό')]
 KIND_CODES = [c for c, _ in PIATO_KINDS]
+
+# UI strings guest μενού (σταθερά κείμενα) ανά γλώσσα. el = Ελληνικά· κάθε άλλη γλώσσα → en (διεθνές).
+PIATO_UI = {
+    'el': {'back': 'Πίσω', 'hide_allergens': 'Απόκρυψη αλλεργιογόνων', 'reset': 'Επαναφορά',
+           'sold_out': 'εξαντλήθηκε', 'options': 'Επιλογές', 'extra': 'Extra', 'add': 'Προσθήκη',
+           'my_order': 'Η παραγγελία μου', 'order_empty': 'Διαλέξτε πιάτα με το «＋ Προσθήκη».',
+           'total': 'Σύνολο', 'order_note': 'Δείξτε την οθόνη στον σερβιτόρο για να καταχωρήσει την παραγγελία.',
+           'clear': 'Καθαρισμός', 'order': 'Παραγγελία', 'questionnaire': 'Ερωτηματολόγιο',
+           'allergen_note': 'Πληροφορίες αλλεργιογόνων διαθέσιμες κατόπιν αιτήματος',
+           'no_match': 'Κανένα πιάτο δεν ταιριάζει με το φίλτρο.', 'preparing': 'Το μενού ετοιμάζεται…'},
+    'en': {'back': 'Back', 'hide_allergens': 'Hide allergens', 'reset': 'Reset',
+           'sold_out': 'sold out', 'options': 'Options', 'extra': 'Extras', 'add': 'Add',
+           'my_order': 'My order', 'order_empty': 'Select dishes with the «＋ Add» button.',
+           'total': 'Total', 'order_note': 'Show the screen to your waiter to place the order.',
+           'clear': 'Clear', 'order': 'Order', 'questionnaire': 'Questionnaire',
+           'allergen_note': 'Allergen information available on request',
+           'no_match': 'No dishes match the filter.', 'preparing': 'The menu is being prepared…'},
+}
+
+def _ui(lang):
+    return PIATO_UI.get(lang, PIATO_UI['en'])
 
 # Γνωστές κατηγορίες ποτού (case-insensitive substrings, en/el) — για idempotent seed
 # defaults ΜΟΝΟ όταν το kind δεν έχει οριστεί ακόμη. Ο admin πάντα υπερισχύει.
@@ -370,7 +390,7 @@ def _render_menu(outlet, preview=False):
                            outlet=outlet, hotel_name=(h.name if h else ''),
                            cats=cats, groups=groups, allergens=allergens,
                            langs=PIATO_LANGS, lang=lang, preview=preview,
-                           hub_link=hub_link)
+                           hub_link=hub_link, T=_ui(lang))
 
 
 # ── GUEST ROUTES (public — χωρίς login) ──────────────────────────────────────

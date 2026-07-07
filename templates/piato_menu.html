@@ -123,10 +123,11 @@
   .root[data-mode="grid"] .thumb{display:block;}
   .root[data-device="phone"][data-mode="grid"] #menu .section{grid-template-columns:1fr;}
 
-  /* SPREAD layout: 2 columns only on wide viewports */
-  .root[data-mode="spread"][data-device="tablet"] #menu{column-count:2;column-gap:34px;padding:0 8px;}
-  @media(min-width:760px){ .root[data-mode="spread"][data-device="full"] #menu{column-count:2;column-gap:34px;padding:0 8px;} }
-  .root[data-mode="spread"] #menu .section{break-inside:avoid;}
+  /* SPREAD (Δίστηλο): κατηγορίες σε πλέγμα ΑΝΑ ΓΡΑΜΜΗ (row-major) — δίπλα σε κάθε κατηγορία η ΕΠΟΜΕΝΗ κατηγορία */
+  @media(min-width:760px){
+    .root[data-mode="spread"] #menu{display:grid;grid-template-columns:1fr 1fr;gap:0 44px;align-items:start;}
+    .root[data-mode="spread"] #menu #empty{grid-column:1/-1;}
+  }
 
   /* footer + rate-us */
   .foot{text-align:center;padding:34px 24px 44px;border-top:1px solid var(--line);margin-top:16px;}
@@ -186,7 +187,7 @@
 <div class="root" data-mode="{{ outlet.layout if outlet.layout in ['grid','spread','list'] else 'grid' }}" data-device="full" id="root">
 
   <header class="hero">
-    <a class="back" href="{{ hub_link }}"><span class="arw">←</span><span class="bt">Πίσω</span></a>
+    <a class="back" href="{{ hub_link }}"><span class="arw">←</span><span class="bt">{{ T.back }}</span></a>
     <div class="eyebrow">{{ hotel_name }}</div>
     <h1 class="title">{{ outlet.name }}</h1>
     {% if outlet.otype %}<div class="sub">à la carte</div>{% endif %}
@@ -208,7 +209,7 @@
 
   {% if allergens %}
   <div class="filterbar">
-    <div class="flabel"><span>Απόκρυψη αλλεργιογόνων</span><button onclick="clearF()">Reset</button></div>
+    <div class="flabel"><span>{{ T.hide_allergens }}</span><button onclick="clearF()">{{ T.reset }}</button></div>
     <div class="chips" id="chips"></div>
   </div>
   {% endif %}
@@ -221,24 +222,24 @@
       {% for it in c.dishes %}
       <div class="dish {{ 'sold' if not it.available else '' }}" data-al="{{ it.allergen_codes|join(' ') }}">
         <div class="drow">
-          <span class="dname">{{ it.title }}{% if not it.available %}<span class="sold-badge">εξαντλήθηκε</span>{% endif %}</span>
+          <span class="dname">{{ it.title }}{% if not it.available %}<span class="sold-badge">{{ T.sold_out }}</span>{% endif %}</span>
           <span class="leader"></span>
           <span class="price">{{ '%.2f'|format(it.price) }}</span>
         </div>
         {% if it.photo %}<img class="thumb" src="{{ it.photo }}" alt="" loading="lazy">{% endif %}
         {% if it.desc %}<div class="ddesc">{{ it.desc }}</div>{% endif %}
-        {% if it.variants %}<div class="vm"><b>Επιλογές:</b> {% for v in it.variants %}{{ v.label }}{% if v.delta %} (+{{ '%.2f'|format(v.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
-        {% if it.modifiers %}<div class="vm"><b>Extra:</b> {% for m in it.modifiers %}{{ m.label }}{% if m.delta %} (+{{ '%.2f'|format(m.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+        {% if it.variants %}<div class="vm"><b>{{ T.options }}:</b> {% for v in it.variants %}{{ v.label }}{% if v.delta %} (+{{ '%.2f'|format(v.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+        {% if it.modifiers %}<div class="vm"><b>{{ T.extra }}:</b> {% for m in it.modifiers %}{{ m.label }}{% if m.delta %} (+{{ '%.2f'|format(m.delta) }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
         {% if it.allergens %}<div class="dtags">{% for a in it.allergens %}<span class="tag">{{ a.name }}</span>{% endfor %}</div>{% endif %}
-        {% if it.available %}<button class="additem" data-id="{{ it.id }}" data-name="{{ it.title }}" data-price="{{ it.price }}" onclick="ORDER.add(this)">＋ Προσθήκη</button>{% endif %}
+        {% if it.available %}<button class="additem" data-id="{{ it.id }}" data-name="{{ it.title }}" data-price="{{ it.price }}" onclick="ORDER.add(this)">＋ {{ T.add }}</button>{% endif %}
       </div>
       {% endfor %}
     </section>
   {% endfor %}{% endfor %}
-    <div class="empty" id="empty" style="display:none">Κανένα πιάτο δεν ταιριάζει με το φίλτρο.</div>
+    <div class="empty" id="empty" style="display:none">{{ T.no_match }}</div>
   </div>
   {% else %}
-    <div class="empty" style="padding:60px 24px;">Το μενού ετοιμάζεται…</div>
+    <div class="empty" style="padding:60px 24px;">{{ T.preparing }}</div>
   {% endif %}
 
   <footer class="foot">
@@ -246,11 +247,11 @@
     <div class="rates">
       {% if outlet.google_url %}<a class="rate" href="{{ outlet.google_url }}" target="_blank" rel="noopener"><span class="st">★</span> Google</a>{% endif %}
       {% if outlet.tripadvisor_url %}<a class="rate" href="{{ outlet.tripadvisor_url }}" target="_blank" rel="noopener"><span class="st">◉</span> TripAdvisor</a>{% endif %}
-      {% if outlet.survey_token %}<a class="rate" href="/s/{{ outlet.survey_token }}" target="_blank" rel="noopener"><span class="st">✎</span> Ερωτηματολόγιο</a>{% endif %}
+      {% if outlet.survey_token %}<a class="rate" href="/s/{{ outlet.survey_token }}" target="_blank" rel="noopener"><span class="st">✎</span> {{ T.questionnaire }}</a>{% endif %}
     </div>
     {% endif %}
     <div class="mk">{{ outlet.name }}</div>
-    <div class="fmeta">{{ hotel_name }}<br>Πληροφορίες αλλεργιογόνων διαθέσιμες κατόπιν αιτήματος</div>
+    <div class="fmeta">{{ hotel_name }}<br>{{ T.allergen_note }}</div>
     <div class="brand">
       <div class="pw">Powered by Piato</div>
       <div class="pw">ESTIA © 2026</div>
@@ -259,19 +260,20 @@
   </footer>
 </div>
 
-<aside class="orderpanel" id="orderpanel" aria-label="Η παραγγελία μου">
-  <div class="ord-head"><h3>Η παραγγελία μου</h3><button class="ord-x" onclick="ORDER.toggle()" aria-label="Κλείσιμο">×</button></div>
-  <div class="ord-body" id="ordbody"><div class="ord-empty">Διαλέξτε πιάτα με το «＋ Προσθήκη».</div></div>
+<aside class="orderpanel" id="orderpanel" aria-label="{{ T.my_order }}">
+  <div class="ord-head"><h3>{{ T.my_order }}</h3><button class="ord-x" onclick="ORDER.toggle()" aria-label="×">×</button></div>
+  <div class="ord-body" id="ordbody"><div class="ord-empty">{{ T.order_empty }}</div></div>
   <div class="ord-foot">
-    <div class="ord-total"><span>Σύνολο</span><b id="ordtotal">0.00</b></div>
-    <div class="ord-note">Δείξτε την οθόνη στον σερβιτόρο για να καταχωρήσει την παραγγελία.</div>
-    <button class="ord-clear" id="ordclear" onclick="ORDER.clear()" style="display:none">Καθαρισμός</button>
+    <div class="ord-total"><span>{{ T.total }}</span><b id="ordtotal">0.00</b></div>
+    <div class="ord-note">{{ T.order_note }}</div>
+    <button class="ord-clear" id="ordclear" onclick="ORDER.clear()" style="display:none">{{ T.clear }}</button>
   </div>
 </aside>
-<button class="ordfab" id="ordfab" onclick="ORDER.toggle()"><span>🛒 Παραγγελία</span><span class="oc" id="ordcount">0</span></button>
+<button class="ordfab" id="ordfab" onclick="ORDER.toggle()"><span>🛒 {{ T.order }}</span><span class="oc" id="ordcount">0</span></button>
 
 <script>
   // ── Order pad (client-side μόνο· καμία αποστολή — ο πελάτης δείχνει το tablet στον σερβιτόρο) ──
+  var T_EMPTY = {{ T.order_empty|tojson }};
   function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   var ORDER={
     items:{},
@@ -285,7 +287,7 @@
     toggle:function(){document.getElementById('orderpanel').classList.toggle('open');},
     render:function(){
       var body=document.getElementById('ordbody'),ids=Object.keys(this.items),total=0,count=0,html='';
-      if(!ids.length){html='<div class="ord-empty">Διαλέξτε πιάτα με το «＋ Προσθήκη».</div>';}
+      if(!ids.length){html='<div class="ord-empty">'+esc(T_EMPTY)+'</div>';}
       ids.forEach(function(id){var it=ORDER.items[id];total+=it.price*it.qty;count+=it.qty;
         html+='<div class="ord-row"><div class="on"><div class="onm">'+esc(it.name)+'</div><div class="op">'+it.price.toFixed(2)+'</div></div>'+
           '<div class="ord-qty"><button onclick="ORDER.dec(\''+id+'\')" aria-label="Λιγότερα">−</button>'+

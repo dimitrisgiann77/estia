@@ -7,8 +7,9 @@ BEGIN
   IF v_hotel IS NULL THEN RAISE EXCEPTION 'Δεν βρέθηκε ξενοδοχείο'; END IF;
   SELECT id INTO v_outlet FROM piato_outlet WHERE hotel_id=v_hotel AND name='Oliva A la carte Restaurant' LIMIT 1;
   IF v_outlet IS NULL THEN
-    INSERT INTO piato_outlet (hotel_id,name,otype,hours,qr_token,preview_token,published,sort,created_at,updated_at)
-    VALUES (v_hotel,'Oliva A la carte Restaurant','restaurant','',md5(random()::text||clock_timestamp()::text),md5(random()::text||clock_timestamp()::text||'p'),false,0,now(),now()) RETURNING id INTO v_outlet;
+    INSERT INTO piato_outlet (hotel_id,name,otype,hours,layout,qr_token,preview_token,published,sort,created_at,updated_at)
+    VALUES (v_hotel,'Oliva A la carte Restaurant','restaurant','','spread',md5(random()::text||clock_timestamp()::text),md5(random()::text||clock_timestamp()::text||'p'),false,0,now(),now()) RETURNING id INTO v_outlet;
+  ELSE UPDATE piato_outlet SET layout='spread' WHERE id=v_outlet;
   END IF;
   -- Appetizers / Ορεκτικά
   SELECT id INTO v_cat FROM piato_category WHERE outlet_id=v_outlet AND (name_i18n::jsonb->>'en')='Appetizers' LIMIT 1;

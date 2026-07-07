@@ -94,8 +94,9 @@ def emit_sql(hotel_like='asterias'):
     L.append("  IF v_hotel IS NULL THEN RAISE EXCEPTION 'Δεν βρέθηκε ξενοδοχείο'; END IF;")
     L.append("  SELECT id INTO v_outlet FROM piato_outlet WHERE hotel_id=v_hotel AND name='%s' LIMIT 1;" % _sq(OUTLET_NAME))
     L.append("  IF v_outlet IS NULL THEN")
-    L.append("    INSERT INTO piato_outlet (hotel_id,name,otype,hours,qr_token,preview_token,published,sort,created_at,updated_at)")
-    L.append("    VALUES (v_hotel,'%s','restaurant','',md5(random()::text||clock_timestamp()::text),md5(random()::text||clock_timestamp()::text||'p'),false,0,now(),now()) RETURNING id INTO v_outlet;" % _sq(OUTLET_NAME))
+    L.append("    INSERT INTO piato_outlet (hotel_id,name,otype,hours,layout,qr_token,preview_token,published,sort,created_at,updated_at)")
+    L.append("    VALUES (v_hotel,'%s','restaurant','','spread',md5(random()::text||clock_timestamp()::text),md5(random()::text||clock_timestamp()::text||'p'),false,0,now(),now()) RETURNING id INTO v_outlet;" % _sq(OUTLET_NAME))
+    L.append("  ELSE UPDATE piato_outlet SET layout='spread' WHERE id=v_outlet;")
     L.append("  END IF;")
     for ci, (cat_en, cat_el, chours, items) in enumerate(MENU, start=1):
         cj = _sq(_i18n(cat_en, cat_el))
@@ -154,10 +155,11 @@ def main():
             print('… --rebuild: σβήστηκε το προηγούμενο outlet')
         if not o:
             o = Outlet(hotel_id=h.id, name=OUTLET_NAME, otype='restaurant', hours=HOURS,
-                       qr_token=_tok(), preview_token=_tok(), published=False)
+                       layout='spread', qr_token=_tok(), preview_token=_tok(), published=False)
             db.session.add(o); db.session.commit()
             print('… δημιουργήθηκε outlet: %s' % OUTLET_NAME)
         else:
+            o.layout = 'spread'   # Δίστηλο (row-major) — προτίμηση Giannis
             print('… υπάρχον outlet (sync): %s' % OUTLET_NAME)
 
         n_cat = n_item = n_upd = 0
