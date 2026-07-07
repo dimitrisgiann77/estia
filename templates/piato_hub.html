@@ -10,56 +10,51 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   :root{--serif:"Cormorant Garamond",Georgia,serif;--sans:"Jost",ui-sans-serif,-apple-system,"Segoe UI",Arial,sans-serif;
-    --ground:#0E120B;--panel:#161B0F;--line:#2C3320;--gold:#C6A15B;--gold2:#8F7638;--ink:#ECE6D4;--muted:#9E9C82;}
-  html{background:var(--ground);}
-  body{min-height:100vh;background:radial-gradient(130% 70% at 50% 0%,#1A2013,var(--ground) 66%);
-    color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
-  .pvnote{text-align:center;padding:8px 14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
-    color:var(--gold);background:rgba(0,0,0,.25);border-bottom:1px solid var(--line);}
-  .wrap{max-width:940px;margin:0 auto;padding:0 20px 54px;}
+    --paper:#F7F5EF;--card:#FFFFFF;--ink:#2A2A20;--muted:#7C7869;--faint:#A8A492;--line:#E8E4D8;--gold:#A9863F;}
+  html{background:var(--paper);}
+  body{min-height:100vh;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .wrap{max-width:940px;margin:0 auto;padding:44px 20px 56px;}
 
-  .top{text-align:center;padding:52px 16px 24px;}
-  .crest{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);font-weight:500;}
-  .hname{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.03;margin:14px 0 6px;text-wrap:balance;}
+  .top{text-align:center;padding:0 8px 30px;}
+  .crest{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--gold);font-weight:600;}
+  .hname{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.03;margin:13px 0 5px;color:var(--ink);text-wrap:balance;}
   .welcome{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--muted);}
-  .divider{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px 0 8px;color:var(--gold2);}
-  .divider::before,.divider::after{content:"";height:1px;width:56px;background:var(--gold2);opacity:.55;}
-  .divider .m{color:var(--gold);font-size:13px;}
+  .divider{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px 0 8px;color:var(--gold);}
+  .divider::before,.divider::after{content:"";height:1px;width:54px;background:var(--gold);opacity:.4;}
+  .divider .m{font-size:12px;}
   .pick{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-top:6px;}
 
-  .cards{display:grid;grid-template-columns:1fr;gap:18px;padding:16px 0;}
+  .cards{display:grid;grid-template-columns:1fr;gap:20px;}
   @media(min-width:680px){.cards{grid-template-columns:1fr 1fr;}}
-
-  .card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:212px;
-    padding:22px;border-radius:18px;overflow:hidden;text-decoration:none;color:var(--ink);
-    border:1px solid var(--line);background:linear-gradient(158deg,var(--panel),#0C0F08);
-    transition:transform .2s,box-shadow .2s,border-color .2s;}
-  .card:hover{transform:translateY(-3px);box-shadow:0 20px 46px rgba(0,0,0,.5);border-color:var(--gold2);}
-  .card .bg{position:absolute;inset:0;background-size:cover;background-position:center;}
-  .card .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,6,.12) 0%,rgba(8,10,6,.55) 52%,rgba(8,10,6,.93) 100%);}
-  .card .emblem{position:absolute;top:16px;right:20px;font-size:34px;opacity:.14;}
-  .card .c-body{position:relative;}
-  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:6px;}
-  .card .nm{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.03;color:#fff;}
-  .card .meta{font-size:12.5px;margin-top:8px;color:rgba(236,230,212,.82);line-height:1.5;}
-  .card .go{margin-top:15px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);}
+  .card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:196px;
+    padding:24px 24px 22px;border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ink);
+    background:var(--card);border:1px solid var(--line);box-shadow:0 8px 26px rgba(42,38,24,.07);
+    transition:transform .2s,box-shadow .2s;}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--acc);}
+  .card:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(42,38,24,.14);}
+  .card .emblem{position:absolute;top:18px;right:20px;font-size:26px;opacity:.55;letter-spacing:2px;}
+  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:7px;}
+  .card .nm{font-family:var(--serif);font-size:31px;font-weight:600;line-height:1.04;color:var(--ink);}
+  .card .meta{font-size:12.5px;margin-top:9px;color:var(--muted);line-height:1.5;}
+  .card .go{margin-top:15px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);font-weight:500;}
   .card .go .arw{display:inline-block;transition:transform .2s;}
   .card:hover .go .arw{transform:translateX(4px);}
-  .card .draft{position:absolute;top:14px;right:16px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
-    color:#fef3c7;border:1px solid #a1791f;border-radius:999px;padding:2px 9px;background:rgba(0,0,0,.4);z-index:2;}
+  .card .draft{position:absolute;top:14px;left:16px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+    color:#8a6d1a;border:1px solid #cbb26a;border-radius:999px;padding:2px 9px;background:#fbf6e6;}
 
-  .foot{text-align:center;padding:32px 16px 8px;}
-  .langs{display:flex;justify-content:center;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
-  .langs a{color:var(--muted);font-size:12px;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;transition:color .15s;}
+  .foot{text-align:center;padding:42px 16px 6px;}
+  .langs{display:flex;justify-content:center;gap:15px;flex-wrap:wrap;margin-bottom:20px;}
+  .langs a{color:var(--muted);font-size:12px;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:color .15s;}
   .langs a:hover{color:var(--ink);}
   .langs a.on{color:var(--gold);border-bottom:1px solid var(--gold);padding-bottom:2px;}
   .brand{margin-top:2px;}
-  .pw{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold2);margin-top:3px;}
-  .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:50px 16px;grid-column:1/-1;}
+  .pw{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);margin-top:3px;}
+  .pvnote{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:18px;opacity:.85;}
+  .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:60px 16px;grid-column:1/-1;}
 </style>
 </head>
 <body>
-{% if preview %}<div class="pvnote">Προεπισκόπηση — δείχνει και μη δημοσιευμένα σημεία</div>{% endif %}
 <div class="wrap">
   <header class="top">
     <div class="crest">Condian Hotels</div>
@@ -71,16 +66,14 @@
 
   <div class="cards">
     {% for c in cards %}
-      <a class="card" href="{{ c.link }}">
-        {% if c.hero %}<div class="bg" style="background-image:url('{{ c.hero }}')"></div><div class="scrim"></div>
-        {% else %}<div class="emblem">{{ {'restaurant':'🍽','bar':'🍸','pool_bar':'🍹','beach_bar':'🏖','room_service':'🛎','cafe':'☕'}.get(c.otype,'✦') }}</div>{% endif %}
+      {% set ACC = {'olive':'#8F7638','charcoal':'#9A7B2E','ink':'#B8792A','aegean':'#C26A38','linen':'#5F7A4A'}.get(c.palette,'#A9863F') %}
+      <a class="card" href="{{ c.link }}" style="--acc:{{ ACC }}">
         {% if preview and not c.published %}<span class="draft">Draft</span>{% endif %}
-        <div class="c-body">
-          <div class="type">{{ c.otype_label }}</div>
-          <div class="nm">{{ c.name }}</div>
-          {% if c.tagline or c.hours %}<div class="meta">{% if c.tagline %}{{ c.tagline }}{% endif %}{% if c.tagline and c.hours %} · {% endif %}{% if c.hours %}{{ c.hours }}{% endif %}</div>{% endif %}
-          <div class="go">Δείτε το μενού <span class="arw">→</span></div>
-        </div>
+        <div class="emblem">{% if c.has_food and c.has_drink %}🍽 🍸{% elif c.has_drink %}🍸{% elif c.has_food %}🍽{% else %}{{ {'restaurant':'🍽','bar':'🍸','pool_bar':'🍸','beach_bar':'🍸','room_service':'🛎','cafe':'☕'}.get(c.otype,'✦') }}{% endif %}</div>
+        <div class="type">{{ c.otype_label }}</div>
+        <div class="nm">{{ c.name }}</div>
+        {% if c.tagline or c.hours %}<div class="meta">{% if c.tagline %}{{ c.tagline }}{% endif %}{% if c.tagline and c.hours %} · {% endif %}{% if c.hours %}{{ c.hours }}{% endif %}</div>{% endif %}
+        <div class="go">Δείτε το μενού <span class="arw">→</span></div>
       </a>
     {% else %}
       <div class="empty">Δεν υπάρχουν διαθέσιμα μενού αυτή τη στιγμή.</div>
@@ -94,6 +87,7 @@
       <div class="pw">ESTIA © 2026</div>
       <div class="pw">CONDIAN Hotels</div>
     </div>
+    {% if preview %}<div class="pvnote">Προεπισκόπηση · περιλαμβάνει μη δημοσιευμένα σημεία</div>{% endif %}
   </div>
 </div>
 </body>

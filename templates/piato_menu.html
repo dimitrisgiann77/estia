@@ -26,27 +26,21 @@
   .root[data-device="phone"]{max-width:434px;}
   .root[data-device="tablet"]{max-width:840px;}
 
-  /* top action bar: back link + language selector */
-  .topbar{position:static;z-index:22;display:flex;align-items:center;justify-content:space-between;
-    gap:10px;padding:14px 20px;background:var(--ground);}
-  .back{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:var(--muted);
-    font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px 6px 9px;border:1px solid var(--line);
-    border-radius:999px;background:transparent;transition:color .15s,border-color .15s;max-width:62%;overflow:hidden;
-    white-space:nowrap;text-overflow:ellipsis;}
+  /* back link — επιπλέει διακριτικά πάνω-αριστερά στο hero (καμία ξεχωριστή μπάρα) */
+  .back{position:absolute;top:16px;left:16px;z-index:5;display:inline-flex;align-items:center;gap:7px;
+    text-decoration:none;color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    padding:6px 13px 6px 10px;border:1px solid var(--line);border-radius:999px;background:transparent;
+    transition:color .15s,border-color .15s;}
   .back:hover{color:var(--accent);border-color:var(--accent2);}
-  .back .arw{font-size:14px;line-height:1;flex:none;}
-  .back .bt{overflow:hidden;text-overflow:ellipsis;}
-  .langsel{position:relative;display:inline-flex;align-items:center;flex:none;}
-  .langsel select{-webkit-appearance:none;appearance:none;background:transparent;border:1px solid var(--line);
-    color:var(--ink);font-family:var(--sans);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    padding:7px 30px 7px 13px;border-radius:999px;cursor:pointer;}
-  .langsel select:hover{border-color:var(--accent2);}
-  .langsel::after{content:"";position:absolute;right:13px;top:50%;width:6px;height:6px;pointer-events:none;
-    border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);}
-  .langsel select option{background:var(--panel);color:var(--ink);}
+  .back .arw{font-size:14px;line-height:1;}
+  /* γλώσσες ως κωδικοί — κάτω από το ωράριο */
+  .langs{display:flex;justify-content:center;flex-wrap:wrap;gap:15px;margin-top:16px;}
+  .langs a{color:var(--muted);font-size:12px;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;transition:color .15s;}
+  .langs a:hover{color:var(--ink);}
+  .langs a.on{color:var(--accent);border-bottom:1px solid var(--accent);padding-bottom:2px;}
 
   /* hero */
-  .hero{padding:44px 28px 28px;text-align:center;border-bottom:1px solid var(--line);
+  .hero{position:relative;padding:44px 28px 28px;text-align:center;border-bottom:1px solid var(--line);
     background:radial-gradient(120% 90% at 50% 0%,var(--hero),var(--ground) 74%);}
   .eyebrow{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:500;}
   .title{font-family:var(--serif);font-size:48px;line-height:1;font-weight:600;margin:12px 0 4px;text-wrap:balance;}
@@ -191,21 +185,14 @@
 
 <div class="root" data-mode="{{ outlet.layout if outlet.layout in ['grid','spread','list'] else 'grid' }}" data-device="full" id="root">
 
-  <div class="topbar">
-    <a class="back" href="{{ hub_link }}"><span class="arw">←</span><span class="bt">{{ hotel_name or 'Πίσω' }}</span></a>
-    <div class="langsel">
-      <select id="langsel" aria-label="Language" onchange="if(this.value){location.href=this.value;}">
-        {% for code, name in langs %}<option value="?lang={{ code }}" {{ 'selected' if code == lang else '' }}>{{ name }}</option>{% endfor %}
-      </select>
-    </div>
-  </div>
-
   <header class="hero">
+    <a class="back" href="{{ hub_link }}"><span class="arw">←</span><span class="bt">Πίσω</span></a>
     <div class="eyebrow">{{ hotel_name }}</div>
     <h1 class="title">{{ outlet.name }}</h1>
     {% if outlet.otype %}<div class="sub">à la carte</div>{% endif %}
     <div class="rule"><span class="m">✦</span></div>
     {% if outlet.hours %}<div class="hours">{{ outlet.hours }}</div>{% endif %}
+    <div class="langs">{% for code, name in langs %}<a href="?lang={{ code }}" class="{{ 'on' if code == lang else '' }}">{{ code|upper }}</a>{% endfor %}</div>
   </header>
 
   {% if cats %}

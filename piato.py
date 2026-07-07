@@ -405,7 +405,11 @@ def _hub_cards(hotel_id, preview):
     cards = []
     for o in q.order_by(Outlet.sort, Outlet.name).all():
         link = ('/piato/preview/' + o.preview_token) if preview else ('/piato/' + o.qr_token)
+        # Τι σερβίρει το σημείο (φαγητό/ποτό) — από τις ενεργές κατηγορίες με πιάτα → εικονίδια hub.
+        kinds = {(c.kind if c.kind in KIND_CODES else 'food')
+                 for c in o.categories if c.active and c.items}
         cards.append({'name': o.name, 'otype': o.otype, 'otype_label': OTYPE_LABEL.get(o.otype, o.otype),
+                      'has_food': 'food' in kinds, 'has_drink': 'drink' in kinds,
                       'tagline': o.tagline or '', 'hero': o.hero_image or '',
                       'palette': o.palette or 'olive', 'hours': o.hours or '',
                       'link': link, 'published': bool(o.published)})
