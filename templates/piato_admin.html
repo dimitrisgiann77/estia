@@ -280,8 +280,8 @@
           <div class="subform">
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="category_id" value="{{ c.id }}">
-              <label>Τίτλος</label>{{ langfields('title', ml(it.title_i18n)) }}
-              <label>Περιγραφή <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Δημιουργία (AI)</button></label>{{ langfields('desc', ml(it.desc_i18n)) }}
+              <label>Τίτλος <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Συμπλήρωση όλων των γλωσσών (AI)</button></label>{{ langfields('title', ml(it.title_i18n)) }}
+              <label>Περιγραφή</label>{{ langfields('desc', ml(it.desc_i18n)) }}
               <div class="row">
                 <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" value="{{ '%.2f'|format(it.price) }}"></div>
                 <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost" value="{{ '%.2f'|format(it.cost) if it.cost is not none else '' }}"></div>
@@ -334,8 +334,8 @@
           <div class="subform">
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="category_id" value="{{ c.id }}">
-              <label>Τίτλος</label>{{ langfields('title', {}) }}
-              <label>Περιγραφή <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Δημιουργία (AI)</button></label>{{ langfields('desc', {}) }}
+              <label>Τίτλος <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Συμπλήρωση όλων των γλωσσών (AI)</button></label>{{ langfields('title', {}) }}
+              <label>Περιγραφή</label>{{ langfields('desc', {}) }}
               <div class="row">
                 <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" placeholder="0.00"></div>
                 <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost"></div>
@@ -389,20 +389,26 @@
   function aiDescribe(btn){
     var form=btn.closest('form'); if(!form) return;
     var tinp=form.querySelector('[name="title_el"]'); var title=tinp?tinp.value.trim():'';
-    if(!title){ alert('Βάλε πρώτα τον τίτλο (Ελληνικά) και μετά «Δημιουργία».'); return; }
+    if(!title){ alert('Βάλε πρώτα τον τίτλο (Ελληνικά) και μετά «Συμπλήρωση».'); return; }
+    var dinp=form.querySelector('[name="desc_el"]'); var desc=dinp?dinp.value.trim():'';
     var allerg=Array.prototype.map.call(form.querySelectorAll('[name="allergens"]:checked'),
       function(c){ return (c.parentNode.textContent||'').trim(); }).join(', ');
     var old=btn.textContent; btn.disabled=true; btn.textContent='✨ …';
-    var body=new URLSearchParams(); body.append('title',title); body.append('allergens',allerg);
+    var body=new URLSearchParams(); body.append('title',title); body.append('desc',desc); body.append('allergens',allerg);
     fetch('/dashboard/piato/ai/describe',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})
       .then(function(r){ return r.json(); })
       .then(function(j){
         if(j.error){ alert(j.error==='not_configured'
           ? 'Το AI δεν είναι ρυθμισμένο — βάλε το Groq key (GROQ_API_KEY) + AI_PROVIDER=groq στις Variables.'
           : ('Σφάλμα AI: '+j.error)); return; }
-        ['el','en','de','it','fr'].forEach(function(code){
-          var inp=form.querySelector('[name="desc_'+code+'"]');
-          if(inp && j.desc && j.desc[code]){ inp.value=j.desc[code]; lfMark(inp); }
+        [['title',j.title],['desc',j.desc]].forEach(function(pair){
+          var prefix=pair[0], vals=pair[1]||{};
+          ['el','en','de','it','fr'].forEach(function(code){
+            var inp=form.querySelector('[name="'+prefix+'_'+code+'"]');
+            if(!inp || !vals[code]) return;
+            if(code==='el' && inp.value.trim()) return;   // κράτα το δικό σου Ελληνικό
+            inp.value=vals[code]; lfMark(inp);
+          });
         });
       })
       .catch(function(){ alert('Σφάλμα σύνδεσης με το AI.'); })

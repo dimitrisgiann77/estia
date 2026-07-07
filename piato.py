@@ -753,13 +753,21 @@ def piato_ai_describe():
     title = (request.form.get('title') or '').strip()
     if not title:
         return jsonify(error='no_title'), 400
+    desc = (request.form.get('desc') or '').strip()       # υπάρχουσα περιγραφή (πηγή· αλλιώς παράγεται)
     allerg = (request.form.get('allergens') or '').strip()
     from app import call_llm
-    sys_p = ('You are a menu copywriter for a Greek hotel restaurant. Write a SHORT, appetizing dish '
-             'description (12-18 words, no price, do not just repeat the dish name). '
-             'Return ONLY a compact JSON object with keys el,en,de,it,fr — each the description in '
-             'that language (Greek, English, German, Italian, French). No markdown, no extra text.')
-    user_p = 'Dish: ' + title + (('\nAllergens: ' + allerg) if allerg else '')
+    langs_txt = 'el (Greek), en (English), de (German), it (Italian), fr (French)'
+    sys_p = ('You localize restaurant menu items for a Greek hotel. Given a dish name and an optional '
+             'description in Greek, produce for EACH language [' + langs_txt + ']: (1) the dish name '
+             'translated/localized, and (2) a SHORT appetizing description (12-18 words, no price). '
+             'If a Greek description is given, TRANSLATE it faithfully; if not, WRITE a fitting one. '
+             'Return ONLY a compact JSON: {"title":{"el":..,"en":..,"de":..,"it":..,"fr":..},'
+             '"desc":{"el":..,"en":..,"de":..,"it":..,"fr":..}}. No markdown, no extra text.')
+    user_p = 'Dish name (Greek): ' + title
+    if desc:
+        user_p += '\nDescription (Greek): ' + desc
+    if allerg:
+        user_p += '\nAllergens: ' + allerg
     reply, err = call_llm(sys_p, [{'role': 'user', 'content': user_p}])
     if err:
         return jsonify(error=err), 502
@@ -769,11 +777,14 @@ def piato_ai_describe():
         data = json.loads(m.group(0)) if m else {}
     except Exception:
         data = {}
-    out = {k: (str(data.get(k) or '')).strip() for k in LANG_CODES}
-    if not any(out.values()):
+    t = data.get('title') or {}
+    d = data.get('desc') or {}
+    out_t = {k: (str(t.get(k) or '')).strip() for k in LANG_CODES}
+    out_d = {k: (str(d.get(k) or '')).strip() for k in LANG_CODES}
+    if not (any(out_t.values()) or any(out_d.values())):
         return jsonify(error='parse_failed', raw=(reply or '')[:200]), 502
     log_activity('piato_ai_describe', title)
-    return jsonify(ok=True, desc=out)
+    return jsonify(ok=True, title=out_t, desc=out_d)
 
 
 print('piato module loaded (F&B μενού — Φ1: μοντέλα + admin CRUD + guest menu + preview/publish + AI describe)')
