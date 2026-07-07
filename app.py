@@ -131,7 +131,7 @@ GROQ_API_KEY      = os.environ.get('GROQ_API_KEY', '')      # δωρεάν, Open
 AI_BASE_URL       = os.environ.get('AI_BASE_URL', '')       # override endpoint (OpenAI-compatible· π.χ. Groq)
 AI_MODEL          = os.environ.get('AI_MODEL', '')          # override· αλλιώς default ανά πάροχο
 
-POOL_ASSISTANT_PROMPT = """Είσαι το «SpithaAI», ο ψηφιακός βοηθός της πλατφόρμας Εστία (CONDIAN HOTELS).
+POOL_ASSISTANT_PROMPT = """Είσαι η «Σοφία», ο ψηφιακός βοηθός της πλατφόρμας Εστία (CONDIAN HOTELS).
 Βοηθάς το προσωπικό συντήρησης και τους υπεύθυνους βάρδιας στην ασφαλή, καθαρή και
 νόμιμη καθημερινή λειτουργία των πισινών και των δικτύων νερού/ΖΝΧ (νερά χρήσης, legionella).
 # ΑΡΜΟΔΙΟΤΗΤΕΣ
@@ -364,11 +364,18 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.436'
-APP_BUILD   = '717'
+APP_VERSION = '12.437'
+APP_BUILD   = '718'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.437', 'b': '718', 'date': '07/07/2026', 'time': '23:40', 'title': 'AI — Advanced Console (κονσόλα διακυβέρνησης · cockpit) + ενιαίο κουμπί AI + βοηθός «Σοφία»',
+     'items': ['Νέα **Κονσόλα AI** (`/dashboard/ai`) σε μορφή **cockpit** πλήρους πλάτους: **γενικός διακόπτης** (kill-switch) που κόβει όλο το AI ακαριαία· κάρτες κατάστασης (πάροχος/μοντέλο/ενεργά κελιά/χρήσεις σήμερα)· **ιστορικό χρήσης** (ποιος/πότε/τι).',
+               '**Πίνακας δεδομένων — δικλείδα ασφαλείας:** κάθε module × τύπος δεδομένου με διακόπτη, **όλα κλειστά (OFF) by default**. Το AI αγγίζει **μόνο** ό,τι ανάβεις εσύ. Τα ευαίσθητα (π.χ. Μισθοδοσία) επισημαίνονται.',
+               'Νέα πύλη `ai_allowed(module, τύπος)`: **κάθε** λειτουργία AI περνά από τον έλεγχο πριν εκτελεστεί (το Piato «Συμπλήρωση γλωσσών» ήδη ελέγχεται).',
+               '**Groq** πλήρως στην κονσόλα: επιλογή παρόχου + κλειδί + **«Δοκιμή σύνδεσης»**. Διορθώθηκε η σύνδεση (σωστό User-Agent — το Cloudflare του Groq μπλόκαρε το default).',
+               '**Ενιαίο κουμπί AI** σε όλη την πλατφόρμα: ίδια αισθητική (περίγραμμα στο σκούρο πετρόλ CONDIAN + εικονίδιο sparkle) όπου καλείται AI.',
+               'Ο ψηφιακός βοηθός μετονομάστηκε **«Σοφία»** (πρώην SpithaAI) — chat bubble, οθόνη βοηθού, κουμπιά ανάλυσης, login badge.']},
     {'v': '12.436', 'b': '717', 'date': '07/07/2026', 'time': '21:23', 'title': 'Piato — AI «Συμπλήρωση όλων των γλωσσών» (τίτλος + περιγραφή) + υποστήριξη Groq',
      'items': ['Νέο κουμπί **«✨ Συμπλήρωση όλων των γλωσσών (AI)»** στη φόρμα πιάτου: γράφεις το πιάτο **σε μία γλώσσα** (Ελληνικά) και το AI γεμίζει αυτόματα **τίτλο ΚΑΙ περιγραφή στις 5 γλώσσες** (EL/EN/DE/IT/FR). Κρατά το δικό σου Ελληνικό, μεταφράζει τα υπόλοιπα. Τα ελέγχεις πριν σώσεις.',
                'Στέλνεται στο AI **ΜΟΝΟ ο τίτλος + η περιγραφή του πιάτου** (+ αλλεργιογόνα ως context) — κανένα ευαίσθητο δεδομένο.',
@@ -2534,6 +2541,11 @@ def ai_allowed(module, dtype):
     return _ai_setting('ai_allow_%s_%s' % (module, dtype), '0') == '1'
 
 
+# Cloudflare (μπροστά από Groq) μπλοκάρει το default 'Python-urllib' UA → 403 error 1010.
+# Στέλνουμε κανονικό browser-like User-Agent ώστε να περνούν οι server-side κλήσεις.
+AI_HTTP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+
+
 def call_llm(system_prompt, messages):
     """messages: list of {'role':'user'|'assistant','content':str}. Returns (reply, error)."""
     provider = resolve_provider()
@@ -2549,6 +2561,7 @@ def call_llm(system_prompt, messages):
                 'https://api.anthropic.com/v1/messages',
                 data=json.dumps(payload).encode('utf-8'),
                 headers={'content-type': 'application/json',
+                         'user-agent': AI_HTTP_UA,
                          'x-api-key': c['anthropic'],
                          'anthropic-version': '2023-06-01'})
             with urllib.request.urlopen(req, timeout=60) as r:
@@ -2568,6 +2581,7 @@ def call_llm(system_prompt, messages):
                 url,
                 data=json.dumps(payload).encode('utf-8'),
                 headers={'content-type': 'application/json',
+                         'user-agent': AI_HTTP_UA,
                          'authorization': 'Bearer ' + key})
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read().decode('utf-8'))
