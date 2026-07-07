@@ -10,81 +10,75 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   :root{--serif:"Cormorant Garamond",Georgia,serif;--sans:"Jost",ui-sans-serif,-apple-system,"Segoe UI",Arial,sans-serif;
-    --gold:#C6A15B;--gold2:#8F7638;--ink:#ECE6D4;--muted:#9E9C82;}
-  html{background:#0B0D08;}
-  body{min-height:100vh;background:radial-gradient(130% 75% at 50% 0%,#1A2013,#0B0D08 68%);
-    color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
-  .rvbar{position:sticky;top:0;z-index:20;background:#0C0F08;border-bottom:1px solid #2C3320;
-    padding:9px 14px;text-align:center;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);}
-  .wrap{max-width:460px;margin:0 auto;padding:0 16px 44px;}
+    --ground:#0E120B;--panel:#161B0F;--line:#2C3320;--gold:#C6A15B;--gold2:#8F7638;--ink:#ECE6D4;--muted:#9E9C82;}
+  html{background:var(--ground);}
+  body{min-height:100vh;background:radial-gradient(130% 70% at 50% 0%,#1A2013,var(--ground) 66%);
+    color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .pvnote{text-align:center;padding:8px 14px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--gold);background:rgba(0,0,0,.25);border-bottom:1px solid var(--line);}
+  .wrap{max-width:940px;margin:0 auto;padding:0 20px 54px;}
 
-  .top{text-align:center;padding:38px 16px 22px;}
-  .crest{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);}
-  .hname{font-family:var(--serif);font-size:38px;font-weight:600;line-height:1.04;margin:12px 0 8px;text-wrap:balance;}
-  .welcome{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--muted);}
-  .divider{display:flex;align-items:center;justify-content:center;gap:12px;margin:18px 0 8px;color:var(--gold2);}
-  .divider::before,.divider::after{content:"";height:1px;width:52px;background:var(--gold2);opacity:.6;}
-  .divider .m{color:var(--gold);font-size:12px;}
-  .pick{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:8px;}
+  .top{text-align:center;padding:52px 16px 24px;}
+  .crest{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--gold);font-weight:500;}
+  .hname{font-family:var(--serif);font-size:46px;font-weight:600;line-height:1.03;margin:14px 0 6px;text-wrap:balance;}
+  .welcome{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--muted);}
+  .divider{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px 0 8px;color:var(--gold2);}
+  .divider::before,.divider::after{content:"";height:1px;width:56px;background:var(--gold2);opacity:.55;}
+  .divider .m{color:var(--gold);font-size:13px;}
+  .pick{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-top:6px;}
 
-  .cards{display:flex;flex-direction:column;gap:16px;padding:10px 2px;}
-  .card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;
-    min-height:180px;padding:20px;border-radius:18px;overflow:hidden;text-decoration:none;
-    border:1px solid rgba(255,255,255,.09);transition:transform .2s,box-shadow .2s;
-    /* fallback backdrop so a card με άγνωστη/κενή παλέτα ΔΕΝ γίνεται γκρι */
-    background:linear-gradient(160deg,#1E2414,#0E120B);}
-  .card .type,.card .go{color:var(--gold);}
-  .card .nm{color:#fff;}
-  .card:hover{transform:translateY(-3px);box-shadow:0 18px 42px rgba(0,0,0,.5);}
-  .card .bg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.5;}
-  .card .scrim{position:absolute;inset:0;}
+  .cards{display:grid;grid-template-columns:1fr;gap:18px;padding:16px 0;}
+  @media(min-width:680px){.cards{grid-template-columns:1fr 1fr;}}
+
+  .card{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:212px;
+    padding:22px;border-radius:18px;overflow:hidden;text-decoration:none;color:var(--ink);
+    border:1px solid var(--line);background:linear-gradient(158deg,var(--panel),#0C0F08);
+    transition:transform .2s,box-shadow .2s,border-color .2s;}
+  .card:hover{transform:translateY(-3px);box-shadow:0 20px 46px rgba(0,0,0,.5);border-color:var(--gold2);}
+  .card .bg{position:absolute;inset:0;background-size:cover;background-position:center;}
+  .card .scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,10,6,.12) 0%,rgba(8,10,6,.55) 52%,rgba(8,10,6,.93) 100%);}
+  .card .emblem{position:absolute;top:16px;right:20px;font-size:34px;opacity:.14;}
   .card .c-body{position:relative;}
-  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:6px;font-weight:500;}
-  .card .nm{font-family:var(--serif);font-size:31px;font-weight:600;line-height:1;color:#fff;}
-  .card .meta{font-size:12.5px;margin-top:8px;color:rgba(255,255,255,.9);}
-  .card .go{margin-top:14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;}
+  .card .type{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:6px;}
+  .card .nm{font-family:var(--serif);font-size:30px;font-weight:600;line-height:1.03;color:#fff;}
+  .card .meta{font-size:12.5px;margin-top:8px;color:rgba(236,230,212,.82);line-height:1.5;}
+  .card .go{margin-top:15px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);}
   .card .go .arw{display:inline-block;transition:transform .2s;}
   .card:hover .go .arw{transform:translateX(4px);}
   .card .draft{position:absolute;top:14px;right:16px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
-    color:#fef3c7;border:1px solid #a1791f;border-radius:999px;padding:2px 9px;background:rgba(0,0,0,.35);}
+    color:#fef3c7;border:1px solid #a1791f;border-radius:999px;padding:2px 9px;background:rgba(0,0,0,.4);z-index:2;}
 
-  .card[data-pal] .scrim{background:linear-gradient(165deg,rgba(20,24,14,.55),rgba(10,13,8,.9));}
-  .card[data-pal="olive"]   {background:linear-gradient(160deg,#1E2414,#0E120B);} .card[data-pal="olive"] .type,.card[data-pal="olive"] .go{color:#C6A15B;}
-  .card[data-pal="charcoal"]{background:linear-gradient(160deg,#242219,#12110C);} .card[data-pal="charcoal"] .type,.card[data-pal="charcoal"] .go{color:#D4AF5A;}
-  .card[data-pal="oxblood"] {background:linear-gradient(160deg,#2C1618,#150C0D);} .card[data-pal="oxblood"] .type,.card[data-pal="oxblood"] .go{color:#C98A5E;}
-  .card[data-pal="pine"]    {background:linear-gradient(160deg,#12231B,#0A130E);} .card[data-pal="pine"] .type,.card[data-pal="pine"] .go{color:#D8C79A;}
-  .card[data-pal="ink"]     {background:linear-gradient(160deg,#141C28,#0A0E14);} .card[data-pal="ink"] .type,.card[data-pal="ink"] .go{color:#E0A63E;}
-  .card[data-pal="aegean"]  {background:linear-gradient(160deg,#B0714E,#6E4E38);} .card[data-pal="aegean"] .type,.card[data-pal="aegean"] .go{color:#EAD9BE;}
-  .card[data-pal="aegean"] .scrim{background:linear-gradient(165deg,rgba(120,80,55,.3),rgba(70,50,40,.78));}
-
-  .foot{text-align:center;padding:26px 16px 8px;}
-  .langs{display:flex;justify-content:center;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
-  .langs a{color:var(--muted);font-size:12px;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;}
+  .foot{text-align:center;padding:32px 16px 8px;}
+  .langs{display:flex;justify-content:center;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+  .langs a{color:var(--muted);font-size:12px;letter-spacing:.13em;text-transform:uppercase;text-decoration:none;transition:color .15s;}
+  .langs a:hover{color:var(--ink);}
   .langs a.on{color:var(--gold);border-bottom:1px solid var(--gold);padding-bottom:2px;}
-  .pw{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold2);}
-  .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:40px 16px;}
+  .brand{margin-top:2px;}
+  .pw{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold2);margin-top:3px;}
+  .empty{font-family:var(--serif);font-style:italic;color:var(--muted);text-align:center;padding:50px 16px;grid-column:1/-1;}
 </style>
 </head>
 <body>
-{% if preview %}<div class="rvbar">Προεπισκόπηση hub — δείχνει και μη δημοσιευμένα</div>{% endif %}
+{% if preview %}<div class="pvnote">Προεπισκόπηση — δείχνει και μη δημοσιευμένα σημεία</div>{% endif %}
 <div class="wrap">
-  <div class="top">
+  <header class="top">
     <div class="crest">Condian Hotels</div>
     <div class="hname">{{ hotel_name }}</div>
-    <div class="welcome">welcome — καλωσορίσατε</div>
+    <div class="welcome">Καλωσορίσατε</div>
     <div class="divider"><span class="m">✦</span></div>
     <div class="pick">Διαλέξτε χώρο εστίασης</div>
-  </div>
+  </header>
 
   <div class="cards">
     {% for c in cards %}
-      <a class="card" data-pal="{{ c.palette }}" href="{{ c.link }}">
-        {% if c.hero %}<div class="bg" style="background-image:url('{{ c.hero }}')"></div><div class="scrim"></div>{% endif %}
+      <a class="card" href="{{ c.link }}">
+        {% if c.hero %}<div class="bg" style="background-image:url('{{ c.hero }}')"></div><div class="scrim"></div>
+        {% else %}<div class="emblem">{{ {'restaurant':'🍽','bar':'🍸','pool_bar':'🍹','beach_bar':'🏖','room_service':'🛎','cafe':'☕'}.get(c.otype,'✦') }}</div>{% endif %}
         {% if preview and not c.published %}<span class="draft">Draft</span>{% endif %}
         <div class="c-body">
           <div class="type">{{ c.otype_label }}</div>
           <div class="nm">{{ c.name }}</div>
-          <div class="meta">{% if c.tagline %}{{ c.tagline }}{% endif %}{% if c.tagline and c.hours %} · {% endif %}{% if c.hours %}{{ c.hours }}{% endif %}</div>
+          {% if c.tagline or c.hours %}<div class="meta">{% if c.tagline %}{{ c.tagline }}{% endif %}{% if c.tagline and c.hours %} · {% endif %}{% if c.hours %}{{ c.hours }}{% endif %}</div>{% endif %}
           <div class="go">Δείτε το μενού <span class="arw">→</span></div>
         </div>
       </a>
@@ -95,7 +89,11 @@
 
   <div class="foot">
     <div class="langs">{% for code, name in langs %}<a href="?lang={{ code }}" class="{{ 'on' if code == lang else '' }}">{{ code|upper }}</a>{% endfor %}</div>
-    <div class="pw">Powered by Piato</div>
+    <div class="brand">
+      <div class="pw">Powered by Piato</div>
+      <div class="pw">ESTIA © 2026</div>
+      <div class="pw">CONDIAN Hotels</div>
+    </div>
   </div>
 </div>
 </body>
