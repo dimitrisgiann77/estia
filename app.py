@@ -124,10 +124,12 @@ GRAPH_CLIENT_SECRET = os.environ.get('GRAPH_CLIENT_SECRET', '')
 GRAPH_SENDER        = os.environ.get('GRAPH_SENDER', EMAIL_FROM)
 
 # ── AI Assistant config (provider-agnostic) ──
-AI_PROVIDER       = os.environ.get('AI_PROVIDER', 'auto')   # auto | anthropic | openai
+AI_PROVIDER       = os.environ.get('AI_PROVIDER', 'auto')   # auto | anthropic | openai | groq
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 OPENAI_API_KEY    = os.environ.get('OPENAI_API_KEY', '')
-AI_MODEL          = os.environ.get('AI_MODEL', '')          # override; αλλιώς default ανά πάροχο
+GROQ_API_KEY      = os.environ.get('GROQ_API_KEY', '')      # δωρεάν, OpenAI-compatible (Llama/Mixtral)
+AI_BASE_URL       = os.environ.get('AI_BASE_URL', '')       # override endpoint (OpenAI-compatible· π.χ. Groq)
+AI_MODEL          = os.environ.get('AI_MODEL', '')          # override· αλλιώς default ανά πάροχο
 
 POOL_ASSISTANT_PROMPT = """Είσαι το «SpithaAI», ο ψηφιακός βοηθός της πλατφόρμας Εστία (CONDIAN HOTELS).
 Βοηθάς το προσωπικό συντήρησης και τους υπεύθυνους βάρδιας στην ασφαλή, καθαρή και
@@ -362,11 +364,15 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.435'
-APP_BUILD   = '716'
+APP_VERSION = '12.436'
+APP_BUILD   = '717'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.436', 'b': '717', 'date': '07/07/2026', 'time': '21:23', 'title': 'Piato — AI «Δημιουργία περιγραφής πιάτου» (και στις 5 γλώσσες) + υποστήριξη Groq',
+     'items': ['Νέο κουμπί **«✨ Δημιουργία (AI)»** δίπλα στην Περιγραφή κάθε πιάτου: γράφει αυτόματα σύντομη, ελκυστική περιγραφή **και στις 5 γλώσσες** (EL/EN/DE/IT/FR) από τον τίτλο του πιάτου. Την ελέγχεις/διορθώνεις πριν σώσεις.',
+               'Στέλνεται στο AI **ΜΟΝΟ ο τίτλος του πιάτου** (+ αλλεργιογόνα ως context) — κανένα ευαίσθητο δεδομένο.',
+               'Προστέθηκε υποστήριξη **Groq** (δωρεάν, OpenAI-compatible, open μοντέλα) στη μηχανή AI — ρυθμιζόμενο endpoint· ο ίδιος μηχανισμός τροφοδοτεί και τον SpithaAI. Ενεργοποίηση: `GROQ_API_KEY` + `AI_PROVIDER=groq` στις Variables.']},
     {'v': '12.435', 'b': '716', 'date': '07/07/2026', 'time': '20:47', 'title': 'Piato — αναβάθμιση διαχειριστικού μενού: σύμπτυξη/σειρά, tabs γλωσσών, ένδειξη μεταφράσεων + DE/IT/FR',
      'items': ['**Σύμπτυξη/άνοιγμα κατηγοριών** (και «όλων») + **μετρητής πιάτων** ανά κατηγορία → εύκολη διαχείριση μεγάλων μενού με μια ματιά.',
                '**Αναδιάταξη με ↑↓** κατηγοριών ΚΑΙ πιάτων (η σειρά που ορίζεις φαίνεται στο μενού του πελάτη).',
@@ -2274,7 +2280,8 @@ def get_theme():
     return t
 
 def get_ai_config():
-    cfg = {'provider': AI_PROVIDER, 'anthropic': ANTHROPIC_API_KEY, 'openai': OPENAI_API_KEY, 'model': AI_MODEL}
+    cfg = {'provider': AI_PROVIDER, 'anthropic': ANTHROPIC_API_KEY, 'openai': OPENAI_API_KEY,
+           'groq': GROQ_API_KEY, 'base_url': AI_BASE_URL, 'model': AI_MODEL}
     try:
         for row in Setting.query.filter(Setting.key.like('ai_%')).all():
             k = row.key[3:]
@@ -2465,11 +2472,15 @@ def resolve_provider():
         return 'anthropic'
     if c['provider'] == 'openai' and c['openai']:
         return 'openai'
+    if c['provider'] == 'groq' and c['groq']:
+        return 'groq'
     if c['provider'] == 'auto':
         if c['anthropic']:
             return 'anthropic'
         if c['openai']:
             return 'openai'
+        if c['groq']:
+            return 'groq'
     return None
 
 def call_llm(system_prompt, messages):
@@ -2492,15 +2503,21 @@ def call_llm(system_prompt, messages):
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read().decode('utf-8'))
             return data['content'][0]['text'], None
-        else:  # openai
-            model = c['model'] or 'gpt-4o-mini'
+        else:  # openai-compatible (openai / groq)
+            if provider == 'groq':
+                url = c.get('base_url') or 'https://api.groq.com/openai/v1/chat/completions'
+                key = c['groq']; default_model = 'llama-3.3-70b-versatile'
+            else:
+                url = c.get('base_url') or 'https://api.openai.com/v1/chat/completions'
+                key = c['openai']; default_model = 'gpt-4o-mini'
+            model = c['model'] or default_model
             msgs = [{'role': 'system', 'content': system_prompt}] + messages
             payload = {'model': model, 'max_tokens': 1024, 'messages': msgs}
             req = urllib.request.Request(
-                'https://api.openai.com/v1/chat/completions',
+                url,
                 data=json.dumps(payload).encode('utf-8'),
                 headers={'content-type': 'application/json',
-                         'authorization': 'Bearer ' + c['openai']})
+                         'authorization': 'Bearer ' + key})
             with urllib.request.urlopen(req, timeout=60) as r:
                 data = json.loads(r.read().decode('utf-8'))
             return data['choices'][0]['message']['content'], None

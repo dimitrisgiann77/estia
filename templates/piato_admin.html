@@ -53,6 +53,8 @@
   .tl.on{color:#166534;background:#dcfce7;border-color:#bbf7d0;}
   /* Γ: thumbnail φωτό */
   .item-row .thumb{width:34px;height:34px;object-fit:cover;border-radius:7px;vertical-align:middle;margin-right:7px;}
+  .aidesc{margin-left:8px;padding:2px 8px;font-size:11px;vertical-align:middle;}
+  .aidesc:disabled{opacity:.6;cursor:default;}
   .item-row{display:flex;justify-content:space-between;gap:8px;align-items:center;
             border-top:1px solid #f1f5f9;padding:8px 0;}
   .item-row .t{font-weight:600;font-size:14px;} .item-row .p{color:var(--accent,#185FA5);font-weight:700;}
@@ -279,7 +281,7 @@
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="category_id" value="{{ c.id }}">
               <label>Τίτλος</label>{{ langfields('title', ml(it.title_i18n)) }}
-              <label>Περιγραφή</label>{{ langfields('desc', ml(it.desc_i18n)) }}
+              <label>Περιγραφή <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Δημιουργία (AI)</button></label>{{ langfields('desc', ml(it.desc_i18n)) }}
               <div class="row">
                 <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" value="{{ '%.2f'|format(it.price) }}"></div>
                 <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost" value="{{ '%.2f'|format(it.cost) if it.cost is not none else '' }}"></div>
@@ -333,7 +335,7 @@
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="category_id" value="{{ c.id }}">
               <label>Τίτλος</label>{{ langfields('title', {}) }}
-              <label>Περιγραφή</label>{{ langfields('desc', {}) }}
+              <label>Περιγραφή <button type="button" class="btn sm ghost aidesc" onclick="aiDescribe(this)">✨ Δημιουργία (AI)</button></label>{{ langfields('desc', {}) }}
               <div class="row">
                 <div style="flex:1;"><label>Τιμή (€)</label><input type="text" name="price" placeholder="0.00"></div>
                 <div style="flex:1;"><label>Κόστος (προαιρ.)</label><input type="text" name="cost"></div>
@@ -383,6 +385,28 @@
     var box=inp.closest('[data-lf]'); if(!box) return; var code=inp.getAttribute('data-code');
     var tab=box.querySelector('.lf-tab[data-code="'+code+'"]'); if(!tab) return;
     var dot=tab.querySelector('.lf-dot'); if(dot) dot.classList.toggle('filled', !!inp.value.trim());
+  }
+  function aiDescribe(btn){
+    var form=btn.closest('form'); if(!form) return;
+    var tinp=form.querySelector('[name="title_el"]'); var title=tinp?tinp.value.trim():'';
+    if(!title){ alert('Βάλε πρώτα τον τίτλο (Ελληνικά) και μετά «Δημιουργία».'); return; }
+    var allerg=Array.prototype.map.call(form.querySelectorAll('[name="allergens"]:checked'),
+      function(c){ return (c.parentNode.textContent||'').trim(); }).join(', ');
+    var old=btn.textContent; btn.disabled=true; btn.textContent='✨ …';
+    var body=new URLSearchParams(); body.append('title',title); body.append('allergens',allerg);
+    fetch('/dashboard/piato/ai/describe',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j.error){ alert(j.error==='not_configured'
+          ? 'Το AI δεν είναι ρυθμισμένο — βάλε το Groq key (GROQ_API_KEY) + AI_PROVIDER=groq στις Variables.'
+          : ('Σφάλμα AI: '+j.error)); return; }
+        ['el','en','de','it','fr'].forEach(function(code){
+          var inp=form.querySelector('[name="desc_'+code+'"]');
+          if(inp && j.desc && j.desc[code]){ inp.value=j.desc[code]; lfMark(inp); }
+        });
+      })
+      .catch(function(){ alert('Σφάλμα σύνδεσης με το AI.'); })
+      .finally(function(){ btn.disabled=false; btn.textContent=old; });
   }
 </script>
 </body></html>

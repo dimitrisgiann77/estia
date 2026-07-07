@@ -16,7 +16,7 @@ Spec: 02_MODULES_ESTIA/ΕΣΤΙΑΣΗ_PIATO/00_SPEC_PIATO.md
 """
 import json, uuid
 from datetime import datetime
-from flask import request, redirect, url_for, render_template, abort
+from flask import request, redirect, url_for, render_template, abort, jsonify
 from app import (app, db, current_user, is_admin, allowed_hotels, active_hotel_id,
                  log_activity, has_rank, ROLE_RANK, Hotel)
 
@@ -745,4 +745,35 @@ def piato_vm_delete():
     return redirect(url_for('piato_admin', outlet=o.id) + '#cat%d' % c.id)
 
 
-print('piato module loaded (F&B μενού — Φ1: μοντέλα + admin CRUD + guest menu + preview/publish)')
+# ── AI: δημιουργία περιγραφής πιάτου (reuse call_llm· στέλνει ΜΟΝΟ τίτλο+αλλεργιογόνα) ──────────
+@app.route('/dashboard/piato/ai/describe', methods=['POST'])
+def piato_ai_describe():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    title = (request.form.get('title') or '').strip()
+    if not title:
+        return jsonify(error='no_title'), 400
+    allerg = (request.form.get('allergens') or '').strip()
+    from app import call_llm
+    sys_p = ('You are a menu copywriter for a Greek hotel restaurant. Write a SHORT, appetizing dish '
+             'description (12-18 words, no price, do not just repeat the dish name). '
+             'Return ONLY a compact JSON object with keys el,en,de,it,fr — each the description in '
+             'that language (Greek, English, German, Italian, French). No markdown, no extra text.')
+    user_p = 'Dish: ' + title + (('\nAllergens: ' + allerg) if allerg else '')
+    reply, err = call_llm(sys_p, [{'role': 'user', 'content': user_p}])
+    if err:
+        return jsonify(error=err), 502
+    import re
+    m = re.search(r'\{.*\}', reply or '', re.S)
+    try:
+        data = json.loads(m.group(0)) if m else {}
+    except Exception:
+        data = {}
+    out = {k: (str(data.get(k) or '')).strip() for k in LANG_CODES}
+    if not any(out.values()):
+        return jsonify(error='parse_failed', raw=(reply or '')[:200]), 502
+    log_activity('piato_ai_describe', title)
+    return jsonify(ok=True, desc=out)
+
+
+print('piato module loaded (F&B μενού — Φ1: μοντέλα + admin CRUD + guest menu + preview/publish + AI describe)')
