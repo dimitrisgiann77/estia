@@ -6,7 +6,7 @@
 *{box-sizing:border-box;margin:0;padding:0;} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#eff9fb;color:#1a1a1a;}
 .topbar{background:#193847;color:white;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;}
 .topbar a{color:white;text-decoration:none;font-size:13px;padding:6px 12px;background:rgba(255,255,255,0.15);border-radius:6px;}
-.container{max-width:720px;margin:0 auto;padding:24px;}
+.container{max-width:none;margin:0;padding:22px 28px;}
 .card{background:white;border-radius:12px;padding:22px;border:1px solid #d6eef3;margin-bottom:18px;}
 .card h2{font-size:15px;color:#193847;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
 .card .sub{font-size:12px;color:#8a9aa3;margin-bottom:14px;}
@@ -55,6 +55,18 @@ table.audit tr:first-child td{border-top:none;}
 table.audit td.tm{color:#93a3ab;white-space:nowrap;font-size:12px;}
 table.audit td.ac{color:#193847;font-weight:600;white-space:nowrap;}
 table.audit td.dt{color:#6b7a82;}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;}
+.tile{background:#fff;border:1px solid #d6eef3;border-radius:12px;padding:14px 16px;}
+.tile .tl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#93a3ab;font-weight:700;}
+.tile .tv{font-size:19px;font-weight:700;color:#193847;margin-top:5px;display:flex;align-items:center;gap:8px;line-height:1.2;}
+.tile .tv .dot{width:11px;height:11px;border-radius:50%;flex:none;}
+.tile .tv .dot.g{background:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,.15);}
+.tile .tv .dot.r{background:#dc2626;box-shadow:0 0 0 4px rgba(220,38,38,.15);}
+.grid2{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:start;}
+.grid2 .card{margin-bottom:0;}
+.modgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.mod{margin-top:0;}
+@media(max-width:900px){.grid2{grid-template-columns:1fr;}}
 </style><script>try{if(new URLSearchParams(location.search).get("embed")==="1"){document.documentElement.classList.add("embed");document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll("a[href^='/']").forEach(function(a){var h=a.getAttribute("href");if(h&&h.indexOf("embed=")<0&&!a.target){a.setAttribute("href",h+(h.indexOf("?")<0?"?":"&")+"embed=1");}});});}}catch(e){}</script>
 <style>.embed .app-header,.embed .topbar{display:none!important;}.embed body{background:transparent!important;}</style>
 </head><body>
@@ -70,81 +82,80 @@ table.audit td.dt{color:#6b7a82;}
     <label class="switch big"><input type="checkbox" name="master" onchange="this.form.submit()" {{ 'checked' if master_on }}><span class="slider"></span></label>
   </form>
 
-  <div class="status">
-    <span class="dot {{ 'g' if configured else 'r' }}"></span>
-    <div>
-      {% if configured %}
-        <div class="big">Ενεργό AI: {{ active.provider_label }}</div>
-        <div class="small">Μοντέλο: {{ active.model }}</div>
-      {% else %}
-        <div class="big">AI ανενεργό</div>
-        <div class="small">Δεν έχει οριστεί κλειδί για τον επιλεγμένο πάροχο.</div>
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="card">
-    <h2><i class="ti ti-plug-connected"></i> Πάροχος &amp; Μοντέλο</h2>
-    <div class="sub">Ποιος πάροχος AI τροφοδοτεί τις λειτουργίες + το κλειδί σύνδεσης.</div>
-    <form method="POST">
-      <label>Πάροχος</label>
-      <select name="provider">
-        <option value="auto" {{ 'selected' if cfg.provider=='auto' }}>Αυτόματα (όποιο key υπάρχει)</option>
-        <option value="anthropic" {{ 'selected' if cfg.provider=='anthropic' }}>Anthropic (Claude)</option>
-        <option value="openai" {{ 'selected' if cfg.provider=='openai' }}>OpenAI (ChatGPT)</option>
-        <option value="groq" {{ 'selected' if cfg.provider=='groq' }}>Groq (Llama · δωρεάν)</option>
-      </select>
-      <label>Anthropic API key</label>
-      <input type="text" name="anthropic" value="{{ masked.anthropic }}" placeholder="sk-ant-...">
-      <label>OpenAI API key</label>
-      <input type="text" name="openai" value="{{ masked.openai }}" placeholder="sk-...">
-      <label>Groq API key</label>
-      <input type="text" name="groq" value="{{ masked.groq }}" placeholder="gsk_...">
-      <div class="hint">Άφησε τα keys όπως είναι (με αστερίσκους) για να μην αλλάξουν. Ιδανικά ορίζονται από Railway Variables.</div>
-      <label>Μοντέλο (προαιρετικό)</label>
-      <input type="text" name="model" value="{{ cfg.model }}" placeholder="π.χ. llama-3.3-70b-versatile ή claude-sonnet-4-6">
-      <label>Base URL (προαιρετικό — μόνο για custom endpoint)</label>
-      <input type="text" name="base_url" value="{{ cfg.base_url }}" placeholder="π.χ. https://api.groq.com/openai/v1/chat/completions">
-      <label class="chk"><input type="checkbox" name="clear_keys" value="1" style="width:auto;"> Διαγραφή αποθηκευμένων keys</label>
-      <div>
-        <button class="btn ghost" type="button" onclick="aiTest(this)"><i class="ti ti-wifi"></i> Δοκιμή σύνδεσης</button>
-        <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
-      </div>
-      <div id="testout"></div>
-    </form>
+  <div class="tiles">
+    <div class="tile"><div class="tl">Κατάσταση</div><div class="tv"><span class="dot {{ 'g' if configured else 'r' }}"></span>{{ 'Ενεργό' if configured else 'Ανενεργό' }}</div></div>
+    <div class="tile"><div class="tl">Πάροχος</div><div class="tv">{{ active.provider_label or '—' }}</div></div>
+    <div class="tile"><div class="tl">Μοντέλο</div><div class="tv" style="font-size:14px;">{{ active.model or '—' }}</div></div>
+    <div class="tile"><div class="tl">Ενεργά κελιά δεδομένων</div><div class="tv">{{ stats.active_cells }}<span style="font-size:13px;color:#93a3ab;font-weight:600;">/ {{ stats.total_cells }}</span></div></div>
+    <div class="tile"><div class="tl">Χρήσεις AI σήμερα</div><div class="tv">{{ stats.uses_today }}</div></div>
   </div>
 
   <div class="card" id="matrix">
     <h2><i class="ti ti-shield-lock"></i> Πίνακας δεδομένων — τι επιτρέπεται στο AI</h2>
     <div class="sub">Το AI αγγίζει <strong>μόνο</strong> ό,τι ανάψεις εδώ. Όλα ξεκινούν <strong>κλειστά (OFF)</strong> — δικλείδα ασφαλείας για τα δεδομένα σου.</div>
     <form method="POST" action="/dashboard/ai/matrix">
+      <div class="modgrid">
       {% for m in matrix %}
-      <div class="mod">
-        <div class="mh"><i class="ti {{ m.icon }}"></i> {{ m.label }}</div>
-        {% for dt in m.types %}
-        <div class="row{{ ' first' if loop.first }}">
-          <div class="txt">{{ dt.label }}<small{% if 'ΕΥΑΙΣΘΗΤΑ' in dt.note %} class="sens"{% endif %}>{{ dt.note }}</small></div>
-          <label class="switch"><input type="checkbox" name="ai_allow_{{ m.key }}_{{ dt.key }}" {{ 'checked' if allow[m.key ~ '_' ~ dt.key] }}><span class="slider"></span></label>
+        <div class="mod">
+          <div class="mh"><i class="ti {{ m.icon }}"></i> {{ m.label }}</div>
+          {% for dt in m.types %}
+          <div class="row{{ ' first' if loop.first }}">
+            <div class="txt">{{ dt.label }}<small{% if 'ΕΥΑΙΣΘΗΤΑ' in dt.note %} class="sens"{% endif %}>{{ dt.note }}</small></div>
+            <label class="switch"><input type="checkbox" name="ai_allow_{{ m.key }}_{{ dt.key }}" {{ 'checked' if allow[m.key ~ '_' ~ dt.key] }}><span class="slider"></span></label>
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
-      </div>
       {% endfor %}
+      </div>
       <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση πίνακα</button>
     </form>
   </div>
 
-  <div class="card">
-    <h2><i class="ti ti-history"></i> Ιστορικό χρήσης AI</h2>
-    <div class="sub">Ποιος &amp; πότε χρησιμοποίησε AI ή άλλαξε ρυθμίσεις — διαφάνεια.</div>
-    {% if audit %}
-    <table class="audit">
-      {% for a in audit %}
-      <tr><td class="tm">{{ a.tm }}</td><td>{{ a.who }}</td><td class="ac">{{ a.label }}</td><td class="dt">{{ a.detail }}</td></tr>
-      {% endfor %}
-    </table>
-    {% else %}
-    <div class="hint">Καμία δραστηριότητα AI ακόμη.</div>
-    {% endif %}
+  <div class="grid2">
+    <div class="card">
+      <h2><i class="ti ti-plug-connected"></i> Πάροχος &amp; Μοντέλο</h2>
+      <div class="sub">Ποιος πάροχος AI τροφοδοτεί τις λειτουργίες + το κλειδί σύνδεσης.</div>
+      <form method="POST">
+        <label>Πάροχος</label>
+        <select name="provider">
+          <option value="auto" {{ 'selected' if cfg.provider=='auto' }}>Αυτόματα (όποιο key υπάρχει)</option>
+          <option value="anthropic" {{ 'selected' if cfg.provider=='anthropic' }}>Anthropic (Claude)</option>
+          <option value="openai" {{ 'selected' if cfg.provider=='openai' }}>OpenAI (ChatGPT)</option>
+          <option value="groq" {{ 'selected' if cfg.provider=='groq' }}>Groq (Llama · δωρεάν)</option>
+        </select>
+        <label>Anthropic API key</label>
+        <input type="text" name="anthropic" value="{{ masked.anthropic }}" placeholder="sk-ant-...">
+        <label>OpenAI API key</label>
+        <input type="text" name="openai" value="{{ masked.openai }}" placeholder="sk-...">
+        <label>Groq API key</label>
+        <input type="text" name="groq" value="{{ masked.groq }}" placeholder="gsk_...">
+        <div class="hint">Άφησε τα keys όπως είναι (με αστερίσκους) για να μην αλλάξουν. Ιδανικά ορίζονται από Railway Variables.</div>
+        <label>Μοντέλο (προαιρετικό)</label>
+        <input type="text" name="model" value="{{ cfg.model }}" placeholder="π.χ. llama-3.3-70b-versatile ή claude-sonnet-4-6">
+        <label>Base URL (προαιρετικό — μόνο για custom endpoint)</label>
+        <input type="text" name="base_url" value="{{ cfg.base_url }}" placeholder="π.χ. https://api.groq.com/openai/v1/chat/completions">
+        <label class="chk"><input type="checkbox" name="clear_keys" value="1" style="width:auto;"> Διαγραφή αποθηκευμένων keys</label>
+        <div>
+          <button class="btn ghost" type="button" onclick="aiTest(this)"><i class="ti ti-wifi"></i> Δοκιμή σύνδεσης</button>
+          <button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση</button>
+        </div>
+        <div id="testout"></div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2><i class="ti ti-history"></i> Ιστορικό χρήσης AI</h2>
+      <div class="sub">Ποιος &amp; πότε χρησιμοποίησε AI ή άλλαξε ρυθμίσεις — διαφάνεια.</div>
+      {% if audit %}
+      <table class="audit">
+        {% for a in audit %}
+        <tr><td class="tm">{{ a.tm }}</td><td>{{ a.who }}</td><td class="ac">{{ a.label }}</td><td class="dt">{{ a.detail }}</td></tr>
+        {% endfor %}
+      </table>
+      {% else %}
+      <div class="hint">Καμία δραστηριότητα AI ακόμη.</div>
+      {% endif %}
+    </div>
   </div>
 
 </div>

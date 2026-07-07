@@ -4147,8 +4147,17 @@ def ai_admin():
     audit = [{'tm': a.created_at.strftime('%d/%m %H:%M') if a.created_at else '',
               'who': (a.user.full_name if a.user else '—'),
               'label': _audit_label.get(a.action, a.action), 'detail': a.detail or ''} for a in rows]
+    _today = datetime.combine(datetime.now().date(), datetime.min.time())
+    try:
+        uses_today = ActivityLog.query.filter(ActivityLog.action == 'piato_ai_describe',
+                                              ActivityLog.created_at >= _today).count()
+    except Exception:
+        uses_today = 0
+    stats = {'active_cells': sum(1 for v in allow.values() if v), 'total_cells': len(allow),
+             'uses_today': uses_today}
     return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None),
-                           active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on, audit=audit)
+                           active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on,
+                           audit=audit, stats=stats)
 
 
 @app.route('/dashboard/ai/master', methods=['POST'])
