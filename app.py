@@ -359,7 +359,9 @@ CHANGELOG = [
                'Νέα πύλη `ai_allowed(module, τύπος)`: **κάθε** λειτουργία AI περνά από τον έλεγχο πριν εκτελεστεί (το Piato «Συμπλήρωση γλωσσών» ήδη ελέγχεται).',
                '**Groq** πλήρως στην κονσόλα: επιλογή παρόχου + κλειδί + **«Δοκιμή σύνδεσης»**. Διορθώθηκε η σύνδεση (σωστό User-Agent — το Cloudflare του Groq μπλόκαρε το default).',
                '**Ενιαίο κουμπί AI** σε όλη την πλατφόρμα: ίδια αισθητική (περίγραμμα στο σκούρο πετρόλ CONDIAN + εικονίδιο sparkle) όπου καλείται AI.',
-               'Ο ψηφιακός βοηθός μετονομάστηκε **«Sophia»** (πρώην SpithaAI) — chat bubble, οθόνη βοηθού, κουμπιά ανάλυσης, login badge.']},
+               'Ο ψηφιακός βοηθός μετονομάστηκε **«Sophia»** (πρώην SpithaAI) — chat bubble, οθόνη βοηθού, κουμπιά ανάλυσης, login badge.',
+               '**Η Sophia έγινε γενικός βοηθός όλης της πλατφόρμας** (όχι μόνο πισίνες): ο ρόλος/ταυτότητά της **ορίζεται μέσα στην Κονσόλα AI** (editable). Απαντά **scoped** — μόνο με βάση τα δικαιώματα & τα ξενοδοχεία που βλέπει ο κάθε χρήστης.',
+               '**Επανασχεδιασμένο chat** (σύγχρονο): αφαιρέθηκαν τα υποχρεωτικά φίλτρα ξενοδοχείου/πισίνας, νέα οθόνη υποδοχής με προτάσεις, φυσαλίδες με avatar, ένδειξη πληκτρολόγησης, μορφοποίηση απαντήσεων (λίστες/έντονα) και υπενθύμιση «το AI μπορεί να κάνει λάθη».']},
     {'v': '12.436', 'b': '717', 'date': '07/07/2026', 'time': '21:23', 'title': 'Piato — AI «Συμπλήρωση όλων των γλωσσών» (τίτλος + περιγραφή) + υποστήριξη Groq',
      'items': ['Νέο κουμπί **«✨ Συμπλήρωση όλων των γλωσσών (AI)»** στη φόρμα πιάτου: γράφεις το πιάτο **σε μία γλώσσα** (Ελληνικά) και το AI γεμίζει αυτόματα **τίτλο ΚΑΙ περιγραφή στις 5 γλώσσες** (EL/EN/DE/IT/FR). Κρατά το δικό σου Ελληνικό, μεταφράζει τα υπόλοιπα. Τα ελέγχεις πριν σώσεις.',
                'Στέλνεται στο AI **ΜΟΝΟ ο τίτλος + η περιγραφή του πιάτου** (+ αλλεργιογόνα ως context) — κανένα ευαίσθητο δεδομένο.',
@@ -2618,6 +2620,31 @@ def build_pool_context(pool):
     return '\n'.join(lines)
 
 
+def build_assistant_context(user):
+    """Scoped context για τη Sophia: ρόλος + ξενοδοχεία/πισίνες που ΒΛΕΠΕΙ ο χρήστης (τίποτα εκτός εμβέλειας)."""
+    if user is None:
+        return 'Άγνωστος χρήστης — απάντα γενικά, χωρίς δεδομένα.'
+    rl = {'masteradmin': 'Master Admin', 'admin': 'Διαχειριστής', 'manager': 'Υπεύθυνος', 'staff': 'Προσωπικό'}
+    L = ['Χρήστης που ρωτά: %s · ρόλος: %s.' % (user.full_name or user.username, rl.get(user.role, user.role))]
+    try:
+        hs = scoped_hotels(user)
+    except Exception:
+        hs = []
+    if not hs:
+        L.append('Ο χρήστης δεν έχει ξενοδοχεία στην εμβέλειά του — απάντα γενικά, χωρίς δεδομένα.')
+        return '\n'.join(L)
+    L.append('Ξενοδοχεία στην εμβέλεια του χρήστη (ανάφερε ΜΟΝΟ αυτά, τίποτα εκτός): ' + ', '.join(h.name for h in hs) + '.')
+    pools = [p for h in hs for p in h.pools if p.is_active]
+    if pools:
+        L.append('')
+        L.append('# ΠΙΣΙΝΕΣ ΣΤΗΝ ΕΜΒΕΛΕΙΑ (%d) — στοιχεία & τελευταίες μετρήσεις:' % len(pools))
+        for p in pools[:6]:
+            L.append(build_pool_context(p))
+        if len(pools) > 6:
+            L.append('... και %d ακόμη πισίνες (ζήτα από τον χρήστη να ονομάσει όποια χρειάζεται).' % (len(pools) - 6))
+    return '\n'.join(L)
+
+
 def build_pool_report_pdf(rep_date, records):
     """Branded PDF αναφορά πισινών για μια ημέρα (fpdf2 + DejaVuSans)."""
     from fpdf import FPDF
@@ -3349,7 +3376,6 @@ def api_assistant():
         return jsonify({'reply': '', 'error': 'auth'}), 401
     data = request.get_json(force=True, silent=True) or {}
     raw  = data.get('messages', [])
-    pool_id = data.get('pool_id')
     messages = []
     for m in raw[-12:]:
         role = m.get('role')
@@ -3358,8 +3384,7 @@ def api_assistant():
             messages.append({'role': role, 'content': content[:4000]})
     if not messages:
         return jsonify({'reply': '', 'error': 'empty'}), 400
-    pool = Pool.query.filter_by(id=pool_id, is_active=True).first() if pool_id else None
-    context = build_pool_context(pool)
+    context = build_assistant_context(current_user())   # scoped στα δικαιώματα & ξενοδοχεία του χρήστη
     base_persona = _ai_setting('ai_persona', '').strip() or AI_ASSISTANT_PROMPT
     system = base_persona + '\n\n# ΔΕΔΟΜΕΝΑ ΕΦΑΡΜΟΓΗΣ (τρέχουσα κατάσταση)\n' + context
     reply, err = call_llm(system, messages)
