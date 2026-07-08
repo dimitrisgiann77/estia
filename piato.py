@@ -926,6 +926,96 @@ def piato_menu_reorder():
     return jsonify(ok=True)
 
 
+# ── AI IMPORT (P-083 · φωτογραφία μενού → AI parse → preview → φόρτωση) ───────
+@app.route('/dashboard/piato/import/parse', methods=['POST'])
+def piato_import_parse():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    from app import call_llm, ai_allowed, resolve_vision_model
+    if not ai_allowed('piato', 'menu_import'):
+        return jsonify(error='ai_disabled'), 403     # πύλη διακυβέρνησης (Κονσόλα AI)
+    f = request.files.get('file')
+    if not f:
+        return jsonify(error='no_file'), 400
+    raw = f.read()
+    if len(raw) > 6 * 1024 * 1024:
+        return jsonify(error='too_large'), 400
+    mime = (f.mimetype or '').lower()
+    if not mime.startswith('image/'):
+        return jsonify(error='only_image'), 400       # PDF σε επόμενο βήμα
+    import base64
+    data_url = 'data:%s;base64,%s' % (mime, base64.b64encode(raw).decode('ascii'))
+    sys_p = ('You extract a restaurant menu from an image into STRICT JSON. Output ONLY JSON, no markdown, no prose. '
+             'Schema: {"categories":[{"name":"<category>","items":[{"title":"<dish>","desc":"<short desc or empty>",'
+             '"price":<number or null>}]}]}. Keep the printed language. price numeric only (no currency symbol). '
+             'Group items under their printed category headings. Best effort if unclear.')
+    content = [{'type': 'text', 'text': 'Extract this menu into the JSON schema.'},
+               {'type': 'image_url', 'image_url': {'url': data_url}}]
+    reply, err = call_llm(sys_p, [{'role': 'user', 'content': content}],
+                          model=resolve_vision_model(), max_tokens=3000)
+    if err:
+        return jsonify(error=err), 502
+    import re
+    mm = re.search(r'\{.*\}', reply or '', re.S)
+    try:
+        data = json.loads(mm.group(0)) if mm else {}
+    except Exception:
+        return jsonify(error='parse_failed', raw=(reply or '')[:300]), 502
+    out = []
+    for c in (data.get('categories') or [])[:40]:
+        items = []
+        for it in (c.get('items') or [])[:120]:
+            title = str(it.get('title') or '').strip()[:200]
+            if not title:
+                continue
+            pr = it.get('price')
+            try:
+                pr = round(float(pr), 2) if pr not in (None, '') else None
+            except Exception:
+                pr = None
+            items.append({'title': title, 'desc': str(it.get('desc') or '').strip()[:500], 'price': pr})
+        name = str(c.get('name') or '').strip()[:120]
+        if name or items:
+            out.append({'name': name, 'items': items})
+    log_activity('piato_import_parse', '%d κατηγορίες' % len(out))
+    return jsonify(ok=True, categories=out)
+
+
+@app.route('/dashboard/piato/import/commit', methods=['POST'])
+def piato_import_commit():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    data = request.get_json(force=True, silent=True) or {}
+    menu = Menu.query.get(_i(data.get('menu_id')))
+    if not menu:
+        return jsonify(error='no_menu'), 400
+    _outlet_or_403(menu.outlet_id)
+    made_c = made_i = 0
+    for c in (data.get('categories') or []):
+        cname = str(c.get('name') or '').strip()
+        if not cname:
+            continue
+        mx = db.session.query(db.func.max(MenuCategory.sort)).filter_by(outlet_id=menu.outlet_id).scalar() or 0
+        cat = MenuCategory(outlet_id=menu.outlet_id, menu_id=menu.id, kind='food', sort=mx + 1,
+                           name_i18n=json.dumps({'el': cname}, ensure_ascii=False))
+        db.session.add(cat); db.session.flush(); made_c += 1
+        for i, it in enumerate(c.get('items') or []):
+            title = str(it.get('title') or '').strip()
+            if not title:
+                continue
+            try:
+                price = float(it.get('price')) if it.get('price') not in (None, '') else 0.0
+            except Exception:
+                price = 0.0
+            db.session.add(MenuItem(category_id=cat.id, price=price, available=True, sort=i,
+                                    title_i18n=json.dumps({'el': title}, ensure_ascii=False),
+                                    desc_i18n=json.dumps({'el': str(it.get('desc') or '').strip()}, ensure_ascii=False)))
+            made_i += 1
+    db.session.commit()
+    log_activity('piato_import_commit', '%d κατηγ. / %d πιάτα' % (made_c, made_i))
+    return jsonify(ok=True, categories=made_c, items=made_i)
+
+
 # ── ITEM CRUD ────────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/item/save', methods=['POST'])
 def piato_item_save():

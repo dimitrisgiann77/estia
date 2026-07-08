@@ -143,6 +143,9 @@ table.audit td.dt{color:#6b7a82;}
         <input type="text" name="model" value="{{ cfg.model }}" placeholder="π.χ. llama-3.3-70b-versatile ή claude-sonnet-4-6">
         <label>Base URL (προαιρετικό — μόνο για custom endpoint)</label>
         <input type="text" name="base_url" value="{{ cfg.base_url }}" placeholder="π.χ. https://api.groq.com/openai/v1/chat/completions">
+        <label>Μοντέλο εικόνας (vision — εισαγωγή μενού από φωτογραφία)</label>
+        <input type="text" name="vision_model" value="{{ vision_model }}" placeholder="π.χ. llama-3.2-90b-vision-preview (Groq) ή gpt-4o-mini / claude-sonnet-4-6">
+        <div class="hint">Μόνο για την «Εισαγωγή μενού από φωτογραφία». Κενό = προεπιλογή ανά πάροχο.</div>
         <label class="chk"><input type="checkbox" name="clear_keys" value="1" style="width:auto;"> Διαγραφή αποθηκευμένων keys</label>
         <div>
           <button class="btn ghost" type="button" onclick="aiTest(this)"><i class="ti ti-wifi"></i> Δοκιμή σύνδεσης</button>

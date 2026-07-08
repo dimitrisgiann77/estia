@@ -348,11 +348,16 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.442'
-APP_BUILD   = '723'
+APP_VERSION = '12.443'
+APP_BUILD   = '724'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.443', 'b': '724', 'date': '08/07/2026', 'time': '14:15', 'title': 'Piato — Εισαγωγή μενού από φωτογραφία με AI (P-083)',
+     'items': ['Νέα καρτέλα **«Εισαγωγή AI»** στο Piato: **σύρε/ανέβασε φωτογραφία μενού** → το AI διαβάζει κατηγορίες & πιάτα → **preview με διόρθωση** → φόρτωση στο επιλεγμένο μενού. Human-in-the-loop (ελέγχεις πριν σωθεί).',
+               'Περνά από την **πύλη διακυβέρνησης**: χρειάζεται ενεργό το κελί «Piato · Εισαγωγή μενού» στην Κονσόλα AI (default κλειστό).',
+               'Νέο πεδίο **«Μοντέλο εικόνας (vision)»** στην Κονσόλα AI — το vision μοντέλο ρυθμίζεται (Groq/OpenAI/Anthropic)· κενό = προεπιλογή ανά πάροχο.',
+               '(Προς το παρόν φωτογραφίες· η υποστήριξη PDF έρχεται σε επόμενο βήμα.)']},
     {'v': '12.442', 'b': '723', 'date': '08/07/2026', 'time': '13:20', 'title': 'Piato — Μενού πελάτη ανά ονομαστό μενού (tabs) — ολοκλήρωση multi-menu',
      'items': ['Το μενού του πελάτη ομαδοποιείται πλέον **ανά μενού** (π.χ. Φαγητό · Ποτά · Cocktails) με tabs στην κορυφή, αντί απλό food/drink. Ένα μόνο μενού → χωρίς tabs (όπως πριν).',
                'Ολοκληρώθηκε το **multi-menu (P-082) από άκρη σε άκρη**: αυτόματη μεταφορά υπαρχόντων → διαχειριστικός builder με μενού-ενότητες → μενού πελάτη με tabs. Το κομψό guest design παραμένει αμετάβλητο.']},
@@ -2497,6 +2502,17 @@ def resolve_provider():
     return None
 
 
+def resolve_vision_model():
+    """Μοντέλο για ανάγνωση εικόνας (menu import). Ρυθμιζόμενο (Setting ai_vision_model / env),
+    αλλιώς λογικό default ανά πάροχο. Ο χρήστης μπορεί να το αλλάξει αν το Groq preview vision αλλάξει."""
+    v = (_ai_setting('ai_vision_model', '') or os.environ.get('AI_VISION_MODEL', '')).strip()
+    if v:
+        return v
+    prov = resolve_provider()
+    return {'anthropic': 'claude-sonnet-4-6', 'openai': 'gpt-4o-mini',
+            'groq': 'llama-3.2-90b-vision-preview'}.get(prov, '')
+
+
 # ── AI governance matrix (P-081): κάθε module × τύπος δεδομένου· default OFF ──
 # Το AI αγγίζει ΜΟΝΟ ό,τι έχει ρητά ενεργοποιηθεί εδώ. Νέος τύπος → πρόσθεσέ τον.
 AI_MATRIX = [
@@ -2552,16 +2568,17 @@ def ai_allowed(module, dtype):
 AI_HTTP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 
 
-def call_llm(system_prompt, messages):
-    """messages: list of {'role':'user'|'assistant','content':str}. Returns (reply, error)."""
+def call_llm(system_prompt, messages, model=None, max_tokens=1024):
+    """messages: list of {'role':'user'|'assistant','content':str|list}. content μπορεί να είναι
+    array (vision· openai/groq format με image_url). model/max_tokens = override. Returns (reply, error)."""
     provider = resolve_provider()
     if not provider:
         return None, 'not_configured'
     c = get_ai_config()
     try:
         if provider == 'anthropic':
-            model = c['model'] or 'claude-sonnet-4-6'
-            payload = {'model': model, 'max_tokens': 1024,
+            model = model or c['model'] or 'claude-sonnet-4-6'
+            payload = {'model': model, 'max_tokens': max_tokens,
                        'system': system_prompt, 'messages': messages}
             req = urllib.request.Request(
                 'https://api.anthropic.com/v1/messages',
@@ -2580,9 +2597,9 @@ def call_llm(system_prompt, messages):
             else:
                 url = c.get('base_url') or 'https://api.openai.com/v1/chat/completions'
                 key = c['openai']; default_model = 'gpt-4o-mini'
-            model = c['model'] or default_model
+            model = model or c['model'] or default_model
             msgs = [{'role': 'system', 'content': system_prompt}] + messages
-            payload = {'model': model, 'max_tokens': 1024, 'messages': msgs}
+            payload = {'model': model, 'max_tokens': max_tokens, 'messages': msgs}
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode('utf-8'),
@@ -4160,6 +4177,7 @@ def ai_admin():
         setk('provider', request.form.get('provider', 'auto'))
         setk('model', request.form.get('model', '').strip())
         setk('base_url', request.form.get('base_url', '').strip())
+        setk('vision_model', request.form.get('vision_model', '').strip())   # P-083 (menu import)
         if request.form.get('clear_keys'):
             setk('anthropic', ''); setk('openai', ''); setk('groq', '')
         else:
@@ -4203,7 +4221,8 @@ def ai_admin():
     return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None),
                            active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on,
                            audit=audit, stats=stats, persona=_ai_setting('ai_persona', ''),
-                           persona_default=AI_ASSISTANT_PROMPT)
+                           persona_default=AI_ASSISTANT_PROMPT,
+                           vision_model=_ai_setting('ai_vision_model', ''))
 
 
 @app.route('/dashboard/ai/master', methods=['POST'])
