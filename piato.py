@@ -1054,6 +1054,53 @@ def piato_import_analyze():
     return jsonify(ok=True, categories=out)
 
 
+@app.route('/dashboard/piato/import/commit', methods=['POST'])
+def piato_import_commit():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    data = request.get_json(force=True, silent=True) or {}
+    menu = Menu.query.get(_i(data.get('menu_id')))
+    if not menu:
+        return jsonify(error='no_menu'), 400
+    _outlet_or_403(menu.outlet_id)
+    allg_by_code = {a.code: a for a in Allergen.query.all()}
+
+    def i18n(d):
+        d = d if isinstance(d, dict) else {}
+        return {lc: str(d.get(lc) or '').strip() for lc in LANG_CODES}
+
+    made_c = made_i = 0
+    for c in (data.get('categories') or []):
+        nm = i18n(c.get('name'))
+        if not any(nm.values()):
+            continue
+        mx = db.session.query(db.func.max(MenuCategory.sort)).filter_by(outlet_id=menu.outlet_id).scalar() or 0
+        cat = MenuCategory(outlet_id=menu.outlet_id, menu_id=menu.id, kind='food', sort=mx + 1,
+                           name_i18n=json.dumps(nm, ensure_ascii=False))
+        db.session.add(cat); db.session.flush(); made_c += 1
+        for i, it in enumerate(c.get('items') or []):
+            ti = i18n(it.get('title'))
+            if not any(ti.values()):
+                continue
+            try:
+                price = float(str(it.get('price')).replace(',', '.')) if it.get('price') not in (None, '') else 0.0
+            except Exception:
+                price = 0.0
+            item = MenuItem(category_id=cat.id, price=price, available=True, sort=i,
+                            title_i18n=json.dumps(ti, ensure_ascii=False),
+                            desc_i18n=json.dumps(i18n(it.get('desc')), ensure_ascii=False))
+            db.session.add(item); db.session.flush()
+            seen = set()
+            for code in (it.get('allergens') or []):
+                a = allg_by_code.get(code)
+                if a and a.id not in seen:
+                    db.session.add(ItemAllergen(item_id=item.id, allergen_id=a.id)); seen.add(a.id)
+            made_i += 1
+    db.session.commit()
+    log_activity('piato_import_commit', '%d κατηγ. / %d πιάτα' % (made_c, made_i))
+    return jsonify(ok=True, categories=made_c, items=made_i)
+
+
 # ── ITEM CRUD ────────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/item/save', methods=['POST'])
 def piato_item_save():

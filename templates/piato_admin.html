@@ -115,6 +115,21 @@
   .dropzone{border:2px dashed #c4d5df;border-radius:12px;padding:30px 20px;text-align:center;color:#7a94a2;cursor:pointer;margin-top:14px;transition:border-color .15s,background .15s,color .15s;}
   .dropzone:hover,.dropzone.over{border-color:#193847;background:#f6fbfd;color:#193847;}
   .dropzone i{font-size:34px;display:block;margin-bottom:8px;color:#9db4c0;}
+  .impbox.wide{max-width:920px;}
+  .implangs{margin:12px 0 8px;font-size:12px;color:#64748b;}
+  .implang{border:1px solid #d4dde3;background:#fff;border-radius:6px;padding:3px 9px;margin-left:4px;cursor:pointer;font-size:12px;font-weight:600;color:#64748b;}
+  .implang.on{background:#193847;color:#fff;border-color:#193847;}
+  .imptbl{overflow-x:auto;border:1px solid #e6eef2;border-radius:8px;max-height:52vh;overflow-y:auto;}
+  .imptbl table{width:100%;border-collapse:collapse;font-size:13px;}
+  .imptbl th{background:#f1f6f9;color:#193847;font-size:11px;text-align:left;padding:7px 8px;position:sticky;top:0;}
+  .imptbl td{padding:4px 6px;border-top:1px solid #eef3f6;vertical-align:middle;}
+  .imcatrow td{background:#f8fbfd;}
+  .imcatrow input{font-weight:700;color:#193847;}
+  .imptbl input{width:100%;border:1px solid #e2e8f0;border-radius:5px;padding:4px 6px;font-size:13px;}
+  .imptbl input.imprice{width:64px;text-align:right;}
+  .imallg{white-space:nowrap;}
+  .imchip{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:5px;margin:1px;cursor:pointer;opacity:.32;font-size:12px;background:#eef2f7;padding:0 3px;}
+  .imchip.on{opacity:1;background:#dcfce7;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -463,6 +478,7 @@
             <input type="file" id="impfile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="impPick(this.files[0])">
           </div>
           <div id="impstatus" class="muted" style="margin-top:10px;"></div>
+          <div id="imptable"></div>
         </div>
       </div>
     </div>
@@ -709,11 +725,70 @@
       .then(function(r){return r.json();})
       .then(function(d){
         if(d.error){ st.innerHTML=impErr(d.error); return; }
-        window.IMP_DATA=d.categories;
+        window.IMP_DATA=d.categories; window.IMP_LANG='el';
         var ni=d.categories.reduce(function(a,c){return a+(c.items?c.items.length:0);},0);
-        st.innerHTML='✓ Βρέθηκαν <b>'+d.categories.length+'</b> κατηγορίες &amp; <b>'+ni+'</b> πιάτα (μεταφρασμένα σε όλες τις γλώσσες). — ο πίνακας ελέγχου μπαίνει στο Βήμα 3.';
+        st.innerHTML='✓ Βρέθηκαν <b>'+d.categories.length+'</b> κατηγορίες &amp; <b>'+ni+'</b> πιάτα (μεταφρασμένα). Έλεγξε/διόρθωσε και πάτα «Καταχώρηση».';
+        var box=document.querySelector('.impbox'); if(box) box.classList.add('wide');
+        impRender();
       })
       .catch(function(){ st.textContent='Σφάλμα σύνδεσης.'; });
+  }
+  // ── Βήμα 3: πίνακας ελέγχου (γραμμές/στήλες) + γλώσσες + αλλεργιογόνα + καταχώρηση ──
+  var IMP_ALLG=[{% for a in allergens %}{code:{{ a.code|tojson }},icon:{{ a.icon|tojson }},name:{{ (ml(a.name_i18n).get('el') or a.code)|tojson }}}{{ ',' if not loop.last }}{% endfor %}];
+  var IMP_LANGS=[{% for code,name in langs %}{{ code|tojson }}{{ ',' if not loop.last }}{% endfor %}];
+  function impEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function impSync(){
+    var L=window.IMP_LANG||'el', D=window.IMP_DATA||[];
+    document.querySelectorAll('#imptable [data-fld]').forEach(function(inp){
+      var ci=+inp.getAttribute('data-ci'), ii=inp.getAttribute('data-ii'), fld=inp.getAttribute('data-fld');
+      var c=D[ci]; if(!c) return;
+      if(fld==='cname'){ c.name=c.name||{}; c.name[L]=inp.value; }
+      else { var it=c.items[+ii]; if(!it) return;
+        if(fld==='title'){ it.title=it.title||{}; it.title[L]=inp.value; }
+        else if(fld==='desc'){ it.desc=it.desc||{}; it.desc[L]=inp.value; }
+        else if(fld==='price'){ it.price=inp.value; }
+      }
+    });
+  }
+  function impLang(code){ impSync(); window.IMP_LANG=code; impRender(); }
+  function impToggleAllg(ci,ii,code){
+    impSync(); var it=window.IMP_DATA[ci].items[ii]; it.allergens=it.allergens||[];
+    var k=it.allergens.indexOf(code);
+    if(k>=0) it.allergens.splice(k,1); else it.allergens.push(code);
+    impRender();
+  }
+  function impRender(){
+    var D=window.IMP_DATA||[], L=window.IMP_LANG||'el';
+    var h='<div class="implangs">Γλώσσα: ';
+    IMP_LANGS.forEach(function(lc){ h+='<button type="button" class="implang'+(lc===L?' on':'')+'" onclick="impLang(\''+lc+'\')">'+lc.toUpperCase()+'</button>'; });
+    h+='</div><div class="imptbl"><table><thead><tr><th>Πιάτο</th><th>Περιγραφή</th><th>Τιμή €</th><th>Αλλεργιογόνα</th></tr></thead><tbody>';
+    D.forEach(function(c,ci){
+      var cn=(c.name&&c.name[L])||'';
+      h+='<tr class="imcatrow"><td colspan="4"><input data-ci="'+ci+'" data-fld="cname" value="'+impEsc(cn)+'" placeholder="Κατηγορία"></td></tr>';
+      (c.items||[]).forEach(function(it,ii){
+        var t=(it.title&&it.title[L])||'', d=(it.desc&&it.desc[L])||'';
+        h+='<tr><td><input data-ci="'+ci+'" data-ii="'+ii+'" data-fld="title" value="'+impEsc(t)+'"></td>'+
+           '<td><input data-ci="'+ci+'" data-ii="'+ii+'" data-fld="desc" value="'+impEsc(d)+'"></td>'+
+           '<td><input class="imprice" data-ci="'+ci+'" data-ii="'+ii+'" data-fld="price" value="'+(it.price==null?'':it.price)+'"></td>'+
+           '<td class="imallg">';
+        IMP_ALLG.forEach(function(a){
+          var on=(it.allergens||[]).indexOf(a.code)>=0;
+          h+='<span class="imchip'+(on?' on':'')+'" title="'+impEsc(a.name)+'" onclick="impToggleAllg('+ci+','+ii+',\''+a.code+'\')">'+impEsc(a.icon)+'</span>';
+        });
+        h+='</td></tr>';
+      });
+    });
+    h+='</tbody></table></div><div style="margin-top:12px;text-align:right;"><button type="button" class="btn green" onclick="impCommit()"><i class="ti ti-check"></i> Καταχώρηση στο μενού</button></div>';
+    document.getElementById('imptable').innerHTML=h;
+  }
+  function impCommit(){
+    impSync();
+    var menuId=document.getElementById('impmenu').value;
+    var st=document.getElementById('impstatus'); st.innerHTML='<i class="ti ti-loader-2"></i> Καταχώρηση…';
+    fetch('/dashboard/piato/import/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({menu_id:menuId, categories:window.IMP_DATA})})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d.error){st.innerHTML=impErr(d.error);return;} st.innerHTML='✓ Προστέθηκαν '+d.categories+' κατηγορίες &amp; '+d.items+' πιάτα.'; setTimeout(function(){location.reload();},1300); })
+      .catch(function(){st.textContent='Σφάλμα σύνδεσης.';});
   }
   (function(){
     var dz=document.getElementById('dropzone'); if(!dz) return;
