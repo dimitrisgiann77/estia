@@ -547,12 +547,20 @@ def piato_admin():
     except Exception as e:
         print('[piato] surveys list skipped:', e)
     stats = _outlet_stats(sel) if sel else None
+    menus = sorted(sel.menus, key=lambda m: (m.sort or 0, m.id)) if sel else []
+    orphan_cats = [c for c in sel.categories if not c.menu_id] if sel else []
+    if sel and orphan_cats:                       # self-heal: ανάθετες κατηγορίες → default μενού
+        seed_default_menus()
+        db.session.expire_all()
+        sel = Outlet.query.get(sel.id)
+        menus = sorted(sel.menus, key=lambda m: (m.sort or 0, m.id))
+        orphan_cats = [c for c in sel.categories if not c.menu_id]
     return render_template('piato_admin.html',
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
                            allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
                            palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS, kinds=PIATO_KINDS,
-                           surveys=surveys, stats=stats,
+                           surveys=surveys, stats=stats, menus=menus, orphan_cats=orphan_cats,
                            base_url=request.host_url.rstrip('/'))
 
 
@@ -737,14 +745,21 @@ def piato_category_save():
     kind = request.form.get('kind') or 'food'
     if kind not in KIND_CODES:
         kind = 'food'
+    menu_id = _i(request.form.get('menu_id')) or None       # P-082: μενού-στόχος
+    if menu_id:
+        m = Menu.query.get(menu_id)
+        if not m or m.outlet_id != o.id:
+            menu_id = None
     if cid:
         c = MenuCategory.query.get(_i(cid))
         if not c or c.outlet_id != o.id:
             abort(404)
         c.name_i18n, c.hours, c.kind = name, hours, kind
+        if menu_id:
+            c.menu_id = menu_id
     else:
         mx = db.session.query(db.func.max(MenuCategory.sort)).filter_by(outlet_id=o.id).scalar() or 0
-        c = MenuCategory(outlet_id=o.id, name_i18n=name, hours=hours, kind=kind, sort=mx + 1)
+        c = MenuCategory(outlet_id=o.id, name_i18n=name, hours=hours, kind=kind, sort=mx + 1, menu_id=menu_id)
         db.session.add(c)
     db.session.commit()
     log_activity('piato_category_save', o.name)
@@ -798,6 +813,11 @@ def piato_category_reorder():
     if not _can_manage():
         return jsonify(error='forbidden'), 403
     o = _outlet_or_403(_i(request.form.get('outlet_id')))
+    menu_id = _i(request.form.get('menu_id')) or None       # P-082: μενού-στόχος (drag μεταξύ μενού)
+    if menu_id:
+        m = Menu.query.get(menu_id)
+        if not m or m.outlet_id != o.id:
+            menu_id = None
     valid = {c.id for c in o.categories}
     ids = [int(x) for x in request.form.get('ids', '').split(',') if x.strip().isdigit()]
     for i, cid in enumerate(ids):
@@ -805,6 +825,8 @@ def piato_category_reorder():
             c = MenuCategory.query.get(cid)
             if c:
                 c.sort = i
+                if menu_id:
+                    c.menu_id = menu_id
     db.session.commit()
     return jsonify(ok=True)
 
@@ -826,6 +848,66 @@ def piato_item_reorder():
         if it and it.category and it.category.outlet and it.category.outlet.hotel_id in my:
             it.category_id = cat.id
             it.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+# ── MENU CRUD (P-082 · ονομαστά μενού ανά σημείο) ────────────────────────────
+@app.route('/dashboard/piato/menu/save', methods=['POST'])
+def piato_menu_save():
+    if not _can_manage():
+        return redirect(url_for('login'))
+    o = _outlet_or_403(request.form.get('outlet_id'))
+    mid = request.form.get('id')
+    name = _ml_from_form('mname')
+    icon = (request.form.get('icon') or '').strip()[:30]
+    if mid:
+        m = Menu.query.get(_i(mid))
+        if not m or m.outlet_id != o.id:
+            abort(404)
+        m.name_i18n = name
+        if icon:
+            m.icon = icon
+    else:
+        mx = db.session.query(db.func.max(Menu.sort)).filter_by(outlet_id=o.id).scalar() or 0
+        db.session.add(Menu(outlet_id=o.id, name_i18n=name, icon=icon, sort=mx + 1, active=True))
+    db.session.commit()
+    log_activity('piato_menu_save', o.name)
+    return redirect(url_for('piato_admin', outlet=o.id))
+
+
+@app.route('/dashboard/piato/menu/delete', methods=['POST'])
+def piato_menu_delete():
+    if not _can_manage():
+        return redirect(url_for('login'))
+    m = Menu.query.get(_i(request.form.get('id')))
+    if not m:
+        abort(404)
+    o = _outlet_or_403(m.outlet_id)
+    cats = list(m.categories)
+    if cats:
+        other = Menu.query.filter(Menu.outlet_id == o.id, Menu.id != m.id).order_by(Menu.sort).first()
+        if not other:
+            return redirect(url_for('piato_admin', outlet=o.id))   # δεν σβήνεις το μοναδικό μενού που κρατά κατηγορίες
+        for c in cats:
+            c.menu_id = other.id
+    db.session.delete(m); db.session.commit()
+    log_activity('piato_menu_delete', o.name)
+    return redirect(url_for('piato_admin', outlet=o.id))
+
+
+@app.route('/dashboard/piato/menu/reorder', methods=['POST'])
+def piato_menu_reorder():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    o = _outlet_or_403(_i(request.form.get('outlet_id')))
+    valid = {m.id for m in o.menus}
+    ids = [int(x) for x in request.form.get('ids', '').split(',') if x.strip().isdigit()]
+    for i, mid in enumerate(ids):
+        if mid in valid:
+            m = Menu.query.get(mid)
+            if m:
+                m.sort = i
     db.session.commit()
     return jsonify(ok=True)
 

@@ -93,6 +93,17 @@
   .sortable-ghost{opacity:.35;}
   .sortable-chosen{background:#eef5f8;}
   .sortable-drag .cgrip,.sortable-drag .igrip{color:#193847;}
+  /* menu sections (Βήμα 5β · multi-menu) */
+  .menu{border:1px solid #d6e2ea;border-radius:12px;margin-bottom:14px;background:#fbfdfe;}
+  .mhead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #e6eef2;background:#eef4f8;border-radius:12px 12px 0 0;}
+  .mhead b{color:#193847;font-size:15px;}
+  .mcount{font-size:12px;color:#8aa0ac;}
+  .mgrip{cursor:grab;color:#8aa9b8;font-size:17px;display:inline-flex;align-items:center;touch-action:none;}
+  .mgrip:active{cursor:grabbing;}
+  .medit{margin-left:auto;}
+  .medit summary{cursor:pointer;color:#64748b;font-size:14px;padding:0 4px;}
+  .catlist{padding:10px 12px;min-height:26px;}
+  .newcat{padding:0 12px 12px;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -229,17 +240,40 @@
     <!-- Κατηγορίες + πιάτα -->
     <div class="card" style="margin-top:14px;">
       <h3>Μενού — κατηγορίες & πιάτα</h3>
-      {% if sel.categories %}<div class="toolbar">
+      {% if menus %}<div class="toolbar">
         <button type="button" onclick="foldAll(true)">▸ Σύμπτυξη όλων</button>
         <button type="button" onclick="foldAll(false)">▾ Άνοιγμα όλων</button>
       </div>{% endif %}
 
-      <div id="catlist">
-      {% for c in sel.categories %}
+      <div id="menulist">
+      {% for m in menus %}
+      <div class="menu" data-menu-id="{{ m.id }}">
+        <div class="mhead">
+          <span class="mgrip" title="Σύρε για αναδιάταξη μενού"><i class="ti ti-grip-vertical"></i></span>
+          <i class="ti {{ m.icon or 'ti-list' }}" style="color:#193847;font-size:18px;"></i>
+          <b>{{ mlget(m.name_i18n, 'el') or 'Μενού' }}</b>
+          <span class="mcount">· {{ m.categories|length }} κατηγ.</span>
+          <details class="medit"><summary>✎</summary>
+            <div class="subform">
+              <form method="post" action="/dashboard/piato/menu/save">
+                <input type="hidden" name="id" value="{{ m.id }}"><input type="hidden" name="outlet_id" value="{{ sel.id }}">
+                <label>Όνομα μενού</label>{{ langfields('mname', ml(m.name_i18n)) }}
+                <label>Εικονίδιο (Tabler)</label><input type="text" name="icon" value="{{ m.icon }}" placeholder="π.χ. ti-glass-cocktail">
+                <div class="row" style="margin-top:8px;"><button class="btn sm" type="submit">Αποθήκευση μενού</button></div>
+              </form>
+              <form method="post" action="/dashboard/piato/menu/delete" style="margin-top:6px;" onsubmit="return confirm('Διαγραφή μενού; Οι κατηγορίες του μεταφέρονται σε άλλο μενού.');">
+                <input type="hidden" name="id" value="{{ m.id }}">
+                <button class="btn red sm" type="submit"><i class="ti ti-trash"></i> Διαγραφή μενού</button>
+              </form>
+            </div>
+          </details>
+        </div>
+        <div class="catlist" data-menu-id="{{ m.id }}">
+      {% for c in m.categories %}
       <div class="cat" id="cat{{ c.id }}" data-cat-id="{{ c.id }}">
         <div class="chead">
           <div class="lhs">
-            <span class="cgrip" title="Σύρε για αναδιάταξη κατηγορίας"><i class="ti ti-grip-vertical"></i></span>
+            <span class="cgrip" title="Σύρε — αναδιάταξη ή μετακίνηση σε άλλο μενού"><i class="ti ti-grip-vertical"></i></span>
             <button type="button" class="fold" onclick="toggleCat('cat{{ c.id }}')" title="Σύμπτυξη/άνοιγμα">▾</button>
             <h4>{{ mlget(c.name_i18n, 'el') or '—' }}
               <span class="badge" style="background:#eef2f7;color:#475569;">{{ 'Ποτό' if (c.kind or 'food') == 'drink' else 'Φαγητό' }}</span>
@@ -366,18 +400,32 @@
         </div>
       </div>
       {% endfor %}
-      </div><!-- /catlist -->
+        </div><!-- /catlist -->
+        <details class="newcat" style="margin-top:8px;">
+          <summary>➕ Νέα κατηγορία σε «{{ mlget(m.name_i18n, 'el') or 'Μενού' }}»</summary>
+          <div class="subform">
+            <form method="post" action="/dashboard/piato/category/save">
+              <input type="hidden" name="outlet_id" value="{{ sel.id }}"><input type="hidden" name="menu_id" value="{{ m.id }}">
+              <label>Όνομα κατηγορίας</label>{{ langfields('cname', {}) }}
+              <label>Ενότητα</label>
+              <select name="kind">{% for k, v in kinds %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+              <label>Ωράριο διαθεσιμότητας (προαιρ.)</label><input type="text" name="chours" placeholder="π.χ. Πρωινό 07:00–11:00">
+              <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Προσθήκη κατηγορίας</button></div>
+            </form>
+          </div>
+        </details>
+      </div><!-- /menu -->
+      {% endfor %}
+      </div><!-- /menulist -->
 
       <details style="margin-top:14px;">
-        <summary>➕ Νέα κατηγορία</summary>
+        <summary>➕ Νέο μενού</summary>
         <div class="subform">
-          <form method="post" action="/dashboard/piato/category/save">
+          <form method="post" action="/dashboard/piato/menu/save">
             <input type="hidden" name="outlet_id" value="{{ sel.id }}">
-            <label>Όνομα κατηγορίας</label>{{ langfields('cname', {}) }}
-            <label>Ενότητα</label>
-            <select name="kind">{% for k, v in kinds %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
-            <label>Ωράριο διαθεσιμότητας (προαιρ.)</label><input type="text" name="chours" placeholder="π.χ. Πρωινό 07:00–11:00">
-            <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Προσθήκη κατηγορίας</button></div>
+            <label>Όνομα μενού</label>{{ langfields('mname', {}) }}
+            <label>Εικονίδιο (Tabler, προαιρ.)</label><input type="text" name="icon" placeholder="π.χ. ti-glass-cocktail">
+            <div class="row" style="margin-top:10px;"><button class="btn sm green" type="submit">Δημιουργία μενού</button></div>
           </form>
         </div>
       </details>
@@ -567,16 +615,30 @@
       var n=body?body.querySelectorAll(':scope > .mitem').length:0;
       var cc=cat.querySelector('.catcount'); if(cc) cc.textContent='· '+n+' πιάτα';
     });
+    document.querySelectorAll('.menu').forEach(function(menu){
+      var cl=menu.querySelector('.catlist');
+      var n=cl?cl.querySelectorAll(':scope > .cat').length:0;
+      var mc=menu.querySelector('.mcount'); if(mc) mc.textContent='· '+n+' κατηγ.';
+    });
   }
+  var PIATO_OUTLET={{ sel.id if sel else 0 }};
   function initSort(){
     if(typeof Sortable==='undefined') return;
-    var cl=document.getElementById('catlist');
-    if(cl){
-      new Sortable(cl, {handle:'.cgrip', draggable:'.cat', animation:150, onEnd:function(){
-        var ids=[].map.call(cl.querySelectorAll(':scope > .cat'), function(e){return e.getAttribute('data-cat-id');});
-        postReorder('/dashboard/piato/category/reorder', {outlet_id:{{ sel.id if sel else 0 }}, ids:ids.join(',')});
+    var ml=document.getElementById('menulist');
+    if(ml){
+      new Sortable(ml, {handle:'.mgrip', draggable:'.menu', animation:150, onEnd:function(){
+        var ids=[].map.call(ml.querySelectorAll(':scope > .menu'), function(e){return e.getAttribute('data-menu-id');});
+        postReorder('/dashboard/piato/menu/reorder', {outlet_id:PIATO_OUTLET, ids:ids.join(',')});
       }});
     }
+    document.querySelectorAll('.catlist').forEach(function(cl){
+      new Sortable(cl, {group:'piato-cats', handle:'.cgrip', draggable:'.cat', animation:150, onEnd:function(evt){
+        var target=evt.to; var menuId=target.getAttribute('data-menu-id');
+        var ids=[].map.call(target.querySelectorAll(':scope > .cat'), function(e){return e.getAttribute('data-cat-id');});
+        postReorder('/dashboard/piato/category/reorder', {outlet_id:PIATO_OUTLET, menu_id:menuId, ids:ids.join(',')});
+        refreshCounts();
+      }});
+    });
     document.querySelectorAll('.cat-body').forEach(function(body){
       new Sortable(body, {group:'piato-items', handle:'.igrip', draggable:'.mitem', animation:150, onEnd:function(evt){
         var target=evt.to; var catId=(target.id||'').replace('body-cat','');
@@ -586,6 +648,6 @@
       }});
     });
   }
-  if(document.getElementById('catlist')){ initSort(); }
+  if(document.getElementById('menulist')){ initSort(); }
 </script>
 </body></html>
