@@ -218,15 +218,7 @@
           {% endif %}
         </div>
       </div>
-      <div class="link-box">
-        <b>Δημόσιο QR link:</b> {{ base_url }}/piato/{{ sel.qr_token }}
-        {% if not sel.published %}<span class="muted"> (ενεργό μόνο μετά τη δημοσίευση)</span>{% endif %}
-      </div>
-      <div class="link-box" style="margin-top:6px;">
-        <b>Προεπισκόπηση</b> (πραγματικό μενού με την επιλεγμένη παλέτα/layout — δουλεύει και σε draft):
-        <a href="{{ base_url }}/piato/preview/{{ sel.preview_token }}" target="_blank" rel="noopener">Άνοιγμα ↗</a>
-      </div>
-      <p class="muted" style="margin-top:8px;"><i class="ti ti-settings"></i> Ρυθμίσεις &amp; διαγραφή σημείου → καρτέλα <a href="#" onclick="hubTab('settings',null);return false;">Ρυθμίσεις</a>.</p>
+      <p class="muted" style="margin-top:8px;"><i class="ti ti-qrcode"></i> Δημόσιος σύνδεσμος &amp; QR → καρτέλα <a href="#" onclick="hubTab('qr',null);return false;">QR &amp; σύνδεσμοι</a> · <i class="ti ti-settings"></i> Ρυθμίσεις &amp; διαγραφή → καρτέλα <a href="#" onclick="hubTab('settings',null);return false;">Ρυθμίσεις</a>.</p>
     </div>
 
     <!-- Κατηγορίες + πιάτα -->
