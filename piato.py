@@ -125,6 +125,20 @@ class Outlet(db.Model):
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     categories    = db.relationship('MenuCategory', backref='outlet',
                                     order_by='MenuCategory.sort', cascade='all, delete-orphan')
+    menus         = db.relationship('Menu', backref='outlet',
+                                    order_by='Menu.sort', cascade='all, delete-orphan')
+
+class Menu(db.Model):
+    """Ονομαστό μενού ανά σημείο (Φαγητό/Κρασιά/Cocktails...) — P-082. Κατηγορίες κουμπώνουν με menu_id."""
+    __tablename__ = 'piato_menu'
+    id         = db.Column(db.Integer, primary_key=True)
+    outlet_id  = db.Column(db.Integer, db.ForeignKey('piato_outlet.id'), index=True, nullable=False)
+    name_i18n  = db.Column(db.Text, default='{}')                 # JSON {lang: όνομα μενού}
+    icon       = db.Column(db.String(30), default='')
+    active     = db.Column(db.Boolean, default=True)
+    sort       = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
 
 class PiatoHotel(db.Model):
     """Ρυθμίσεις Piato ανά ξενοδοχείο (owner: Piato· FK στο Hotel). Οθόνη-hub υποδοχής."""
@@ -142,6 +156,8 @@ class MenuCategory(db.Model):
     __tablename__ = 'piato_category'
     id         = db.Column(db.Integer, primary_key=True)
     outlet_id  = db.Column(db.Integer, db.ForeignKey('piato_outlet.id'), index=True, nullable=False)
+    menu_id    = db.Column(db.Integer, db.ForeignKey('piato_menu.id'), index=True, nullable=True)  # P-082
+    menu       = db.relationship('Menu', backref=db.backref('categories', order_by='MenuCategory.sort'))
     name_i18n  = db.Column(db.Text, default='{}')                 # JSON {lang: τίτλος}
     kind       = db.Column(db.String(8), default='food')          # 'food' | 'drink' (top-level ομαδοποίηση)
     hours      = db.Column(db.String(200), default='')           # διαθεσιμότητα κατηγορίας
@@ -221,10 +237,44 @@ def ensure_piato_columns():
             _add_col('piato_outlet', 'survey_token', 'survey_token VARCHAR(36)')
             _add_col('piato_category', 'kind', "kind VARCHAR(8) DEFAULT 'food'")
             _add_col('piato_outlet', 'views', 'views INTEGER DEFAULT 0')
+            _add_col('piato_category', 'menu_id', 'menu_id INTEGER')
         except Exception as e:
             db.session.rollback(); print('[piato] ensure cols skipped:', e)
         seed_allergens()
         seed_category_kinds()
+        seed_default_menus()
+
+
+def seed_default_menus():
+    """Idempotent migration (P-082): κατηγορίες με menu_id=NULL μπαίνουν σε default μενού ανά outlet,
+    βάσει kind (food→«Φαγητό», drink→«Ποτά»). ΔΕΝ πειράζει κατηγορίες που έχουν ήδη menu_id
+    (ώστε ο admin να μην ξεπερνιέται). Τρέχει μόνο πάνω σε ό,τι είναι ακόμη ανάθετο."""
+    try:
+        unassigned = MenuCategory.query.filter(MenuCategory.menu_id.is_(None)).all()
+        if not unassigned:
+            return
+        defs = {'food': ('Φαγητό', 'ti-tools-kitchen-2', 0), 'drink': ('Ποτά', 'ti-glass-cocktail', 1)}
+        by_outlet = {}
+        for c in unassigned:
+            by_outlet.setdefault(c.outlet_id, []).append(c)
+        made = 0
+        for oid, cats in by_outlet.items():
+            existing = {(_ml(m.name_i18n).get('el') or ''): m for m in Menu.query.filter_by(outlet_id=oid).all()}
+            for c in cats:
+                kind = c.kind if c.kind in defs else 'food'
+                label, icon, srt = defs[kind]
+                m = existing.get(label)
+                if not m:
+                    m = Menu(outlet_id=oid, name_i18n=json.dumps({'el': label}, ensure_ascii=False),
+                             icon=icon, sort=srt, active=True)
+                    db.session.add(m); db.session.flush()
+                    existing[label] = m; made += 1
+                c.menu_id = m.id
+        db.session.commit()
+        if made:
+            print('[piato] seeded %d default menus (P-082)' % made)
+    except Exception as e:
+        db.session.rollback(); print('[piato] seed menus skipped:', e)
 
 def seed_allergens():
     """Seed 14 EU αλλεργιογόνων (μία φορά· idempotent ανά code)."""
