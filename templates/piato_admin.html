@@ -76,6 +76,8 @@
           font-family:inherit;margin-bottom:-1px;}
   .hubtab:hover{color:#193847;}
   .hubtab.on{color:#193847;border-bottom-color:#193847;}
+  .hubtab.impbtn{color:#193847;font-weight:600;margin-left:10px;border-left:1px solid #e6eef2;padding-left:16px;}
+  .hubtab.impbtn:hover{background:#eef4f8;border-radius:6px 6px 0 0;}
   .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
   .statcard{background:#fff;border:1px solid #e6eef2;border-radius:12px;padding:14px 16px;}
   .statcard .l{font-size:11px;color:#8aa0ac;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
@@ -216,6 +218,7 @@
       <button type="button" class="hubtab" data-pane="qr" onclick="hubTab('qr',this)"><i class="ti ti-qrcode"></i> QR &amp; σύνδεσμοι</button>
       <button type="button" class="hubtab" data-pane="print" onclick="hubTab('print',this)"><i class="ti ti-printer"></i> Εκτύπωση</button>
       <button type="button" class="hubtab" data-pane="settings" onclick="hubTab('settings',this)"><i class="ti ti-settings"></i> Ρυθμίσεις</button>
+      {% if menus %}<button type="button" class="hubtab impbtn" onclick="impOpen()"><i class="ti ti-file-import"></i> Εισαγωγή μενού</button>{% endif %}
     </div>
 
     <!-- ΕΠΙΣΚΟΠΗΣΗ -->
@@ -265,10 +268,7 @@
 
     <!-- Κατηγορίες + πιάτα -->
     <div class="card" style="margin-top:14px;">
-      <div class="row" style="justify-content:space-between;align-items:center;">
-        <h3 style="margin:0;">Μενού — κατηγορίες &amp; πιάτα</h3>
-        {% if menus %}<button type="button" class="btn sm" onclick="impOpen()"><i class="ti ti-file-import"></i> Εισαγωγή μενού</button>{% endif %}
-      </div>
+      <h3>Μενού — κατηγορίες &amp; πιάτα</h3>
       {% if menus %}<div class="toolbar">
         <button type="button" onclick="foldAll(true)">▸ Σύμπτυξη όλων</button>
         <button type="button" onclick="foldAll(false)">▾ Άνοιγμα όλων</button>
@@ -704,7 +704,7 @@
   if(document.getElementById('menulist')){ initSort(); }
 
   // ── Εισαγωγή μενού (P-088) — Βήμα 1: modal + επιλογή αρχείου ──
-  function impOpen(){ var m=document.getElementById('impmodal'); if(m){ m.style.display='flex'; document.getElementById('impstatus').textContent=''; } }
+  function impOpen(){ hubTab('menu',null); var m=document.getElementById('impmodal'); if(m){ m.style.display='flex'; document.getElementById('impstatus').textContent=''; } }
   function impClose(){ var m=document.getElementById('impmodal'); if(m) m.style.display='none'; }
   function impErr(e){
     if(e==='ai_disabled') return '⚠ Η εισαγωγή AI είναι κλειστή — άναψε το κελί «Piato · Εισαγωγή μενού» στην Κονσόλα AI.';
