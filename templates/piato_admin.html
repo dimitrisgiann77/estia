@@ -87,6 +87,12 @@
   .qrcard{background:#fff;border:1px solid #e6eef2;border-radius:14px;padding:18px;text-align:center;}
   .qrcap{margin-top:10px;} .qrcap strong{display:block;color:#193847;font-size:15px;} .qrcap span{font-size:12px;color:#8aa0ac;}
   .qrside{flex:1;min-width:240px;}
+  /* drag & drop builder (Βήμα 5α) */
+  .cgrip,.igrip{cursor:grab;color:#aebfc9;padding:0 5px;font-size:17px;display:inline-flex;align-items:center;flex:none;touch-action:none;}
+  .cgrip:active,.igrip:active{cursor:grabbing;}
+  .sortable-ghost{opacity:.35;}
+  .sortable-chosen{background:#eef5f8;}
+  .sortable-drag .cgrip,.sortable-drag .igrip{color:#193847;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -229,10 +235,12 @@
         <button type="button" onclick="foldAll(false)">▾ Άνοιγμα όλων</button>
       </div>{% endif %}
 
+      <div id="catlist">
       {% for c in sel.categories %}
-      <div class="cat" id="cat{{ c.id }}">
+      <div class="cat" id="cat{{ c.id }}" data-cat-id="{{ c.id }}">
         <div class="chead">
           <div class="lhs">
+            <span class="cgrip" title="Σύρε για αναδιάταξη κατηγορίας"><i class="ti ti-grip-vertical"></i></span>
             <button type="button" class="fold" onclick="toggleCat('cat{{ c.id }}')" title="Σύμπτυξη/άνοιγμα">▾</button>
             <h4>{{ mlget(c.name_i18n, 'el') or '—' }}
               <span class="badge" style="background:#eef2f7;color:#475569;">{{ 'Ποτό' if (c.kind or 'food') == 'drink' else 'Φαγητό' }}</span>
@@ -240,10 +248,6 @@
               {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
           </div>
           <div class="row">
-            <span class="mv">
-              <form method="post" action="/dashboard/piato/category/move"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="dir" value="up"><button type="submit" title="Πάνω">↑</button></form>
-              <form method="post" action="/dashboard/piato/category/move"><input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="dir" value="down"><button type="submit" title="Κάτω">↓</button></form>
-            </span>
             <details><summary>✎</summary>
             <div class="subform">
               <form method="post" action="/dashboard/piato/category/save">
@@ -266,12 +270,10 @@
         <div class="cat-body" id="body-cat{{ c.id }}">
 
         {% for it in c.items %}
+        <div class="mitem" data-item-id="{{ it.id }}">
         <div class="item-row">
           <div>
-            <span class="imv mv">
-              <form method="post" action="/dashboard/piato/item/move"><input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="dir" value="up"><button type="submit" title="Πάνω">↑</button></form>
-              <form method="post" action="/dashboard/piato/item/move"><input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="dir" value="down"><button type="submit" title="Κάτω">↓</button></form>
-            </span>
+            <span class="igrip" title="Σύρε — αναδιάταξη ή μετακίνηση σε άλλη κατηγορία"><i class="ti ti-grip-vertical"></i></span>
             {% if it.photo_url %}<img class="thumb" src="{{ it.photo_url }}" alt="">{% endif %}
             <span class="t">{{ mlget(it.title_i18n, 'el') or '—' }}</span>
             {% if not it.available %}<span class="badge draft">εξαντλήθηκε</span>{% endif %}
@@ -338,6 +340,7 @@
             </form>
           </div>
         </details>
+        </div><!-- /mitem -->
         {% endfor %}
 
         <details style="margin-top:10px;">
@@ -364,6 +367,7 @@
         </div>
       </div>
       {% endfor %}
+      </div><!-- /catlist -->
 
       <details style="margin-top:14px;">
         <summary>➕ Νέα κατηγορία</summary>
@@ -461,6 +465,7 @@
 </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
   function hubTab(name, btn){
     document.querySelectorAll('.hubpane').forEach(function(p){ p.style.display='none'; });
@@ -551,5 +556,37 @@
       .finally(function(){ btn.disabled=false; btn.innerHTML=old; });
   }
   if(document.getElementById('qrcanvas')){ qrRender(); }
+
+  // ── Drag & drop builder (Βήμα 5α· SortableJS) ──
+  function postReorder(url, data){
+    var body=Object.keys(data).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(data[k]);}).join('&');
+    fetch(url, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'}, body:body}).catch(function(){});
+  }
+  function refreshCounts(){
+    document.querySelectorAll('.cat').forEach(function(cat){
+      var body=cat.querySelector('.cat-body');
+      var n=body?body.querySelectorAll(':scope > .mitem').length:0;
+      var cc=cat.querySelector('.catcount'); if(cc) cc.textContent='· '+n+' πιάτα';
+    });
+  }
+  function initSort(){
+    if(typeof Sortable==='undefined') return;
+    var cl=document.getElementById('catlist');
+    if(cl){
+      new Sortable(cl, {handle:'.cgrip', draggable:'.cat', animation:150, onEnd:function(){
+        var ids=[].map.call(cl.querySelectorAll(':scope > .cat'), function(e){return e.getAttribute('data-cat-id');});
+        postReorder('/dashboard/piato/category/reorder', {outlet_id:{{ sel.id if sel else 0 }}, ids:ids.join(',')});
+      }});
+    }
+    document.querySelectorAll('.cat-body').forEach(function(body){
+      new Sortable(body, {group:'piato-items', handle:'.igrip', draggable:'.mitem', animation:150, onEnd:function(evt){
+        var target=evt.to; var catId=(target.id||'').replace('body-cat','');
+        var ids=[].map.call(target.querySelectorAll(':scope > .mitem'), function(e){return e.getAttribute('data-item-id');});
+        postReorder('/dashboard/piato/item/reorder', {category_id:catId, ids:ids.join(',')});
+        refreshCounts();
+      }});
+    });
+  }
+  if(document.getElementById('catlist')){ initSort(); }
 </script>
 </body></html>

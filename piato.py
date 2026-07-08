@@ -742,6 +742,44 @@ def piato_category_move():
     return redirect(url_for('piato_admin', outlet=o.id) + '#cat%d' % c.id)
 
 
+@app.route('/dashboard/piato/category/reorder', methods=['POST'])
+def piato_category_reorder():
+    """Drag&drop αναδιάταξη κατηγοριών (Βήμα 5α): ids = νέα σειρά → sort=index."""
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    o = _outlet_or_403(_i(request.form.get('outlet_id')))
+    valid = {c.id for c in o.categories}
+    ids = [int(x) for x in request.form.get('ids', '').split(',') if x.strip().isdigit()]
+    for i, cid in enumerate(ids):
+        if cid in valid:
+            c = MenuCategory.query.get(cid)
+            if c:
+                c.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@app.route('/dashboard/piato/item/reorder', methods=['POST'])
+def piato_item_reorder():
+    """Drag&drop αναδιάταξη/μετακίνηση πιάτων (Βήμα 5α): ids = νέα σειρά της κατηγορίας-στόχου·
+    κάθε πιάτο παίρνει category_id=στόχος + sort=index (χειρίζεται και μετακίνηση σε άλλη κατηγορία)."""
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    cat = MenuCategory.query.get(_i(request.form.get('category_id')))
+    if not cat:
+        return jsonify(error='not_found'), 404
+    _outlet_or_403(cat.outlet_id)                 # scope: η κατηγορία-στόχος στα δικά μου ξενοδοχεία
+    my = _my_hids()
+    ids = [int(x) for x in request.form.get('ids', '').split(',') if x.strip().isdigit()]
+    for i, iid in enumerate(ids):
+        it = MenuItem.query.get(iid)
+        if it and it.category and it.category.outlet and it.category.outlet.hotel_id in my:
+            it.category_id = cat.id
+            it.sort = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 # ── ITEM CRUD ────────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/item/save', methods=['POST'])
 def piato_item_save():
