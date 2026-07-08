@@ -348,16 +348,13 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.443'
-APP_BUILD   = '724'
+APP_VERSION = '12.444'
+APP_BUILD   = '725'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
-    {'v': '12.443', 'b': '724', 'date': '08/07/2026', 'time': '14:15', 'title': 'Piato — Εισαγωγή μενού από φωτογραφία με AI (P-083)',
-     'items': ['Νέα καρτέλα **«Εισαγωγή AI»** στο Piato: **σύρε/ανέβασε φωτογραφία μενού** → το AI διαβάζει κατηγορίες & πιάτα → **preview με διόρθωση** → φόρτωση στο επιλεγμένο μενού. Human-in-the-loop (ελέγχεις πριν σωθεί).',
-               'Περνά από την **πύλη διακυβέρνησης**: χρειάζεται ενεργό το κελί «Piato · Εισαγωγή μενού» στην Κονσόλα AI (default κλειστό).',
-               'Νέο πεδίο **«Μοντέλο εικόνας (vision)»** στην Κονσόλα AI — το vision μοντέλο ρυθμίζεται (Groq/OpenAI/Anthropic)· κενό = προεπιλογή ανά πάροχο.',
-               '(Προς το παρόν φωτογραφίες· η υποστήριξη PDF έρχεται σε επόμενο βήμα.)']},
+    {'v': '12.444', 'b': '725', 'date': '08/07/2026', 'time': '15:00', 'title': 'Piato — απόσυρση πρόχειρης «Εισαγωγής AI» (επανασχεδιάζεται με προδιαγραφή)',
+     'items': ['Αφαιρέθηκε η πρόχειρη καρτέλα «Εισαγωγή AI» — επανασχεδιάζεται σωστά με βάση την προδιαγραφή: εισαγωγή μενού (φωτο/PDF/Word/Excel) μέσα στην καρτέλα Μενού, με αναλυτικό editable πίνακα (κατηγορίες/πιάτα/περιγραφές/τιμές/αλλεργιογόνα) + **αυτόματες μεταφράσεις σε όλες τις γλώσσες** πριν την καταχώρηση.']},
     {'v': '12.442', 'b': '723', 'date': '08/07/2026', 'time': '13:20', 'title': 'Piato — Μενού πελάτη ανά ονομαστό μενού (tabs) — ολοκλήρωση multi-menu',
      'items': ['Το μενού του πελάτη ομαδοποιείται πλέον **ανά μενού** (π.χ. Φαγητό · Ποτά · Cocktails) με tabs στην κορυφή, αντί απλό food/drink. Ένα μόνο μενού → χωρίς tabs (όπως πριν).',
                'Ολοκληρώθηκε το **multi-menu (P-082) από άκρη σε άκρη**: αυτόματη μεταφορά υπαρχόντων → διαχειριστικός builder με μενού-ενότητες → μενού πελάτη με tabs. Το κομψό guest design παραμένει αμετάβλητο.']},
@@ -2502,17 +2499,6 @@ def resolve_provider():
     return None
 
 
-def resolve_vision_model():
-    """Μοντέλο για ανάγνωση εικόνας (menu import). Ρυθμιζόμενο (Setting ai_vision_model / env),
-    αλλιώς λογικό default ανά πάροχο. Ο χρήστης μπορεί να το αλλάξει αν το Groq preview vision αλλάξει."""
-    v = (_ai_setting('ai_vision_model', '') or os.environ.get('AI_VISION_MODEL', '')).strip()
-    if v:
-        return v
-    prov = resolve_provider()
-    return {'anthropic': 'claude-sonnet-4-6', 'openai': 'gpt-4o-mini',
-            'groq': 'llama-3.2-90b-vision-preview'}.get(prov, '')
-
-
 # ── AI governance matrix (P-081): κάθε module × τύπος δεδομένου· default OFF ──
 # Το AI αγγίζει ΜΟΝΟ ό,τι έχει ρητά ενεργοποιηθεί εδώ. Νέος τύπος → πρόσθεσέ τον.
 AI_MATRIX = [
@@ -4177,7 +4163,6 @@ def ai_admin():
         setk('provider', request.form.get('provider', 'auto'))
         setk('model', request.form.get('model', '').strip())
         setk('base_url', request.form.get('base_url', '').strip())
-        setk('vision_model', request.form.get('vision_model', '').strip())   # P-083 (menu import)
         if request.form.get('clear_keys'):
             setk('anthropic', ''); setk('openai', ''); setk('groq', '')
         else:
@@ -4221,8 +4206,7 @@ def ai_admin():
     return render_template('ai_admin.html', cfg=c, masked=masked, configured=(prov is not None),
                            active=active, matrix=AI_MATRIX, allow=allow, master_on=master_on,
                            audit=audit, stats=stats, persona=_ai_setting('ai_persona', ''),
-                           persona_default=AI_ASSISTANT_PROMPT,
-                           vision_model=_ai_setting('ai_vision_model', ''))
+                           persona_default=AI_ASSISTANT_PROMPT)
 
 
 @app.route('/dashboard/ai/master', methods=['POST'])

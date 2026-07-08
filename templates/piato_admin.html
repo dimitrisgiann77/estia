@@ -104,16 +104,6 @@
   .medit summary{cursor:pointer;color:#64748b;font-size:14px;padding:0 4px;}
   .catlist{padding:10px 12px;min-height:26px;}
   .newcat{padding:0 12px 12px;}
-  /* AI import (Βήμα P-083) */
-  .dropzone{border:2px dashed #c4d5df;border-radius:12px;padding:30px 20px;text-align:center;color:#7a94a2;cursor:pointer;margin-top:12px;transition:border-color .15s,background .15s,color .15s;}
-  .dropzone:hover,.dropzone.over{border-color:#193847;background:#f6fbfd;color:#193847;}
-  .dropzone i{font-size:34px;display:block;margin-bottom:8px;color:#9db4c0;}
-  .imp-grid{margin:14px 0;display:grid;gap:10px;}
-  .imp-cat{border:1px solid #e6eef2;border-radius:10px;padding:10px 12px;background:#fff;}
-  .imp-cname{font-weight:700;color:#193847;width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 9px;margin-bottom:6px;font-size:14px;}
-  .imp-item{display:flex;gap:6px;margin:4px 0;}
-  .imp-t{flex:1;border:1px solid #eef2f7;border-radius:6px;padding:5px 8px;font-size:13px;}
-  .imp-p{width:74px;border:1px solid #eef2f7;border-radius:6px;padding:5px 8px;font-size:13px;text-align:right;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -200,7 +190,6 @@
       <button type="button" class="hubtab" data-pane="qr" onclick="hubTab('qr',this)"><i class="ti ti-qrcode"></i> QR &amp; σύνδεσμοι</button>
       <button type="button" class="hubtab" data-pane="print" onclick="hubTab('print',this)"><i class="ti ti-printer"></i> Εκτύπωση</button>
       <button type="button" class="hubtab" data-pane="settings" onclick="hubTab('settings',this)"><i class="ti ti-settings"></i> Ρυθμίσεις</button>
-      <button type="button" class="hubtab" data-pane="import" onclick="hubTab('import',this)"><i class="ti ti-sparkles"></i> Εισαγωγή AI</button>
     </div>
 
     <!-- ΕΠΙΣΚΟΠΗΣΗ -->
@@ -518,21 +507,6 @@
       </div>
     </div>
 
-    <div id="pane-import" class="hubpane" style="display:none">
-      <div class="card">
-        <h3 style="margin-top:0;"><i class="ti ti-sparkles"></i> Εισαγωγή μενού από φωτογραφία (AI)</h3>
-        <p class="muted">Ανέβασε φωτογραφία ενός μενού → το AI διαβάζει κατηγορίες &amp; πιάτα → τα ελέγχεις → φορτώνεις. Χρειάζεται ενεργό «Piato · Εισαγωγή μενού» στην Κονσόλα AI.</p>
-        <label style="display:block;margin:10px 0 4px;">Μενού προορισμού</label>
-        <select id="impmenu" style="max-width:320px;">{% for m in menus %}<option value="{{ m.id }}">{{ mlget(m.name_i18n, 'el') or 'Μενού' }}</option>{% endfor %}</select>
-        <div id="dropzone" class="dropzone" onclick="document.getElementById('impfile').click()">
-          <i class="ti ti-photo-up"></i>
-          <div>Σύρε εδώ φωτογραφία μενού ή <b>κάνε κλικ</b></div>
-          <input type="file" id="impfile" accept="image/*" style="display:none" onchange="impUpload(this.files[0])">
-        </div>
-        <div id="impstatus" class="muted" style="margin-top:10px;"></div>
-        <div id="imppreview"></div>
-      </div>
-    </div>
   {% endif %}
   </div>
 
@@ -676,61 +650,5 @@
     });
   }
   if(document.getElementById('menulist')){ initSort(); }
-
-  // ── AI import μενού από φωτογραφία (P-083) ──
-  function impEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
-  function impErr(e){
-    if(e==='ai_disabled') return 'Η εισαγωγή AI είναι κλειστή — ενεργοποίησέ την στην Κονσόλα AI (Piato · Εισαγωγή μενού).';
-    if(e==='not_configured') return 'Το AI δεν είναι ρυθμισμένο (πάροχος/κλειδί).';
-    if(e==='only_image') return 'Προς το παρόν μόνο εικόνες (το PDF έρχεται σύντομα).';
-    if(e==='too_large') return 'Το αρχείο είναι πολύ μεγάλο (μέγιστο 6MB).';
-    if(e==='parse_failed') return 'Το AI δεν διάβασε καθαρά το μενού — δοκίμασε πιο ευκρινή φωτογραφία.';
-    return 'Σφάλμα: '+e;
-  }
-  function impUpload(file){
-    if(!file) return;
-    var st=document.getElementById('impstatus'); st.textContent='Ανάλυση εικόνας από το AI… (μπορεί να πάρει λίγα δευτερόλεπτα)';
-    document.getElementById('imppreview').innerHTML='';
-    var fd=new FormData(); fd.append('file', file);
-    fetch('/dashboard/piato/import/parse',{method:'POST', body:fd})
-      .then(function(r){return r.json();})
-      .then(function(d){
-        if(d.error){ st.textContent=impErr(d.error); return; }
-        st.textContent=(d.categories.length)+' κατηγορίες βρέθηκαν — έλεγξε/διόρθωσε και φόρτωσε:';
-        impRender(d.categories);
-      })
-      .catch(function(){ st.textContent='Σφάλμα σύνδεσης.'; });
-  }
-  function impRender(cats){
-    window.IMP_DATA=cats;
-    var h='<div class="imp-grid">';
-    cats.forEach(function(c,ci){
-      h+='<div class="imp-cat"><input class="imp-cname" data-ci="'+ci+'" value="'+impEsc(c.name)+'">';
-      (c.items||[]).forEach(function(it,ii){
-        h+='<div class="imp-item"><input class="imp-t" data-ci="'+ci+'" data-ii="'+ii+'" value="'+impEsc(it.title)+'"><input class="imp-p" data-ci="'+ci+'" data-ii="'+ii+'" value="'+(it.price==null?'':it.price)+'"></div>';
-      });
-      h+='</div>';
-    });
-    h+='</div><button type="button" class="btn green" onclick="impCommit()"><i class="ti ti-download"></i> Φόρτωσε στο μενού</button>';
-    document.getElementById('imppreview').innerHTML=h;
-  }
-  function impCommit(){
-    var cats=window.IMP_DATA||[];
-    document.querySelectorAll('.imp-cname').forEach(function(inp){ var c=cats[inp.getAttribute('data-ci')]; if(c) c.name=inp.value; });
-    document.querySelectorAll('.imp-t').forEach(function(inp){ var c=cats[inp.getAttribute('data-ci')]; if(c&&c.items[inp.getAttribute('data-ii')]) c.items[inp.getAttribute('data-ii')].title=inp.value; });
-    document.querySelectorAll('.imp-p').forEach(function(inp){ var c=cats[inp.getAttribute('data-ci')]; if(c&&c.items[inp.getAttribute('data-ii')]) c.items[inp.getAttribute('data-ii')].price=inp.value; });
-    var menuId=document.getElementById('impmenu').value;
-    var st=document.getElementById('impstatus'); st.textContent='Φόρτωση…';
-    fetch('/dashboard/piato/import/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({menu_id:menuId, categories:cats})})
-      .then(function(r){return r.json();})
-      .then(function(d){ if(d.error){st.textContent='Σφάλμα: '+d.error;return;} st.textContent='✓ Προστέθηκαν '+d.categories+' κατηγορίες & '+d.items+' πιάτα.'; setTimeout(function(){location.reload();},1300); })
-      .catch(function(){st.textContent='Σφάλμα σύνδεσης.';});
-  }
-  (function(){
-    var dz=document.getElementById('dropzone'); if(!dz) return;
-    ['dragover','dragenter'].forEach(function(e){ dz.addEventListener(e,function(ev){ ev.preventDefault(); dz.classList.add('over'); }); });
-    ['dragleave','dragend'].forEach(function(e){ dz.addEventListener(e,function(ev){ ev.preventDefault(); dz.classList.remove('over'); }); });
-    dz.addEventListener('drop',function(ev){ ev.preventDefault(); dz.classList.remove('over'); if(ev.dataTransfer.files.length) impUpload(ev.dataTransfer.files[0]); });
-  })();
 </script>
 </body></html>
