@@ -104,6 +104,17 @@
   .medit summary{cursor:pointer;color:#64748b;font-size:14px;padding:0 4px;}
   .catlist{padding:10px 12px;min-height:26px;}
   .newcat{padding:0 12px 12px;}
+  /* Εισαγωγή μενού modal (P-088) */
+  .impmodal{position:fixed;inset:0;background:rgba(15,30,40,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;}
+  .impbox{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .imphead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e6eef2;}
+  .imphead b{color:#193847;font-size:16px;}
+  .impx{border:none;background:none;cursor:pointer;color:#64748b;font-size:20px;}
+  .impbody{padding:16px 18px;}
+  .impbody label{display:block;font-size:13px;margin:10px 0 4px;color:#334;}
+  .dropzone{border:2px dashed #c4d5df;border-radius:12px;padding:30px 20px;text-align:center;color:#7a94a2;cursor:pointer;margin-top:14px;transition:border-color .15s,background .15s,color .15s;}
+  .dropzone:hover,.dropzone.over{border-color:#193847;background:#f6fbfd;color:#193847;}
+  .dropzone i{font-size:34px;display:block;margin-bottom:8px;color:#9db4c0;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -239,7 +250,10 @@
 
     <!-- Κατηγορίες + πιάτα -->
     <div class="card" style="margin-top:14px;">
-      <h3>Μενού — κατηγορίες & πιάτα</h3>
+      <div class="row" style="justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;">Μενού — κατηγορίες &amp; πιάτα</h3>
+        {% if menus %}<button type="button" class="btn sm" onclick="impOpen()"><i class="ti ti-file-import"></i> Εισαγωγή μενού</button>{% endif %}
+      </div>
       {% if menus %}<div class="toolbar">
         <button type="button" onclick="foldAll(true)">▸ Σύμπτυξη όλων</button>
         <button type="button" onclick="foldAll(false)">▾ Άνοιγμα όλων</button>
@@ -429,6 +443,28 @@
           </form>
         </div>
       </details>
+    </div>
+
+    <!-- Εισαγωγή μενού — modal (P-088) -->
+    <div id="impmodal" class="impmodal" style="display:none">
+      <div class="impbox">
+        <div class="imphead">
+          <b><i class="ti ti-file-import"></i> Εισαγωγή μενού</b>
+          <button type="button" class="impx" onclick="impClose()" title="Κλείσιμο"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="impbody">
+          <p class="muted">Ανέβασε ένα υπάρχον μενού (φωτογραφία, PDF, Word ή Excel). Το AI θα διαβάσει κατηγορίες &amp; πιάτα, θα τα <strong>μεταφράσει σε όλες τις γλώσσες</strong>, και θα σου τα δείξει σε πίνακα για έλεγχο πριν την καταχώρηση.</p>
+          <label>Μενού προορισμού</label>
+          <select id="impmenu" style="max-width:340px;">{% for m in menus %}<option value="{{ m.id }}">{{ mlget(m.name_i18n, 'el') or 'Μενού' }}</option>{% endfor %}</select>
+          <div id="dropzone" class="dropzone" onclick="document.getElementById('impfile').click()">
+            <i class="ti ti-cloud-upload"></i>
+            <div>Σύρε εδώ το αρχείο ή <b>κάνε κλικ</b></div>
+            <div class="muted" style="font-size:11px;margin-top:4px;">Φωτογραφία · PDF · Word · Excel</div>
+            <input type="file" id="impfile" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none" onchange="impPick(this.files[0])">
+          </div>
+          <div id="impstatus" class="muted" style="margin-top:10px;"></div>
+        </div>
+      </div>
     </div>
     </div><!-- /pane-menu -->
 
@@ -650,5 +686,22 @@
     });
   }
   if(document.getElementById('menulist')){ initSort(); }
+
+  // ── Εισαγωγή μενού (P-088) — Βήμα 1: modal + επιλογή αρχείου ──
+  function impOpen(){ var m=document.getElementById('impmodal'); if(m){ m.style.display='flex'; document.getElementById('impstatus').textContent=''; } }
+  function impClose(){ var m=document.getElementById('impmodal'); if(m) m.style.display='none'; }
+  function impPick(file){
+    if(!file) return;
+    var st=document.getElementById('impstatus');
+    st.innerHTML='<i class="ti ti-file"></i> Επιλέχθηκε: <b>'+String(file.name).replace(/</g,'&lt;')+'</b> — η ανάλυση με AI + μεταφράσεις μπαίνει στο Βήμα 2.';
+  }
+  (function(){
+    var dz=document.getElementById('dropzone'); if(!dz) return;
+    var mod=document.getElementById('impmodal');
+    ['dragover','dragenter'].forEach(function(e){ dz.addEventListener(e,function(ev){ ev.preventDefault(); dz.classList.add('over'); }); });
+    ['dragleave','dragend'].forEach(function(e){ dz.addEventListener(e,function(ev){ ev.preventDefault(); dz.classList.remove('over'); }); });
+    dz.addEventListener('drop',function(ev){ ev.preventDefault(); dz.classList.remove('over'); if(ev.dataTransfer.files.length) impPick(ev.dataTransfer.files[0]); });
+    if(mod) mod.addEventListener('click',function(ev){ if(ev.target===mod) impClose(); });   // κλικ έξω = κλείσιμο
+  })();
 </script>
 </body></html>
