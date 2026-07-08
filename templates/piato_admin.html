@@ -226,39 +226,7 @@
         <b>Προεπισκόπηση</b> (πραγματικό μενού με την επιλεγμένη παλέτα/layout — δουλεύει και σε draft):
         <a href="{{ base_url }}/piato/preview/{{ sel.preview_token }}" target="_blank" rel="noopener">Άνοιγμα ↗</a>
       </div>
-      <details>
-        <summary>Επεξεργασία / διαγραφή σημείου</summary>
-        <div class="subform">
-          <form method="post" action="/dashboard/piato/outlet/save">
-            <input type="hidden" name="id" value="{{ sel.id }}">
-            <label>Ονομασία</label><input type="text" name="name" value="{{ sel.name }}" required>
-            <label>Ξενοδοχείο</label>
-            <select name="hotel_id">{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id == sel.hotel_id else '' }}>{{ h.name }}</option>{% endfor %}</select>
-            <label>Τύπος</label>
-            <select name="otype">{% for k, v in otypes %}<option value="{{ k }}" {{ 'selected' if k == sel.otype else '' }}>{{ v }}</option>{% endfor %}</select>
-            <label>Ωράριο</label><input type="text" name="hours" value="{{ sel.hours }}">
-            <label>Χρωματική παλέτα (guest μενού)</label>
-            <select name="palette">{% for k, v in palettes %}<option value="{{ k }}" {{ 'selected' if k == sel.palette else '' }}>{{ v }}</option>{% endfor %}</select>
-            <label>Τρόπος παρουσίασης</label>
-            <select name="layout">{% for k, v in layouts %}<option value="{{ k }}" {{ 'selected' if k == sel.layout else '' }}>{{ v }}</option>{% endfor %}</select>
-            <label>Υπότιτλος (tagline)</label><input type="text" name="tagline" value="{{ sel.tagline or '' }}" placeholder="π.χ. Mediterranean & Cretan cuisine">
-            <label>Φωτό κάρτας/hero (URL)</label><input type="text" name="hero_image" value="{{ sel.hero_image or '' }}" placeholder="https://…">
-            <label>Google review (link)</label><input type="text" name="google_url" value="{{ sel.google_url or '' }}" placeholder="π.χ. https://g.page/r/…">
-            <label>TripAdvisor (link)</label><input type="text" name="tripadvisor_url" value="{{ sel.tripadvisor_url or '' }}" placeholder="π.χ. https://www.tripadvisor.com/…">
-            <label>Ερωτηματολόγιο (Εστία — module Surveys)</label>
-            <select name="survey_token">
-              <option value="">— κανένα —</option>
-              {% for s in surveys %}<option value="{{ s.token }}" {{ 'selected' if s.token == sel.survey_token else '' }}>{{ s.title }}</option>{% endfor %}
-            </select>
-            <div class="row" style="margin-top:10px;"><button class="btn sm" type="submit">Αποθήκευση</button></div>
-          </form>
-          <form method="post" action="/dashboard/piato/outlet/delete" style="margin-top:8px;"
-                onsubmit="return confirm('Διαγραφή σημείου «{{ sel.name }}» και ΟΛΟΥ του μενού του;');">
-            <input type="hidden" name="id" value="{{ sel.id }}">
-            <button class="btn red sm" type="submit">🗑 Διαγραφή σημείου</button>
-          </form>
-        </div>
-      </details>
+      <p class="muted" style="margin-top:8px;"><i class="ti ti-settings"></i> Ρυθμίσεις &amp; διαγραφή σημείου → καρτέλα <a href="#" onclick="hubTab('settings',null);return false;">Ρυθμίσεις</a>.</p>
     </div>
 
     <!-- Κατηγορίες + πιάτα -->
@@ -456,7 +424,45 @@
         </div>
       </div>
     </div>
-    <div id="pane-settings" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-settings"></i><p>Ρυθμίσεις outlet (brand, ωράρια, γλώσσες, review links) — έρχεται στο Βήμα 4.</p></div></div>
+    <div id="pane-settings" class="hubpane" style="display:none">
+      <div class="card">
+        <h3 style="margin-top:0;">Ρυθμίσεις σημείου</h3>
+        <div class="subform">
+          <form method="post" action="/dashboard/piato/outlet/save">
+            <input type="hidden" name="id" value="{{ sel.id }}">
+            <label>Ονομασία</label><input type="text" name="name" value="{{ sel.name }}" required>
+            <label>Ξενοδοχείο</label>
+            <select name="hotel_id">{% for h in hotels %}<option value="{{ h.id }}" {{ 'selected' if h.id == sel.hotel_id else '' }}>{{ h.name }}</option>{% endfor %}</select>
+            <label>Τύπος</label>
+            <select name="otype">{% for k, v in otypes %}<option value="{{ k }}" {{ 'selected' if k == sel.otype else '' }}>{{ v }}</option>{% endfor %}</select>
+            <label>Ωράριο</label><input type="text" name="hours" value="{{ sel.hours }}">
+            <label>Χρωματική παλέτα (guest μενού)</label>
+            <select name="palette">{% for k, v in palettes %}<option value="{{ k }}" {{ 'selected' if k == sel.palette else '' }}>{{ v }}</option>{% endfor %}</select>
+            <label>Τρόπος παρουσίασης</label>
+            <select name="layout">{% for k, v in layouts %}<option value="{{ k }}" {{ 'selected' if k == sel.layout else '' }}>{{ v }}</option>{% endfor %}</select>
+            <label>Υπότιτλος (tagline)</label><input type="text" name="tagline" value="{{ sel.tagline or '' }}" placeholder="π.χ. Mediterranean & Cretan cuisine">
+            <label>Φωτό κάρτας/hero (URL)</label><input type="text" name="hero_image" value="{{ sel.hero_image or '' }}" placeholder="https://…">
+            <label>Google review (link)</label><input type="text" name="google_url" value="{{ sel.google_url or '' }}" placeholder="π.χ. https://g.page/r/…">
+            <label>TripAdvisor (link)</label><input type="text" name="tripadvisor_url" value="{{ sel.tripadvisor_url or '' }}" placeholder="π.χ. https://www.tripadvisor.com/…">
+            <label>Ερωτηματολόγιο (Εστία — module Surveys)</label>
+            <select name="survey_token">
+              <option value="">— κανένα —</option>
+              {% for s in surveys %}<option value="{{ s.token }}" {{ 'selected' if s.token == sel.survey_token else '' }}>{{ s.title }}</option>{% endfor %}
+            </select>
+            <div class="row" style="margin-top:12px;"><button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Αποθήκευση ρυθμίσεων</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card" style="border-color:#f3c9c9;">
+        <h3 style="margin-top:0;color:#b91c1c;">Επικίνδυνη ζώνη</h3>
+        <p class="muted">Η διαγραφή σβήνει το σημείο <strong>και όλο το μενού του</strong> (μη αναστρέψιμο).</p>
+        <form method="post" action="/dashboard/piato/outlet/delete" style="margin-top:8px;"
+              onsubmit="return confirm('Διαγραφή σημείου «{{ sel.name }}» και ΟΛΟΥ του μενού του;');">
+          <input type="hidden" name="id" value="{{ sel.id }}">
+          <button class="btn red sm" type="submit"><i class="ti ti-trash"></i> Διαγραφή σημείου</button>
+        </form>
+      </div>
+    </div>
   {% endif %}
   </div>
 
