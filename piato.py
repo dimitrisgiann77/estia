@@ -420,6 +420,7 @@ def _build_menu(outlet, lang):
         if items:
             cats.append({'id': c.id, 'name': _ml_get(c.name_i18n, lang),
                          'kind': (c.kind if c.kind in KIND_CODES else 'food'),
+                         'menu_id': c.menu_id,
                          'hours': c.hours or '', 'dishes': items})
     allergen_master = [{'code': a.code, 'icon': a.icon, 'name': _ml_get(a.name_i18n, lang)}
                        for a in sorted(allg.values(), key=lambda x: x.sort)]
@@ -433,12 +434,25 @@ def _render_menu(outlet, preview=False):
     # Back-link προς το hub του ξενοδοχείου (get-or-create ώστε να υπάρχει πάντα token).
     hub = _hub_for(outlet.hotel_id)
     hub_link = ('/piato/h/preview/' + hub.hub_preview_token) if preview else ('/piato/h/' + hub.hub_token)
-    # Ομαδοποίηση Φαγητό/Ποτό — μόνο οι ενότητες που έχουν ≥1 κατηγορία.
+    # Ομαδοποίηση ανά ΜΕΝΟΥ (P-082· Φαγητό/Ποτά/Cocktails...) — μόνο μενού με ≥1 κατηγορία.
+    # Fallback: αν το σημείο δεν έχει μενού (παλιά δεδομένα πριν το migration), ομαδοποίηση food/drink.
+    menus = sorted(outlet.menus, key=lambda m: (m.sort or 0, m.id))
     groups = []
-    for code, label in PIATO_KINDS:
-        gcats = [c for c in cats if c.get('kind', 'food') == code]
-        if gcats:
-            groups.append({'code': code, 'label': label, 'cats': gcats})
+    if menus:
+        known = {m.id for m in menus}
+        for m in menus:
+            gcats = [c for c in cats if c.get('menu_id') == m.id]
+            if gcats:
+                groups.append({'code': 'menu%d' % m.id, 'label': _ml_get(m.name_i18n, lang) or 'Menu',
+                               'icon': m.icon or '', 'cats': gcats})
+        orphan = [c for c in cats if c.get('menu_id') not in known]
+        if orphan:
+            groups.append({'code': 'other', 'label': _ui(lang).get('more_menu', 'Μενού'), 'icon': '', 'cats': orphan})
+    else:
+        for code, label in PIATO_KINDS:
+            gcats = [c for c in cats if c.get('kind', 'food') == code]
+            if gcats:
+                groups.append({'code': code, 'label': label, 'icon': '', 'cats': gcats})
     return render_template('piato_menu.html',
                            outlet=outlet, hotel_name=(h.name if h else ''),
                            cats=cats, groups=groups, allergens=allergens,
