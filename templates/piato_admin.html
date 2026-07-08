@@ -690,10 +690,30 @@
   // ── Εισαγωγή μενού (P-088) — Βήμα 1: modal + επιλογή αρχείου ──
   function impOpen(){ var m=document.getElementById('impmodal'); if(m){ m.style.display='flex'; document.getElementById('impstatus').textContent=''; } }
   function impClose(){ var m=document.getElementById('impmodal'); if(m) m.style.display='none'; }
+  function impErr(e){
+    if(e==='ai_disabled') return '⚠ Η εισαγωγή AI είναι κλειστή — άναψε το κελί «Piato · Εισαγωγή μενού» στην Κονσόλα AI.';
+    if(e==='not_configured') return '⚠ Το AI δεν είναι ρυθμισμένο (πάροχος/κλειδί).';
+    if(e==='unsupported') return '⚠ Μη υποστηριζόμενος τύπος αρχείου (δέξου φωτο/PDF/Word .docx/Excel .xlsx).';
+    if(e==='read_error') return '⚠ Δεν διαβάστηκε το αρχείο — δοκίμασε άλλο format.';
+    if(e==='too_large') return '⚠ Πολύ μεγάλο αρχείο (μέγιστο 8MB).';
+    if(e==='empty') return '⚠ Δεν βρέθηκε κείμενο στο αρχείο.';
+    if(e==='parse_failed') return '⚠ Το AI δεν έβγαλε καθαρό αποτέλεσμα — δοκίμασε καθαρότερο αρχείο.';
+    return '⚠ Σφάλμα: '+e;
+  }
   function impPick(file){
     if(!file) return;
     var st=document.getElementById('impstatus');
-    st.innerHTML='<i class="ti ti-file"></i> Επιλέχθηκε: <b>'+String(file.name).replace(/</g,'&lt;')+'</b> — η ανάλυση με AI + μεταφράσεις μπαίνει στο Βήμα 2.';
+    st.innerHTML='<i class="ti ti-loader-2"></i> Ανάλυση &amp; μετάφραση από το AI… (μπορεί να πάρει λίγα δευτερόλεπτα)';
+    var fd=new FormData(); fd.append('file', file);
+    fetch('/dashboard/piato/import/analyze',{method:'POST', body:fd})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.error){ st.innerHTML=impErr(d.error); return; }
+        window.IMP_DATA=d.categories;
+        var ni=d.categories.reduce(function(a,c){return a+(c.items?c.items.length:0);},0);
+        st.innerHTML='✓ Βρέθηκαν <b>'+d.categories.length+'</b> κατηγορίες &amp; <b>'+ni+'</b> πιάτα (μεταφρασμένα σε όλες τις γλώσσες). — ο πίνακας ελέγχου μπαίνει στο Βήμα 3.';
+      })
+      .catch(function(){ st.textContent='Σφάλμα σύνδεσης.'; });
   }
   (function(){
     var dz=document.getElementById('dropzone'); if(!dz) return;

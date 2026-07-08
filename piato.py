@@ -926,6 +926,134 @@ def piato_menu_reorder():
     return jsonify(ok=True)
 
 
+# ── AI IMPORT (P-088 · φωτο/PDF/Word/Excel → AI parse+μετάφραση → preview → commit) ──
+def _import_pdf_text(raw):
+    import io as _io
+    from pypdf import PdfReader
+    r = PdfReader(_io.BytesIO(raw))
+    return '\n'.join((p.extract_text() or '') for p in r.pages)
+
+
+def _import_docx_text(raw):
+    import io as _io, zipfile, re as _re, html as _html
+    z = zipfile.ZipFile(_io.BytesIO(raw))
+    xml = z.read('word/document.xml').decode('utf-8', 'ignore').replace('</w:p>', '\n')
+    return _html.unescape(_re.sub(r'<[^>]+>', '', xml))
+
+
+def _import_xlsx_text(raw):
+    import io as _io
+    from openpyxl import load_workbook
+    wb = load_workbook(_io.BytesIO(raw), read_only=True, data_only=True)
+    lines = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(values_only=True):
+            cells = [str(c).strip() for c in row if c not in (None, '')]
+            if cells:
+                lines.append(' | '.join(cells))
+    return '\n'.join(lines)
+
+
+def _import_extract(raw, mime, filename):
+    """Επιστρέφει ('image', data_url) ή ('text', κείμενο) ή (None, κωδικός_σφάλματος)."""
+    fn = (filename or '').lower()
+    mime = mime or ''
+    if mime.startswith('image/'):
+        import base64
+        return 'image', 'data:%s;base64,%s' % (mime, base64.b64encode(raw).decode('ascii'))
+    try:
+        if mime == 'application/pdf' or fn.endswith('.pdf'):
+            return 'text', _import_pdf_text(raw)
+        if fn.endswith('.docx') or 'wordprocessing' in mime:
+            return 'text', _import_docx_text(raw)
+        if fn.endswith('.xlsx') or 'spreadsheet' in mime:
+            return 'text', _import_xlsx_text(raw)
+    except Exception as e:
+        print('[piato] import extract error:', e)
+        return None, 'read_error'
+    return None, 'unsupported'
+
+
+def _import_vision_model():
+    from app import resolve_provider, _ai_setting
+    import os as _os
+    v = (_ai_setting('ai_vision_model', '') or _os.environ.get('AI_VISION_MODEL', '')).strip()
+    if v:
+        return v
+    return {'anthropic': 'claude-sonnet-4-6', 'openai': 'gpt-4o-mini',
+            'groq': 'llama-3.2-90b-vision-preview'}.get(resolve_provider(), '')
+
+
+@app.route('/dashboard/piato/import/analyze', methods=['POST'])
+def piato_import_analyze():
+    if not _can_manage():
+        return jsonify(error='forbidden'), 403
+    from app import call_llm, ai_allowed
+    if not ai_allowed('piato', 'menu_import'):
+        return jsonify(error='ai_disabled'), 403
+    f = request.files.get('file')
+    if not f:
+        return jsonify(error='no_file'), 400
+    raw = f.read()
+    if len(raw) > 8 * 1024 * 1024:
+        return jsonify(error='too_large'), 400
+    kind, payload = _import_extract(raw, (f.mimetype or '').lower(), f.filename)
+    if kind is None:
+        return jsonify(error=payload), 400
+    codes = ', '.join('%s=%s' % (c, el) for (c, el, en, icon) in EU_ALLERGENS)
+    sys_p = ('You convert a restaurant menu into STRICT JSON with translations. Output ONLY JSON, no markdown. '
+             'Schema: {"categories":[{"name":{"el":"","en":"","de":"","it":"","fr":""},'
+             '"items":[{"title":{"el":"","en":"","de":"","it":"","fr":""},'
+             '"desc":{"el":"","en":"","de":"","it":"","fr":""},"price":0,"allergens":["code"]}]}]}. '
+             'Translate EVERY name/title/desc into ALL languages [el,en,de,it,fr] faithfully. price numeric only, no symbol '
+             '(null if none). allergens: pick codes the dish LIKELY contains, inferring from ingredients (best effort), '
+             'from this list: ' + codes + '. Empty string for missing desc. Keep menu order.')
+    if kind == 'image':
+        content = [{'type': 'text', 'text': 'Extract & translate this menu image.'},
+                   {'type': 'image_url', 'image_url': {'url': payload}}]
+        reply, err = call_llm(sys_p, [{'role': 'user', 'content': content}],
+                              model=_import_vision_model(), max_tokens=6000)
+    else:
+        text = (payload or '').strip()
+        if not text:
+            return jsonify(error='empty'), 400
+        reply, err = call_llm(sys_p, [{'role': 'user', 'content': 'Menu content:\n' + text[:16000]}],
+                              max_tokens=6000)
+    if err:
+        return jsonify(error=err), 502
+    import re
+    mm = re.search(r'\{.*\}', reply or '', re.S)
+    try:
+        data = json.loads(mm.group(0)) if mm else {}
+    except Exception:
+        return jsonify(error='parse_failed', raw=(reply or '')[:300]), 502
+    valid_codes = {c for (c, el, en, icon) in EU_ALLERGENS}
+
+    def pick_langs(d):
+        d = d if isinstance(d, dict) else {}
+        return {lc: str(d.get(lc) or '').strip()[:600] for lc in LANG_CODES}
+
+    out = []
+    for c in (data.get('categories') or [])[:50]:
+        items = []
+        for it in (c.get('items') or [])[:150]:
+            ti = pick_langs(it.get('title'))
+            if not any(ti.values()):
+                continue
+            pr = it.get('price')
+            try:
+                pr = round(float(pr), 2) if pr not in (None, '') else None
+            except Exception:
+                pr = None
+            algs = [a for a in (it.get('allergens') or []) if a in valid_codes]
+            items.append({'title': ti, 'desc': pick_langs(it.get('desc')), 'price': pr, 'allergens': algs})
+        nm = pick_langs(c.get('name'))
+        if any(nm.values()) or items:
+            out.append({'name': nm, 'items': items})
+    log_activity('piato_import_analyze', '%d κατηγ. / %d πιάτα' % (len(out), sum(len(c['items']) for c in out)))
+    return jsonify(ok=True, categories=out)
+
+
 # ── ITEM CRUD ────────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/item/save', methods=['POST'])
 def piato_item_save():
