@@ -83,6 +83,10 @@
   .statcard .v.good{color:#16a34a;} .statcard .v.warn{color:#b45309;}
   .hubsoon{padding:40px 20px;text-align:center;color:#8aa0ac;border:1px dashed #d4e0e6;border-radius:12px;}
   .hubsoon i{font-size:34px;color:#b9ccd6;} .hubsoon p{margin-top:10px;font-size:14px;}
+  .qrwrap{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;}
+  .qrcard{background:#fff;border:1px solid #e6eef2;border-radius:14px;padding:18px;text-align:center;}
+  .qrcap{margin-top:10px;} .qrcap strong{display:block;color:#193847;font-size:15px;} .qrcap span{font-size:12px;color:#8aa0ac;}
+  .qrside{flex:1;min-width:240px;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -417,7 +421,28 @@
     </div>
     </div><!-- /pane-menu -->
 
-    <div id="pane-qr" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-qrcode"></i><p>QR generator (εικόνα + printable card) — έρχεται στο Βήμα 2.</p></div></div>
+    <div id="pane-qr" class="hubpane" style="display:none">
+      <div class="card">
+        <h3 style="margin-top:0;">QR &amp; σύνδεσμοι</h3>
+        <div class="qrwrap">
+          <div class="qrcard">
+            <canvas id="qrcanvas" width="240" height="240"></canvas>
+            <div class="qrcap"><strong>{{ sel.name }}</strong><span>Σκανάρετε για το μενού</span></div>
+          </div>
+          <div class="qrside">
+            <label class="muted" style="font-size:12px;">Δημόσιος σύνδεσμος (μενού πελάτη)</label>
+            <div class="link-box" id="qrlink">{{ base_url }}/piato/{{ sel.qr_token }}</div>
+            <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:12px;">
+              <button type="button" class="btn sm" onclick="qrCopy()"><i class="ti ti-copy"></i> Αντιγραφή</button>
+              <button type="button" class="btn sm" onclick="qrDownloadPng()"><i class="ti ti-download"></i> PNG</button>
+              <button type="button" class="btn sm" onclick="qrDownloadSvg()"><i class="ti ti-download"></i> SVG</button>
+              <button type="button" class="btn sm" onclick="qrPrint()"><i class="ti ti-printer"></i> Εκτύπωση κάρτας</button>
+            </div>
+            {% if not sel.published %}<p class="muted" style="margin-top:12px;"><i class="ti ti-alert-triangle"></i> Το σημείο δεν είναι δημοσιευμένο — ο σύνδεσμος ενεργοποιείται μετά τη δημοσίευση (το QR είναι ήδη έτοιμο).</p>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="pane-print" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-printer"></i><p>Εκτυπώσιμο PDF μενού — έρχεται στο Βήμα 3.</p></div></div>
     <div id="pane-settings" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-settings"></i><p>Ρυθμίσεις outlet (brand, ωράρια, γλώσσες, review links) — έρχεται στο Βήμα 4.</p></div></div>
   {% endif %}
@@ -425,11 +450,51 @@
 
 </div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script>
   function hubTab(name, btn){
     document.querySelectorAll('.hubpane').forEach(function(p){ p.style.display='none'; });
     var pane=document.getElementById('pane-'+name); if(pane) pane.style.display='';
     document.querySelectorAll('.hubtab').forEach(function(t){ t.classList.toggle('on', t.getAttribute('data-pane')===name); });
+  }
+  // ── QR generator (Βήμα 2· client-side, χωρίς server dependency) ──
+  function qrText(){ var el=document.getElementById('qrlink'); return el ? el.textContent.trim() : ''; }
+  function qrName(){ return {{ sel.name|tojson }}; }
+  function qrModel(){ var qr=qrcode(0,'M'); qr.addData(qrText()); qr.make(); return qr; }
+  function qrRender(){
+    var c=document.getElementById('qrcanvas');
+    if(!c || typeof qrcode==='undefined') return;
+    var qr=qrModel(), n=qr.getModuleCount(), m=2, size=c.width;
+    var cell=Math.floor(size/(n+m*2)), off=Math.floor((size-cell*n)/2);
+    var ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,size,size); ctx.fillStyle='#193847';
+    for(var r=0;r<n;r++){ for(var col=0;col<n;col++){ if(qr.isDark(r,col)) ctx.fillRect(off+col*cell, off+r*cell, cell, cell); } }
+  }
+  function qrSvg(){
+    var qr=qrModel(), n=qr.getModuleCount(), m=2, s=n+m*2, cell=10, rects='';
+    for(var r=0;r<n;r++){ for(var col=0;col<n;col++){ if(qr.isDark(r,col)) rects+='<rect x="'+((col+m)*cell)+'" y="'+((r+m)*cell)+'" width="'+cell+'" height="'+cell+'"/>'; } }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+(s*cell)+' '+(s*cell)+'"><rect width="100%" height="100%" fill="#ffffff"/><g fill="#193847">'+rects+'</g></svg>';
+  }
+  function qrCopy(){
+    var t=qrText();
+    if(navigator.clipboard){ navigator.clipboard.writeText(t); }
+    else { var i=document.createElement('input'); i.value=t; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove(); }
+  }
+  function qrDL(href, name){ var a=document.createElement('a'); a.href=href; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+  function qrDownloadPng(){
+    var c=document.getElementById('qrcanvas'); if(!c) return;
+    qrDL(c.toDataURL('image/png'), 'piato-qr.png');
+  }
+  function qrDownloadSvg(){
+    if(typeof qrcode==='undefined') return;
+    qrDL('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(qrSvg()), 'piato-qr.svg');
+  }
+  function qrPrint(){
+    var c=document.getElementById('qrcanvas'); if(!c) return;
+    var png=c.toDataURL('image/png');
+    var w=window.open('', '_blank', 'width=420,height=580'); if(!w) return;
+    var nm=qrName().replace(/</g,'&lt;');
+    w.document.write('<html><head><title>QR — '+nm+'</title></head><body style="text-align:center;font-family:-apple-system,Segoe UI,sans-serif;padding:36px;"><img src="'+png+'" style="width:300px;height:300px;"><h2 style="margin:18px 0 4px;color:#193847;">'+nm+'</h2><p style="color:#555;font-size:15px;">Σκανάρετε για το μενού</p></body></html>');
+    w.document.close(); setTimeout(function(){ w.focus(); w.print(); }, 250);
   }
   function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
   function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }
@@ -471,5 +536,6 @@
       .catch(function(){ alert('Σφάλμα σύνδεσης με το AI.'); })
       .finally(function(){ btn.disabled=false; btn.innerHTML=old; });
   }
+  if(document.getElementById('qrcanvas')){ qrRender(); }
 </script>
 </body></html>
