@@ -120,6 +120,7 @@ class Outlet(db.Model):
     tripadvisor_url = db.Column(db.String(500), default='')      # TripAdvisor link
     survey_token  = db.Column(db.String(36), default='')         # token υπάρχοντος Survey (Εστία) → /s/<token>
     sort          = db.Column(db.Integer, default=0)
+    views         = db.Column(db.Integer, default=0)             # μετρητής δημόσιων προβολών μενού (hub stats)
     created_at    = db.Column(db.DateTime, default=datetime.now)
     updated_at    = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     categories    = db.relationship('MenuCategory', backref='outlet',
@@ -219,6 +220,7 @@ def ensure_piato_columns():
             _add_col('piato_outlet', 'tripadvisor_url', 'tripadvisor_url VARCHAR(500)')
             _add_col('piato_outlet', 'survey_token', 'survey_token VARCHAR(36)')
             _add_col('piato_category', 'kind', "kind VARCHAR(8) DEFAULT 'food'")
+            _add_col('piato_outlet', 'views', 'views INTEGER DEFAULT 0')
         except Exception as e:
             db.session.rollback(); print('[piato] ensure cols skipped:', e)
         seed_allergens()
@@ -400,6 +402,11 @@ def piato_public(qr_token):
     o = Outlet.query.filter_by(qr_token=qr_token).first()
     if not o or not o.published:
         abort(404)                       # draft/άγνωστο -> μη διαθέσιμο για το κοινό
+    try:                                 # μετρητής προβολών (hub stats)· μη-κρίσιμο
+        o.views = (o.views or 0) + 1
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     return _render_menu(o, preview=False)
 
 @app.route('/piato/preview/<preview_token>')
@@ -489,13 +496,38 @@ def piato_admin():
                    .order_by(Survey.title).all())
     except Exception as e:
         print('[piato] surveys list skipped:', e)
+    stats = _outlet_stats(sel) if sel else None
     return render_template('piato_admin.html',
                            outlets=outlets, hotel_names=hn, sel=sel, hotels=hotels,
                            langs=PIATO_LANGS, otypes=OUTLET_TYPES, otype_label=OTYPE_LABEL,
                            allergens=allergens, ml=_ml, mlget=_ml_get, hubs=hubs,
                            palettes=PIATO_PALETTES, layouts=PIATO_LAYOUTS, kinds=PIATO_KINDS,
-                           surveys=surveys,
+                           surveys=surveys, stats=stats,
                            base_url=request.host_url.rstrip('/'))
+
+
+def _outlet_stats(o):
+    """Στατιστικά επισκόπησης ενός outlet για το hub (από υπάρχοντα δεδομένα)."""
+    cats = list(o.categories)
+    items = [it for c in cats for it in c.items]
+    lang_codes = [code for code, _ in PIATO_LANGS]
+    slots = filled = 0
+    for it in items:
+        ti = _ml(it.title_i18n)
+        for lc in lang_codes:
+            slots += 1
+            if (ti.get(lc) or '').strip():
+                filled += 1
+    return {
+        'cats': len(cats),
+        'items': len(items),
+        'unavail': sum(1 for it in items if not it.available),
+        'tpct': round(100 * filled / slots) if slots else 0,
+        'views': o.views or 0,
+        'published': bool(o.published),
+        'updated': o.updated_at,
+        'active_cats': sum(1 for c in cats if c.active),
+    }
 
 
 # ── OUTLET CRUD ──────────────────────────────────────────────────────────────

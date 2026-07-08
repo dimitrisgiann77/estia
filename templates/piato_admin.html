@@ -69,6 +69,20 @@
            padding:2px 4px 2px 9px;font-size:12px;margin:2px 3px 2px 0;}
   .vm-chip form{display:inline;} .vm-chip button{background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;}
   .container{max-width:100%!important;padding:18px 22px!important;}
+  /* HUB shell (Βήμα 1) */
+  .hubtabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid #e6eef2;margin-bottom:16px;}
+  .hubtab{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;font-size:13px;font-weight:600;
+          color:#6b8290;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;
+          font-family:inherit;margin-bottom:-1px;}
+  .hubtab:hover{color:#193847;}
+  .hubtab.on{color:#193847;border-bottom-color:#193847;}
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px;}
+  .statcard{background:#fff;border:1px solid #e6eef2;border-radius:12px;padding:14px 16px;}
+  .statcard .l{font-size:11px;color:#8aa0ac;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+  .statcard .v{font-size:26px;font-weight:700;color:#193847;margin-top:5px;line-height:1.1;}
+  .statcard .v.good{color:#16a34a;} .statcard .v.warn{color:#b45309;}
+  .hubsoon{padding:40px 20px;text-align:center;color:#8aa0ac;border:1px dashed #d4e0e6;border-radius:12px;}
+  .hubsoon i{font-size:34px;color:#b9ccd6;} .hubsoon p{margin-top:10px;font-size:14px;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -148,6 +162,40 @@
       (κατηγορίες, πιάτα, αλλεργιογόνα, πολυγλωσσία), να δεις προεπισκόπηση και να δημοσιεύσεις.</p>
     </div>
   {% else %}
+    <!-- HUB tab bar (Βήμα 1) -->
+    <div class="hubtabs">
+      <button type="button" class="hubtab on" data-pane="overview" onclick="hubTab('overview',this)"><i class="ti ti-layout-dashboard"></i> Επισκόπηση</button>
+      <button type="button" class="hubtab" data-pane="menu" onclick="hubTab('menu',this)"><i class="ti ti-list-details"></i> Μενού</button>
+      <button type="button" class="hubtab" data-pane="qr" onclick="hubTab('qr',this)"><i class="ti ti-qrcode"></i> QR &amp; σύνδεσμοι</button>
+      <button type="button" class="hubtab" data-pane="print" onclick="hubTab('print',this)"><i class="ti ti-printer"></i> Εκτύπωση</button>
+      <button type="button" class="hubtab" data-pane="settings" onclick="hubTab('settings',this)"><i class="ti ti-settings"></i> Ρυθμίσεις</button>
+    </div>
+
+    <!-- ΕΠΙΣΚΟΠΗΣΗ -->
+    <div id="pane-overview" class="hubpane">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">{{ sel.name }}
+          <span class="badge {{ 'pub' if sel.published else 'draft' }}">{{ 'Δημοσιευμένο' if sel.published else 'Draft' }}</span>
+        </h3>
+      </div>
+      <div class="statgrid">
+        <div class="statcard"><div class="l">Κατηγορίες</div><div class="v">{{ stats.cats }}</div></div>
+        <div class="statcard"><div class="l">Πιάτα</div><div class="v">{{ stats['items'] }}</div></div>
+        <div class="statcard"><div class="l">Μεταφρασμένα</div><div class="v {{ 'good' if stats.tpct>=80 else '' }}">{{ stats.tpct }}%</div></div>
+        <div class="statcard"><div class="l">Μη διαθέσιμα</div><div class="v {{ 'warn' if stats.unavail else '' }}">{{ stats.unavail }}</div></div>
+        <div class="statcard"><div class="l">Προβολές</div><div class="v">{{ stats.views }}</div></div>
+        <div class="statcard"><div class="l">Κατάσταση</div><div class="v" style="font-size:16px;">{{ 'Δημοσιευμένο' if stats.published else 'Draft' }}</div></div>
+      </div>
+      {% if stats.updated %}<p class="muted" style="margin-bottom:14px;">Τελευταία ενημέρωση: {{ stats.updated.strftime('%d/%m/%Y %H:%M') }}</p>{% endif %}
+      <div class="row" style="gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn sm" onclick="hubTab('menu',null)"><i class="ti ti-edit"></i> Επεξεργασία μενού</button>
+        <a class="btn sm" href="{{ base_url }}/piato/preview/{{ sel.preview_token }}" target="_blank" rel="noopener"><i class="ti ti-eye"></i> Preview</a>
+        {% if sel.published %}<a class="btn sm" href="{{ base_url }}/piato/{{ sel.qr_token }}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Άνοιγμα μενού</a>{% endif %}
+      </div>
+    </div>
+
+    <!-- ΜΕΝΟΥ (υπάρχων editor) -->
+    <div id="pane-menu" class="hubpane" style="display:none">
     <!-- Κεφαλίδα outlet + publish + links -->
     <div class="card">
       <div class="row" style="justify-content:space-between;">
@@ -367,12 +415,22 @@
         </div>
       </details>
     </div>
+    </div><!-- /pane-menu -->
+
+    <div id="pane-qr" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-qrcode"></i><p>QR generator (εικόνα + printable card) — έρχεται στο Βήμα 2.</p></div></div>
+    <div id="pane-print" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-printer"></i><p>Εκτυπώσιμο PDF μενού — έρχεται στο Βήμα 3.</p></div></div>
+    <div id="pane-settings" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-settings"></i><p>Ρυθμίσεις outlet (brand, ωράρια, γλώσσες, review links) — έρχεται στο Βήμα 4.</p></div></div>
   {% endif %}
   </div>
 
 </div>
 </div>
 <script>
+  function hubTab(name, btn){
+    document.querySelectorAll('.hubpane').forEach(function(p){ p.style.display='none'; });
+    var pane=document.getElementById('pane-'+name); if(pane) pane.style.display='';
+    document.querySelectorAll('.hubtab').forEach(function(t){ t.classList.toggle('on', t.getAttribute('data-pane')===name); });
+  }
   function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
   function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }
   function lfTab(btn){
