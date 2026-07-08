@@ -477,7 +477,7 @@
   }
   // ── QR generator (Βήμα 2· client-side, χωρίς server dependency) ──
   function qrText(){ var el=document.getElementById('qrlink'); return el ? el.textContent.trim() : ''; }
-  function qrName(){ return {{ sel.name|tojson }}; }
+  function qrName(){ return {{ (sel.name if sel else '')|tojson }}; }
   function qrModel(){ var qr=qrcode(0,'M'); qr.addData(qrText()); qr.make(); return qr; }
   function qrRender(){
     var c=document.getElementById('qrcanvas');
@@ -516,7 +516,7 @@
   }
   function pdfOpen(){
     var el=document.getElementById('pdflang'); var l=el ? el.value : 'el';
-    window.open('/dashboard/piato/pdf/{{ sel.id }}?lang='+encodeURIComponent(l), '_blank');
+    window.open('/dashboard/piato/pdf/{{ sel.id if sel else 0 }}?lang='+encodeURIComponent(l), '_blank');
   }
   function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
   function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }
