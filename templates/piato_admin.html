@@ -443,7 +443,19 @@
         </div>
       </div>
     </div>
-    <div id="pane-print" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-printer"></i><p>Εκτυπώσιμο PDF μενού — έρχεται στο Βήμα 3.</p></div></div>
+    <div id="pane-print" class="hubpane" style="display:none">
+      <div class="card">
+        <h3 style="margin-top:0;">Εκτυπώσιμο μενού (PDF)</h3>
+        <p class="muted">Branded PDF με όλες τις ενεργές κατηγορίες &amp; τα διαθέσιμα πιάτα (τίτλος, περιγραφή, τιμή) στη γλώσσα που επιλέγεις — έτοιμο για εκτύπωση.</p>
+        <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:14px;align-items:flex-end;">
+          <div>
+            <label class="muted" style="font-size:12px;display:block;margin-bottom:4px;">Γλώσσα</label>
+            <select id="pdflang">{% for code, name in langs %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</select>
+          </div>
+          <button type="button" class="btn" onclick="pdfOpen()"><i class="ti ti-file-type-pdf"></i> Δημιουργία PDF</button>
+        </div>
+      </div>
+    </div>
     <div id="pane-settings" class="hubpane" style="display:none"><div class="hubsoon"><i class="ti ti-settings"></i><p>Ρυθμίσεις outlet (brand, ωράρια, γλώσσες, review links) — έρχεται στο Βήμα 4.</p></div></div>
   {% endif %}
   </div>
@@ -495,6 +507,10 @@
     var nm=qrName().replace(/</g,'&lt;');
     w.document.write('<html><head><title>QR — '+nm+'</title></head><body style="text-align:center;font-family:-apple-system,Segoe UI,sans-serif;padding:36px;"><img src="'+png+'" style="width:300px;height:300px;"><h2 style="margin:18px 0 4px;color:#193847;">'+nm+'</h2><p style="color:#555;font-size:15px;">Σκανάρετε για το μενού</p></body></html>');
     w.document.close(); setTimeout(function(){ w.focus(); w.print(); }, 250);
+  }
+  function pdfOpen(){
+    var el=document.getElementById('pdflang'); var l=el ? el.value : 'el';
+    window.open('/dashboard/piato/pdf/{{ sel.id }}?lang='+encodeURIComponent(l), '_blank');
   }
   function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
   function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }

@@ -530,6 +530,88 @@ def _outlet_stats(o):
     }
 
 
+# ── PRINTED PDF MENU (Βήμα 3· branded, fpdf2 + DejaVu — reuse pool-report pattern) ──
+def build_menu_pdf(outlet, lang='el'):
+    from fpdf import FPDF
+    from app import BASE_DIR
+    import os as _os
+    NAVY = (25, 56, 71); GOLD = (187, 149, 73); GREY = (120, 120, 120); DARK = (40, 40, 40)
+    fdir = _os.path.join(BASE_DIR, 'assets', 'fonts')
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.set_auto_page_break(True, margin=16)
+    pdf.add_font('dv', '', _os.path.join(fdir, 'DejaVuSans.ttf'))
+    pdf.add_font('dv', 'B', _os.path.join(fdir, 'DejaVuSans-Bold.ttf'))
+    pdf.add_page()
+    try:
+        pdf.image(_os.path.join(BASE_DIR, 'static', 'img', 'logo.png'), x=12, y=11, h=13)
+    except Exception:
+        pass
+    hotel = Hotel.query.get(outlet.hotel_id)
+    pdf.set_xy(30, 11); pdf.set_font('dv', 'B', 18); pdf.set_text_color(*NAVY)
+    pdf.cell(0, 9, outlet.name, ln=1)
+    pdf.set_x(30); pdf.set_font('dv', '', 11); pdf.set_text_color(*GREY)
+    sub = (hotel.name if hotel else '') + ((' · ' + outlet.tagline) if outlet.tagline else '')
+    pdf.cell(0, 6, sub, ln=1)
+    pdf.ln(5)
+    pdf.set_draw_color(*GOLD); pdf.set_line_width(0.6); y = pdf.get_y(); pdf.line(12, y, 198, y); pdf.ln(4)
+
+    def price_str(p):
+        try:
+            return ('%.2f' % float(p)).replace('.', ',') + ' €'
+        except Exception:
+            return ''
+
+    def pick(i18n):
+        d = _ml(i18n)
+        return (d.get(lang) or d.get('el') or '').strip()
+
+    any_item = False
+    for c in outlet.categories:
+        if not c.active:
+            continue
+        its = [it for it in c.items if it.available]
+        if not its:
+            continue
+        any_item = True
+        pdf.ln(2); pdf.set_font('dv', 'B', 13); pdf.set_text_color(*NAVY); pdf.set_fill_color(242, 245, 247)
+        pdf.cell(0, 8, '  ' + pick(c.name_i18n), ln=1, fill=True); pdf.ln(1)
+        for it in its:
+            title = pick(it.title_i18n); desc = pick(it.desc_i18n)
+            pr = price_str(it.price) if it.price else ''
+            pdf.set_font('dv', 'B', 11); pdf.set_text_color(*DARK); pdf.cell(150, 6, title)
+            pdf.set_font('dv', '', 11); pdf.set_text_color(*NAVY); pdf.cell(0, 6, pr, ln=1, align='R')
+            if desc:
+                pdf.set_font('dv', '', 9.5); pdf.set_text_color(*GREY); pdf.multi_cell(0, 4.6, desc)
+            pdf.ln(1)
+    if not any_item:
+        pdf.set_font('dv', '', 12); pdf.set_text_color(*GREY)
+        pdf.cell(0, 8, 'Δεν υπάρχουν διαθέσιμα πιάτα.', ln=1)
+    pdf.ln(5); pdf.set_font('dv', '', 8); pdf.set_text_color(*GREY)
+    pdf.cell(0, 5, 'Powered by Piato · Εστία · CONDIAN Hotels', ln=1, align='C')
+    return bytes(pdf.output())
+
+
+@app.route('/dashboard/piato/pdf/<int:outlet_id>')
+def piato_menu_pdf(outlet_id):
+    if not _can_manage():
+        return redirect(url_for('login'))
+    o = Outlet.query.get(outlet_id)
+    if not o or o.hotel_id not in _my_hids():
+        abort(404)
+    lang = request.args.get('lang', 'el')
+    if lang not in LANG_CODES:
+        lang = 'el'
+    try:
+        data = build_menu_pdf(o, lang)
+    except Exception as e:
+        print('[piato] menu pdf error:', e)
+        abort(500)
+    log_activity('piato_menu_pdf', '%s (%s)' % (o.name, lang))
+    fname = 'piato-menu-%d-%s.pdf' % (o.id, lang)
+    return app.response_class(data, mimetype='application/pdf',
+                              headers={'Content-Disposition': 'inline; filename=' + fname})
+
+
 # ── OUTLET CRUD ──────────────────────────────────────────────────────────────
 @app.route('/dashboard/piato/outlet/save', methods=['POST'])
 def piato_outlet_save():
