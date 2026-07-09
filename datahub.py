@@ -500,38 +500,62 @@ def datahub_ingest():
 
     batch_id = '%s-%s-%s' % (source, datetime.now().strftime('%Y%m%d%H%M%S'), uuid.uuid4().hex[:8])
     started = datetime.now()
-    staged = upserted = created = amounts = 0
+    staged = upserted = created = amounts = skipped = skipped_bronze = 0
     watermark_to = None
-    status = 'ok'; err = None
-    try:
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            afm9 = _afm9(row.get('VAT'))
-            # 1) bronze (verbatim, idempotent)
+    status = 'ok'; err = None; first_err = None
+    # ΑΝΘΕΚΤΙΚΟΤΗΤΑ ΑΝΑ ΓΡΑΜΜΗ (2 savepoints): bronze ξεχωριστά (κρατιέται πάντα — «τίποτα δεν
+    # χάνεται») + curated ξεχωριστά (μόνο αυτό προσπερνιέται αν σκάσει). Μία κακή γραμμή ΔΕΝ ρίχνει batch.
+    def _note_err(kind, e, row):
+        nonlocal first_err
+        if first_err is None:
+            first_err = ('%s@%s | VAT=%s XRISI=%s IDPER=%s PERTYPE=%s: %s' % (
+                type(e).__name__, kind, row.get('VAT'), row.get('XRISI'),
+                row.get('ID_PERIODOS'), row.get('PER_TYPE'), str(e)))[:1800]
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        afm9 = _afm9(row.get('VAT'))
+        # 1) BRONZE — δικό του savepoint (raw, κρατιέται ακόμη κι αν το curated σκάσει)
+        sp1 = db.session.begin_nested()
+        try:
             _rec, is_new = _write_staging(row, batch_id)
+            db.session.flush()
+            sp1.commit()
             if is_new:
                 staged += 1
-            # 2) curated (μόνο με έγκυρο ΑΦΜ)
-            if afm9:
+        except Exception as e:
+            try: sp1.rollback()
+            except Exception: pass
+            skipped_bronze += 1; _note_err('bronze', e, row)
+        # 2) CURATED — δικό του savepoint
+        if afm9:
+            sp2 = db.session.begin_nested()
+            try:
                 u, was_created = _upsert_identity(row, afm9)
-                if was_created:
-                    created += 1
-                upserted += 1
-                # ποσά: Tier A = μόνο ταυτότητες· Tier B = + ποσά
+                r_up = 1; r_cr = 1 if was_created else 0; r_am = 0
                 if tier != 'A':
                     comp = _company_for_row(row)
-                    arec, a_new = _upsert_amounts(row, afm9, u, comp)
-                    if arec is not None:
-                        amounts += 1
-            # watermark (max PER_CALCULATED_DATE)
-            pcd = _dt(row.get('PER_CALCULATED_DATE'))
-            if pcd and (watermark_to is None or pcd > watermark_to):
-                watermark_to = pcd
+                    arec, _an = _upsert_amounts(row, afm9, u, comp)
+                    r_am = 1 if arec is not None else 0
+                db.session.flush()
+                sp2.commit()
+                upserted += r_up; created += r_cr; amounts += r_am
+            except Exception as e:
+                try: sp2.rollback()
+                except Exception: pass
+                skipped += 1; _note_err('curated', e, row)
+                continue
+        pcd = _dt(row.get('PER_CALCULATED_DATE'))
+        if pcd and (watermark_to is None or pcd > watermark_to):
+            watermark_to = pcd
+    try:
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         status = 'error'; err = str(e)[:2000]
+    if (skipped or skipped_bronze) and status == 'ok':
+        err = 'skipped_curated=%d skipped_bronze=%d first=%s' % (skipped, skipped_bronze, first_err or '')
 
     # 3) audit sync log + control-plane update
     finished = datetime.now()
@@ -557,6 +581,7 @@ def datahub_ingest():
         'batch_id': batch_id, 'source': source, 'tier': tier, 'mode': mode,
         'rows_read': len(rows), 'staged': staged, 'upserted': upserted,
         'created': created, 'amounts': amounts,
+        'skipped': skipped, 'skipped_bronze': skipped_bronze,
         'watermark_to': watermark_to.isoformat() if watermark_to else None,
         'status': status, 'error': err,
     }), code
@@ -621,6 +646,9 @@ def datahub_verify():
             'guard_nonzero_count': guard_nonzero,
             'last_status': last.status if last else None,
             'last_watermark': last.watermark_to.isoformat() if last and last.watermark_to else None,
+            'recent_errors': [e.error for e in DatahubSyncLog.query.filter(
+                DatahubSyncLog.source == 'bmisthos', DatahubSyncLog.error.isnot(None))
+                .order_by(DatahubSyncLog.id.desc()).limit(5).all()],
         },
     })
 
