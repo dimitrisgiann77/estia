@@ -348,11 +348,14 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.449'
-APP_BUILD   = '730'
+APP_VERSION = '12.450'
+APP_BUILD   = '731'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.450', 'b': '731', 'date': '09/07/2026', 'time': '17:30', 'title': 'Data Hub — καθαρισμός διπλών (datahub=μοναδική πηγή) + σκελετός on-prem agent',
+     'items': ['**Διόρθωση διπλού:** στην καρτέλα εργαζομένου τα 2023-2025 εμφανίζονταν διπλά (24 «μήνες» αντί 12) — υπήρχαν ταυτόχρονα οι παλιές γραμμές από xlsx uploads ΚΑΙ οι νέες από το Data Hub. Νέο ασφαλές endpoint `POST /api/datahub/purge_legacy_legal` που αφαιρεί τις **παλιές** γραμμές όπου το Data Hub ήδη καλύπτει (ίδιο ΑΦΜ×έτος×μήνα) → μένει **μία πηγή**. Με προστασία: dry-run (δεν σβήνει), backup (dump), κρατά ό,τι δεν καλύπτεται.',
+               'Νέος **on-prem agent** (`datahub_agent/`) — σκελετός: διαβάζει read-only ΟΛΑ τα πεδία Epsilon (PERIODOI_DATA 643 + EMPLOYEE 681, εκτός εικόνων) και τα σπρώχνει στο endpoint. Tiered (ταυτότητες συχνά / ποσά incremental). Εγκαθίσταται στον CND_SERVER (βλ. datahub_agent/README).']},
     {'v': '12.449', 'b': '730', 'date': '09/07/2026', 'time': '16:10', 'title': 'Data Hub — read-only endpoint επαλήθευσης (verify) για reconciliation στην παραγωγή',
      'items': ['Υποδομή (χωρίς UI): νέο `GET /api/datahub/verify` (ίδιο token) που επιστρέφει από την παραγωγή πλήθη + αθροίσματα (Αποδοχές/Κόστος/Πληρωτέο) staging & curated + guard flags — ώστε ο έλεγχος του seed να επιβεβαιώνει τα νούμερα **στο live**, όχι μόνο τοπικά.',
                'Το εργαλείο `tools/datahub_seed.py` σε λειτουργία `--url` κάνει πλέον πλήρες reconciliation στην παραγωγή (μέσω verify): αθροίσματα cent-perfect + idempotency + guard=0. Πρώτο κομμάτι της Φ4 (monitoring).']},

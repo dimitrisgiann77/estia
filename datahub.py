@@ -615,3 +615,57 @@ def datahub_verify():
             'last_watermark': last.watermark_to.isoformat() if last and last.watermark_to else None,
         },
     })
+
+
+@app.route('/api/datahub/purge_legacy_legal', methods=['POST'])
+def datahub_purge_legacy_legal():
+    """Καθαρισμός διπλών `LegalNetImport`: αφαιρεί τις ΠΑΛΙΕΣ (μη-datahub) γραμμές που το Data Hub
+    **ήδη καλύπτει** (ίδιο ΑΦΜ×έτος×μήνα) → datahub = ΜΟΝΑΔΙΚΗ πηγή, σταματά το διπλομέτρημα στην κάρτα.
+    Ασφάλεια: default DRY (δεν σβήνει)· κρατά όσες ΔΕΝ καλύπτονται από datahub (coverage gap).
+    Body: {commit:false, dump:false}. bearer token."""
+    auth = _authorized()
+    if auth is None:
+        return jsonify({'error': 'ingest disabled (no DATAHUB_INGEST_TOKEN)'}), 503
+    if auth is False:
+        return jsonify({'error': 'unauthorized'}), 401
+    data = request.get_json(silent=True) or {}
+    commit = bool(data.get('commit'))
+    dump = bool(data.get('dump'))
+    DH = 'datahub:bmisthos'
+    # κλειδιά κάλυψης datahub: (afm, year, month)
+    covered = set()
+    for r in db.session.query(LegalNetImport.afm, LegalNetImport.year, LegalNetImport.month).filter(
+            LegalNetImport.source_file == DH).all():
+        covered.add((r[0], r[1], r[2]))
+    legacy = LegalNetImport.query.filter(
+        (LegalNetImport.source_file.is_(None)) | (LegalNetImport.source_file != DH)).all()
+    to_delete, kept = [], []
+    for li in legacy:
+        if (li.afm, li.year, li.month) in covered:
+            to_delete.append(li)
+        else:
+            kept.append(li)
+    by_year = {}
+    for li in to_delete:
+        by_year[li.year] = by_year.get(li.year, 0) + 1
+    resp = {
+        'mode': 'commit' if commit else 'dry',
+        'legacy_total': len(legacy),
+        'would_delete': len(to_delete),
+        'kept_no_coverage': len(kept),
+        'delete_by_year': {str(k): v for k, v in sorted(by_year.items(), key=lambda x: (x[0] or 0))},
+        'kept_sample': [{'id': li.id, 'afm': li.afm, 'year': li.year, 'month': li.month,
+                         'net': li.net_legal, 'src': li.source_file} for li in kept[:50]],
+    }
+    if dump:
+        resp['deleted_rows'] = [{'id': li.id, 'afm': li.afm, 'year': li.year, 'month': li.month,
+                                 'period_kind': li.period_kind, 'net_legal': li.net_legal,
+                                 'gross_legal': li.gross_legal, 'employer_cost_legal': li.employer_cost_legal,
+                                 'source_file': li.source_file} for li in to_delete]
+    if commit:
+        n = 0
+        for li in to_delete:
+            db.session.delete(li); n += 1
+        db.session.commit()
+        resp['deleted'] = n
+    return jsonify(resp)
