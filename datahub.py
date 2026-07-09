@@ -552,3 +552,66 @@ def datahub_ingest():
         'watermark_to': watermark_to.isoformat() if watermark_to else None,
         'status': status, 'error': err,
     }), code
+
+
+@app.route('/api/datahub/verify', methods=['GET'])
+def datahub_verify():
+    """Read-only επαλήθευση από την παραγωγή (bearer token). Επιστρέφει πλήθη + αθροίσματα
+    staging & curated (+ guard flags) ώστε το prove-run να κάνει reconciliation στο live.
+    Προαιρετικό ?year=YYYY για φιλτράρισμα ανά έτος. Μέρος Φ4 monitoring."""
+    auth = _authorized()
+    if auth is None:
+        return jsonify({'error': 'ingest disabled (no DATAHUB_INGEST_TOKEN)'}), 503
+    if auth is False:
+        return jsonify({'error': 'unauthorized'}), 401
+    from sqlalchemy import func
+    year = request.args.get('year', type=int)
+    ST = DatahubStagingBmisthos
+    LN = LegalNetImport
+
+    def ssum(col):
+        q = db.session.query(func.coalesce(func.sum(col), 0.0))
+        if year:
+            q = q.filter(ST.XRISI == year)
+        return round(q.scalar() or 0.0, 2)
+
+    def csum(col):
+        q = db.session.query(func.coalesce(func.sum(col), 0.0)).filter(LN.source_file == 'datahub:bmisthos')
+        if year:
+            q = q.filter(LN.year == year)
+        return round(q.scalar() or 0.0, 2)
+
+    sq = ST.query
+    cq = LN.query.filter(LN.source_file == 'datahub:bmisthos')
+    saq = db.session.query(func.count(func.distinct(ST.VAT)))
+    caq = db.session.query(func.count(func.distinct(LN.afm))).filter(LN.source_file == 'datahub:bmisthos')
+    if year:
+        sq = sq.filter(ST.XRISI == year)
+        cq = cq.filter(LN.year == year)
+        saq = saq.filter(ST.XRISI == year)
+        caq = caq.filter(LN.year == year)
+
+    guard_nonzero = DatahubSyncLog.query.filter(
+        DatahubSyncLog.source == 'bmisthos', DatahubSyncLog.guard_flags != '0').count()
+    last = DatahubSyncLog.query.filter_by(source='bmisthos').order_by(DatahubSyncLog.id.desc()).first()
+    return jsonify({
+        'year': year,
+        'staging': {
+            'rows': sq.count(), 'distinct_afm': saq.scalar() or 0,
+            'sum_M_APODOXES': ssum(ST.M_APODOXES),
+            'sum_S_KOSTOS': ssum(ST.S_KOSTOS),
+            'sum_PLIROTEO': ssum(ST.PLIROTEO),
+        },
+        'curated': {
+            'rows': cq.count(), 'distinct_afm': caq.scalar() or 0,
+            'sum_gross': csum(LN.gross_legal),
+            'sum_employer_cost': csum(LN.employer_cost_legal),
+            'sum_net': csum(LN.net_legal),
+        },
+        'sync': {
+            'batches': DatahubSyncLog.query.filter_by(source='bmisthos').count(),
+            'guard_nonzero_count': guard_nonzero,
+            'last_status': last.status if last else None,
+            'last_watermark': last.watermark_to.isoformat() if last and last.watermark_to else None,
+        },
+    })

@@ -98,10 +98,12 @@ def source_stats(rows):
     for r in rows:
         grain.add((_afm9(r.get('VAT')), r.get('ID_CMP'), r.get('XRISI'),
                    r.get('ID_PERIODOS'), r.get('PER_TYPE')))
+    years = set(_i for _i in (r.get('XRISI') for r in rows) if _i)
     return {
         'rows': len(rows),
         'afm': len(afm),
         'grain': len(grain),
+        'years': years,
         'M_APODOXES': round(sum(_f(r.get('M_APODOXES')) for r in rows), 2),
         'S_KOSTOS': round(sum(_f(r.get('S_KOSTOS')) for r in rows), 2),
         'PLIROTEO': round(sum(_f(r.get('PLIROTEO')) for r in rows), 2),
@@ -153,12 +155,13 @@ def send_local(payload_rows, batch):
 
     a1 = send_all(payload_rows, 'PASS-1')
     a2 = send_all(payload_rows, 'PASS-2(idem)')   # idempotency
-    return a1, a2, A, D
+    return a1, a2, {'kind': 'local', 'A': A, 'D': D}
 
 
-def send_url(payload_rows, batch, url, token):
+def send_url(payload_rows, batch, url, token, year=None):
     import urllib.request
-    endpoint = url.rstrip('/') + '/api/datahub/ingest'
+    base = url.rstrip('/')
+    endpoint = base + '/api/datahub/ingest'
     print('   [url] POST → %s' % endpoint)
 
     def post(chunk):
@@ -167,7 +170,7 @@ def send_url(payload_rows, batch, url, token):
                                        'mode': 'seed', 'rows': chunk}).encode('utf-8'),
             headers={'Content-Type': 'application/json',
                      'Authorization': 'Bearer ' + token}, method='POST')
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=180) as resp:
             return resp.status, json.loads(resp.read().decode('utf-8'))
 
     def send_all(chunks_rows, label):
@@ -184,11 +187,22 @@ def send_url(payload_rows, batch, url, token):
 
     a1 = send_all(payload_rows, 'PASS-1')
     a2 = send_all(payload_rows, 'PASS-2(idem)')
-    return a1, a2, None, None
+    # read-back verify από την παραγωγή (GET /api/datahub/verify) → πραγματικό reconciliation
+    verify = None
+    if a1 is not None:
+        vurl = base + '/api/datahub/verify' + (('?year=%d' % year) if year else '')
+        try:
+            req = urllib.request.Request(vurl, headers={'Authorization': 'Bearer ' + token}, method='GET')
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                verify = json.loads(resp.read().decode('utf-8'))
+            print('   [url] verify ← %s' % vurl)
+        except Exception as e:
+            print('   ⚠ verify GET απέτυχε (%s) — reconciliation μόνο με endpoint tallies' % e)
+    return a1, a2, {'kind': 'url', 'verify': verify}
 
 
 # ── RECONCILIATION ────────────────────────────────────────────────────────────
-def reconcile(src, a1, a2, A, D):
+def reconcile(src, a1, a2, ctx):
     print('\n' + '=' * 64)
     print('RECONCILIATION — source vs landed')
     print('=' * 64)
@@ -209,11 +223,32 @@ def reconcile(src, a1, a2, A, D):
     chk('PASS-1 staged == rows πηγής', a1 and a1['staged'] == src['rows'], '%s vs %s' % (a1 and a1['staged'], src['rows']))
     chk('idempotency: PASS-2 staged == 0', a2 and a2['staged'] == 0, str(a2 and a2['staged']))
 
-    if D is None:
-        print('\n(url mode: DB-level reconciliation παραλείπεται — μόνο endpoint tallies)')
+    # ── URL mode: read-back verify από την παραγωγή ──
+    if ctx.get('kind') == 'url':
+        v = ctx.get('verify')
+        if not v:
+            print('\n⚠ δεν ήρθε verify από την παραγωγή — reconciliation μόνο με endpoint tallies (staged/idempotency).')
+            return fails
+        stg = v.get('staging', {}); cur = v.get('curated', {}); syn = v.get('sync', {})
+        print('\nLANDED (verify@prod): staging=%s · curated=%s · curated ΑΦΜ=%s' % (
+            stg.get('rows'), cur.get('rows'), cur.get('distinct_afm')))
+        print('  staging Σ: Αποδ=%s Κόστος=%s Πληρ=%s' % (stg.get('sum_M_APODOXES'), stg.get('sum_S_KOSTOS'), stg.get('sum_PLIROTEO')))
+        print('  curated Σ: Αποδ=%s Κόστος=%s Καθαρές=%s' % (cur.get('sum_gross'), cur.get('sum_employer_cost'), cur.get('sum_net')))
+        print('  sync: batches=%s guard_nonzero=%s last_status=%s' % (syn.get('batches'), syn.get('guard_nonzero_count'), syn.get('last_status')))
+        chk('staging rows == πηγή', stg.get('rows') == src['rows'], '%s vs %s' % (stg.get('rows'), src['rows']))
+        chk('staging Σ M_APODOXES cent-perfect', abs((stg.get('sum_M_APODOXES') or 0) - src['M_APODOXES']) < 0.01, '%s vs %.2f' % (stg.get('sum_M_APODOXES'), src['M_APODOXES']))
+        chk('staging Σ S_KOSTOS cent-perfect', abs((stg.get('sum_S_KOSTOS') or 0) - src['S_KOSTOS']) < 0.01, '%s vs %.2f' % (stg.get('sum_S_KOSTOS'), src['S_KOSTOS']))
+        chk('curated Σ Αποδοχές cent-perfect (SUM)', abs((cur.get('sum_gross') or 0) - src['M_APODOXES']) < 0.01, '%s vs %.2f' % (cur.get('sum_gross'), src['M_APODOXES']))
+        chk('curated Σ Κόστος cent-perfect (SUM)', abs((cur.get('sum_employer_cost') or 0) - src['S_KOSTOS']) < 0.01, '%s vs %.2f' % (cur.get('sum_employer_cost'), src['S_KOSTOS']))
+        chk('curated rows == grain πηγής', cur.get('rows') == src['grain'], '%s vs %s' % (cur.get('rows'), src['grain']))
+        chk('guard flags == 0', (syn.get('guard_nonzero_count') or 0) == 0, str(syn.get('guard_nonzero_count')))
+        chk('last sync status == ok', syn.get('last_status') == 'ok', str(syn.get('last_status')))
+        if src['grain'] != src['rows']:
+            print('  NOTE  %d γραμμές αθροίστηκαν σε %d curated grains (ίδιο άτομο×μήνα, πολλαπλά επεισόδια) — όπως το εκκαθαριστικό.' % (src['rows'] - src['grain'], src['grain']))
         return fails
 
-    # DB-level (local mode)
+    # ── LOCAL mode: DB-level reconciliation ──
+    A = ctx['A']; D = ctx['D']
     with A.app.app_context():
         st = D.DatahubStagingBmisthos.query.count()
         ln_rows = D.LegalNetImport.query.filter_by(source_file='datahub:bmisthos').count()
@@ -269,14 +304,15 @@ def main():
     if args.url:
         if not args.token:
             print('✗ url mode: απαιτείται --token ή env DATAHUB_INGEST_TOKEN'); sys.exit(1)
-        a1, a2, A, D = send_url(payload, args.batch, args.url, args.token)
+        one_year = list(src['years'])[0] if len(src['years']) == 1 else None
+        a1, a2, ctx = send_url(payload, args.batch, args.url, args.token, year=one_year)
     else:
-        a1, a2, A, D = send_local(payload, args.batch)
+        a1, a2, ctx = send_local(payload, args.batch)
 
     if a1 is None or a2 is None:
         print('\n✗ Το POST απέτυχε — δες παραπάνω.'); sys.exit(1)
 
-    fails = reconcile(src, a1, a2, A, D)
+    fails = reconcile(src, a1, a2, ctx)
     print('\n' + '=' * 64)
     print('ΑΠΟΤΕΛΕΣΜΑ: %s (%d αποκλίσεις)' % ('✓ ΚΑΘΑΡΟ' if fails == 0 else '✗ ΑΠΟΚΛΙΣΕΙΣ', fails))
     sys.exit(1 if fails else 0)
