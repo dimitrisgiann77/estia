@@ -385,9 +385,28 @@ def _month_of(row):
     pd = _dt(row.get('PERIODOS_DATE'))
     return pd.month if pd else None
 
+def _grain_episodes(row):
+    """Επιστρέφει τα staging επεισόδια του grain (ίδιο άτομο×εταιρεία×έτος×περίοδος×τύπος),
+    ΕΝΑ ανά ID_EMP (το τελευταίο ingested — ώστε re-push ίδιου επεισοδίου να ΜΗ διπλομετρά).
+    Εδώ συναντιούνται οι >1 γραμμές/μήνα (π.χ. Epsilon σπάει εκκαθαριστικό ανά επεισόδιο) → θα ΑΘΡΟΙΣΤΟΥΝ."""
+    raw_vat = _s(row.get('VAT'), 20)
+    q = DatahubStagingBmisthos.query.filter_by(
+        VAT=raw_vat, XRISI=_i(row.get('XRISI')),
+        ID_PERIODOS=_i(row.get('ID_PERIODOS')), PER_TYPE=_i(row.get('PER_TYPE')))
+    idc = _i(row.get('ID_CMP'))
+    if idc is not None:
+        q = q.filter_by(ID_CMP=idc)
+    latest = {}   # ID_EMP → τελευταίο staging record
+    for s in q.order_by(DatahubStagingBmisthos.ingested_at.asc()).all():
+        latest[s.ID_EMP] = s
+    return list(latest.values())
+
 def _upsert_amounts(row, afm9, u, comp):
     """LegalNetImport keyed by hash(afm, company, year, id_periodos, per_type).
-    Καταβλητέο = PLIROTEO − PROKATAVOLI − PAROXES (τύπος Epsilon)."""
+    ΑΘΡΟΙΣΜΑ ανά grain (P-097/DH-06): όταν εργαζόμενος έχει >1 επεισόδιο τον ίδιο μήνα/εταιρεία,
+    το curated = ΣΥΝΟΛΟ όλων των επεισοδίων (όπως το εκκαθαριστικό λογιστηρίου). Idempotent:
+    ξαναϋπολογίζεται από το staging (πηγή αλήθειας), ΟΧΙ incremental → re-run δεν διπλομετρά.
+    Καταβλητέο = ΣPLIROTEO − ΣPROKATAVOLI − ΣPAROXES (τύπος Epsilon)."""
     yr = _i(row.get('XRISI'))
     idp = _i(row.get('ID_PERIODOS'))
     pt = _i(row.get('PER_TYPE'))
@@ -400,6 +419,11 @@ def _upsert_amounts(row, afm9, u, comp):
     rec = LegalNetImport.query.filter_by(import_hash=h).first()
     if not rec:
         rec = LegalNetImport(import_hash=h); db.session.add(rec); is_new = True
+    # ΣΥΝΟΛΟ όλων των επεισοδίων του grain από το staging (idempotent recompute)
+    eps = _grain_episodes(row)
+    def S(attr):
+        return round(sum((getattr(e, attr) or 0.0) for e in eps), 2)
+    last = eps[-1] if eps else None   # αντιπροσωπευτικό για μη-αθροιστικά
     rec.company_id = comp.id if comp else None
     rec.user_id = u.id if u else None
     rec.year = yr
@@ -407,32 +431,29 @@ def _upsert_amounts(row, afm9, u, comp):
     rec.afm = afm9
     rec.emp_name = ((_s(row.get('SURNAME')) or '') + ' ' + (_s(row.get('NAME')) or '')).strip()
     rec.period_kind = (PER_TYPE_KIND.get(pt, 'monthly') or 'monthly')[:24]
-    # curated ποσά (headline + verbatim επεκτάσεις)
-    plir = _f(row.get('PLIROTEO'))
-    prok = _f(row.get('PROKATAVOLI'))
-    parx = _f(row.get('PAROXES'))
-    rec.gross_legal = _f(row.get('M_APODOXES'))
-    rec.efka_employee_legal = _f(row.get('SKRATISEIS_ERGAZ'))
-    rec.fmy_legal = _f(row.get('FMY'))
+    # ── ΑΘΡΟΙΣΤΙΚΑ ποσά (headline + verbatim επεκτάσεις) ──
+    plir = S('PLIROTEO'); prok = S('PROKATAVOLI'); parx = S('PAROXES')
+    rec.gross_legal = S('M_APODOXES')
+    rec.efka_employee_legal = S('SKRATISEIS_ERGAZ')
+    rec.fmy_legal = S('FMY')
     rec.net_legal = plir
-    rec.employer_cost_legal = _f(row.get('S_KOSTOS'))
-    rec.prosthetes_sum = _f(row.get('PROSTHETES_SUM'))
-    rec.prosthetes_sum_nokrat = _f(row.get('PROSTHETES_SUM_NOKRAT'))
-    rec.skratiseis_ergod = _f(row.get('SKRATISEIS_ERGOD'))
-    rec.xartoshmo = _f(row.get('XARTOSHMO'))
+    rec.employer_cost_legal = S('S_KOSTOS')
+    rec.prosthetes_sum = S('PROSTHETES_SUM')
+    rec.prosthetes_sum_nokrat = S('PROSTHETES_SUM_NOKRAT')
+    rec.skratiseis_ergod = S('SKRATISEIS_ERGOD')
+    rec.xartoshmo = S('XARTOSHMO')
     rec.prokatavoli = prok
     rec.paroxes = parx
-    rec.s_kostos = _f(row.get('S_KOSTOS'))
-    rec.apoz_apol_salary = _f(row.get('APOZ_APOL_SALARY'))
-    rec.salary = _f(row.get('SALARY'))
-    rec.working_days = _f(row.get('WORKING_DAYS'))
+    rec.s_kostos = S('S_KOSTOS')
+    rec.apoz_apol_salary = S('APOZ_APOL_SALARY')
+    rec.working_days = S('WORKING_DAYS')
+    rec.katavliteo = round(plir - prok - parx, 2)   # καταβλητέο (τύπος Epsilon)
+    # ── ΜΗ-αθροιστικά (αντιπροσωπευτικά = τελευταίο επεισόδιο / max ημ/νία) ──
+    rec.salary = (last.SALARY if last else None)    # βασικός ΣΣΕ — δεν αθροίζεται
     rec.id_periodos = idp
     rec.per_type = pt
-    rec.periodos_date = _dt(row.get('PERIODOS_DATE'))
-    rec.per_calculated_date = _dt(row.get('PER_CALCULATED_DATE'))
-    # καταβλητέο (τύπος Epsilon) — μόνο όταν έχουμε PLIROTEO
-    if plir is not None:
-        rec.katavliteo = round(plir - (prok or 0.0) - (parx or 0.0), 2)
+    rec.periodos_date = max((e.PERIODOS_DATE for e in eps if e.PERIODOS_DATE), default=None)
+    rec.per_calculated_date = max((e.PER_CALCULATED_DATE for e in eps if e.PER_CALCULATED_DATE), default=None)
     rec.source_file = 'datahub:bmisthos'
     return rec, is_new
 
