@@ -348,11 +348,18 @@ def _gr_time(dt, fmt='%d/%m %H:%M'):
             return str(dt)
 
 # έκδοση/build για το footer του shell
-APP_VERSION = '12.446'
-APP_BUILD   = '727'
+APP_VERSION = '12.447'
+APP_BUILD   = '728'
 
 # ── v12.36 — Ιστορικό εκδόσεων («Τι νέο»). Newest first. ──────────────────────
 CHANGELOG = [
+    {'v': '12.447', 'b': '728', 'date': '09/07/2026', 'time': '13:40', 'title': 'Κέντρο Δεδομένων (Data Hub) Φ1 — «λιμάνι» υποδοχής Epsilon (landing + ingest endpoint)',
+     'items': ['Υποδομή (χωρίς UI — δεν αλλάζει τίποτα στην εμφάνιση): νέο module `datahub.py` που στήνει το «λιμάνι» υποδοχής δεδομένων από την Epsilon (μισθοδοσία `bmisthos`), πριν μπει στην παραγωγή ο on-prem agent.',
+               'Νέοι πίνακες: `datahub_source` (μητρώο πηγών), `datahub_staging_bmisthos` (ωμά δεδομένα verbatim — τίποτα δεν χάνεται), `datahub_sync_log` (audit κάθε συγχρονισμού).',
+               'Επεκτάθηκαν (μη καταστροφικά) `EmployeePII` (+10 πεδία: email/κινητό/αιτία αποχώρησης/εποχικός/δανεισμός/…) & `LegalNetImport` (+15 πεδία ποσών: προκαταβολή/παροχές/χαρτόσημο/καταβλητέο/…).',
+               'Νέο endpoint `POST /api/datahub/ingest` (μηχανή-προς-μηχανή, bearer token): γράφει ωμά → idempotent upsert με κλειδί **ΑΦΜ** → audit log. Νέο ΑΦΜ → αυτόματο κλειδωμένο προφίλ.',
+               'Πολιτική συγχώνευσης ανά πεδίο: Epsilon authoritative (νομικά/ονόματα) · Εστία-owned fill-gaps (email/κινητό — ΠΟΤΕ σβήσιμο υπάρχοντος) · Οργανόγραμμα ανέγγιχτο. Καταβλητέο = τύπος Epsilon (Καθαρές − Προκαταβολή − Παροχές).',
+               'ΕΚΤΟΣ Φ1 (επόμενα): on-prem agent (Φ3), οθόνη επισκόπησης/monitoring (Φ4), Pylon Οικονομικά (Φ4).']},
     {'v': '12.446', 'b': '727', 'date': '08/07/2026', 'time': '18:10', 'title': 'Piato — Επεξεργασία πιάτου/κατηγορίας σε pop-up (μολύβι) αντί για dropdown',
      'items': ['Κάθε **πιάτο** έχει τώρα εικονίδιο **μολυβιού αριστερά από το όνομα** → ανοίγει **παράθυρο (pop-up)** επεξεργασίας. Έφυγε εντελώς το dropdown «Επεξεργασία πιάτου» από κάτω.',
                'Το ίδιο για τις **κατηγορίες**: μολύβι-edit → pop-up (αντί για το dropdown).',
@@ -3987,6 +3994,7 @@ ROADMAP = [
         {'t': 'Ξεκαθάρισμα «προσωπικό vs χρήστες login» (αν το προσωπικό πρέπει να είναι users ή merge με master)', 's': 'idea'},
         {'t': 'Μεταφράσεις EN/UK', 's': 'planned'},
         {'t': 'Σύνδεση μισθοδοσίας με ΕΡΓΑΝΗ/Epsilon (μέσω προγράμματος)', 's': 'idea'},
+        {'t': 'Κέντρο Δεδομένων (Data Hub) — Φ1: landing (staging bronze) + ingest endpoint Epsilon bmisthos (✓)· Φ2 prove-the-pipe· Φ3 on-prem agent· Φ4 review/monitoring + Pylon', 's': 'progress'},
     ]},
     {'area': 'Διασφαλίσεις & Διακυβέρνηση (καθώς μεγαλώνει)', 'items': [
         {'t': 'Διαδικασία: Impact-note + εντοπισμός conflicts ΠΡΙΝ από κάθε δομική/κοινή αλλαγή — προχωράμε μόνο με ρητή έγκριση', 's': 'progress'},
@@ -5249,6 +5257,7 @@ console  = _try_import('console')
 rotation = _try_import('rotation')           # v12.377 «εκ περιτροπής» (ΠΡΙΝ init_db: create_all να πιάσει RotationShare)
 measurements = _try_import('measurements')   # Φ1 ενοποίηση μετρήσεων (ΠΡΙΝ init_db: create_all να πιάσει MonitorPeriod)
 piato    = _try_import('piato')              # P-075 module Εστίασης (ΠΡΙΝ init_db: create_all να πιάσει Outlet/MenuItem κ.λπ.)
+datahub  = _try_import('datahub')            # P-093 Data Hub Φ1 (ΜΕΤΑ το payroll — χρησιμοποιεί EmployeePII/LegalNetImport· ΠΡΙΝ init_db: create_all να πιάσει datahub_*)
 init_db()
 if backup:   backup.ensure_backup_columns()   # v12.33 — auto-migration backup_log + seed ρυθμίσεων
 if piato:    piato.ensure_piato_columns()      # P-075 — auto-migration piato_* + seed 14 EU αλλεργιογόνων
@@ -5266,6 +5275,8 @@ if schedule: schedule.seed_schedule()
 if payroll:  payroll.ensure_payroll_columns()
 if payroll:  payroll.seed_payroll()
 if payroll:  payroll.backfill_agreement_from_mgmt()   # v12.365 P-047: one-time backfill συμφωνίας → EmploymentProfile
+if datahub:  datahub.ensure_datahub_columns()          # P-093 Φ1: ALTER EmployeePII/LegalNetImport (μη καταστροφικό)
+if datahub:  datahub.seed_datahub()                    # P-093 Φ1: seed 1 γραμμή μητρώου πηγών (bmisthos)
 if measurements: measurements.seed_measurement_engine()   # Φ1: seed templates Πισίνα/ΖΝΧ + περίοδοι (idempotent)
 if measurements: measurements.seed_node_catalog()         # Φ-Α: κατάλογος-αναφορά δέντρου δικτύων (idempotent)
 if menu: menu.seed_menu_meta()   # v12.239: seed workspace+ρόλοι μενού (μόνο αν λείπει)

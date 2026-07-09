@@ -126,6 +126,17 @@ class EmployeePII(db.Model):
     locked           = db.Column(db.Boolean, default=False)   # v12.56: κλειδωμένο μητρώο (πηγή=Epsilon)
     cost_center      = db.Column(db.String(8))   # v12.59: managerial μονάδα (AST/CNT/IRO/SRG/PSV/CND)
     emp_code         = db.Column(db.String(12), index=True)  # v12.60: Κωδ. Εργαζομένου (master Excel)
+    # v12.447 (Data Hub Φ1 — LANDING_SCHEMA §3· ALTER: datahub.ensure_datahub_columns)
+    email             = db.Column(db.String(160))    # B: fill-gaps (Εστία-owned — ΠΟΤΕ overwrite μη-κενού)
+    mobile            = db.Column(db.String(40))      # B: fill-gaps (Εστία-owned)
+    fr_reason         = db.Column(db.String(40))      # A: Epsilon authoritative (κωδ. αιτίας αποχώρησης)
+    fr_reason_descr   = db.Column(db.String(160))     # A: περιγραφή αιτίας
+    is_future_emp     = db.Column(db.Boolean)         # A: επερχόμενη πρόσληψη
+    hotel_seasonal    = db.Column(db.String(20))      # A: εποχικός ξεν.
+    supervisor_id_emp = db.Column(db.Integer)         # A: προϊστάμενος (→ID_EMP Epsilon· informational)
+    lending_from      = db.Column(db.String(80))      # A: δανεισμός από εταιρεία
+    lending_to        = db.Column(db.String(80))      # A: δανεισμός προς εταιρεία
+    id_emp_current    = db.Column(db.Integer)         # A: τρέχον επεισόδιο (max ID_EMP)
     updated_at       = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     updated_by       = db.Column(db.Integer, db.ForeignKey('user.id'))
 
@@ -738,6 +749,22 @@ class LegalNetImport(db.Model):
     fmy_legal     = db.Column(db.Float)
     net_legal     = db.Column(db.Float)
     employer_cost_legal = db.Column(db.Float)
+    # v12.447 (Data Hub Φ1 — LANDING_SCHEMA §4· ALTER: datahub.ensure_datahub_columns) — verbatim Epsilon
+    prosthetes_sum        = db.Column(db.Float)      # PROSTHETES_SUM (λοιπές/έξτρα)
+    prosthetes_sum_nokrat = db.Column(db.Float)      # PROSTHETES_SUM_NOKRAT (χωρίς κρατ.)
+    skratiseis_ergod      = db.Column(db.Float)      # SKRATISEIS_ERGOD (εισφορές εργοδότη)
+    xartoshmo             = db.Column(db.Float)      # XARTOSHMO (ψηφ. τέλος/χαρτόσημο)
+    prokatavoli           = db.Column(db.Float)      # PROKATAVOLI (προκαταβολή)
+    paroxes               = db.Column(db.Float)      # PAROXES (κράτηση σωματείου/υπέρ τρίτων)
+    s_kostos              = db.Column(db.Float)      # S_KOSTOS (συνολικό κόστος)
+    apoz_apol_salary      = db.Column(db.Float)      # APOZ_APOL_SALARY (αποζημίωση απόλυσης)
+    salary                = db.Column(db.Float)      # SALARY (βασικός ΣΣΕ)
+    working_days          = db.Column(db.Float)      # WORKING_DAYS (ημέρες ασφάλισης)
+    id_periodos           = db.Column(db.Integer, index=True)  # ID_PERIODOS (κλειδί περιόδου)
+    per_type              = db.Column(db.Integer, index=True)  # PER_TYPE (κατηγορία περιόδου)
+    periodos_date         = db.Column(db.DateTime)   # PERIODOS_DATE
+    per_calculated_date   = db.Column(db.DateTime)   # PER_CALCULATED_DATE (watermark)
+    katavliteo            = db.Column(db.Float)      # τύπος Epsilon: PLIROTEO − PROKATAVOLI − PAROXES
     period_kind   = db.Column(db.String(24), default='monthly')  # monthly/Δώρο Πάσχα/Επίδομα Αδείας...
     import_hash   = db.Column(db.String(40), unique=True, index=True)
     source_file   = db.Column(db.String(160))

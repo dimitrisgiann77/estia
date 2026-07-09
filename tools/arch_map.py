@@ -36,7 +36,10 @@ NAME_HINTS = ('full_name', 'fullname', 'name', 'onoma', 'lastname', 'firstname')
 AFM_HINTS  = ('afm', 'vat', 'amka', 'tax_id', 'taxid')
 # Tables that LEGITIMATELY hold name+AFM without user_id (legal entities, NOT persons).
 # Documented exceptions -- if a new one appears, think whether it is really a non-person.
-KNOWN_OK_ENTITIES = {'company'}
+#   datahub_staging_bmisthos = raw bronze landing (Data Hub Φ1): ΟΛΑ τα Epsilon πεδία verbatim,
+#   κλειδί = φυσικά κλειδιά Epsilon (VAT+ID_CMP+XRISI+ID_PERIODOS+ID_EMP), ΟΧΙ curated μητρώο
+#   προσωπικού. Η ταυτότητα προάγεται στο EmployeePII (έχει user_id). Δεν είναι παράλληλο μητρώο.
+KNOWN_OK_ENTITIES = {'company', 'datahub_staging_bmisthos'}
 
 # Colour per module (for the graphic).
 MODULE_COLOR = {
