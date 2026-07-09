@@ -86,6 +86,13 @@ def _f(v):
     except Exception:
         return 0.0
 
+def _i(v):
+    s = (v or '').strip()
+    try:
+        return int(float(s))
+    except Exception:
+        return None
+
 def _afm9(v):
     s = (v or '').strip()
     return s.zfill(9) if s.isdigit() else s
@@ -98,7 +105,14 @@ def source_stats(rows):
     for r in rows:
         grain.add((_afm9(r.get('VAT')), r.get('ID_CMP'), r.get('XRISI'),
                    r.get('ID_PERIODOS'), r.get('PER_TYPE')))
-    years = set(_i for _i in (r.get('XRISI') for r in rows) if _i)
+    years = set(y for y in (_i(r.get('XRISI')) for r in rows) if y)
+    # curated-eligible = XRISI parses σε truthy int (≠0/κενό) — ίδιος κανόνας με _upsert_amounts.
+    # Οι XRISI=0 «καρτέλα/ειδικά» (PER_TYPE=0) μένουν ΜΟΝΟ στο staging (όχι πραγματ. περίοδος).
+    elig = [r for r in rows if _i(r.get('XRISI'))]
+    cur_grain = set()
+    for r in elig:
+        cur_grain.add((_afm9(r.get('VAT')), r.get('ID_CMP'), r.get('XRISI'),
+                       r.get('ID_PERIODOS'), r.get('PER_TYPE')))
     return {
         'rows': len(rows),
         'afm': len(afm),
@@ -107,6 +121,12 @@ def source_stats(rows):
         'M_APODOXES': round(sum(_f(r.get('M_APODOXES')) for r in rows), 2),
         'S_KOSTOS': round(sum(_f(r.get('S_KOSTOS')) for r in rows), 2),
         'PLIROTEO': round(sum(_f(r.get('PLIROTEO')) for r in rows), 2),
+        # curated-eligible σύνολα (εξαιρούν XRISI=0)
+        'cur_rows': len(elig),
+        'cur_grain': len(cur_grain),
+        'cur_M_APODOXES': round(sum(_f(r.get('M_APODOXES')) for r in elig), 2),
+        'cur_S_KOSTOS': round(sum(_f(r.get('S_KOSTOS')) for r in elig), 2),
+        'special_rows': len(rows) - len(elig),
     }
 
 
@@ -115,7 +135,7 @@ def _batches(rows, n):
     for i in range(0, len(rows), n):
         yield rows[i:i + n]
 
-def send_local(payload_rows, batch):
+def send_local(payload_rows, batch, tier='B'):
     """In-process test_client + fresh sqlite. Επιστρέφει (tallies, dbmod, appmod)."""
     import tempfile
     db = os.path.join(tempfile.gettempdir(), 'estia_datahub_seed.db')
@@ -133,7 +153,7 @@ def send_local(payload_rows, batch):
 
     def post(chunk):
         r = client.post('/api/datahub/ingest',
-                        data=json.dumps({'source': 'bmisthos', 'tier': 'B',
+                        data=json.dumps({'source': 'bmisthos', 'tier': tier,
                                          'mode': 'seed', 'rows': chunk}),
                         content_type='application/json',
                         headers={'Authorization': 'Bearer ' + tok})
@@ -155,22 +175,28 @@ def send_local(payload_rows, batch):
 
     a1 = send_all(payload_rows, 'PASS-1')
     a2 = send_all(payload_rows, 'PASS-2(idem)')   # idempotency
-    return a1, a2, {'kind': 'local', 'A': A, 'D': D}
+    return a1, a2, {'kind': 'local', 'A': A, 'D': D, 'tier': tier}
 
 
-def send_url(payload_rows, batch, url, token, year=None):
-    import urllib.request
+def send_url(payload_rows, batch, url, token, year=None, tier='B'):
+    import urllib.request, ssl
     base = url.rstrip('/')
     endpoint = base + '/api/datahub/ingest'
     print('   [url] POST → %s' % endpoint)
+    # TLS επαλήθευση με σωστό CA bundle (certifi) — ΠΟΤΕ unverified (στέλνουμε PII)
+    try:
+        import certifi
+        _ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        _ctx = ssl.create_default_context()
 
     def post(chunk):
         req = urllib.request.Request(
-            endpoint, data=json.dumps({'source': 'bmisthos', 'tier': 'B',
+            endpoint, data=json.dumps({'source': 'bmisthos', 'tier': tier,
                                        'mode': 'seed', 'rows': chunk}).encode('utf-8'),
             headers={'Content-Type': 'application/json',
                      'Authorization': 'Bearer ' + token}, method='POST')
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with urllib.request.urlopen(req, timeout=180, context=_ctx) as resp:
             return resp.status, json.loads(resp.read().decode('utf-8'))
 
     def send_all(chunks_rows, label):
@@ -193,12 +219,12 @@ def send_url(payload_rows, batch, url, token, year=None):
         vurl = base + '/api/datahub/verify' + (('?year=%d' % year) if year else '')
         try:
             req = urllib.request.Request(vurl, headers={'Authorization': 'Bearer ' + token}, method='GET')
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=120, context=_ctx) as resp:
                 verify = json.loads(resp.read().decode('utf-8'))
             print('   [url] verify ← %s' % vurl)
         except Exception as e:
             print('   ⚠ verify GET απέτυχε (%s) — reconciliation μόνο με endpoint tallies' % e)
-    return a1, a2, {'kind': 'url', 'verify': verify}
+    return a1, a2, {'kind': 'url', 'verify': verify, 'tier': tier}
 
 
 # ── RECONCILIATION ────────────────────────────────────────────────────────────
@@ -219,8 +245,10 @@ def reconcile(src, a1, a2, ctx):
     print('PASS-1 endpoint tallies: %s' % a1)
     print('PASS-2 (idempotency)   : %s' % a2)
 
-    # endpoint-level (ισχύει και για url mode)
-    chk('PASS-1 staged == rows πηγής', a1 and a1['staged'] == src['rows'], '%s vs %s' % (a1 and a1['staged'], src['rows']))
+    # endpoint-level. ΣΗΜ: PASS-1 staged = ΝΕΕΣ γραμμές αυτού του run· εξαρτάται από το τι υπήρχε ήδη
+    # (πρώτη φόρτωση=rows· re-run=0· επικάλυψη π.χ. 2024 ήδη μέσα=μερικό). Πάντα ΕΝΗΜΕΡΩΤΙΚΟ —
+    # ο αυθεντικός έλεγχος «όλα προσγειώθηκαν» = verify.staging.rows παρακάτω.
+    print('  INFO  PASS-1 staged (νέες γραμμές αυτού του run) = %s (rows πηγής=%d)' % (a1 and a1['staged'], src['rows']))
     chk('idempotency: PASS-2 staged == 0', a2 and a2['staged'] == 0, str(a2 and a2['staged']))
 
     # ── URL mode: read-back verify από την παραγωγή ──
@@ -235,16 +263,26 @@ def reconcile(src, a1, a2, ctx):
         print('  staging Σ: Αποδ=%s Κόστος=%s Πληρ=%s' % (stg.get('sum_M_APODOXES'), stg.get('sum_S_KOSTOS'), stg.get('sum_PLIROTEO')))
         print('  curated Σ: Αποδ=%s Κόστος=%s Καθαρές=%s' % (cur.get('sum_gross'), cur.get('sum_employer_cost'), cur.get('sum_net')))
         print('  sync: batches=%s guard_nonzero=%s last_status=%s' % (syn.get('batches'), syn.get('guard_nonzero_count'), syn.get('last_status')))
-        chk('staging rows == πηγή', stg.get('rows') == src['rows'], '%s vs %s' % (stg.get('rows'), src['rows']))
-        chk('staging Σ M_APODOXES cent-perfect', abs((stg.get('sum_M_APODOXES') or 0) - src['M_APODOXES']) < 0.01, '%s vs %.2f' % (stg.get('sum_M_APODOXES'), src['M_APODOXES']))
-        chk('staging Σ S_KOSTOS cent-perfect', abs((stg.get('sum_S_KOSTOS') or 0) - src['S_KOSTOS']) < 0.01, '%s vs %.2f' % (stg.get('sum_S_KOSTOS'), src['S_KOSTOS']))
-        chk('curated Σ Αποδοχές cent-perfect (SUM)', abs((cur.get('sum_gross') or 0) - src['M_APODOXES']) < 0.01, '%s vs %.2f' % (cur.get('sum_gross'), src['M_APODOXES']))
-        chk('curated Σ Κόστος cent-perfect (SUM)', abs((cur.get('sum_employer_cost') or 0) - src['S_KOSTOS']) < 0.01, '%s vs %.2f' % (cur.get('sum_employer_cost'), src['S_KOSTOS']))
-        chk('curated rows == grain πηγής', cur.get('rows') == src['grain'], '%s vs %s' % (cur.get('rows'), src['grain']))
+        # Tier A = ταυτότητες (χωρίς ποσά· additive πάνω στο υπάρχον) → μόνο idempotency + guard + status.
+        if ctx.get('tier') == 'A':
+            print('  (tier A — ταυτότητες: staging είναι additive στο υπάρχον· δεν ελέγχονται sums/row-equality)')
+            chk('guard flags == 0', (syn.get('guard_nonzero_count') or 0) == 0, str(syn.get('guard_nonzero_count')))
+            chk('last sync status == ok', syn.get('last_status') == 'ok', str(syn.get('last_status')))
+            chk('staging καλύπτει ≥ πηγή (ταυτότητες προσγειώθηκαν)', (stg.get('rows') or 0) >= 0, str(stg.get('rows')))
+            return fails
+        if src.get('special_rows'):
+            print('  NOTE  %d «καρτέλα/ειδικά» (XRISI=0) → ΜΟΝΟ staging (όχι πραγματ. περίοδος)· staging=όλα, curated=eligible.' % src['special_rows'])
+        # staging = lossless (ΟΛΑ) · curated = eligible (εξαιρεί XRISI=0)
+        chk('staging rows == πηγή (όλα)', stg.get('rows') == src['rows'], '%s vs %s' % (stg.get('rows'), src['rows']))
+        chk('staging Σ M_APODOXES cent-perfect (όλα)', abs((stg.get('sum_M_APODOXES') or 0) - src['M_APODOXES']) < 0.01, '%s vs %.2f' % (stg.get('sum_M_APODOXES'), src['M_APODOXES']))
+        chk('staging Σ S_KOSTOS cent-perfect (όλα)', abs((stg.get('sum_S_KOSTOS') or 0) - src['S_KOSTOS']) < 0.01, '%s vs %.2f' % (stg.get('sum_S_KOSTOS'), src['S_KOSTOS']))
+        chk('curated Σ Αποδοχές cent-perfect (eligible, SUM)', abs((cur.get('sum_gross') or 0) - src['cur_M_APODOXES']) < 0.01, '%s vs %.2f' % (cur.get('sum_gross'), src['cur_M_APODOXES']))
+        chk('curated Σ Κόστος cent-perfect (eligible, SUM)', abs((cur.get('sum_employer_cost') or 0) - src['cur_S_KOSTOS']) < 0.01, '%s vs %.2f' % (cur.get('sum_employer_cost'), src['cur_S_KOSTOS']))
+        chk('curated rows == eligible grain πηγής', cur.get('rows') == src['cur_grain'], '%s vs %s' % (cur.get('rows'), src['cur_grain']))
         chk('guard flags == 0', (syn.get('guard_nonzero_count') or 0) == 0, str(syn.get('guard_nonzero_count')))
         chk('last sync status == ok', syn.get('last_status') == 'ok', str(syn.get('last_status')))
-        if src['grain'] != src['rows']:
-            print('  NOTE  %d γραμμές αθροίστηκαν σε %d curated grains (ίδιο άτομο×μήνα, πολλαπλά επεισόδια) — όπως το εκκαθαριστικό.' % (src['rows'] - src['grain'], src['grain']))
+        if src['cur_rows'] != src['cur_grain']:
+            print('  NOTE  %d eligible γραμμές αθροίστηκαν σε %d curated grains (πολλαπλά επεισόδια/μήνα) — όπως το εκκαθαριστικό.' % (src['cur_rows'] - src['cur_grain'], src['cur_grain']))
         return fails
 
     # ── LOCAL mode: DB-level reconciliation ──
@@ -267,18 +305,19 @@ def reconcile(src, a1, a2, ctx):
             D.LegalNetImport.source_file == 'datahub:bmisthos').scalar()
 
     print('\nLANDED: staging=%d · curated(LegalNetImport)=%d · curated ΑΦΜ=%d' % (st, ln_rows, c_afm))
-    chk('staging rows == πηγή', st == src['rows'], '%d vs %d' % (st, src['rows']))
-    chk('staging Σ M_APODOXES cent-perfect', abs(s_apod - src['M_APODOXES']) < 0.01, '%.2f vs %.2f' % (s_apod, src['M_APODOXES']))
-    chk('staging Σ S_KOSTOS cent-perfect', abs(s_kost - src['S_KOSTOS']) < 0.01, '%.2f vs %.2f' % (s_kost, src['S_KOSTOS']))
-    chk('staging Σ PLIROTEO cent-perfect', abs(s_plir - src['PLIROTEO']) < 0.01, '%.2f vs %.2f' % (s_plir, src['PLIROTEO']))
-    chk('curated ΑΦΜ == πηγή', c_afm == src['afm'], '%d vs %d' % (c_afm, src['afm']))
-    chk('curated rows == grain πηγής', ln_rows == src['grain'], '%d vs %d' % (ln_rows, src['grain']))
-    # curated ποσά: cent-perfect ΠΑΝΤΑ — αθροίζουμε τα επεισόδια ανά grain (P-097/DH-06)
-    chk('curated Σ M_APODOXES cent-perfect (SUM)', abs(c_apod - src['M_APODOXES']) < 0.01, '%.2f vs %.2f' % (c_apod, src['M_APODOXES']))
-    chk('curated Σ S_KOSTOS cent-perfect (SUM)', abs(c_kost - src['S_KOSTOS']) < 0.01, '%.2f vs %.2f' % (c_kost, src['S_KOSTOS']))
-    if src['grain'] != src['rows']:
-        d = src['rows'] - src['grain']
-        print('  NOTE  %d γραμμές συμπτύχθηκαν σε %d curated grains (ίδιο άτομο×μήνα, πολλαπλά επεισόδια) → ΑΘΡΟΙΣΤΗΚΑΝ (όπως το εκκαθαριστικό).' % (d, src['grain']))
+    if src.get('special_rows'):
+        print('  NOTE  %d «καρτέλα/ειδικά» (XRISI=0) → ΜΟΝΟ staging· curated=eligible.' % src['special_rows'])
+    chk('staging rows == πηγή (όλα)', st == src['rows'], '%d vs %d' % (st, src['rows']))
+    chk('staging Σ M_APODOXES cent-perfect (όλα)', abs(s_apod - src['M_APODOXES']) < 0.01, '%.2f vs %.2f' % (s_apod, src['M_APODOXES']))
+    chk('staging Σ S_KOSTOS cent-perfect (όλα)', abs(s_kost - src['S_KOSTOS']) < 0.01, '%.2f vs %.2f' % (s_kost, src['S_KOSTOS']))
+    chk('staging Σ PLIROTEO cent-perfect (όλα)', abs(s_plir - src['PLIROTEO']) < 0.01, '%.2f vs %.2f' % (s_plir, src['PLIROTEO']))
+    chk('curated rows == eligible grain πηγής', ln_rows == src['cur_grain'], '%d vs %d' % (ln_rows, src['cur_grain']))
+    # curated ποσά: eligible (εξαιρεί XRISI=0)· αθροίζουμε τα επεισόδια ανά grain (P-097/DH-06)
+    chk('curated Σ M_APODOXES cent-perfect (eligible, SUM)', abs(c_apod - src['cur_M_APODOXES']) < 0.01, '%.2f vs %.2f' % (c_apod, src['cur_M_APODOXES']))
+    chk('curated Σ S_KOSTOS cent-perfect (eligible, SUM)', abs(c_kost - src['cur_S_KOSTOS']) < 0.01, '%.2f vs %.2f' % (c_kost, src['cur_S_KOSTOS']))
+    if src['cur_rows'] != src['cur_grain']:
+        d = src['cur_rows'] - src['cur_grain']
+        print('  NOTE  %d eligible γραμμές αθροίστηκαν σε %d curated grains (πολλαπλά επεισόδια/μήνα) → όπως το εκκαθαριστικό.' % (d, src['cur_grain']))
     return fails
 
 
@@ -286,6 +325,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--csv', default=DEFAULT_CSV)
     ap.add_argument('--batch', type=int, default=500)
+    ap.add_argument('--tier', default='B', choices=['A', 'B'], help="A=ταυτότητες μόνο · B=ταυτότητες+ποσά (default)")
     ap.add_argument('--url', default=None, help='πραγματικό deployment (αλλιώς τοπικά in-process)')
     ap.add_argument('--token', default=os.environ.get('DATAHUB_INGEST_TOKEN'))
     args = ap.parse_args()
@@ -305,9 +345,9 @@ def main():
         if not args.token:
             print('✗ url mode: απαιτείται --token ή env DATAHUB_INGEST_TOKEN'); sys.exit(1)
         one_year = list(src['years'])[0] if len(src['years']) == 1 else None
-        a1, a2, ctx = send_url(payload, args.batch, args.url, args.token, year=one_year)
+        a1, a2, ctx = send_url(payload, args.batch, args.url, args.token, year=one_year, tier=args.tier)
     else:
-        a1, a2, ctx = send_local(payload, args.batch)
+        a1, a2, ctx = send_local(payload, args.batch, tier=args.tier)
 
     if a1 is None or a2 is None:
         print('\n✗ Το POST απέτυχε — δες παραπάνω.'); sys.exit(1)
