@@ -132,6 +132,15 @@
   .imallg{white-space:nowrap;}
   .imchip{display:inline-block;min-width:20px;height:20px;line-height:20px;text-align:center;border-radius:5px;margin:1px;cursor:pointer;opacity:.32;font-size:12px;background:#eef2f7;padding:0 3px;}
   .imchip.on{opacity:1;background:#dcfce7;}
+  /* edit modals (πιάτο/κατηγορία) — pencil trigger + pop-up (P-088 rework) */
+  .iedit,.cedit{border:none;background:none;cursor:pointer;color:#7a94a2;padding:2px 5px;font-size:15px;display:inline-flex;align-items:center;flex:none;}
+  .iedit:hover,.cedit:hover{color:#193847;}
+  .editmodal{position:fixed;inset:0;background:rgba(15,30,40,.5);display:flex;align-items:flex-start;justify-content:center;z-index:9998;padding:26px 16px;overflow-y:auto;}
+  .editbox{background:#fff;border-radius:14px;max-width:620px;width:100%;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .edithead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e6eef2;position:sticky;top:0;background:#fff;border-radius:14px 14px 0 0;z-index:1;}
+  .edithead b{color:#193847;font-size:15px;}
+  .edx{border:none;background:none;cursor:pointer;color:#64748b;font-size:20px;display:inline-flex;}
+  .editmodal .subform{padding:14px 16px;}
 </style></head><body>
 {# req4: αφαιρέθηκε ο μεγάλος τίτλος shell (mp.topbar) — δεν διπλασιάζουμε το Estia chrome #}
 
@@ -310,7 +319,10 @@
               {% if c.hours %}<span class="muted">· {{ c.hours }}</span>{% endif %}</h4>
           </div>
           <div class="row">
-            <details><summary>✎</summary>
+            <button type="button" class="cedit" onclick="openMod('cm-{{ c.id }}')" title="Επεξεργασία κατηγορίας"><i class="ti ti-pencil"></i></button>
+            <div class="editmodal" id="cm-{{ c.id }}" style="display:none">
+              <div class="editbox">
+              <div class="edithead"><b><i class="ti ti-pencil"></i> Επεξεργασία κατηγορίας</b><button type="button" class="edx" onclick="closeMod('cm-{{ c.id }}')" title="Κλείσιμο"><i class="ti ti-x"></i></button></div>
             <div class="subform">
               <form method="post" action="/dashboard/piato/category/save">
                 <input type="hidden" name="id" value="{{ c.id }}"><input type="hidden" name="outlet_id" value="{{ sel.id }}">
@@ -326,7 +338,8 @@
                 <button class="btn red sm" type="submit">🗑 Διαγραφή κατηγορίας</button>
               </form>
             </div>
-          </details>
+              </div><!-- /editbox -->
+            </div><!-- /editmodal -->
           </div>
         </div>
         <div class="cat-body" id="body-cat{{ c.id }}">
@@ -336,6 +349,7 @@
         <div class="item-row">
           <div>
             <span class="igrip" title="Σύρε — αναδιάταξη ή μετακίνηση σε άλλη κατηγορία"><i class="ti ti-grip-vertical"></i></span>
+            <button type="button" class="iedit" onclick="openMod('im-{{ it.id }}')" title="Επεξεργασία πιάτου"><i class="ti ti-pencil"></i></button>
             {% if it.photo_url %}<img class="thumb" src="{{ it.photo_url }}" alt="">{% endif %}
             <span class="t">{{ mlget(it.title_i18n, 'el') or '—' }}</span>
             {% if not it.available %}<span class="badge draft">εξαντλήθηκε</span>{% endif %}
@@ -350,8 +364,9 @@
             </form>
           </div>
         </div>
-        <details>
-          <summary>✎ Επεξεργασία πιάτου</summary>
+        <div class="editmodal" id="im-{{ it.id }}" style="display:none">
+          <div class="editbox">
+          <div class="edithead"><b><i class="ti ti-pencil"></i> Επεξεργασία πιάτου</b><button type="button" class="edx" onclick="closeMod('im-{{ it.id }}')" title="Κλείσιμο"><i class="ti ti-x"></i></button></div>
           <div class="subform">
             <form method="post" action="/dashboard/piato/item/save">
               <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="category_id" value="{{ c.id }}">
@@ -401,7 +416,8 @@
               <button class="btn red sm" type="submit">🗑 Διαγραφή πιάτου</button>
             </form>
           </div>
-        </details>
+          </div><!-- /editbox -->
+        </div><!-- /editmodal -->
         </div><!-- /mitem -->
         {% endfor %}
 
@@ -615,6 +631,11 @@
     var el=document.getElementById('pdflang'); var l=el ? el.value : 'el';
     window.open('/dashboard/piato/pdf/{{ sel.id if sel else 0 }}?lang='+encodeURIComponent(l), '_blank');
   }
+  // edit modals (πιάτο/κατηγορία) — pencil άνοιγμα/κλείσιμο
+  function openMod(id){ var m=document.getElementById(id); if(m) m.style.display='flex'; }
+  function closeMod(id){ var m=document.getElementById(id); if(m) m.style.display='none'; }
+  document.addEventListener('click', function(e){ if(e.target.classList && e.target.classList.contains('editmodal')) e.target.style.display='none'; });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') document.querySelectorAll('.editmodal').forEach(function(m){ m.style.display='none'; }); });
   function toggleCat(id){ var el=document.getElementById(id); if(el) el.classList.toggle('folded'); }
   function foldAll(f){ document.querySelectorAll('.cat').forEach(function(c){ c.classList.toggle('folded', f); }); }
   function lfTab(btn){
