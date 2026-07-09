@@ -37,13 +37,14 @@ def load_env():
     cfg = {}
     path = os.path.join(HERE, '.env')
     if os.path.exists(path):
-        with open(path, encoding='utf-8') as fh:
+        # utf-8-sig: αφαιρεί το BOM που βάζει το Notepad στην αρχή (αλλιώς η 1η γραμμή δεν διαβάζεται)
+        with open(path, encoding='utf-8-sig') as fh:
             for ln in fh:
-                ln = ln.strip()
+                ln = ln.strip().lstrip('﻿')
                 if not ln or ln.startswith('#') or '=' not in ln:
                     continue
                 k, v = ln.split('=', 1)
-                cfg[k.strip()] = v.strip().strip('"').strip("'")
+                cfg[k.strip().lstrip('﻿')] = v.strip().strip('"').strip("'")
     # env vars override .env
     for k in ('EPSILON_CONN', 'ESTIA_URL', 'ESTIA_TOKEN', 'DB_INSTANCE', 'BATCH'):
         if os.environ.get(k):
@@ -135,24 +136,34 @@ def push(cfg, tier, mode, rows, dry=False):
     endpoint = cfg['ESTIA_URL'].rstrip('/') + '/api/datahub/ingest'
     ctx = _ctx()
     total = {'staged': 0, 'upserted': 0, 'created': 0, 'amounts': 0}
+    nbatch = (len(rows) + batch - 1) // batch
+    errors = 0
     for i in range(0, len(rows), batch):
+        bi = i // batch + 1
         chunk = rows[i:i + batch]
         body = json.dumps({'source': 'bmisthos', 'tier': tier, 'mode': mode, 'rows': chunk}).encode('utf-8')
         if dry:
-            print('   [dry] tier %s batch %d rows=%d (δεν στέλνω)' % (tier, i // batch + 1, len(chunk)))
+            print('   [dry] tier %s batch %d rows=%d (δεν στέλνω)' % (tier, bi, len(chunk)))
             continue
         req = urllib.request.Request(endpoint, data=body, method='POST',
                                      headers={'Content-Type': 'application/json',
                                               'Authorization': 'Bearer ' + cfg['ESTIA_TOKEN']})
-        with urllib.request.urlopen(req, timeout=180, context=ctx) as resp:
-            j = json.loads(resp.read().decode('utf-8'))
-        if j.get('status') != 'ok':
-            print('   ✗ tier %s batch %d: %s' % (tier, i // batch + 1, j)); return None
+        try:
+            with urllib.request.urlopen(req, timeout=180, context=ctx) as resp:
+                j = json.loads(resp.read().decode('utf-8'))
+            if j.get('status') != 'ok':
+                raise RuntimeError(str(j))
+        except Exception as e:
+            # ΑΝΘΕΚΤΙΚΟΤΗΤΑ: ένα κακό batch ΔΕΝ σταματά όλη τη δουλειά — κατάγραψε & συνέχισε
+            errors += 1
+            print('   ⚠ tier %s batch %d/%d ΑΠΕΤΥΧΕ — προσπερνώ (%s)' % (tier, bi, nbatch, str(e)[:160]))
+            continue
         for k in total:
             total[k] += j.get(k, 0)
         print('   tier %s batch %d/%d: staged+%d upserted+%d amounts+%d' % (
-            tier, i // batch + 1, (len(rows) + batch - 1) // batch,
-            j.get('staged', 0), j.get('upserted', 0), j.get('amounts', 0)))
+            tier, bi, nbatch, j.get('staged', 0), j.get('upserted', 0), j.get('amounts', 0)))
+    if errors:
+        print('   (tier %s: %d batches απέτυχαν — δες παραπάνω· τα υπόλοιπα προσγειώθηκαν)' % (tier, errors))
     return total
 
 

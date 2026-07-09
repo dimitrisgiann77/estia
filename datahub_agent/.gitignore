@@ -1,0 +1,4 @@
+# ΠΟΤΕ στο git: περιέχει secrets (connection string + token)
+.env
+__pycache__/
+*.pyc
