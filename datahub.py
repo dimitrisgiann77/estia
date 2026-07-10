@@ -785,10 +785,11 @@ PERIOD_CATS = [
     ('Εκκαθαρίσεις / Αναδρομικά', {6, 7, 8, 9}),
     ('Λοιπά', None),   # ό,τι δεν έπεσε παραπάνω
 ]
-# Ποια group ανήκει σε ποιο tab (Ταυτότητα = σταθερά στοιχεία· Περίοδος/Ποσά = ανά περίοδο)
+# Ποια group πάει πού: 'header' = σταθερή κεφαλίδα (ΑΦΜ/όνομα κ.λπ., όχι στο detail)·
+# 'period' = μέσα στην ανάλυση μήνα (Εταιρεία/Οργάνωση εδώ γιατί αλλάζει ανά περίοδο).
 GROUP_TAB = {
-    'Ταυτότητα εργαζομένου': 'identity',
-    'Εταιρεία / Οργάνωση': 'identity',
+    'Ταυτότητα εργαζομένου': 'header',
+    'Εταιρεία / Οργάνωση': 'period',
     'Περίοδος / Σύμβαση': 'period',
     'Ποσά (αποδοχές / κρατήσεις / κόστος)': 'period',
 }
@@ -843,23 +844,24 @@ def datahub_epsilon_inspect():
         'last_status': (last.status if last else None),
     }
 
-    people, periods, rec, groups, extra, hero, period_cats = [], [], None, None, None, None, []
+    people, periods, rec, groups, extra, hero, period_cats, hdr = [], [], None, None, None, None, [], None
     if vat or row_id:
-        # ── HUB εργαζομένου: περίοδοι (κατηγοριοποιημένες) + επιλεγμένη περίοδος ──
+        # ── HUB εργαζομένου: σταθερή κεφαλίδα + ΟΛΕΣ οι χρήσεις (φίλτρο client-side) ──
         rec0 = ST.query.get(row_id) if row_id else None
         if rec0 is not None and not vat:
             vat = rec0.VAT
-        if rec0 is not None and rec0.XRISI:
-            year = rec0.XRISI   # συγχρόνισε τη χρήση με την επιλεγμένη περίοδο
-        # ΜΙΑ γραμμή ανά περίοδο (dedup επανα-εισαγωγών bronze, κρατά latest ingested)
+        # ΜΙΑ γραμμή ανά περίοδο (dedup), ΟΛΕΣ οι χρήσεις
         allp = _scope(ST.query.filter_by(VAT=vat)).order_by(ST.ingested_at.asc()).all()
         dd = {}
         for p in allp:
             dd[(p.ID_CMP, p.XRISI, p.ID_PERIODOS, p.PER_TYPE, p.ID_EMP)] = p
-        allper = sorted(dd.values(),
-                        key=lambda p: (p.XRISI or 0, p.ID_PERIODOS or 0, p.PER_TYPE or 0), reverse=True)
-        periods = [p for p in allper if (not year or p.XRISI == year)]
-        # κατηγοριοποίηση αριστερής στήλης
+        periods = sorted(dd.values(),
+                         key=lambda p: (p.XRISI or 0, p.ID_PERIODOS or 0, p.PER_TYPE or 0), reverse=True)
+        # χρήσεις του εργαζομένου (για τον selector)
+        emp_years = sorted({p.XRISI for p in periods if p.XRISI}, reverse=True)
+        if emp_years:
+            years = emp_years
+        # κατηγορίες (όλες οι χρήσεις μαζί· φιλτράρονται client-side ανά έτος)
         used = set()
         for title, types in PERIOD_CATS:
             if types is None:
@@ -869,8 +871,10 @@ def datahub_epsilon_inspect():
                 used.update(id(p) for p in items)
             if items:
                 period_cats.append({'title': title, 'items': items})
-        # επιλεγμένη περίοδος = row_id ή η πιο πρόσφατη
+        # επιλεγμένη περίοδος = row_id ή η πιο πρόσφατη· προεπιλεγμένη χρήση = της επιλεγμένης
         rec = rec0 or (periods[0] if periods else None)
+        if rec is not None and rec.XRISI:
+            year = rec.XRISI
         if rec is not None:
             try:
                 raw = json.loads(rec.raw_json) if rec.raw_json else {}
@@ -892,6 +896,20 @@ def datahub_epsilon_inspect():
                            key=lambda d: d['key'])
             hero = [{'label': lbl, 'value': _val(k), 'accent': (k == HERO_ACCENT)}
                     for lbl, k in HERO_TILES]
+
+            # ── ΚΕΦΑΛΙΔΑ (σταθερά) + heuristic email/IBAN (αυτο-εντοπισμός στηλών) ──
+            def _multi(needle):
+                out = []
+                for k in sorted(raw.keys()):
+                    if needle in k.upper():
+                        v = raw.get(k)
+                        if v not in (None, '') and str(v) not in out:
+                            out.append(str(v))
+                return out
+            hdr = {'name': ((_val('SURNAME') or '') + ' ' + (_val('NAME') or '')).strip(),
+                   'vat': vat, 'amka': _val('AM_KOIN_ASF'), 'ika': _val('AM_IKA'),
+                   'code': _val('CODE'), 'spc': _val('SPC_DESCR'),
+                   'emails': _multi('MAIL'), 'ibans': _multi('IBAN')}
     else:
         # ── ΛΙΣΤΑ όλων των εργαζομένων (distinct ΑΦΜ), φίλτρο χρήσης + client-side search ──
         pq = _scope(db.session.query(ST.VAT, func.max(ST.SURNAME), func.max(ST.NAME),
@@ -903,6 +921,6 @@ def datahub_epsilon_inspect():
                           'code': r[3]} for r in rows), key=lambda d: d['name'])
 
     return render_template('datahub_epsilon.html', vat=vat, year=year, years=years, status=status,
-                           people=people, periods=periods, period_cats=period_cats, rec=rec,
+                           people=people, periods=periods, period_cats=period_cats, rec=rec, hdr=hdr,
                            groups=groups, extra=extra, hero=hero, per_type_kind=PER_TYPE_KIND,
                            show_test=show_test, test_rows=test_rows)
