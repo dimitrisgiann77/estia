@@ -1,22 +1,23 @@
 {% import '_monitoring.html' as mp %}
 <!DOCTYPE html><html lang="el"><head>{{ mp.head('Business Μισθοδοσία — Επιθεώρηση Epsilon', theme.primary) }}
 <style>
+ .container{max-width:100%!important;width:100%;}
  .card{background:#fff;border:1px solid #e6ecf2;border-radius:12px;padding:16px 18px;margin-bottom:14px;}
  .card h3{margin:0 0 10px;font-size:15px;}
  table{width:100%;border-collapse:collapse;font-size:13px;}
  td,th{padding:7px 9px;border-bottom:1px solid #eef2f6;text-align:left;vertical-align:top;}
  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#64748b;}
- .b{background:var(--accent,#185FA5);color:#fff;border:none;padding:7px 13px;border-radius:8px;cursor:pointer;text-decoration:none;font-size:13px;display:inline-block;}
  .lnk{color:var(--accent,#185FA5);text-decoration:none;font-weight:600;}
- .muted{color:#94a3b8;font-size:12px;} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;color:#64748b;font-size:12px;}
+ .muted{color:#94a3b8;font-size:12px;} .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;}
  .grp{margin:16px 0 6px;font-weight:700;color:var(--accent,#185FA5);font-size:14px;}
  .st{display:flex;gap:22px;flex-wrap:wrap;align-items:center;}
  .st b{font-size:20px;display:block;} .st .k{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;}
  .pill{padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600;}
  .pill.ok{background:#dcfce7;color:#166534;} .pill.no{background:#fee2e2;color:#b91c1c;}
- input[type=text]{padding:8px 10px;border:1px solid #dbe3ea;border-radius:8px;min-width:260px;font-size:14px;}
+ select,input[type=text]{padding:8px 10px;border:1px solid #dbe3ea;border-radius:8px;font-size:14px;}
  .crumb{font-size:12px;color:#64748b;margin-bottom:10px;} .crumb a{color:var(--accent,#185FA5);text-decoration:none;}
- .val{font-weight:600;} .fld{color:#94a3b8;} .lbl{width:230px;}
+ .fkey{color:#94a3b8;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;width:230px;}
+ .lbl{width:230px;} .val{font-weight:600;} .num{text-align:right;white-space:nowrap;}
 </style></head><body>
 {{ mp.topbar('plug-connected', 'ΕΣΤΙΑ — Business Μισθοδοσία · Επιθεώρηση σύνδεσης Epsilon') }}
 <div class="container">
@@ -35,24 +36,15 @@
     <p class="muted" style="margin:10px 0 0;">Το πρώτο σημείο ελέγχου: εδώ βλέπεις <b>ό,τι φέρνει ολόκληρο</b> η σύνδεση από την Epsilon (Business Μισθοδοσία), πριν μπει στα κυκλώματα της Εστίας — χωρίς να κατεβάσεις Excel.</p>
   </div>
 
-  <div class="card">
-    <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <input type="hidden" name="embed" value="1">
-      <input type="text" name="q" value="{{ q or '' }}" placeholder="Αναζήτηση: επώνυμο / όνομα / ΑΦΜ / κωδικός…" autofocus>
-      <button class="b" type="submit"><i class="ti ti-search"></i> Αναζήτηση</button>
-      {% if q or vat or rec %}<a class="lnk" href="/dashboard/payroll/epsilon?embed=1">καθαρισμός</a>{% endif %}
-    </form>
-  </div>
-
   {% if rec %}
-  <div class="crumb"><a href="/dashboard/payroll/epsilon?embed=1">Αναζήτηση</a> › <a href="/dashboard/payroll/epsilon?vat={{ vat }}&embed=1">{{ (rec.SURNAME or '') }} {{ (rec.NAME or '') }}</a> › Περίοδος</div>
+  <div class="crumb"><a href="/dashboard/payroll/epsilon?year={{ year }}&embed=1">Εργαζόμενοι</a> › <a href="/dashboard/payroll/epsilon?vat={{ vat }}&year={{ year }}&embed=1">{{ (rec.SURNAME or '') }} {{ (rec.NAME or '') }}</a> › Περίοδος</div>
   <div class="card">
     <h3>{{ (rec.SURNAME or '') }} {{ (rec.NAME or '') }} — {{ rec.PERIODOS_DESCR or '—' }} <span class="muted">(χρήση {{ rec.XRISI }} · {{ per_type_kind.get(rec.PER_TYPE, rec.PER_TYPE) }} · {{ rec.CMP_NAME or '' }})</span></h3>
     {% for g in groups %}
       <div class="grp">{{ g.title }}</div>
       <table data-nocopy>
         {% for f in g.rows %}
-        <tr><td class="lbl">{{ f.label }}</td><td class="val">{% if f.value is none or f.value=='' %}<span class="muted">—</span>{% else %}{{ f.value }}{% endif %}</td><td class="fld mono">{{ f.key }}</td></tr>
+        <tr><td class="fkey">{{ f.key }}</td><td class="lbl">{{ f.label }}</td><td class="val">{% if f.value is none or f.value=='' %}<span class="muted">—</span>{% else %}{{ f.value }}{% endif %}</td></tr>
         {% endfor %}
       </table>
     {% endfor %}
@@ -60,7 +52,7 @@
       <div class="grp">Λοιπά πεδία Epsilon (ακατέργαστα · {{ extra|length }})</div>
       <table data-nocopy>
         {% for f in extra %}
-        <tr><td class="lbl mono">{{ f.key }}</td><td class="val">{% if f.value is none or f.value=='' %}<span class="muted">—</span>{% else %}{{ f.value }}{% endif %}</td></tr>
+        <tr><td class="fkey">{{ f.key }}</td><td class="val">{% if f.value is none or f.value=='' %}<span class="muted">—</span>{% else %}{{ f.value }}{% endif %}</td></tr>
         {% endfor %}
       </table>
     {% endif %}
@@ -68,7 +60,7 @@
   </div>
 
   {% elif periods %}
-  <div class="crumb"><a href="/dashboard/payroll/epsilon?embed=1">Αναζήτηση</a> › {{ periods[0].SURNAME }} {{ periods[0].NAME }}</div>
+  <div class="crumb"><a href="/dashboard/payroll/epsilon?year={{ year }}&embed=1">Εργαζόμενοι</a> › {{ periods[0].SURNAME }} {{ periods[0].NAME }}</div>
   <div class="card">
     <h3>{{ periods[0].SURNAME }} {{ periods[0].NAME }} — ΑΦΜ {{ vat }} <span class="muted">({{ periods|length }} περίοδοι)</span></h3>
     <table>
@@ -78,30 +70,51 @@
         <td>{{ p.XRISI }}</td><td>{{ p.PERIODOS_DESCR or '—' }}</td>
         <td>{{ per_type_kind.get(p.PER_TYPE, p.PER_TYPE) }}</td>
         <td class="muted">{{ p.CMP_NAME or '' }}</td>
-        <td style="text-align:right">{{ '%.2f'|format(p.M_APODOXES) if p.M_APODOXES is not none else '—' }}</td>
-        <td style="text-align:right">{{ '%.2f'|format(p.PLIROTEO) if p.PLIROTEO is not none else '—' }}</td>
-        <td><a class="lnk" href="/dashboard/payroll/epsilon?row={{ p.id }}&embed=1">Πεδία →</a></td>
+        <td class="num">{{ '%.2f'|format(p.M_APODOXES) if p.M_APODOXES is not none else '—' }}</td>
+        <td class="num">{{ '%.2f'|format(p.PLIROTEO) if p.PLIROTEO is not none else '—' }}</td>
+        <td><a class="lnk" href="/dashboard/payroll/epsilon?row={{ p.id }}&year={{ year }}&embed=1">Πεδία →</a></td>
       </tr>
       {% endfor %}
     </table>
   </div>
 
-  {% elif people %}
-  <div class="card">
-    <h3>Αποτελέσματα ({{ people|length }})</h3>
-    <table>
-      <tr><th>Ονοματεπώνυμο</th><th>ΑΦΜ</th><th>Κωδικός</th><th></th></tr>
-      {% for pr in people %}
-      <tr><td>{{ pr.name or '—' }}</td><td class="mono">{{ pr.vat }}</td><td class="muted">{{ pr.code or '' }}</td>
-        <td><a class="lnk" href="/dashboard/payroll/epsilon?vat={{ pr.vat }}&embed=1">Περίοδοι →</a></td></tr>
-      {% endfor %}
-    </table>
-  </div>
-
-  {% elif q %}
-  <div class="card"><p class="muted">Κανένα αποτέλεσμα για «{{ q }}».</p></div>
   {% else %}
-  <div class="card"><p class="muted">Πληκτρολόγησε επώνυμο, όνομα, ΑΦΜ ή κωδικό εργαζομένου για να δεις τι έφερε η σύνδεση.</p></div>
+  <div class="card">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <form method="GET" style="display:flex;gap:8px;align-items:center;">
+        <input type="hidden" name="embed" value="1">
+        <b style="font-size:13px;">Χρήση (έτος):</b>
+        <select name="year" onchange="this.form.submit()">
+          {% for y in years %}<option value="{{ y }}" {{ 'selected' if year==y }}>{{ y }}</option>{% endfor %}
+          <option value="0" {{ 'selected' if year==0 }}>Όλα τα έτη</option>
+        </select>
+      </form>
+      <input type="text" id="psearch" placeholder="🔎 Αναζήτηση εργαζομένου (όνομα / ΑΦΜ / κωδικός)…" onkeyup="filterPeople()" style="flex:1;min-width:260px;">
+      <span class="muted" id="pcount"></span>
+    </div>
+    <table id="ptbl">
+      <thead><tr><th>Ονοματεπώνυμο</th><th>ΑΦΜ</th><th>Κωδικός</th><th></th></tr></thead>
+      <tbody>
+      {% for pr in people %}
+        <tr data-s="{{ (pr.name ~ ' ' ~ pr.vat ~ ' ' ~ (pr.code or ''))|lower }}">
+          <td>{{ pr.name or '—' }}</td><td class="mono">{{ pr.vat }}</td><td class="muted">{{ pr.code or '' }}</td>
+          <td><a class="lnk" href="/dashboard/payroll/epsilon?vat={{ pr.vat }}&year={{ year }}&embed=1">Περίοδοι →</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if not people %}<p class="muted" style="margin-top:10px;">Καμία γραμμή για τη χρήση {{ year }}.</p>{% endif %}
+  </div>
+  <script>
+  function filterPeople(){
+    var i=document.getElementById('psearch'); if(!i) return;
+    var q=(i.value||'').toLowerCase().trim();
+    var rows=document.querySelectorAll('#ptbl tbody tr'), n=0;
+    rows.forEach(function(r){var m=!q||(r.getAttribute('data-s')||'').indexOf(q)>=0;r.style.display=m?'':'none';if(m)n++;});
+    var c=document.getElementById('pcount'); if(c) c.textContent=n+' εργαζόμενοι';
+  }
+  document.addEventListener('DOMContentLoaded',filterPeople);
+  </script>
   {% endif %}
 
 </div>

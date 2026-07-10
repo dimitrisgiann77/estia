@@ -763,9 +763,15 @@ def datahub_epsilon_inspect():
         return redirect(url_for('login'))
     from sqlalchemy import func
     ST = DatahubStagingBmisthos
-    q = (request.args.get('q') or '').strip()
     vat = (request.args.get('vat') or '').strip()
     row_id = request.args.get('row', type=int)
+    year = request.args.get('year', type=int)
+
+    # διαθέσιμες χρήσεις (έτη) — για το φίλτρο· default = πιο πρόσφατη
+    years = [int(y[0]) for y in db.session.query(ST.XRISI)
+             .filter(ST.XRISI.isnot(None)).distinct().order_by(ST.XRISI.desc()).all()]
+    if year is None and years:
+        year = years[0]
 
     src = DatahubSource.query.filter_by(source='bmisthos').first()
     last = DatahubSyncLog.query.filter_by(source='bmisthos').order_by(DatahubSyncLog.id.desc()).first()
@@ -801,17 +807,17 @@ def datahub_epsilon_inspect():
     elif vat:
         periods = ST.query.filter_by(VAT=vat).order_by(
             ST.XRISI.desc(), ST.ID_PERIODOS.desc(), ST.PER_TYPE.asc()).all()
-    elif q:
-        like = '%' + q + '%'
-        rows = ST.query.filter(db.or_(ST.SURNAME.ilike(like), ST.NAME.ilike(like),
-                                      ST.VAT.ilike(like), ST.CODE.ilike(like))).limit(2000).all()
-        seen = {}
-        for r in rows:
-            if r.VAT and r.VAT not in seen:
-                seen[r.VAT] = {'vat': r.VAT, 'code': r.CODE,
-                               'name': ((r.SURNAME or '') + ' ' + (r.NAME or '')).strip()}
-        people = sorted(seen.values(), key=lambda d: d['name'])
+    else:
+        # ΟΛΟΙ οι εργαζόμενοι (distinct ΑΦΜ), φιλτραρισμένοι ανά χρήση αν επιλεγεί έτος.
+        # Η ζωντανή αναζήτηση γίνεται client-side πάνω σε αυτή τη λίστα.
+        pq = db.session.query(ST.VAT, func.max(ST.SURNAME), func.max(ST.NAME),
+                              func.max(ST.CODE)).filter(ST.VAT.isnot(None))
+        if year:
+            pq = pq.filter(ST.XRISI == year)
+        rows = pq.group_by(ST.VAT).all()
+        people = sorted(({'vat': r[0], 'name': ((r[1] or '') + ' ' + (r[2] or '')).strip(),
+                          'code': r[3]} for r in rows), key=lambda d: d['name'])
 
-    return render_template('datahub_epsilon.html', q=q, vat=vat, status=status,
+    return render_template('datahub_epsilon.html', vat=vat, year=year, years=years, status=status,
                            people=people, periods=periods, rec=rec, groups=groups, extra=extra,
                            per_type_kind=PER_TYPE_KIND)
