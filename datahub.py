@@ -17,7 +17,7 @@ Handoff: GOVERNANCE_DASHBOARD/_handoff/INBOX/2026-07-09-datahub-phase1-landing.m
 """
 import os, json, hashlib, uuid
 from datetime import datetime, date
-from flask import request, jsonify
+from flask import request, jsonify, render_template, redirect, url_for
 
 from app import app, db, _add_col
 # curated προορισμοί ζουν στο payroll (owner των πινάκων EmployeePII/LegalNetImport/Company)
@@ -705,3 +705,113 @@ def datahub_purge_legacy_legal():
         db.session.commit()
         resp['deleted'] = n
     return jsonify(resp)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ΟΘΟΝΗ «Business Μισθοδοσία» — Επιθεώρηση σύνδεσης Epsilon (DH-04, read-only)
+# Το ΠΡΩΤΟ σημείο ελέγχου: «τι έφτασε ολόκληρο από την Epsilon» χωρίς κατέβασμα Excel.
+# Διαβάζει ΜΟΝΟ το bronze staging (raw_json = όλα τα πεδία verbatim). Admin-gated.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Ελληνικές ετικέτες για τα modeled πεδία (τα υπόλοιπα raw εμφανίζονται ως «Λοιπά»).
+FIELD_LABELS = {
+    'VAT': 'ΑΦΜ', 'CODE': 'Κωδικός εργαζομένου', 'SURNAME': 'Επώνυμο', 'NAME': 'Όνομα',
+    'FTHRNAME': 'Πατρώνυμο', 'AM_IKA': 'ΑΜ ΙΚΑ', 'AM_KOIN_ASF': 'ΑΜΚΑ', 'email': 'Email',
+    'MOBILE': 'Κινητό', 'HRDATE': 'Ημ. πρόσληψης', 'FRDATE': 'Ημ. αποχώρησης',
+    'FR_REASON': 'Κωδ. λόγου αποχώρησης', 'FR_REASON_DESCR': 'Λόγος αποχώρησης',
+    'IS_FUTURE_EMP': 'Μελλοντικός εργαζόμενος', 'HOTEL_SEASONAL': 'Εποχικό ξενοδοχείο',
+    'SUPERVISOR': 'Υπεύθυνος (ID)', 'LENDING_FROM': 'Δανεισμός από', 'LENDING_TO': 'Δανεισμός προς',
+    'ID_CMP': 'ID εταιρείας', 'CMP_NAME': 'Εταιρεία', 'CMP_VAT': 'ΑΦΜ εταιρείας',
+    'CMP_CODE': 'Κωδ. εταιρείας', 'COD_YPOKAT': 'Κωδ. υποκαταστήματος', 'YPOKAT_DESCR': 'Υποκατάστημα',
+    'TMHMA': 'Τμήμα', 'ID_ADMINISTRATION': 'Διαβάθμιση (ID)', 'ID_ADMINISTRATION_SUB': 'Υπο-διαβάθμιση (ID)',
+    'XRISI': 'Χρήση (έτος)', 'ID_PERIODOS': 'Περίοδος (αρ.)', 'PERIODOS_DESCR': 'Περιγραφή περιόδου',
+    'PER_TYPE': 'Τύπος περιόδου', 'PERIODOS_DATE': 'Ημ. περιόδου', 'SPC_DESCR': 'Ειδικότητα',
+    'CNDTDESCR': 'Σύμβαση / όροι', 'EMP_KIND': 'Είδος μισθωτού', 'MERIKH_APASX': 'Μερική απασχόληση',
+    'ORISMENOU': 'Ορισμένου / Αορίστου', 'PAY_TYPE': 'Τρόπος πληρωμής', 'WORKING_DAYS': 'Ημέρες εργασίας',
+    'PER_CALCULATED_DATE': 'Ημ. υπολογισμού', 'SALARY': 'Βασικός μισθός', 'M_APODOXES': 'Μικτές αποδοχές',
+    'PROSTHETES_SUM': 'Πρόσθετες αποδοχές', 'PROSTHETES_SUM_NOKRAT': 'Πρόσθετες (χωρίς κρατήσεις)',
+    'SKRATISEIS_ERGAZ': 'Κρατήσεις εργαζομένου (ΕΦΚΑ)', 'SKRATISEIS_ERGOD': 'Κρατήσεις εργοδότη',
+    'FMY': 'ΦΜΥ', 'XARTOSHMO': 'Χαρτόσημο', 'PROKATAVOLI': 'Προκαταβολή', 'PAROXES': 'Παροχές',
+    'PLIROTEO': 'Πληρωτέο (καθαρό)', 'S_KOSTOS': 'Συνολικό κόστος εργοδότη',
+    'APOZ_APOL_SALARY': 'Αποζημίωση απόλυσης',
+}
+# Ομαδοποίηση εμφάνισης (σειρά + τίτλοι group)
+FIELD_GROUPS = [
+    ('Ταυτότητα εργαζομένου', ['VAT', 'CODE', 'SURNAME', 'NAME', 'FTHRNAME', 'AM_IKA', 'AM_KOIN_ASF',
+        'email', 'MOBILE', 'HRDATE', 'FRDATE', 'FR_REASON', 'FR_REASON_DESCR', 'IS_FUTURE_EMP',
+        'HOTEL_SEASONAL', 'SUPERVISOR', 'LENDING_FROM', 'LENDING_TO']),
+    ('Εταιρεία / Οργάνωση', ['ID_CMP', 'CMP_NAME', 'CMP_VAT', 'CMP_CODE', 'COD_YPOKAT', 'YPOKAT_DESCR',
+        'TMHMA', 'ID_ADMINISTRATION', 'ID_ADMINISTRATION_SUB']),
+    ('Περίοδος / Σύμβαση', ['XRISI', 'ID_PERIODOS', 'PERIODOS_DESCR', 'PER_TYPE', 'PERIODOS_DATE',
+        'SPC_DESCR', 'CNDTDESCR', 'EMP_KIND', 'MERIKH_APASX', 'ORISMENOU', 'PAY_TYPE', 'WORKING_DAYS',
+        'PER_CALCULATED_DATE']),
+    ('Ποσά (αποδοχές / κρατήσεις / κόστος)', ['SALARY', 'M_APODOXES', 'PROSTHETES_SUM',
+        'PROSTHETES_SUM_NOKRAT', 'SKRATISEIS_ERGAZ', 'SKRATISEIS_ERGOD', 'FMY', 'XARTOSHMO',
+        'PROKATAVOLI', 'PAROXES', 'PLIROTEO', 'S_KOSTOS', 'APOZ_APOL_SALARY']),
+]
+_KNOWN_KEYS = set()
+for _t, _ks in FIELD_GROUPS:
+    _KNOWN_KEYS.update(_ks)
+
+
+@app.route('/dashboard/payroll/epsilon')
+def datahub_epsilon_inspect():
+    """Read-only επιθεώρηση: τι φέρνει η σύνδεση Epsilon (bronze staging).
+    3 καταστάσεις σε μία σελίδα: αναζήτηση → περίοδοι εργαζομένου → πλήρη πεδία περιόδου."""
+    from payroll import _padmin
+    if not _padmin():
+        return redirect(url_for('login'))
+    from sqlalchemy import func
+    ST = DatahubStagingBmisthos
+    q = (request.args.get('q') or '').strip()
+    vat = (request.args.get('vat') or '').strip()
+    row_id = request.args.get('row', type=int)
+
+    src = DatahubSource.query.filter_by(source='bmisthos').first()
+    last = DatahubSyncLog.query.filter_by(source='bmisthos').order_by(DatahubSyncLog.id.desc()).first()
+    status = {
+        'total_rows': ST.query.count(),
+        'distinct_afm': db.session.query(func.count(func.distinct(ST.VAT))).scalar() or 0,
+        'last_sync_at': (src.last_sync_at if src else None),
+        'last_watermark': (src.last_watermark if src else None),
+        'last_status': (last.status if last else None),
+    }
+
+    people, periods, rec, groups, extra = [], [], None, None, None
+    if row_id:
+        rec = ST.query.get(row_id)
+        if rec:
+            vat = rec.VAT or vat
+            try:
+                raw = json.loads(rec.raw_json) if rec.raw_json else {}
+            except Exception:
+                raw = {}
+
+            def _val(k):
+                v = raw.get(k, None)
+                return v if v is not None else getattr(rec, k, None)
+            groups = []
+            for gtitle, keys in FIELD_GROUPS:
+                groups.append({'title': gtitle,
+                               'rows': [{'label': FIELD_LABELS.get(k, k), 'key': k, 'value': _val(k)}
+                                        for k in keys]})
+            extra = sorted(({'key': k, 'value': v} for k, v in raw.items()
+                            if k not in _KNOWN_KEYS and k != 'raw_json'),
+                           key=lambda d: d['key'])
+    elif vat:
+        periods = ST.query.filter_by(VAT=vat).order_by(
+            ST.XRISI.desc(), ST.ID_PERIODOS.desc(), ST.PER_TYPE.asc()).all()
+    elif q:
+        like = '%' + q + '%'
+        rows = ST.query.filter(db.or_(ST.SURNAME.ilike(like), ST.NAME.ilike(like),
+                                      ST.VAT.ilike(like), ST.CODE.ilike(like))).limit(2000).all()
+        seen = {}
+        for r in rows:
+            if r.VAT and r.VAT not in seen:
+                seen[r.VAT] = {'vat': r.VAT, 'code': r.CODE,
+                               'name': ((r.SURNAME or '') + ' ' + (r.NAME or '')).strip()}
+        people = sorted(seen.values(), key=lambda d: d['name'])
+
+    return render_template('datahub_epsilon.html', q=q, vat=vat, status=status,
+                           people=people, periods=periods, rec=rec, groups=groups, extra=extra,
+                           per_type_kind=PER_TYPE_KIND)
