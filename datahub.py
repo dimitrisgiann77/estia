@@ -766,12 +766,22 @@ def datahub_epsilon_inspect():
     vat = (request.args.get('vat') or '').strip()
     row_id = request.args.get('row', type=int)
     year = request.args.get('year', type=int)
+    show_test = request.args.get('test') == '1'   # παρκαρισμένες «δοκιμαστικές» (χρήση 0/κενή)
 
-    # διαθέσιμες χρήσεις (έτη) — για το φίλτρο· default = πιο πρόσφατη
+    # «Δοκιμαστικές εγγραφές» = XRISI 0 ή κενό: το λογιστήριο δεν τις βλέπει στη μισθοδοσία.
+    # Δεν εμφανίζονται εδώ (κρατιούνται στο bronze)· προσβάσιμες με ?test=1.
+    def _scope(q):
+        if show_test:
+            return q.filter(db.or_(ST.XRISI.is_(None), ST.XRISI == 0))
+        return q.filter(ST.XRISI.isnot(None), ST.XRISI != 0)
+
+    # διαθέσιμες χρήσεις (έτη) — εκτός 0/κενό· default = πιο πρόσφατη
     years = [int(y[0]) for y in db.session.query(ST.XRISI)
-             .filter(ST.XRISI.isnot(None)).distinct().order_by(ST.XRISI.desc()).all()]
+             .filter(ST.XRISI.isnot(None), ST.XRISI != 0).distinct().order_by(ST.XRISI.desc()).all()]
     if year is None and years:
         year = years[0]
+    test_rows = db.session.query(func.count(ST.id)).filter(
+        db.or_(ST.XRISI.is_(None), ST.XRISI == 0)).scalar() or 0
 
     src = DatahubSource.query.filter_by(source='bmisthos').first()
     last = DatahubSyncLog.query.filter_by(source='bmisthos').order_by(DatahubSyncLog.id.desc()).first()
@@ -805,14 +815,20 @@ def datahub_epsilon_inspect():
                             if k not in _KNOWN_KEYS and k != 'raw_json'),
                            key=lambda d: d['key'])
     elif vat:
-        periods = ST.query.filter_by(VAT=vat).order_by(
-            ST.XRISI.desc(), ST.ID_PERIODOS.desc(), ST.PER_TYPE.asc()).all()
+        # ΜΙΑ γραμμή ανά περίοδο: dedup επανα-εισαγωγών bronze (ίδιο ID_EMP×εταιρεία×χρήση×περίοδο×τύπο),
+        # κρατώντας την πιο πρόσφατη ingested — αλλιώς φαίνονται «διπλοί μήνες» (artifact bronze).
+        allp = _scope(ST.query.filter_by(VAT=vat)).order_by(ST.ingested_at.asc()).all()
+        dd = {}
+        for p in allp:
+            dd[(p.ID_CMP, p.XRISI, p.ID_PERIODOS, p.PER_TYPE, p.ID_EMP)] = p   # asc → κρατά latest
+        periods = sorted(dd.values(),
+                         key=lambda p: (p.XRISI or 0, p.ID_PERIODOS or 0, p.PER_TYPE or 0), reverse=True)
     else:
         # ΟΛΟΙ οι εργαζόμενοι (distinct ΑΦΜ), φιλτραρισμένοι ανά χρήση αν επιλεγεί έτος.
         # Η ζωντανή αναζήτηση γίνεται client-side πάνω σε αυτή τη λίστα.
-        pq = db.session.query(ST.VAT, func.max(ST.SURNAME), func.max(ST.NAME),
-                              func.max(ST.CODE)).filter(ST.VAT.isnot(None))
-        if year:
+        pq = _scope(db.session.query(ST.VAT, func.max(ST.SURNAME), func.max(ST.NAME),
+                                     func.max(ST.CODE)).filter(ST.VAT.isnot(None)))
+        if year and not show_test:
             pq = pq.filter(ST.XRISI == year)
         rows = pq.group_by(ST.VAT).all()
         people = sorted(({'vat': r[0], 'name': ((r[1] or '') + ' ' + (r[2] or '')).strip(),
@@ -820,4 +836,4 @@ def datahub_epsilon_inspect():
 
     return render_template('datahub_epsilon.html', vat=vat, year=year, years=years, status=status,
                            people=people, periods=periods, rec=rec, groups=groups, extra=extra,
-                           per_type_kind=PER_TYPE_KIND)
+                           per_type_kind=PER_TYPE_KIND, show_test=show_test, test_rows=test_rows)
