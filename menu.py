@@ -25,6 +25,7 @@ MENU_CATALOG = [
     ('people',      'Διαχείριση προσωπικού',  'ti-users-group',      '/dashboard/people',            False),
     ('org',         'Οργανόγραμμα',           'ti-sitemap',          '/dashboard/org',               False),
     ('pay_mitroo',  'Μητρώο εργαζομένων',     'ti-cash',             '/dashboard/payroll',           False),
+    ('dh_epsilon',  'Business Μισθοδοσία (Epsilon)', 'ti-plug-connected', '/dashboard/payroll/epsilon', False),
     ('evals',       'Αξιολόγηση προσωπικού',  'ti-star',             '/dashboard/evaluations',       False),
     ('pay_grid',    'Μαζική επεξεργασία',     'ti-table',            '/dashboard/payroll/grid',      False),
     ('sched',       'Πρόγραμμα Εργασίας',     'ti-calendar-week',    '/dashboard/schedule',          False),
@@ -77,7 +78,7 @@ DEFAULT_LAYOUT = [
     {'ws': 'staffhub', 'title': 'Ο χώρος μου', 'items': ['whatsnew']},
     {'ws': 'admin', 'title': 'Επισκόπηση', 'items': ['dashboard']},
     {'ws': 'admin', 'title': 'Προσωπικό (HR)', 'items': ['hr_hub', 'people', 'org', 'pay_mitroo', 'sched_status', 'sched_imphub', 'acct_audit', 'sched_staff']},
-    {'ws': 'admin', 'title': 'Μισθοδοσία', 'items': ['pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention', 'sched_sub']},
+    {'ws': 'admin', 'title': 'Μισθοδοσία', 'items': ['dh_epsilon', 'pay_runs', 'pay_control', 'pay_grid', 'rates', 'companies', 'attention', 'sched_sub']},
     {'ws': 'admin', 'title': 'Ρυθμίσεις', 'items': ['meas_console', 'sched_set', 'fault_set', 'hotels', 'areas_admin', 'email', 'theme', 'ai', 'menu_roles', 'menu_builder']},
     {'ws': 'admin', 'title': 'Δεδομένα & Σύστημα', 'items': ['imports', 'backup', 'diag', 'users', 'activity', 'feedback_adm']},
 ]
@@ -112,6 +113,7 @@ DEFAULT_META = {
     'sched_staff':    {'ws': ['admin'], 'roles': []},
     'sched_status':   {'ws': ['admin'], 'roles': []},
     # 🟥 ADMIN — Μισθοδοσία (accountant)
+    'dh_epsilon':     {'ws': ['admin'], 'roles': ['accountant']},
     'pay_runs':       {'ws': ['admin'], 'roles': ['accountant']},
     'pay_control':    {'ws': ['admin'], 'roles': ['accountant']},
     'pay_grid':       {'ws': ['admin'], 'roles': ['accountant']},
