@@ -778,6 +778,20 @@ FIELD_DEST = {
     'XRISI': 'Μισθοδοσία › Έτος', 'ID_PERIODOS': 'Μισθοδοσία › Περίοδος', 'PER_TYPE': 'Μισθοδοσία › Τύπος',
     'PERIODOS_DATE': 'Μισθοδοσία › Ημ. περιόδου', 'PER_CALCULATED_DATE': 'Μισθοδοσία › Ημ. υπολογισμού',
 }
+# Κατηγοριοποίηση περιόδων (αριστερή στήλη hub) ανά PER_TYPE
+PERIOD_CATS = [
+    ('Μηνιαίες', {1}),
+    ('Δώρα / Επιδόματα', {2, 3, 4, 5}),
+    ('Εκκαθαρίσεις / Αναδρομικά', {6, 7, 8, 9}),
+    ('Λοιπά', None),   # ό,τι δεν έπεσε παραπάνω
+]
+# Ποια group ανήκει σε ποιο tab (Ταυτότητα = σταθερά στοιχεία· Περίοδος/Ποσά = ανά περίοδο)
+GROUP_TAB = {
+    'Ταυτότητα εργαζομένου': 'identity',
+    'Εταιρεία / Οργάνωση': 'identity',
+    'Περίοδος / Σύμβαση': 'period',
+    'Ποσά (αποδοχές / κρατήσεις / κόστος)': 'period',
+}
 # hero (μικρό, δευτερεύον) — τα ποσά-κλειδιά
 HERO_TILES = [('Μικτές', 'M_APODOXES'), ('Πρόσθετες', 'PROSTHETES_SUM'), ('ΕΦΚΑ εργαζ.', 'SKRATISEIS_ERGAZ'),
               ('ΦΜΥ', 'FMY'), ('Πληρωτέο', 'PLIROTEO'), ('Κόστος εργοδ.', 'S_KOSTOS')]
@@ -829,11 +843,35 @@ def datahub_epsilon_inspect():
         'last_status': (last.status if last else None),
     }
 
-    people, periods, rec, groups, extra, hero = [], [], None, None, None, None
-    if row_id:
-        rec = ST.query.get(row_id)
-        if rec:
-            vat = rec.VAT or vat
+    people, periods, rec, groups, extra, hero, period_cats = [], [], None, None, None, None, []
+    if vat or row_id:
+        # ── HUB εργαζομένου: περίοδοι (κατηγοριοποιημένες) + επιλεγμένη περίοδος ──
+        rec0 = ST.query.get(row_id) if row_id else None
+        if rec0 is not None and not vat:
+            vat = rec0.VAT
+        if rec0 is not None and rec0.XRISI:
+            year = rec0.XRISI   # συγχρόνισε τη χρήση με την επιλεγμένη περίοδο
+        # ΜΙΑ γραμμή ανά περίοδο (dedup επανα-εισαγωγών bronze, κρατά latest ingested)
+        allp = _scope(ST.query.filter_by(VAT=vat)).order_by(ST.ingested_at.asc()).all()
+        dd = {}
+        for p in allp:
+            dd[(p.ID_CMP, p.XRISI, p.ID_PERIODOS, p.PER_TYPE, p.ID_EMP)] = p
+        allper = sorted(dd.values(),
+                        key=lambda p: (p.XRISI or 0, p.ID_PERIODOS or 0, p.PER_TYPE or 0), reverse=True)
+        periods = [p for p in allper if (not year or p.XRISI == year)]
+        # κατηγοριοποίηση αριστερής στήλης
+        used = set()
+        for title, types in PERIOD_CATS:
+            if types is None:
+                items = [p for p in periods if id(p) not in used]
+            else:
+                items = [p for p in periods if p.PER_TYPE in types]
+                used.update(id(p) for p in items)
+            if items:
+                period_cats.append({'title': title, 'items': items})
+        # επιλεγμένη περίοδος = row_id ή η πιο πρόσφατη
+        rec = rec0 or (periods[0] if periods else None)
+        if rec is not None:
             try:
                 raw = json.loads(rec.raw_json) if rec.raw_json else {}
             except Exception:
@@ -847,25 +885,15 @@ def datahub_epsilon_inspect():
                 empty = v is None or (isinstance(v, str) and v.strip() == '')
                 return {'label': FIELD_LABELS.get(k, k), 'key': k, 'value': v,
                         'dest': FIELD_DEST.get(k), 'basic': k in BASIC_FIELDS, 'empty': empty}
-            groups = [{'title': gt, 'rows': [_frow(k, _val(k)) for k in keys]}
-                      for gt, keys in FIELD_GROUPS]
+            groups = [{'title': gt, 'tab': GROUP_TAB.get(gt, 'period'),
+                       'rows': [_frow(k, _val(k)) for k in keys]} for gt, keys in FIELD_GROUPS]
             extra = sorted((_frow(k, v) for k, v in raw.items()
                             if k not in _KNOWN_KEYS and k != 'raw_json'),
                            key=lambda d: d['key'])
             hero = [{'label': lbl, 'value': _val(k), 'accent': (k == HERO_ACCENT)}
                     for lbl, k in HERO_TILES]
-    elif vat:
-        # ΜΙΑ γραμμή ανά περίοδο: dedup επανα-εισαγωγών bronze (ίδιο ID_EMP×εταιρεία×χρήση×περίοδο×τύπο),
-        # κρατώντας την πιο πρόσφατη ingested — αλλιώς φαίνονται «διπλοί μήνες» (artifact bronze).
-        allp = _scope(ST.query.filter_by(VAT=vat)).order_by(ST.ingested_at.asc()).all()
-        dd = {}
-        for p in allp:
-            dd[(p.ID_CMP, p.XRISI, p.ID_PERIODOS, p.PER_TYPE, p.ID_EMP)] = p   # asc → κρατά latest
-        periods = sorted(dd.values(),
-                         key=lambda p: (p.XRISI or 0, p.ID_PERIODOS or 0, p.PER_TYPE or 0), reverse=True)
     else:
-        # ΟΛΟΙ οι εργαζόμενοι (distinct ΑΦΜ), φιλτραρισμένοι ανά χρήση αν επιλεγεί έτος.
-        # Η ζωντανή αναζήτηση γίνεται client-side πάνω σε αυτή τη λίστα.
+        # ── ΛΙΣΤΑ όλων των εργαζομένων (distinct ΑΦΜ), φίλτρο χρήσης + client-side search ──
         pq = _scope(db.session.query(ST.VAT, func.max(ST.SURNAME), func.max(ST.NAME),
                                      func.max(ST.CODE)).filter(ST.VAT.isnot(None)))
         if year and not show_test:
@@ -875,5 +903,6 @@ def datahub_epsilon_inspect():
                           'code': r[3]} for r in rows), key=lambda d: d['name'])
 
     return render_template('datahub_epsilon.html', vat=vat, year=year, years=years, status=status,
-                           people=people, periods=periods, rec=rec, groups=groups, extra=extra,
-                           hero=hero, per_type_kind=PER_TYPE_KIND, show_test=show_test, test_rows=test_rows)
+                           people=people, periods=periods, period_cats=period_cats, rec=rec,
+                           groups=groups, extra=extra, hero=hero, per_type_kind=PER_TYPE_KIND,
+                           show_test=show_test, test_rows=test_rows)
