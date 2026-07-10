@@ -753,6 +753,42 @@ _KNOWN_KEYS = set()
 for _t, _ks in FIELD_GROUPS:
     _KNOWN_KEYS.update(_ks)
 
+# ── Προορισμός κάθε πεδίου Epsilon στην Εστία (σπόρος = ό,τι γράφει ΣΗΜΕΡΑ το curated).
+# Λείπει/None → «διαθέσιμο». Μεγαλώνει σιγά-σιγά καθώς καλωδιώνουμε νέα πεδία.
+FIELD_DEST = {
+    # Ταυτότητα → EmployeePII (καρτέλα εργαζομένου)
+    'VAT': 'Μητρώο › ΑΦΜ', 'SURNAME': 'Καρτέλα › Επώνυμο', 'NAME': 'Καρτέλα › Όνομα',
+    'FTHRNAME': 'Καρτέλα › Πατρώνυμο', 'AM_KOIN_ASF': 'Καρτέλα › ΑΜΚΑ', 'AM_IKA': 'Καρτέλα › ΑΜ ΙΚΑ',
+    'CODE': 'Καρτέλα › Κωδικός', 'SPC_DESCR': 'Καρτέλα › Ειδικότητα',
+    'HRDATE': 'Καρτέλα › Ημ. πρόσληψης', 'FRDATE': 'Καρτέλα › Ημ. αποχώρησης',
+    'EMP_KIND': 'Καρτέλα › Είδος μισθωτού', 'ORISMENOU': 'Καρτέλα › Τύπος σύμβασης',
+    'FR_REASON': 'Καρτέλα › Λόγος αποχώρησης', 'FR_REASON_DESCR': 'Καρτέλα › Λόγος αποχώρησης',
+    'HOTEL_SEASONAL': 'Καρτέλα › Εποχικό', 'LENDING_FROM': 'Καρτέλα › Δανεισμός από',
+    'LENDING_TO': 'Καρτέλα › Δανεισμός προς', 'SUPERVISOR': 'Καρτέλα › Υπεύθυνος',
+    'IS_FUTURE_EMP': 'Καρτέλα › Μελλοντικός', 'ID_EMP': 'Καρτέλα › Τρέχον ID',
+    'email': 'Καρτέλα › Email (μόνο αν λείπει)', 'MOBILE': 'Καρτέλα › Κινητό (μόνο αν λείπει)',
+    # Ποσά/περίοδος → LegalNetImport (Μισθοδοσία «Λογιστήριο»)
+    'M_APODOXES': 'Μισθοδοσία › Μικτές', 'PLIROTEO': 'Μισθοδοσία › Καθαρό',
+    'S_KOSTOS': 'Μισθοδοσία › Κόστος εργοδότη', 'SKRATISEIS_ERGAZ': 'Μισθοδοσία › ΕΦΚΑ εργαζ.',
+    'SKRATISEIS_ERGOD': 'Μισθοδοσία › Εισφορές εργοδ.', 'FMY': 'Μισθοδοσία › ΦΜΥ',
+    'XARTOSHMO': 'Μισθοδοσία › Χαρτόσημο', 'PROSTHETES_SUM': 'Μισθοδοσία › Πρόσθετες',
+    'PROSTHETES_SUM_NOKRAT': 'Μισθοδοσία › Πρόσθετες (χωρ. κρατ.)', 'PROKATAVOLI': 'Μισθοδοσία › Προκαταβολή',
+    'PAROXES': 'Μισθοδοσία › Παροχές', 'APOZ_APOL_SALARY': 'Μισθοδοσία › Αποζημ. απόλυσης',
+    'SALARY': 'Μισθοδοσία › Βασικός', 'WORKING_DAYS': 'Μισθοδοσία › Ημέρες',
+    'XRISI': 'Μισθοδοσία › Έτος', 'ID_PERIODOS': 'Μισθοδοσία › Περίοδος', 'PER_TYPE': 'Μισθοδοσία › Τύπος',
+    'PERIODOS_DATE': 'Μισθοδοσία › Ημ. περιόδου', 'PER_CALCULATED_DATE': 'Μισθοδοσία › Ημ. υπολογισμού',
+}
+# hero (μικρό, δευτερεύον) — τα ποσά-κλειδιά
+HERO_TILES = [('Μικτές', 'M_APODOXES'), ('Πρόσθετες', 'PROSTHETES_SUM'), ('ΕΦΚΑ εργαζ.', 'SKRATISEIS_ERGAZ'),
+              ('ΦΜΥ', 'FMY'), ('Πληρωτέο', 'PLIROTEO'), ('Κόστος εργοδ.', 'S_KOSTOS')]
+HERO_ACCENT = 'PLIROTEO'
+# «Βασικά» view — τι δείχνει το default (τα υπόλοιπα με «Όλα»)
+BASIC_FIELDS = {'VAT', 'CODE', 'SURNAME', 'NAME', 'FTHRNAME', 'AM_KOIN_ASF', 'AM_IKA', 'SPC_DESCR',
+                'HRDATE', 'FRDATE', 'EMP_KIND', 'ORISMENOU', 'CMP_NAME', 'TMHMA', 'YPOKAT_DESCR',
+                'XRISI', 'ID_PERIODOS', 'PERIODOS_DESCR', 'PER_TYPE', 'WORKING_DAYS',
+                'M_APODOXES', 'PROSTHETES_SUM', 'SKRATISEIS_ERGAZ', 'SKRATISEIS_ERGOD', 'FMY',
+                'PROKATAVOLI', 'PAROXES', 'PLIROTEO', 'S_KOSTOS'}
+
 
 @app.route('/dashboard/payroll/epsilon')
 def datahub_epsilon_inspect():
@@ -793,7 +829,7 @@ def datahub_epsilon_inspect():
         'last_status': (last.status if last else None),
     }
 
-    people, periods, rec, groups, extra = [], [], None, None, None
+    people, periods, rec, groups, extra, hero = [], [], None, None, None, None
     if row_id:
         rec = ST.query.get(row_id)
         if rec:
@@ -806,14 +842,18 @@ def datahub_epsilon_inspect():
             def _val(k):
                 v = raw.get(k, None)
                 return v if v is not None else getattr(rec, k, None)
-            groups = []
-            for gtitle, keys in FIELD_GROUPS:
-                groups.append({'title': gtitle,
-                               'rows': [{'label': FIELD_LABELS.get(k, k), 'key': k, 'value': _val(k)}
-                                        for k in keys]})
-            extra = sorted(({'key': k, 'value': v} for k, v in raw.items()
+
+            def _frow(k, v):
+                empty = v is None or (isinstance(v, str) and v.strip() == '')
+                return {'label': FIELD_LABELS.get(k, k), 'key': k, 'value': v,
+                        'dest': FIELD_DEST.get(k), 'basic': k in BASIC_FIELDS, 'empty': empty}
+            groups = [{'title': gt, 'rows': [_frow(k, _val(k)) for k in keys]}
+                      for gt, keys in FIELD_GROUPS]
+            extra = sorted((_frow(k, v) for k, v in raw.items()
                             if k not in _KNOWN_KEYS and k != 'raw_json'),
                            key=lambda d: d['key'])
+            hero = [{'label': lbl, 'value': _val(k), 'accent': (k == HERO_ACCENT)}
+                    for lbl, k in HERO_TILES]
     elif vat:
         # ΜΙΑ γραμμή ανά περίοδο: dedup επανα-εισαγωγών bronze (ίδιο ID_EMP×εταιρεία×χρήση×περίοδο×τύπο),
         # κρατώντας την πιο πρόσφατη ingested — αλλιώς φαίνονται «διπλοί μήνες» (artifact bronze).
@@ -836,4 +876,4 @@ def datahub_epsilon_inspect():
 
     return render_template('datahub_epsilon.html', vat=vat, year=year, years=years, status=status,
                            people=people, periods=periods, rec=rec, groups=groups, extra=extra,
-                           per_type_kind=PER_TYPE_KIND, show_test=show_test, test_rows=test_rows)
+                           hero=hero, per_type_kind=PER_TYPE_KIND, show_test=show_test, test_rows=test_rows)
