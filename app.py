@@ -4071,7 +4071,7 @@ ROADMAP = [
         {'t': 'Pack 02 δείγματα + `SOURCE_MAP_PMS`', 's': 'planned'},
         {'t': 'Inventory Pylon `Hotel` — **ΕΓΙΝΕ 11/07**', 's': 'done'},
     ]},
-    {'area': 'Guest / Υποδοχή', 'items': [
+    {'area': 'Guest', 'items': [
         {'t': 'Logbook (Παράπονα/Συμβάντα) — 1.762 ιστορικά', 's': 'progress'},
         {'t': 'Guest App (αιτήματα δωματίου)', 's': 'planned'},
         {'t': 'Ερωτηματολόγια (builder, δημόσιος σύνδεσμος, NPS)', 's': 'done'},
