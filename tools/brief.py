@@ -18,6 +18,14 @@ except Exception:
 
 MARK = '00_ΜΝΗΜΗ_ESTIA.md'  # 00_ΜΝΗΜΗ_ESTIA.md
 PEND = 'ΕΚΚΡΕΜΟΤΗΤΕΣ.md'  # ΕΚΚΡΕΜΟΤΗΤΕΣ.md
+REGDIR = os.path.join('GOVERNANCE_DASHBOARD', '_REGISTRY')  # P-118: ενοποιημένο μητρώο
+
+# ── P-118 Φ2 (cutover flag) ──────────────────────────────────────────────────
+# False = ΤΡΕΧΟΥΣΑ συμπεριφορά (διαβάζει ΕΚΚΡΕΜΟΤΗΤΕΣ.md + ΜΗΤΡΩΟ). True = διαβάζει _REGISTRY/.
+# ΑΛΛΑΞΕ σε True ΜΟΝΟ ταυτόχρονα με Cowork _build.py ΚΑΙ αφού τρέξει migrate_registry.py --apply
+# (αλλιώς κενή/μερική κάρτα boot). Δοκιμή χωρίς commit: env ESTIA_BRIEF_REGISTRY=1.
+USE_REGISTRY = (os.environ.get('ESTIA_BRIEF_REGISTRY') == '1') or True   # P-118 Φ2: LIVE (cutover 12/07)
+REG_MIN = 50  # δικλείδα: κάτω από τόσα task/bug records → μη-πληθυσμένο → fallback (όχι κενή κάρτα)
 
 def find_root():
     seeds = [os.path.dirname(os.path.abspath(__file__)), os.getcwd()]
@@ -73,6 +81,42 @@ def collect(root):
             modcount[mod] = modcount.get(mod, 0) + opn
     return allrows, modcount
 
+def parse_fm(txt):
+    """Front-matter (μεταξύ των δύο πρώτων '---') → dict. split στο ΠΡΩΤΟ ':' (headers έχουν ':')."""
+    lines = txt.splitlines()
+    if not lines or lines[0].strip() != '---':
+        return {}
+    d = {}
+    for ln in lines[1:]:
+        if ln.strip() == '---':
+            break
+        if ':' in ln:
+            k, v = ln.split(':', 1)
+            d[k.strip()] = v.strip()
+    return d
+
+def collect_registry(root):
+    """P-118: διαβάζει _REGISTRY/*.md (record-ανά-αρχείο). Ίδιο σχήμα rows με collect().
+    tasks/bugs → allrows+modcount· proposals με decision=open → prop_open."""
+    files = glob.glob(os.path.join(root, REGDIR, '*.md'))
+    allrows, modcount, prop_open = [], {}, 0
+    for f in files:
+        d = parse_fm(rd(f))
+        if not d.get('id'):
+            continue
+        if d.get('type') == 'proposal':
+            if (d.get('decision') or 'open') == 'open':
+                prop_open += 1
+            continue
+        stage = (d.get('stage') or 'NEW').upper()
+        mod = d.get('module') or 'ROOT'
+        allrows.append({'id': d['id'], 'date': d.get('created', ''), 'header': d.get('header', ''),
+                        'origin': d.get('source', ''), 'notes': '', 'owner': (d.get('owner') or 'Code'),
+                        'stage': stage, 'mod': mod})
+        if stage != 'DONE':
+            modcount[mod] = modcount.get(mod, 0) + 1
+    return allrows, modcount, prop_open
+
 def app_changelog(root):
     appsrc = rd(os.path.join(root, '00_ESTIA-REPO', 'estia', 'app.py'))
     return re.findall(
@@ -82,18 +126,26 @@ def app_changelog(root):
 def build(root, recipient):
     mv = re.search(r'v12\.\d+', rd(os.path.join(root, MARK)))
     version = mv.group(0) if mv else 'v12.x'
-    allrows, modcount = collect(root)
+    src = 'trackers'
+    used = False
+    if USE_REGISTRY:
+        r_rows, r_mod, r_prop = collect_registry(root)
+        if len(r_rows) >= REG_MIN:  # δικλείδα: πληθυσμένο → χρησιμοποίησέ το
+            allrows, modcount, prop_open, src, used = r_rows, r_mod, r_prop, 'registry', True
+    if not used:  # default ή fallback (registry μη-πληθυσμένο) → παλιά trackers
+        allrows, modcount = collect(root)
+        reg = rd(os.path.join(root, 'GOVERNANCE_DASHBOARD', 'ΜΗΤΡΩΟ_ΠΡΟΤΑΣΕΩΝ.md'))
+        prop_open = sum(1 for ln in reg.splitlines()
+                        if re.match(r'\s*\|\s*P-\d', ln) and '\U0001f7e1' in ln)
     open_rows = [r for r in allrows if r['stage'] != 'DONE']
     mine = [r for r in open_rows if r['owner'].lower() == recipient.lower()]
-    reg = rd(os.path.join(root, 'GOVERNANCE_DASHBOARD', 'ΜΗΤΡΩΟ_ΠΡΟΤΑΣΕΩΝ.md'))
-    prop_open = sum(1 for ln in reg.splitlines()
-                    if re.match(r'\s*\|\s*P-\d', ln) and '\U0001f7e1' in ln)
     cl = app_changelog(root)
     return {
         'version': version, 'recipient': recipient,
         'recent': [{'v': v, 'date': d, 'title': t} for (v, d, t) in cl[:5]],
         'mine': [{'id': r['id'], 'mod': r['mod'], 'header': r['header'], 'stage': r['stage']} for r in mine],
         'modcount': modcount, 'open_total': len(open_rows), 'prop_open': prop_open,
+        'source': src,  # P-118: 'trackers' (παλιό) ή 'registry' (μετά cutover)
         'next': (mine[0]['header'] if mine else (open_rows[0]['header'] if open_rows else '—')),
     }
 
