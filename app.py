@@ -4026,18 +4026,6 @@ ROADMAP = [
         {'t': 'Πρόγραμμα Εργασίας — βάρδιες, κανόνες, υποβολή λογιστηρίου', 's': 'done'},
         {'t': 'Οργανόγραμμα (εργαζόμενοι σε τμήματα) + εκκαθάριση διπλών', 's': 'done'},
     ]},
-    {'area': 'Διακυβέρνηση', 'items': [
-        {'t': 'Διαδικασία: Impact-note + εντοπισμός conflicts ΠΡΙΝ από κάθε δομική/κοινή αλλαγή — προχωράμε μόνο με ρητή έγκριση', 's': 'progress'},
-        {'t': 'ΜΙΑ πηγή αλήθειας: People=User (μητρώο), τα πάντα linkάρουν με user_id· καμία παράλληλη βάση· Χάρτης Κυριότητας Δεδομένων', 's': 'progress'},
-        {'t': 'ΙΣΧΥΕΙ ΣΕ ΟΛΑ ΤΑ MODULES (Βλάβες/Πελάτες/κ.λπ.): owner-screen ανά οντότητα (edit από ΕΝΑ σημείο, αλλού read/βοηθός με ΙΔΙΟ endpoint)· διπλή επιβεβαίωση για δομικές αλλαγές', 's': 'progress'},
-        {'t': 'Συνέπεια: ένα state-machine ανά record, κανόνες διαγραφής/εξάρτησης, ένας generator κωδικών/domain, permissions matrix σε ένα σημείο', 's': 'planned'},
-        {'t': 'Backups: τεστ ΠΡΑΓΜΑΤΙΚΗΣ επαναφοράς + backup πριν από migrations/μαζικές διαγραφές', 's': 'planned'},
-        {'t': 'Migrations: τεστ σε αντίγραφο προϋπάρχουσας βάσης πριν deploy (αργότερα: Alembic)', 's': 'planned'},
-        {'t': 'Απόδοση: indexes + pagination + eager loading στις βαριές λίστες', 's': 'planned'},
-        {'t': 'Ασφάλεια: CSRF tokens + συνεπείς έλεγχοι δικαιωμάτων σε κάθε route', 's': 'planned'},
-        {'t': 'Αυτόματα smoke-tests (fresh + προϋπάρχουσα βάση + κύρια routes) πριν από κάθε έκδοση', 's': 'planned'},
-        {'t': 'Εικόνες εκτός DB (object storage) όταν μεγαλώσει ο όγκος — η DB να μη φουσκώνει', 's': 'planned'},
-    ]},
     {'area': 'Πλατφόρμα', 'items': [
         {'t': 'Κέντρο Δεδομένων (Data Hub) — Φ1: landing (staging bronze) + ingest endpoint Epsilon bmisthos (✓)· Φ2 prove-the-pipe· Φ3 on-prem agent· Φ4 review/monitoring + Pylon', 's': 'progress'},
         {'t': 'Αυτόματο backup πριν από κάθε καθαρισμό/μαζική διαγραφή', 's': 'planned'},
